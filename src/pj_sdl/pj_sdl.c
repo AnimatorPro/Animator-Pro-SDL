@@ -4,11 +4,11 @@
 
 #include <stdbool.h>
 
+#include <nfd.h>
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_surface.h>
-
-#include "stdtypes.h"
 
 #include "pj_sdl.h"
 
@@ -20,6 +20,10 @@ SDL_Window* window			  = NULL;
 SDL_Surface* s_window_surface = NULL;
 SDL_Renderer* renderer		  = NULL;
 SDL_Texture* render_target    = NULL;
+
+// for the file requestors
+static char last_path[PATH_MAX] = "";
+
 
 /*--------------------------------------------------------------*/
 int pj_sdl_get_video_size(LONG* width, LONG* height)
@@ -136,6 +140,12 @@ void pj_sdl_flip_window_surface()
 	void* pixels = NULL;
 	int pitch = 0;
 
+	/* SDL_BlitScaled doesn't work from 8 bit to screen,
+	 * so I'm copying to a second buffer first and then
+	 * doing my stretched blit. */
+	SDL_BlitSurface(s_surface, NULL, s_buffer, NULL);
+
+	// Lock the texture so we have access to its pixels for writing
 	if (SDL_LockTexture(render_target, NULL, &pixels, &pitch) != 0) {
 		SDL_Log("Could not lock texture: %s", SDL_GetError());
 		SDL_DestroyTexture(render_target);
@@ -144,15 +154,10 @@ void pj_sdl_flip_window_surface()
 		SDL_Quit();
 	}
 
-	/* SDL_BlitScaled doesn't work from 8 bit to screen,
-	 * so I'm copying to a second buffer first and then
-	 * doing my stretched blit. */
-	SDL_BlitSurface(s_surface, NULL, s_buffer, NULL);
-
 	// Copy pixel data from surface to texture
 	memcpy(pixels, s_buffer->pixels, s_buffer->h * s_buffer->pitch);
 
-	// Unlock the texture
+	// Unlock the texture-- commit changes
 	SDL_UnlockTexture(render_target);
 
 	const SDL_FRect source_rect = pj_sdl_rect_convert(&s_surface->clip_rect);
@@ -194,3 +199,62 @@ const char* pj_sdl_preferences_path() {
 	return preferences_path;
 }
 
+
+/*--------------------------------------------------------------*/
+void pj_dialog_set_last_path(const char* path) {
+	if (path) {
+		strncpy(last_path, path, PATH_MAX);
+	}
+	else {
+		//!TODO: Set to home folder?
+		last_path[0] = '\0';
+	}
+}
+
+/*--------------------------------------------------------------*/
+char* pj_dialog_file_open(const char* type_name,
+						  const char* extensions,
+						  const char* default_path) {
+	char* result = last_path;
+
+	nfdchar_t* outPath;
+	const nfdfilteritem_t filterItem = {type_name, extensions};
+
+	nfdresult_t dialog_result = NFD_OpenDialog(&outPath, &filterItem, 1, default_path);
+
+	if (dialog_result == NFD_OKAY) {
+		strncpy(last_path, outPath, PATH_MAX);
+		NFD_FreePath(outPath);
+	}
+	else {
+		result = NULL;
+	}
+
+	NFD_Quit();
+	return result;
+}
+
+
+/*--------------------------------------------------------------*/
+char* pj_dialog_file_save(const char* type_name,
+						  const char* extensions,
+						  const char* default_path,
+						  const char* default_name) {
+	char* result = last_path;
+
+	nfdchar_t* outPath;
+	const nfdfilteritem_t filterItem = {type_name, extensions};
+
+	nfdresult_t dialog_result = NFD_SaveDialog(&outPath, &filterItem, 1, default_path, default_name);
+
+	if (dialog_result == NFD_OKAY) {
+		strncpy(last_path, outPath, PATH_MAX);
+		NFD_FreePath(outPath);
+	}
+	else {
+		result = NULL;
+	}
+
+	NFD_Quit();
+	return result;
+}

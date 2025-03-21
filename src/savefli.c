@@ -2,6 +2,9 @@
    device.  This thing just takes out the indexing.  Doesn't actually
    have to recompress any images.  (That's done in writefli.c). */
 
+//#!TOOD: Unportable
+#include <libgen.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "animinfo.h"
@@ -19,15 +22,26 @@
 #include "unchunk.h"
 #include "zoom.h"
 
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_dialog.h>
+#include <pj_sdl.h>
+
+
 char dirty_file;
 char dirty_frame;
 long dirty_strokes;
+
+
+// for file callbacks
+SHORT segment_start_end[2];
+
 
 void dirties(void)
 {
 	dirty_file = dirty_frame = 1;
 	dirty_strokes += 1;
 }
+
 
 void cleans(void)
 {
@@ -36,7 +50,11 @@ void cleans(void)
 	dirty_strokes = 0;
 }
 
-bool need_scrub_frame(void) { return dirty_frame; }
+
+bool need_scrub_frame(void) {
+	return dirty_frame;
+}
+
 
 /* a scrub cur frame that insures undo is current index and saves it if not */
 Errcode scrub_frame_save_undo(void)
@@ -70,6 +88,7 @@ Errcode scrub_cur_frame(void)
 	}
 }
 
+
 /* will rewrite frame record into current slot or another if needed */
 Errcode write_flx_frame(Flxfile *flx, int ix, Fli_frame *frame)
 {
@@ -81,6 +100,7 @@ Errcode write_flx_frame(Flxfile *flx, int ix, Fli_frame *frame)
 	}
 	return (make_flx_record(flx, ix, frame, size, true));
 }
+
 
 /* returns frame index left in undo buffer errcode if not possible */
 Errcode sub_cur_frame(void)
@@ -242,6 +262,7 @@ error:
 	return (err);
 }
 
+
 /* copies or makes the appropriate prefix chunks from the tempflx to the output
  * flifile and sets the frame1_oset in the output filifile and leaves
  * the output file position at the start of the first frame chunk */
@@ -299,6 +320,7 @@ error:
 	return (err);
 }
 
+
 /* saves up to first frame of new fli from flx */
 static Errcode save_fli_start(char *name, Flifile *flif)
 {
@@ -321,6 +343,7 @@ static Errcode save_fli_start(char *name, Flifile *flif)
 
 	return (copy_flx_prefix(&flix, flif));
 }
+
 
 /* writes whole current tflx out to a fli file */
 Errcode sv_fli(char *name)
@@ -373,6 +396,7 @@ error:
 	return (err);
 }
 
+
 /* save whole fli without altering records */
 static Errcode save_fli(char *name)
 {
@@ -392,6 +416,7 @@ static Errcode save_fli(char *name)
 	return (err);
 }
 
+
 /******** stuff to save a segment of the flx to a fli file *********/
 struct pdr_seek_dat {
 	char *path; /* path for abort check */
@@ -403,6 +428,7 @@ struct pdr_seek_dat {
 	SHORT cur_frame;
 	int cur_ix;
 };
+
 
 static Errcode pdr_seek_seg_frame(int ix, void *data)
 {
@@ -469,16 +495,15 @@ static Errcode pdr_seek_seg_frame(int ix, void *data)
 	err = (*flx_seek)(vb.pencel, sd->cur_frame, ix);
 
 check_cmap:
-
 	if (ocksum != cmap_crcsum(vb.pencel->cmap)) {
 		pj_cmap_load(vb.pencel, vb.pencel->cmap);
 	}
 
 cmap_done:
-
 	sd->cur_frame = ix;
 	return (err);
 }
+
 
 static Errcode pdr_save_flx_segment(char *pdr_name, char *flicname, SHORT sstart, SHORT send)
 {
@@ -581,6 +606,7 @@ out:
 	free_pdr(&pd);
 	return (err);
 }
+
 
 /* returns ecode if cant do */
 static Errcode save_flx_segment(char *title, SHORT sstart, SHORT send)
@@ -687,58 +713,85 @@ done:
 	return (err);
 }
 
+
 static bool save_as_fli(void)
 {
 	char pdr_name[PATH_SIZE];
 	return (is_fli_pdr_name(get_flisave_pdr(pdr_name)));
 }
 
-static void ask_qsave_seg(char *title_key, char *save_word, SHORT sstart, SHORT send)
-{
-	Errcode err;
-	char suffi[PDR_SUFFI_SIZE];
-	char titbuf[80];
-	char pdrinfo[40];
-	char sbuf[50];
-	char *flicname;
-	int num_frames;
 
-	if ((num_frames = send - sstart) < 0) {
+static void ask_qsave_seg(char *title_key, char *save_word, SHORT start_frame, SHORT end_frame)
+{
+	(void)title_key;
+	(void)save_word;
+
+	static char last_path[PATH_MAX] = "untitled.flc";
+
+	Errcode err;
+	char suffix[PDR_SUFFI_SIZE];
+	char pdrinfo[40];
+	char *flicname = "";
+	int num_frames = end_frame - start_frame;
+
+	#define ERR_PRINT softerr(err, "!%s", "fli_savef", flicname)
+
+	if (num_frames < 0) {
 		num_frames = -num_frames;
 	}
 	++num_frames;
 
-	if ((err = get_flisave_info(suffi, pdrinfo, sizeof(pdrinfo))) < Success) {
-		goto error;
+	err = get_flisave_info(suffix, pdrinfo, sizeof(pdrinfo));
+	if (err < Success) {
+		ERR_PRINT;
 	}
 
-	snftextf(titbuf, sizeof(titbuf), "!%d%d%s", stack_string(title_key, sbuf), sstart + 1, send + 1,
-			 pdrinfo);
-
+	//#!TODO: Do we even need this any more?
+	//        The conversion isn't slow on modern machines.
 	if (!save_as_fli()) {
-		/* arrrgh take of trailing period from title */
+		// This is for when it's being saved as an FLI or Amiga Zoetrope format
 		flicname = &pdrinfo[strlen(pdrinfo) - 1];
 		if (*flicname == '.') {
+			// arrrgh take off trailing period from title
 			*flicname = 0;
 		}
 		if (!soft_yes_no_box("!%d%s", "save_conv", num_frames, &pdrinfo)) {
+			ERR_PRINT;
 			return;
 		}
 	}
 
-	if ((flicname = vset_get_filename(titbuf, suffi, save_word, FLI_PATH, NULL, 1)) != NULL) {
-		if (!overwrite_old(flicname)) {
-			return;
+	char* last_folder = dirname(last_path);
+	char* last_name = basename(last_path);
+
+	if (strlen(last_folder) == 1 && last_folder[0] == '.') {
+		sprintf(last_folder, "/Users/kiki");
+	}
+
+	char* file_path = pj_dialog_file_save(
+		"Flic Files",
+		"fli,flc",
+		last_folder,
+		last_name
+	);
+
+	if (file_path) {
+		Errcode err = save_flx_segment(file_path, start_frame, end_frame);
+		if (err < Success) {
+			softerr(err, "!%s", "fli_savef", file_path);
 		}
-		if ((err = save_flx_segment(flicname, sstart, send)) < Success) {
-			goto error;
+		else {
+			printf("+ File saved: %s\n", file_path);
 		}
 	}
-error:
-	softerr(err, "!%s", "fli_savef", flicname);
 }
 
-void qsave(void) { ask_qsave_seg("save_fli", save_str, 0, flix.hdr.frame_count - 1); }
+
+void qsave(void) {
+	ask_qsave_seg("save_fli", save_str,
+			0, flix.hdr.frame_count - 1);
+}
+
 
 /* Save out current FLIC with frames backwards. */
 void qsave_backwards(void) { ask_qsave_seg("save_fli_back", ok_str, flix.hdr.frame_count - 1, 0); }
