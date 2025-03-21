@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -20,9 +20,9 @@
 */
 
 /**
- *  \file SDL_bits.h
+ * # CategoryBits
  *
- *  Functions for fiddling with bits and bitmasks.
+ * Functions for fiddling with bits and bitmasks.
  */
 
 #ifndef SDL_bits_h_
@@ -35,10 +35,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- *  \file SDL_bits.h
- */
 
 #if defined(__WATCOMC__) && defined(__386__)
 extern __inline int _SDL_bsr_watcom(Uint32);
@@ -60,12 +56,12 @@ extern __inline int _SDL_bsr_watcom(Uint32);
  * embedded in the calling program and the linker and dynamic loader will not
  * be able to find this function inside SDL itself).
  *
- * \param x the 32-bit value to examine
+ * \param x the 32-bit value to examine.
  * \returns the index of the most significant bit, or -1 if the value is 0.
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.0.0.
+ * \since This function is available since SDL 3.2.0.
  */
 SDL_FORCE_INLINE int SDL_MostSignificantBitIndex32(Uint32 x)
 {
@@ -82,10 +78,10 @@ SDL_FORCE_INLINE int SDL_MostSignificantBitIndex32(Uint32 x)
         return -1;
     }
     return _SDL_bsr_watcom(x);
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
     unsigned long index;
     if (_BitScanReverse(&index, x)) {
-        return index;
+        return (int)index;
     }
     return -1;
 #else
@@ -120,27 +116,26 @@ SDL_FORCE_INLINE int SDL_MostSignificantBitIndex32(Uint32 x)
  * Determine if a unsigned 32-bit value has exactly one bit set.
  *
  * If there are no bits set (`x` is zero), or more than one bit set, this
- * returns SDL_FALSE. If any one bit is exclusively set, this returns
- * SDL_TRUE.
+ * returns false. If any one bit is exclusively set, this returns true.
  *
  * Note that this is a forced-inline function in a header, and not a public
  * API function available in the SDL library (which is to say, the code is
  * embedded in the calling program and the linker and dynamic loader will not
  * be able to find this function inside SDL itself).
  *
- * \param x the 32-bit value to examine
- * \returns SDL_TRUE if exactly one bit is set in `x`, SDL_FALSE otherwise.
+ * \param x the 32-bit value to examine.
+ * \returns true if exactly one bit is set in `x`, false otherwise.
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.0.0.
+ * \since This function is available since SDL 3.2.0.
  */
-SDL_FORCE_INLINE SDL_bool SDL_HasExactlyOneBitSet32(Uint32 x)
+SDL_FORCE_INLINE bool SDL_HasExactlyOneBitSet32(Uint32 x)
 {
     if (x && !(x & (x - 1))) {
-        return SDL_TRUE;
+        return true;
     }
-    return SDL_FALSE;
+    return false;
 }
 
 /* Ends C function definitions when using C++ */

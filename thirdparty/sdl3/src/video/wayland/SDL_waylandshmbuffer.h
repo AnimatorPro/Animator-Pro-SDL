@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -31,8 +31,8 @@ struct Wayland_SHMBuffer
     int shm_data_size;
 };
 
-/* Allocates an SHM buffer with the format WL_SHM_FORMAT_ARGB8888 */
-extern int Wayland_AllocSHMBuffer(int width, int height, struct Wayland_SHMBuffer *shmBuffer);
+// Allocates an SHM buffer with the format WL_SHM_FORMAT_ARGB8888
+extern bool Wayland_AllocSHMBuffer(int width, int height, struct Wayland_SHMBuffer *shmBuffer);
 extern void Wayland_ReleaseSHMBuffer(struct Wayland_SHMBuffer *shmBuffer);
 
 #endif

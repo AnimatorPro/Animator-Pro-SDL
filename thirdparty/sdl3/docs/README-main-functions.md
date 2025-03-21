@@ -137,16 +137,16 @@ functions:
 First:
 
 ```c
-int SDL_AppInit(void **appstate, int argc, char **argv);
+SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv);
 ```
 
 This will be called _once_ before anything else. argc/argv work like they
-always do. If this returns 0, the app runs. If it returns < 0, the app calls
-SDL_AppQuit and terminates with an exit code that reports an error to the
-platform. If it returns > 0, the app calls SDL_AppQuit and terminates with
-an exit code that reports success to the platform. This function should not
-go into an infinite mainloop; it should do any one-time startup it requires
-and then return.
+always do. If this returns SDL_APP_CONTINUE, the app runs. If it returns
+SDL_APP_FAILURE, the app calls SDL_AppQuit and terminates with an exit
+code that reports an error to the platform. If it returns SDL_APP_SUCCESS,
+the app calls SDL_AppQuit and terminates with an exit code that reports
+success to the platform. This function should not go into an infinite
+mainloop; it should do any one-time startup it requires and then return.
 
 If you want to, you can assign a pointer to `*appstate`, and this pointer
 will be made available to you in later functions calls in their `appstate`
@@ -158,39 +158,39 @@ calls.
 Then:
 
 ```c
-int SDL_AppIterate(void *appstate);
+SDL_AppResult SDL_AppIterate(void *appstate);
 ```
 
 This is called over and over, possibly at the refresh rate of the display or
 some other metric that the platform dictates. This is where the heart of your
 app runs. It should return as quickly as reasonably possible, but it's not a
 "run one memcpy and that's all the time you have" sort of thing. The app
-should do any game updates, and render a frame of video. If it returns < 0,
-SDL will call SDL_AppQuit and terminate the process with an exit code that
-reports an error to the platform. If it returns > 0, the app calls
-SDL_AppQuit and terminates with an exit code that reports success to the
-platform. If it returns 0, then SDL_AppIterate will be called again at some
-regular frequency. The platform may choose to run this more or less (perhaps
-less in the background, etc), or it might just call this function in a loop
-as fast as possible. You do not check the event queue in this function
-(SDL_AppEvent exists for that).
+should do any game updates, and render a frame of video. If it returns
+SDL_APP_FAILURE, SDL will call SDL_AppQuit and terminate the process with an
+exit code that reports an error to the platform. If it returns
+SDL_APP_SUCCESS, the app calls SDL_AppQuit and terminates with an exit code
+that reports success to the platform. If it returns SDL_APP_CONTINUE, then
+SDL_AppIterate will be called again at some regular frequency. The platform
+may choose to run this more or less (perhaps less in the background, etc),
+or it might just call this function in a loop as fast as possible. You do
+not check the  event queue in this function (SDL_AppEvent exists for that).
 
 Next:
 
 ```c
-int SDL_AppEvent(void *appstate, const SDL_Event *event);
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event);
 ```
 
-This will be called whenever an SDL event arrives, on the thread that runs
-SDL_AppIterate.  Your app should also not call SDL_PollEvent, SDL_PumpEvent,
-etc, as  SDL will manage all this for you. Return values are the same as from
-SDL_AppIterate(), so you can terminate in response to SDL_EVENT_QUIT, etc.
+This will be called whenever an SDL event arrives. Your app should not call
+SDL_PollEvent, SDL_PumpEvent, etc, as  SDL will manage all this for you. Return
+values are the same as from SDL_AppIterate(), so you can terminate in response
+to SDL_EVENT_QUIT, etc.
 
 
 Finally:
 
 ```c
-void SDL_AppQuit(void *appstate);
+void SDL_AppQuit(void *appstate, SDL_AppResult result);
 ```
 
 This is called once before terminating the app--assuming the app isn't being
@@ -201,3 +201,36 @@ from main(), so atexit handles will run, if your platform supports that.
 
 If you set `*appstate` during SDL_AppInit, this is where you should free that
 data, as this pointer will not be provided to your app again.
+
+The SDL_AppResult value that terminated the app is provided here, in case
+it's useful to know if this was a successful or failing run of the app.
+
+
+## Summary and Best Practices
+
+- **Always Include SDL_main.h in One Source File:** When working with SDL,
+  remember that SDL_main.h must only be included in one source file in your
+  project. Including it in multiple files will lead to conflicts and undefined
+  behavior.
+
+- **Avoid Redefining main:** If you're using SDL's entry point system (which
+  renames `main` to `SDL_main`), do not define `main` yourself. SDL takes care
+  of this for you, and redefining it can cause issues, especially when linking
+  with SDL libraries.
+
+- **Using SDL's Callback System:** If you're working with more complex
+  scenarios, such as requiring more control over your application's flow
+  (e.g., with games or apps that need extensive event handling), consider
+  using SDL's callback system. Define the necessary callbacks and SDL will
+  handle initialization, event processing, and cleanup automatically.
+
+- **Platform-Specific Considerations:** On platforms like Windows, SDL handles
+  the platform-specific entry point (like `WinMain`) automatically. This means
+  you don't need to worry about writing platform-specific entry code when
+  using SDL.
+
+- **When to Skip SDL_main.h:** If you do not require SDL's custom entry point
+  (for example, if you're integrating SDL into an existing application or a
+  scripting environment), you can omit SDL_main.h. However, this will limit
+  SDL's ability to abstract away platform-specific entry point details.
+

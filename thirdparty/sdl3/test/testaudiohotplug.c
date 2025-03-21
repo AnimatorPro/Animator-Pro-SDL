@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -52,9 +52,9 @@ static void poked(int sig)
     done = 1;
 }
 
-static const char *devtypestr(int iscapture)
+static const char *devtypestr(int recording)
 {
-    return iscapture ? "capture" : "output";
+    return recording ? "recording" : "playback";
 }
 
 static void iteration(void)
@@ -65,37 +65,36 @@ static void iteration(void)
         if (e.type == SDL_EVENT_QUIT) {
             done = 1;
         } else if (e.type == SDL_EVENT_KEY_UP) {
-            if (e.key.keysym.sym == SDLK_ESCAPE) {
+            if (e.key.key == SDLK_ESCAPE) {
                 done = 1;
             }
         } else if (e.type == SDL_EVENT_AUDIO_DEVICE_ADDED) {
-            const SDL_AudioDeviceID which = (SDL_AudioDeviceID) e.adevice.which;
-            const SDL_bool iscapture = e.adevice.iscapture ? SDL_TRUE : SDL_FALSE;
-            char *name = SDL_GetAudioDeviceName(which);
+            const SDL_AudioDeviceID which = e.adevice.which;
+            const bool recording = e.adevice.recording ? true : false;
+            const char *name = SDL_GetAudioDeviceName(which);
             if (name) {
-                SDL_Log("New %s audio device at id %u: %s", devtypestr(iscapture), (unsigned int)which, name);
+                SDL_Log("New %s audio device at id %u: %s", devtypestr(recording), (unsigned int)which, name);
             } else {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Got new %s device, id %u, but failed to get the name: %s",
-                             devtypestr(iscapture), (unsigned int)which, SDL_GetError());
+                             devtypestr(recording), (unsigned int)which, SDL_GetError());
                 continue;
             }
-            if (!iscapture) {
+            if (!recording) {
                 SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(which, &spec, NULL, NULL);
                 if (!stream) {
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create/bind an audio stream to %u ('%s'): %s", (unsigned int) which, name, SDL_GetError());
                 } else {
-                    SDL_Log("Opened '%s' as %u\n", name, (unsigned int) which);
+                    SDL_Log("Opened '%s' as %u", name, (unsigned int) which);
                     /* !!! FIXME: laziness, this used to loop the audio, but we'll just play it once for now on each connect. */
                     SDL_PutAudioStreamData(stream, sound, soundlen);
                     SDL_FlushAudioStream(stream);
-                    SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(stream));
+                    SDL_ResumeAudioStreamDevice(stream);
                     /* !!! FIXME: this is leaking the stream for now. We'll wire it up to a dictionary or whatever later. */
                 }
             }
-            SDL_free(name);
         } else if (e.type == SDL_EVENT_AUDIO_DEVICE_REMOVED) {
-            dev = (SDL_AudioDeviceID)e.adevice.which;
-            SDL_Log("%s device %u removed.\n", devtypestr(e.adevice.iscapture), (unsigned int)dev);
+            dev = e.adevice.which;
+            SDL_Log("%s device %u removed.", devtypestr(e.adevice.recording), (unsigned int)dev);
             /* !!! FIXME: we need to keep track of our streams and destroy them here. */
         }
     }
@@ -123,9 +122,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Enable standard application logging */
-    SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
-
     /* Parse commandline */
     for (i = 1; i < argc;) {
         int consumed;
@@ -147,15 +143,15 @@ int main(int argc, char *argv[])
     }
 
     /* Load the SDL library */
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
         return 1;
     }
 
     /* Some targets (Mac CoreAudio) need an event queue for audio hotplug, so make and immediately hide a window. */
     window = SDL_CreateWindow("testaudiohotplug", 640, 480, 0);
     if (!window) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow failed: %s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow failed: %s", SDL_GetError());
         quit(1);
     }
     SDL_MinimizeWindow(window);
@@ -163,13 +159,13 @@ int main(int argc, char *argv[])
     filename = GetResourceFilename(filename, "sample.wav");
 
     if (!filename) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError());
         quit(1);
     }
 
     /* Load the wave file into memory */
-    if (SDL_LoadWAV(filename, &spec, &sound, &soundlen) == -1) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't load %s: %s\n", filename, SDL_GetError());
+    if (!SDL_LoadWAV(filename, &spec, &sound, &soundlen)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't load %s: %s", filename, SDL_GetError());
         quit(1);
     }
 
@@ -191,8 +187,8 @@ int main(int argc, char *argv[])
         SDL_Log("%i: %s", i, SDL_GetAudioDriver(i));
     }
 
-    SDL_Log("Select a driver with the SDL_AUDIO_DRIVER environment variable.\n");
-    SDL_Log("Using audio driver: %s\n", SDL_GetCurrentAudioDriver());
+    SDL_Log("Select a driver with the SDL_AUDIO_DRIVER environment variable.");
+    SDL_Log("Using audio driver: %s", SDL_GetCurrentAudioDriver());
 
 #ifdef SDL_PLATFORM_EMSCRIPTEN
     emscripten_set_main_loop(loop, 0, 1);

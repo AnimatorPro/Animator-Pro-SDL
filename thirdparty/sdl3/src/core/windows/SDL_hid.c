@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -20,10 +20,9 @@
 */
 #include "SDL_internal.h"
 
-#ifndef SDL_PLATFORM_WINRT
-
 #include "SDL_hid.h"
 
+HidD_GetAttributes_t SDL_HidD_GetAttributes;
 HidD_GetString_t SDL_HidD_GetManufacturerString;
 HidD_GetString_t SDL_HidD_GetProductString;
 HidP_GetCaps_t SDL_HidP_GetCaps;
@@ -36,22 +35,23 @@ static HMODULE s_pHIDDLL = 0;
 static int s_HIDDLLRefCount = 0;
 
 
-int WIN_LoadHIDDLL(void)
+bool WIN_LoadHIDDLL(void)
 {
     if (s_pHIDDLL) {
         SDL_assert(s_HIDDLLRefCount > 0);
         s_HIDDLLRefCount++;
-        return 0; /* already loaded */
+        return true; // already loaded
     }
 
     s_pHIDDLL = LoadLibrary(TEXT("hid.dll"));
     if (!s_pHIDDLL) {
-        return -1;
+        return false;
     }
 
     SDL_assert(s_HIDDLLRefCount == 0);
     s_HIDDLLRefCount = 1;
 
+    SDL_HidD_GetAttributes = (HidD_GetAttributes_t)GetProcAddress(s_pHIDDLL, "HidD_GetAttributes");
     SDL_HidD_GetManufacturerString = (HidD_GetString_t)GetProcAddress(s_pHIDDLL, "HidD_GetManufacturerString");
     SDL_HidD_GetProductString = (HidD_GetString_t)GetProcAddress(s_pHIDDLL, "HidD_GetProductString");
     SDL_HidP_GetCaps = (HidP_GetCaps_t)GetProcAddress(s_pHIDDLL, "HidP_GetCaps");
@@ -63,10 +63,10 @@ int WIN_LoadHIDDLL(void)
         !SDL_HidP_GetCaps || !SDL_HidP_GetButtonCaps ||
         !SDL_HidP_GetValueCaps || !SDL_HidP_MaxDataListLength || !SDL_HidP_GetData) {
         WIN_UnloadHIDDLL();
-        return -1;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
 void WIN_UnloadHIDDLL(void)
@@ -82,11 +82,9 @@ void WIN_UnloadHIDDLL(void)
     }
 }
 
-#endif /* !SDL_PLATFORM_WINRT */
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
 
-#if !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
-
-/* CM_Register_Notification definitions */
+// CM_Register_Notification definitions
 
 #define CR_SUCCESS 0
 
@@ -224,7 +222,7 @@ void WIN_QuitDeviceNotification(void)
     if (--s_DeviceNotificationsRequested > 0) {
         return;
     }
-    /* Make sure we have balanced calls to init/quit */
+    // Make sure we have balanced calls to init/quit
     SDL_assert(s_DeviceNotificationsRequested == 0);
 
     if (cfgmgr32_lib_handle) {
@@ -253,4 +251,4 @@ void WIN_QuitDeviceNotification(void)
 {
 }
 
-#endif // !SDL_PLATFORM_WINRT && !SDL_PLATFORM_XBOXONE && !SDL_PLATFORM_XBOXSERIES
+#endif // !SDL_PLATFORM_XBOXONE && !SDL_PLATFORM_XBOXSERIES

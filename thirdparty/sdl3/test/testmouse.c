@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -43,21 +43,21 @@ typedef struct _Object
     float x1, y1, x2, y2;
     Uint8 r, g, b;
 
-    SDL_bool isRect;
+    bool isRect;
 } Object;
 
 static Object *active = NULL;
 static Object *objects = NULL;
 static int buttons = 0;
-static SDL_bool isRect = SDL_FALSE;
+static bool isRect = false;
 
-static SDL_bool wheel_x_active = SDL_FALSE;
-static SDL_bool wheel_y_active = SDL_FALSE;
+static bool wheel_x_active = false;
+static bool wheel_y_active = false;
 static float wheel_x = SCREEN_WIDTH * 0.5f;
 static float wheel_y = SCREEN_HEIGHT * 0.5f;
 
 struct mouse_loop_data {
-    SDL_bool done;
+    bool done;
     SDL_Renderer *renderer;
 };
 
@@ -127,12 +127,12 @@ static void loop(void *arg)
                 event.wheel.y *= -1;
             }
             if (event.wheel.x != 0.0f) {
-                wheel_x_active = SDL_TRUE;
+                wheel_x_active = true;
                 /* "positive to the right and negative to the left"  */
                 wheel_x += event.wheel.x * 10.0f;
             }
             if (event.wheel.y != 0.0f) {
-                wheel_y_active = SDL_TRUE;
+                wheel_y_active = true;
                 /* "positive away from the user and negative towards the user" */
                 wheel_y -= event.wheel.y * 10.0f;
             }
@@ -211,10 +211,24 @@ static void loop(void *arg)
             break;
 
         case SDL_EVENT_KEY_DOWN:
+            if (event.key.key == SDLK_C) {
+                int x, y, w, h;
+                SDL_GetWindowPosition(window, &x, &y);
+                SDL_GetWindowSize(window, &w, &h);
+                w /= 2;
+                h /= 2;
+
+                if (event.key.mod & SDL_KMOD_ALT) {
+                    SDL_WarpMouseGlobal((float)(x + w), (float)(y + h));
+                } else {
+                    SDL_WarpMouseInWindow(window, (float)w, (float)h);
+                }
+            }
+            SDL_FALLTHROUGH;
         case SDL_EVENT_KEY_UP:
-            switch (event.key.keysym.sym) {
+            switch (event.key.key) {
             case SDLK_LSHIFT:
-                isRect = (event.key.state == SDL_PRESSED);
+                isRect = event.key.down;
                 if (active) {
                     active->isRect = isRect;
                 }
@@ -225,7 +239,7 @@ static void loop(void *arg)
             break;
 
         case SDL_EVENT_QUIT:
-            loop_data->done = SDL_TRUE;
+            loop_data->done = true;
             break;
 
         default:
@@ -274,17 +288,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Enable standard application logging */
-    SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
-
     /* Parse commandline */
     if (!SDLTest_CommonDefaultArgs(state, argc, argv)) {
         return 1;
     }
 
     /* Initialize SDL (Note: video is required to start event loop) */
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
         exit(1);
     }
 
@@ -302,15 +313,15 @@ int main(int argc, char *argv[])
     window = SDL_CreateWindow("Mouse Test", SCREEN_WIDTH, SCREEN_HEIGHT, 0);
 #endif
     if (!window) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError());
         return 0;
     }
 
-    loop_data.done = SDL_FALSE;
+    loop_data.done = false;
 
-    loop_data.renderer = SDL_CreateRenderer(window, NULL, 0);
+    loop_data.renderer = SDL_CreateRenderer(window, NULL);
     if (!loop_data.renderer) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create renderer: %s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create renderer: %s", SDL_GetError());
         SDL_DestroyWindow(window);
         return 0;
     }
@@ -319,7 +330,7 @@ int main(int argc, char *argv[])
 #ifdef SDL_PLATFORM_EMSCRIPTEN
     emscripten_set_main_loop_arg(loop, &loop_data, 0, 1);
 #else
-    while (loop_data.done == SDL_FALSE) {
+    while (loop_data.done == false) {
         loop(&loop_data);
     }
 #endif

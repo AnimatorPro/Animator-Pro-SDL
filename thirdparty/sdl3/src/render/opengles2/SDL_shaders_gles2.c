@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -20,12 +20,12 @@
 */
 #include "SDL_internal.h"
 
-#if SDL_VIDEO_RENDER_OGL_ES2
+#ifdef SDL_VIDEO_RENDER_OGL_ES2
 
 #include <SDL3/SDL_opengles2.h>
 #include "SDL_shaders_gles2.h"
 
-/* *INDENT-OFF* */ /* clang-format off */
+/* *INDENT-OFF* */ // clang-format off
 
 /*************************************************************************************************
  * Vertex/fragment shader source                                                                 *
@@ -100,7 +100,7 @@ static const char GLES2_Fragment_TextureABGR[] =                \
 "}\n"                                                           \
 ;
 
-/* ARGB to ABGR conversion */
+// ARGB to ABGR conversion
 static const char GLES2_Fragment_TextureARGB[] =                \
 "uniform sampler2D u_texture;\n"                                \
 "varying mediump vec4 v_color;\n"                               \
@@ -116,7 +116,7 @@ static const char GLES2_Fragment_TextureARGB[] =                \
 "}\n"                                                           \
 ;
 
-/* RGB to ABGR conversion */
+// RGB to ABGR conversion
 static const char GLES2_Fragment_TextureRGB[] =                 \
 "uniform sampler2D u_texture;\n"                                \
 "varying mediump vec4 v_color;\n"                               \
@@ -133,7 +133,7 @@ static const char GLES2_Fragment_TextureRGB[] =                 \
 "}\n"                                                           \
 ;
 
-/* BGR to ABGR conversion */
+// BGR to ABGR conversion
 static const char GLES2_Fragment_TextureBGR[] =                 \
 "uniform sampler2D u_texture;\n"                                \
 "varying mediump vec4 v_color;\n"                               \
@@ -148,7 +148,7 @@ static const char GLES2_Fragment_TextureBGR[] =                 \
 "}\n"                                                           \
 ;
 
-#if SDL_HAVE_YUV
+#ifdef SDL_HAVE_YUV
 
 #define YUV_SHADER_PROLOGUE                                     \
 "uniform sampler2D u_texture;\n"                                \
@@ -256,13 +256,13 @@ static const char GLES2_Fragment_TextureBGR[] =                 \
 "    gl_FragColor *= v_color;\n"                                \
 "}"                                                             \
 
-/* YUV to ABGR conversion */
+// YUV to ABGR conversion
 static const char GLES2_Fragment_TextureYUV[] = \
         YUV_SHADER_PROLOGUE \
         YUV_SHADER_BODY \
 ;
 
-/* NV12 to ABGR conversion */
+// NV12 to ABGR conversion
 static const char GLES2_Fragment_TextureNV12_RA[] = \
         YUV_SHADER_PROLOGUE \
         NV12_RA_SHADER_BODY \
@@ -272,7 +272,7 @@ static const char GLES2_Fragment_TextureNV12_RG[] = \
         NV12_RG_SHADER_BODY \
 ;
 
-/* NV21 to ABGR conversion */
+// NV21 to ABGR conversion
 static const char GLES2_Fragment_TextureNV21_RA[] = \
         YUV_SHADER_PROLOGUE \
         NV21_RA_SHADER_BODY \
@@ -283,7 +283,7 @@ static const char GLES2_Fragment_TextureNV21_RG[] = \
 ;
 #endif
 
-/* Custom Android video format texture */
+// Custom Android video format texture
 static const char GLES2_Fragment_TextureExternalOES_Prologue[] = \
 "#extension GL_OES_EGL_image_external : require\n"              \
 "\n"                                                            \
@@ -300,7 +300,7 @@ static const char GLES2_Fragment_TextureExternalOES[] =         \
 "}\n"                                                           \
 ;
 
-/* *INDENT-ON* */ /* clang-format on */
+/* *INDENT-ON* */ // clang-format on
 
 /*************************************************************************************************
  * Shader selector                                                                               *
@@ -365,7 +365,7 @@ const char *GLES2_GetShader(GLES2_ShaderType type)
         return GLES2_Fragment_TextureRGB;
     case GLES2_SHADER_FRAGMENT_TEXTURE_BGR:
         return GLES2_Fragment_TextureBGR;
-#if SDL_HAVE_YUV
+#ifdef SDL_HAVE_YUV
     case GLES2_SHADER_FRAGMENT_TEXTURE_YUV:
         return GLES2_Fragment_TextureYUV;
     case GLES2_SHADER_FRAGMENT_TEXTURE_NV12_RA:
@@ -384,4 +384,4 @@ const char *GLES2_GetShader(GLES2_ShaderType type)
     }
 }
 
-#endif /* SDL_VIDEO_RENDER_OGL_ES2 */
+#endif // SDL_VIDEO_RENDER_OGL_ES2

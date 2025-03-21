@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -34,7 +34,7 @@ struct SDL_PrivateAudioData
     ndspWaveBuf waveBuf[NUM_BUFFERS];
     LightLock lock;
     CondVar cv;
-    SDL_bool isCancelled;
+    bool isCancelled;
 };
 
 #endif // SDL_n3dsaudio_h

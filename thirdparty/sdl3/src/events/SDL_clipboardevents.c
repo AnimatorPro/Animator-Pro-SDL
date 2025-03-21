@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -20,22 +20,38 @@
 */
 #include "SDL_internal.h"
 
-/* Clipboard event handling code for SDL */
+// Clipboard event handling code for SDL
 
 #include "SDL_events_c.h"
 #include "SDL_clipboardevents_c.h"
+#include "../video/SDL_clipboard_c.h"
 
-int SDL_SendClipboardUpdate(void)
+void SDL_SendClipboardUpdate(bool owner, char **mime_types, size_t num_mime_types)
 {
-    int posted;
+    if (!owner) {
+        /* Clear our internal clipboard contents when external clipboard is set.
+         *
+         * Wayland recursively sends a data offer to the client from which the clipboard data originated,
+         * and as the client can't determine the origin of the offer, the clipboard must not be cleared,
+         * or the original data may be destroyed. Cleanup will be done in the backend when an offer
+         * cancellation event arrives.
+         */
+        if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") != 0) {
+            SDL_CancelClipboardData(0);
+        }
 
-    /* Post the event, if desired */
-    posted = 0;
+        SDL_SaveClipboardMimeTypes((const char **)mime_types, num_mime_types);
+    }
+
     if (SDL_EventEnabled(SDL_EVENT_CLIPBOARD_UPDATE)) {
         SDL_Event event;
         event.type = SDL_EVENT_CLIPBOARD_UPDATE;
-        event.clipboard.timestamp = 0;
-        posted = (SDL_PushEvent(&event) > 0);
+
+        SDL_ClipboardEvent *cevent = &event.clipboard;
+        cevent->timestamp = 0;
+        cevent->owner = owner;
+        cevent->mime_types = (const char **)mime_types;
+        cevent->num_mime_types = (Uint32)num_mime_types;
+        SDL_PushEvent(&event);
     }
-    return posted;
 }

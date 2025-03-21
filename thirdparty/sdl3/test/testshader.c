@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -23,7 +23,7 @@
 
 #include <SDL3/SDL_opengl.h>
 
-static SDL_bool shaders_supported;
+static bool shaders_supported;
 static int current_shader = 0;
 
 enum
@@ -128,7 +128,7 @@ static PFNGLSHADERSOURCEARBPROC pglShaderSourceARB;
 static PFNGLUNIFORM1IARBPROC pglUniform1iARB;
 static PFNGLUSEPROGRAMOBJECTARBPROC pglUseProgramObjectARB;
 
-static SDL_bool CompileShader(GLhandleARB shader, const char *source)
+static bool CompileShader(GLhandleARB shader, const char *source)
 {
     GLint status = 0;
 
@@ -145,16 +145,18 @@ static SDL_bool CompileShader(GLhandleARB shader, const char *source)
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Out of memory!");
         } else {
             pglGetInfoLogARB(shader, length, NULL, info);
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to compile shader:\n%s\n%s", source, info);
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to compile shader:");
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", source);
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", info);
             SDL_free(info);
         }
-        return SDL_FALSE;
+        return false;
     } else {
-        return SDL_TRUE;
+        return true;
     }
 }
 
-static SDL_bool LinkProgram(ShaderData *data)
+static bool LinkProgram(ShaderData *data)
 {
     GLint status = 0;
 
@@ -173,16 +175,17 @@ static SDL_bool LinkProgram(ShaderData *data)
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Out of memory!");
         } else {
             pglGetInfoLogARB(data->program, length, NULL, info);
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to link program:\n%s", info);
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to link program:");
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", info);
             SDL_free(info);
         }
-        return SDL_FALSE;
+        return false;
     } else {
-        return SDL_TRUE;
+        return true;
     }
 }
 
-static SDL_bool CompileShaderProgram(ShaderData *data)
+static bool CompileShaderProgram(ShaderData *data)
 {
     const int num_tmus_bound = 4;
     int i;
@@ -196,18 +199,18 @@ static SDL_bool CompileShaderProgram(ShaderData *data)
     /* Create the vertex shader */
     data->vert_shader = pglCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
     if (!CompileShader(data->vert_shader, data->vert_source)) {
-        return SDL_FALSE;
+        return false;
     }
 
     /* Create the fragment shader */
     data->frag_shader = pglCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
     if (!CompileShader(data->frag_shader, data->frag_source)) {
-        return SDL_FALSE;
+        return false;
     }
 
     /* ... and in the darkness bind them */
     if (!LinkProgram(data)) {
-        return SDL_FALSE;
+        return false;
     }
 
     /* Set up some uniform variables */
@@ -234,12 +237,12 @@ static void DestroyShaderProgram(ShaderData *data)
     }
 }
 
-static SDL_bool InitShaders(void)
+static bool InitShaders(void)
 {
     int i;
 
     /* Check for shader support */
-    shaders_supported = SDL_FALSE;
+    shaders_supported = false;
     if (SDL_GL_ExtensionSupported("GL_ARB_shader_objects") &&
         SDL_GL_ExtensionSupported("GL_ARB_shading_language_100") &&
         SDL_GL_ExtensionSupported("GL_ARB_vertex_shader") &&
@@ -268,24 +271,24 @@ static SDL_bool InitShaders(void)
             pglShaderSourceARB &&
             pglUniform1iARB &&
             pglUseProgramObjectARB) {
-            shaders_supported = SDL_TRUE;
+            shaders_supported = true;
         }
     }
 
     if (!shaders_supported) {
-        return SDL_FALSE;
+        return false;
     }
 
     /* Compile all the shaders */
     for (i = 0; i < NUM_SHADERS; ++i) {
         if (!CompileShaderProgram(&shaders[i])) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to compile shader!\n");
-            return SDL_FALSE;
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to compile shader!");
+            return false;
         }
     }
 
     /* We're done! */
-    return SDL_TRUE;
+    return true;
 }
 
 static void QuitShaders(void)
@@ -458,9 +461,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    /* Enable standard application logging */
-    SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
-
     /* Parse commandline */
     for (i = 1; i < argc;) {
         int consumed;
@@ -482,21 +482,21 @@ int main(int argc, char **argv)
     }
 
     /* Initialize SDL for video output */
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to initialize SDL: %s\n", SDL_GetError());
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to initialize SDL: %s", SDL_GetError());
         exit(1);
     }
 
     /* Create a 640x480 OpenGL screen */
     window = SDL_CreateWindow("Shader Demo", 640, 480, SDL_WINDOW_OPENGL);
     if (!window) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to create OpenGL window: %s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to create OpenGL window: %s", SDL_GetError());
         SDL_Quit();
         exit(2);
     }
 
     if (!SDL_GL_CreateContext(window)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to create OpenGL context: %s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to create OpenGL context: %s", SDL_GetError());
         SDL_Quit();
         exit(2);
     }
@@ -506,7 +506,7 @@ int main(int argc, char **argv)
     SDL_free(filename);
 
     if (!surface) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load icon.bmp: %s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load icon.bmp: %s", SDL_GetError());
         SDL_Quit();
         exit(3);
     }
@@ -516,9 +516,9 @@ int main(int argc, char **argv)
     /* Loop, drawing and checking events */
     InitGL(640, 480);
     if (InitShaders()) {
-        SDL_Log("Shaders supported, press SPACE to cycle them.\n");
+        SDL_Log("Shaders supported, press SPACE to cycle them.");
     } else {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Shaders not supported!\n");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Shaders not supported!");
     }
     done = 0;
     while (!done) {
@@ -532,10 +532,10 @@ int main(int argc, char **argv)
                     done = 1;
                 }
                 if (event.type == SDL_EVENT_KEY_DOWN) {
-                    if (event.key.keysym.sym == SDLK_SPACE) {
+                    if (event.key.key == SDLK_SPACE) {
                         current_shader = (current_shader + 1) % NUM_SHADERS;
                     }
-                    if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    if (event.key.key == SDLK_ESCAPE) {
                         done = 1;
                     }
                 }
@@ -552,7 +552,7 @@ int main(int argc, char **argv)
 
 int main(int argc, char *argv[])
 {
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "No OpenGL support on this system\n");
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "No OpenGL support on this system");
     return 1;
 }
 

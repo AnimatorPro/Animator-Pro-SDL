@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -37,8 +37,8 @@ struct SDL_PrivateAudioData
 
     int bytes_requested; // bytes of data the hardware wants _now_.
 
-    const Uint8 *capturebuf;
-    int capturelen;
+    const Uint8 *recordingbuf;
+    int recordinglen;
 };
 
 #endif // SDL_pulseaudio_h_

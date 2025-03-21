@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -26,7 +26,7 @@ static SDLTest_CommonState *state;
 
 static SDL_Rect viewport;
 static int done, j;
-static SDL_bool use_target = SDL_FALSE;
+static bool use_target = false;
 #ifdef SDL_PLATFORM_EMSCRIPTEN
 static Uint32 wait_start;
 #endif
@@ -48,7 +48,6 @@ static void DrawOnViewport(SDL_Renderer *renderer)
 {
     SDL_FRect rect;
     SDL_Rect cliprect;
-    int w, h;
 
     /* Set the viewport */
     SDL_SetRenderViewport(renderer, &viewport);
@@ -86,20 +85,16 @@ static void DrawOnViewport(SDL_Renderer *renderer)
     /* Add a box at the top */
     rect.w = 8.0f;
     rect.h = 8.0f;
-    rect.x = (float)((viewport.w - rect.w) / 2);
+    rect.x = (viewport.w - rect.w) / 2;
     rect.y = 0.0f;
     SDL_RenderFillRect(renderer, &rect);
 
     /* Add a clip rect and fill it with the sprite */
-    SDL_QueryTexture(sprite, NULL, NULL, &w, &h);
-    cliprect.x = (viewport.w - w) / 2;
-    cliprect.y = (viewport.h - h) / 2;
-    cliprect.w = w;
-    cliprect.h = h;
-    rect.x = (float)cliprect.x;
-    rect.y = (float)cliprect.y;
-    rect.w = (float)cliprect.w;
-    rect.h = (float)cliprect.h;
+    cliprect.x = (viewport.w - sprite->w) / 2;
+    cliprect.y = (viewport.h - sprite->h) / 2;
+    cliprect.w = sprite->w;
+    cliprect.h = sprite->h;
+    SDL_RectToFRect(&cliprect, &rect);
     SDL_SetRenderClipRect(renderer, &cliprect);
     SDL_RenderTexture(renderer, sprite, NULL, &rect);
     SDL_SetRenderClipRect(renderer, NULL);
@@ -174,7 +169,7 @@ int main(int argc, char *argv[])
         if (consumed == 0) {
             consumed = -1;
             if (SDL_strcasecmp(argv[i], "--target") == 0) {
-                use_target = SDL_TRUE;
+                use_target = true;
                 consumed = 1;
             }
         }
@@ -189,7 +184,7 @@ int main(int argc, char *argv[])
         quit(2);
     }
 
-    sprite = LoadTexture(state->renderers[0], "icon.bmp", SDL_TRUE, &sprite_w, &sprite_h);
+    sprite = LoadTexture(state->renderers[0], "icon.bmp", true, &sprite_w, &sprite_h);
 
     if (!sprite) {
         quit(2);
@@ -232,7 +227,7 @@ int main(int argc, char *argv[])
     now = SDL_GetTicks();
     if (now > then) {
         double fps = ((double)frames * 1000) / (now - then);
-        SDL_Log("%2.2f frames per second\n", fps);
+        SDL_Log("%2.2f frames per second", fps);
     }
     quit(0);
     return 0;
