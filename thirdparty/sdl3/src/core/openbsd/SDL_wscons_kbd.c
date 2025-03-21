@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -49,48 +49,48 @@
     }
 
 typedef struct SDL_WSCONS_mouse_input_data SDL_WSCONS_mouse_input_data;
-extern SDL_WSCONS_mouse_input_data *SDL_WSCONS_Init_Mouse();
+extern SDL_WSCONS_mouse_input_data *SDL_WSCONS_Init_Mouse(void);
 extern void updateMouse(SDL_WSCONS_mouse_input_data *input);
 extern void SDL_WSCONS_Quit_Mouse(SDL_WSCONS_mouse_input_data *input);
 
-/* Conversion table courtesy of /usr/src/sys/dev/wscons/wskbdutil.c */
+// Conversion table courtesy of /usr/src/sys/dev/wscons/wskbdutil.c
 static const unsigned char latin1_to_upper[256] = {
-    /*      0  8  1  9  2  a  3  b  4  c  5  d  6  e  7  f               */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 0 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 0 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 1 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 1 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 2 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 2 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 3 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 3 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 4 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 4 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 5 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 5 */
-    0x00, 'A', 'B', 'C', 'D', 'E', 'F', 'G',        /* 6 */
-    'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',         /* 6 */
-    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',         /* 7 */
-    'X', 'Y', 'Z', 0x00, 0x00, 0x00, 0x00, 0x00,    /* 7 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 8 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 8 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 9 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 9 */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* a */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* a */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* b */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* b */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* c */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* c */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* d */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* d */
-    0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, /* e */
-    0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, /* e */
-    0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0x00, /* f */
-    0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0x00, /* f */
+    // 0  8  1  9  2  a  3  b  4  c  5  d  6  e  7  f
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 2
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 2
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 3
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 3
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 4
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 4
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 5
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 5
+    0x00, 'A', 'B', 'C', 'D', 'E', 'F', 'G',        // 6
+    'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',         // 6
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',         // 7
+    'X', 'Y', 'Z', 0x00, 0x00, 0x00, 0x00, 0x00,    // 7
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 8
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 8
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 9
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 9
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // a
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // a
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // b
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // b
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // c
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // c
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // d
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // d
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, // e
+    0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, // e
+    0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0x00, // f
+    0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0x00, // f
 };
 
-/* Compose table courtesy of /usr/src/sys/dev/wscons/wskbdutil.c */
+// Compose table courtesy of /usr/src/sys/dev/wscons/wskbdutil.c
 static struct SDL_wscons_compose_tab_s
 {
     keysym_t elem[2];
@@ -433,9 +433,9 @@ static SDL_WSCONS_input_data *SDL_WSCONS_Init_Keyboard(const char *dev)
     }
 
     input->keyboardID = SDL_GetNextObjectID();
-    SDL_AddKeyboard(input->keyboardID, NULL, SDL_FALSE);
+    SDL_AddKeyboard(input->keyboardID, NULL, false);
 
-    input->keymap.map = SDL_calloc(sizeof(struct wscons_keymap), KS_NUMKEYCODES);
+    input->keymap.map = SDL_calloc(KS_NUMKEYCODES, sizeof(struct wscons_keymap));
     if (!input->keymap.map) {
         SDL_free(input);
         return NULL;
@@ -452,7 +452,7 @@ static SDL_WSCONS_input_data *SDL_WSCONS_Init_Keyboard(const char *dev)
     return input;
 }
 
-void SDL_WSCONS_Init()
+void SDL_WSCONS_Init(void)
 {
     inputs[0] = SDL_WSCONS_Init_Keyboard("/dev/wskbd0");
     inputs[1] = SDL_WSCONS_Init_Keyboard("/dev/wskbd1");
@@ -463,7 +463,7 @@ void SDL_WSCONS_Init()
     return;
 }
 
-void SDL_WSCONS_Quit()
+void SDL_WSCONS_Quit(void)
 {
     int i = 0;
     SDL_WSCONS_input_data *input = NULL;
@@ -487,7 +487,7 @@ void SDL_WSCONS_Quit()
 
 static void put_queue(SDL_WSCONS_input_data *kbd, uint c)
 {
-    /* c is already part of a UTF-8 sequence and safe to add as a character */
+    // c is already part of a UTF-8 sequence and safe to add as a character
     if (kbd->text_len < (sizeof(kbd->text) - 1)) {
         kbd->text[kbd->text_len++] = (char)(c);
     }
@@ -535,7 +535,7 @@ static void Translate_to_text(SDL_WSCONS_input_data *input, keysym_t ksym)
     case KS_BackSpace:
     case KS_Return:
     case KS_Linefeed:
-        /* All of these are unprintable characters. Ignore them */
+        // All of these are unprintable characters. Ignore them
         break;
     default:
         put_utf8(input, ksym);
@@ -544,38 +544,46 @@ static void Translate_to_text(SDL_WSCONS_input_data *input, keysym_t ksym)
     if (input->text_len > 0) {
         input->text[input->text_len] = '\0';
         SDL_SendKeyboardText(input->text);
-        /*SDL_memset(input->text, 0, sizeof(input->text));*/
+        // SDL_memset(input->text, 0, sizeof(input->text));
         input->text_len = 0;
         input->text[0] = 0;
     }
 }
 
-static void Translate_to_keycode(SDL_WSCONS_input_data *input, int type, keysym_t ksym)
+static void Translate_to_keycode(SDL_WSCONS_input_data *input, int type, keysym_t ksym, Uint64 timestamp)
 {
     struct wscons_keymap keyDesc = input->keymap.map[ksym];
     keysym_t *group = &keyDesc.group1[KS_GROUP(keyDesc.group1[0]) == KS_GROUP_Keypad && IS_NUMLOCK_ON ? !IS_SHIFT_HELD : 0];
     int i = 0;
 
-    /* Check command first, then group[0]*/
+    // Check command first, then group[0]
     switch (keyDesc.command) {
     case KS_Cmd_ScrollBack:
     {
-        SDL_SendKeyboardKey(0, input->keyboardID, type == WSCONS_EVENT_KEY_DOWN ? SDL_PRESSED : SDL_RELEASED, SDL_SCANCODE_PAGEUP);
+        SDL_SendKeyboardKey(timestamp, input->keyboardID, 0, SDL_SCANCODE_PAGEUP, (type == WSCONS_EVENT_KEY_DOWN));
         return;
     }
     case KS_Cmd_ScrollFwd:
     {
-        SDL_SendKeyboardKey(0, input->keyboardID, type == WSCONS_EVENT_KEY_DOWN ? SDL_PRESSED : SDL_RELEASED, SDL_SCANCODE_PAGEDOWN);
+        SDL_SendKeyboardKey(timestamp, input->keyboardID, 0, SDL_SCANCODE_PAGEDOWN, (type == WSCONS_EVENT_KEY_DOWN));
         return;
     }
+    default:
+        break;
     }
-    for (i = 0; i < sizeof(conversion_table) / sizeof(struct wscons_keycode_to_SDL); i++) {
+    for (i = 0; i < SDL_arraysize(conversion_table); i++) {
         if (conversion_table[i].sourcekey == group[0]) {
-            SDL_SendKeyboardKey(0, input->keyboardID, type == WSCONS_EVENT_KEY_DOWN ? SDL_PRESSED : SDL_RELEASED, conversion_table[i].targetKey);
+            SDL_SendKeyboardKey(timestamp, input->keyboardID, group[0], conversion_table[i].targetKey, (type == WSCONS_EVENT_KEY_DOWN));
             return;
         }
     }
-    SDL_SendKeyboardKey(0, input->keyboardID, type == WSCONS_EVENT_KEY_DOWN ? SDL_PRESSED : SDL_RELEASED, SDL_SCANCODE_UNKNOWN);
+    SDL_SendKeyboardKey(timestamp, input->keyboardID, group[0], SDL_SCANCODE_UNKNOWN, (type == WSCONS_EVENT_KEY_DOWN));
+}
+
+static Uint64 GetEventTimestamp(struct timespec *time)
+{
+    // FIXME: Get the event time in the SDL tick time base
+    return SDL_GetTicksNS();
 }
 
 static void updateKeyboard(SDL_WSCONS_input_data *input)
@@ -592,6 +600,7 @@ static void updateKeyboard(SDL_WSCONS_input_data *input)
     if ((n = read(input->fd, events, sizeof(events))) > 0) {
         n /= sizeof(struct wscons_event);
         for (i = 0; i < n; i++) {
+            Uint64 timestamp = GetEventTimestamp(&events[i].time);
             type = events[i].type;
             switch (type) {
             case WSCONS_EVENT_KEY_DOWN:
@@ -808,16 +817,19 @@ static void updateKeyboard(SDL_WSCONS_input_data *input)
                 }
             } break;
             case WSCONS_EVENT_ALL_KEYS_UP:
-                for (i = 0; i < SDL_NUM_SCANCODES; i++) {
-                    SDL_SendKeyboardKey(0, input->keyboardID, SDL_RELEASED, i);
+                for (i = 0; i < SDL_SCANCODE_COUNT; i++) {
+                    SDL_SendKeyboardKey(timestamp, input->keyboardID, 0, (SDL_Scancode)i, false);
                 }
+                break;
+            default:
                 break;
             }
 
-            if (input->type == WSKBD_TYPE_USB && events[i].value <= 0xE7)
-                SDL_SendKeyboardKey(0, input->keyboardID, type == WSCONS_EVENT_KEY_DOWN ? SDL_PRESSED : SDL_RELEASED, (SDL_Scancode)events[i].value);
-            else
-                Translate_to_keycode(input, type, events[i].value);
+            if (input->type == WSKBD_TYPE_USB && events[i].value <= 0xE7) {
+                SDL_SendKeyboardKey(timestamp, input->keyboardID, 0, (SDL_Scancode)events[i].value, (type == WSCONS_EVENT_KEY_DOWN));
+            } else {
+                Translate_to_keycode(input, type, events[i].value, timestamp);
+            }
 
             if (type == WSCONS_EVENT_KEY_UP) {
                 continue;
@@ -910,7 +922,7 @@ static void updateKeyboard(SDL_WSCONS_input_data *input)
                 }
                 if (IS_ALT_HELD) {
                     if (input->encoding & KB_METAESC) {
-                        Translate_to_keycode(input, WSCONS_EVENT_KEY_DOWN, KS_Escape);
+                        Translate_to_keycode(input, WSCONS_EVENT_KEY_DOWN, KS_Escape, 0);
                         Translate_to_text(input, result);
                         continue;
                     } else {
@@ -924,7 +936,7 @@ static void updateKeyboard(SDL_WSCONS_input_data *input)
     }
 }
 
-void SDL_WSCONS_PumpEvents()
+void SDL_WSCONS_PumpEvents(void)
 {
     int i = 0;
     for (i = 0; i < 4; i++) {

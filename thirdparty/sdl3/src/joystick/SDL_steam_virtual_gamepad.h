@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -30,7 +30,7 @@ typedef struct SDL_SteamVirtualGamepadInfo
 } SDL_SteamVirtualGamepadInfo;
 
 void SDL_InitSteamVirtualGamepadInfo(void);
-SDL_bool SDL_SteamVirtualGamepadEnabled(void);
-SDL_bool SDL_UpdateSteamVirtualGamepadInfo(void);
+bool SDL_SteamVirtualGamepadEnabled(void);
+bool SDL_UpdateSteamVirtualGamepadInfo(void);
 const SDL_SteamVirtualGamepadInfo *SDL_GetSteamVirtualGamepadInfo(int slot);
 void SDL_QuitSteamVirtualGamepadInfo(void);

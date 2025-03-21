@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -25,13 +25,13 @@
 
 #ifdef SDL_AUDIO_DRIVER_OPENSLES
 
-void OPENSLES_ResumeDevices(void);
-void OPENSLES_PauseDevices(void);
+extern void OPENSLES_ResumeDevices(void);
+extern void OPENSLES_PauseDevices(void);
 
 #else
 
-static void OPENSLES_ResumeDevices(void) {}
-static void OPENSLES_PauseDevices(void) {}
+#define OPENSLES_ResumeDevices()
+#define OPENSLES_PauseDevices()
 
 #endif
 

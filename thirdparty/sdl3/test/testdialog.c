@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -15,14 +15,13 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_test.h>
 
-const SDL_DialogFileFilter filters[4] = {
+const SDL_DialogFileFilter filters[3] = {
     { "All files", "*" },
     { "JPG images", "jpg;jpeg" },
-    { "PNG images", "png" },
-    { NULL, NULL }
+    { "PNG images", "png" }
 };
 
-static void SDLCALL callback(void* userdata, const char* const* files, int filter) {
+static void SDLCALL callback(void *userdata, const char * const *files, int filter) {
     if (files) {
         const char* filter_name = "(filter fetching unsupported)";
 
@@ -34,18 +33,19 @@ static void SDLCALL callback(void* userdata, const char* const* files, int filte
             }
         }
 
-        SDL_Log("Filter used: '%s'\n", filter_name);
+        SDL_Log("Filter used: '%s'", filter_name);
 
         while (*files) {
-            SDL_Log("'%s'\n", *files);
+            SDL_Log("'%s'", *files);
             files++;
         }
     } else {
-        SDL_Log("Error: %s\n", SDL_GetError());
+        SDL_Log("Error: %s", SDL_GetError());
     }
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     SDL_Window *w;
     SDL_Renderer *r;
     SDLTest_CommonState *state;
@@ -53,16 +53,14 @@ int main(int argc, char *argv[]) {
     const SDL_FRect save_file_rect = { 50, 290, 220, 140 };
     const SDL_FRect open_folder_rect = { 370, 50, 220, 140 };
     int i;
-    char *initial_path = NULL;
+    const char *initial_path = NULL;
+    const int nfilters = sizeof(filters) / sizeof(*filters);
 
     /* Initialize test framework */
     state = SDLTest_CommonCreateState(argv, 0);
     if (state == NULL) {
         return 1;
     }
-
-    /* Enable standard application logging */
-    SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
 
     /* Parse commandline */
     for (i = 1; i < argc;) {
@@ -79,12 +77,12 @@ int main(int argc, char *argv[]) {
         i += consumed;
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed (%s)", SDL_GetError());
         return 1;
     }
-    if (SDL_CreateWindowAndRenderer("testdialog", 640, 480, 0, &w, &r) < 0) {
-        SDL_Log("Failed to create window and/or renderer: %s\n", SDL_GetError());
+    if (!SDL_CreateWindowAndRenderer("testdialog", 640, 480, 0, &w, &r)) {
+        SDL_Log("Failed to create window and/or renderer: %s", SDL_GetError());
         SDL_Quit();
         return 1;
     }
@@ -92,7 +90,7 @@ int main(int argc, char *argv[]) {
     initial_path = SDL_GetUserFolder(SDL_FOLDER_HOME);
 
     if (!initial_path) {
-        SDL_Log("Will not use an initial path, couldn't get the home directory path: %s\n", SDL_GetError());
+        SDL_Log("Will not use an initial path, couldn't get the home directory path: %s", SDL_GetError());
     }
 
     while (1) {
@@ -114,11 +112,11 @@ int main(int argc, char *argv[]) {
                  * - Nonzero if the user is allowed to choose multiple entries (not for SDL_ShowSaveFileDialog)
                  */
                 if (SDL_PointInRectFloat(&p, &open_file_rect)) {
-                    SDL_ShowOpenFileDialog(callback, NULL, w, filters, initial_path, 1);
+                    SDL_ShowOpenFileDialog(callback, NULL, w, filters, nfilters, initial_path, 1);
                 } else if (SDL_PointInRectFloat(&p, &open_folder_rect)) {
                     SDL_ShowOpenFolderDialog(callback, NULL, w, initial_path, 1);
                 } else if (SDL_PointInRectFloat(&p, &save_file_rect)) {
-                    SDL_ShowSaveFileDialog(callback, NULL, w, filters, initial_path);
+                    SDL_ShowSaveFileDialog(callback, NULL, w, filters, nfilters, initial_path);
                 }
             }
         }
@@ -145,10 +143,6 @@ int main(int argc, char *argv[]) {
         SDLTest_DrawString(r, open_folder_rect.x+5, open_folder_rect.y+open_folder_rect.h/2, "Open Folder...");
 
         SDL_RenderPresent(r);
-    }
-
-    if (initial_path) {
-        SDL_free(initial_path);
     }
 
     SDLTest_CleanupTextDrawing();

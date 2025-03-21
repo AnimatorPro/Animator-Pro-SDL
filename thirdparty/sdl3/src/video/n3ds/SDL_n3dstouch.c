@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -54,23 +54,23 @@ void N3DS_QuitTouch(void)
 
 void N3DS_PollTouch(SDL_VideoDevice *_this)
 {
-    SDL_VideoData *driverdata = (SDL_VideoData *)_this->driverdata;
+    SDL_VideoData *internal = (SDL_VideoData *)_this->internal;
     touchPosition touch;
     SDL_Window *window;
     SDL_VideoDisplay *display;
-    static SDL_bool was_pressed = SDL_FALSE;
-    SDL_bool pressed;
+    static bool was_pressed = false;
+    bool pressed;
     hidTouchRead(&touch);
     pressed = (touch.px != 0 || touch.py != 0);
 
-    display = SDL_GetVideoDisplay(driverdata->touch_display);
+    display = SDL_GetVideoDisplay(internal->touch_display);
     window = display ? display->fullscreen_window : NULL;
 
     if (pressed != was_pressed) {
         was_pressed = pressed;
         SDL_SendTouch(0, N3DS_TOUCH_ID, N3DS_TOUCH_FINGER,
                       window,
-                      pressed,
+                      pressed ? SDL_EVENT_FINGER_DOWN : SDL_EVENT_FINGER_UP,
                       touch.px * TOUCHSCREEN_SCALE_X,
                       touch.py * TOUCHSCREEN_SCALE_Y,
                       pressed ? 1.0f : 0.0f);
@@ -83,4 +83,4 @@ void N3DS_PollTouch(SDL_VideoDevice *_this)
     }
 }
 
-#endif /* SDL_VIDEO_DRIVER_N3DS */
+#endif // SDL_VIDEO_DRIVER_N3DS

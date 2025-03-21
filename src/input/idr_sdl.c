@@ -43,11 +43,11 @@ static int16_t sdl_key_event_to_ascii(const SDL_Event* ev)
 
 	assert(ev->type == SDL_EVENT_KEY_DOWN);
 
-	if (SDLK_F1 <= ev->key.keysym.sym && ev->key.keysym.sym <= SDLK_F12) {
-		return fnkey[ev->key.keysym.sym - SDLK_F1];
+	if (SDLK_F1 <= ev->key.key && ev->key.key <= SDLK_F12) {
+		return fnkey[ev->key.key - SDLK_F1];
 	}
 
-	switch (ev->key.keysym.sym) {
+	switch (ev->key.key) {
 		case SDLK_UP:
 			return UARROW;
 		case SDLK_DOWN:
@@ -74,7 +74,7 @@ static int16_t sdl_key_event_to_ascii(const SDL_Event* ev)
 			break;
 	}
 
-	return (int16_t)ev->key.keysym.sym;
+	return (int16_t)ev->key.key;
 }
 
 int16_t dos_wait_key(void)

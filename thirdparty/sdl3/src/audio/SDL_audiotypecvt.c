@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -870,7 +870,7 @@ void ConvertAudioSwapEndian(void* dst, const void* src, int num_samples, int bit
 
 void SDL_ChooseAudioConverters(void)
 {
-    static SDL_bool converters_chosen = SDL_FALSE;
+    static bool converters_chosen = false;
     if (converters_chosen) {
         return;
     }
@@ -921,5 +921,5 @@ void SDL_ChooseAudioConverters(void)
 
 #undef SET_CONVERTER_FUNCS
 
-    converters_chosen = SDL_TRUE;
+    converters_chosen = true;
 }

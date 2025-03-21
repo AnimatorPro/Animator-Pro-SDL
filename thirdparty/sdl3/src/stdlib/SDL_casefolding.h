@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -2765,5 +2765,5 @@ static const CaseFoldHashBucket3_16 case_fold_hash3_16[] = {
     { case_fold3_16_003, SDL_arraysize(case_fold3_16_003) },
 };
 
-#endif /* SDL_casefolding_h_ */
+#endif // SDL_casefolding_h_
 

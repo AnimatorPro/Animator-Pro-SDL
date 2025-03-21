@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -156,7 +156,7 @@ static int window_h;
 static int paused = 0;
 static int done = 0;
 static int fpsdelay;
-static SDL_bool streaming = SDL_TRUE;
+static bool streaming = true;
 static Uint8 *RawMooseData = NULL;
 
 /* Call this instead of exit(), so we can clean up SDL: atexit() is evil. */
@@ -255,6 +255,7 @@ static void loop(void)
     /* Check for events */
     while (SDL_PollEvent(&event)) {
         SDLTest_CommonEvent(state, &event, &done);
+        SDL_ConvertEventToRenderCoordinates(SDL_GetRenderer(SDL_GetWindowFromEvent(&event)), &event);
 
         switch (event.type) {
         case SDL_EVENT_WINDOW_RESIZED:
@@ -275,11 +276,11 @@ static void loop(void)
             }
             break;
         case SDL_EVENT_KEY_DOWN:
-            if (event.key.keysym.sym == SDLK_SPACE) {
+            if (event.key.key == SDLK_SPACE) {
                 paused = !paused;
                 break;
             }
-            if (event.key.keysym.sym != SDLK_ESCAPE) {
+            if (event.key.key != SDLK_ESCAPE) {
                 break;
             }
             break;
@@ -310,7 +311,7 @@ static void loop(void)
         /* Print out some timing information */
         const Uint64 then = next_fps_check - fps_check_delay;
         const double fps = ((double)frames * 1000) / (now - then);
-        SDL_Log("%2.2f frames per second\n", fps);
+        SDL_Log("%2.2f frames per second", fps);
         next_fps_check = now + fps_check_delay;
         frames = 0;
     }
@@ -346,15 +347,15 @@ int main(int argc, char **argv)
                     consumed = 2;
                     fps = SDL_atoi(argv[i + 1]);
                     if (fps == 0) {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option requires an argument [from 1 to 1000], default is 12.\n");
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option requires an argument [from 1 to 1000], default is 12.");
                         quit(10);
                     }
                     if ((fps < 0) || (fps > 1000)) {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option must be in range from 1 to 1000, default is 12.\n");
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option must be in range from 1 to 1000, default is 12.");
                         quit(10);
                     }
                 } else {
-                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option requires an argument [from 1 to 1000], default is 12.\n");
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option requires an argument [from 1 to 1000], default is 12.");
                     quit(10);
                 }
             } else if (SDL_strcmp(argv[i], "--nodelay") == 0) {
@@ -362,21 +363,21 @@ int main(int argc, char **argv)
                 nodelay = 1;
             } else if (SDL_strcmp(argv[i], "--nostreaming") == 0) {
                 consumed = 1;
-                streaming = SDL_FALSE;
+                streaming = false;
             } else if (SDL_strcmp(argv[i], "--scale") == 0) {
                 consumed = 2;
                 if (argv[i + 1]) {
                     scale = SDL_atoi(argv[i + 1]);
                     if (scale == 0) {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --scale option requires an argument [from 1 to 50], default is 5.\n");
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --scale option requires an argument [from 1 to 50], default is 5.");
                         quit(10);
                     }
                     if ((scale < 0) || (scale > 50)) {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --scale option must be in range from 1 to 50, default is 5.\n");
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --scale option must be in range from 1 to 50, default is 5.");
                         quit(10);
                     }
                 } else {
-                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option requires an argument [from 1 to 1000], default is 12.\n");
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --fps option requires an argument [from 1 to 1000], default is 12.");
                     quit(10);
                 }
             } else if (SDL_strcmp(argv[i], "--yuvformat") == 0) {
@@ -399,11 +400,11 @@ int main(int argc, char **argv)
                     } else if (SDL_strcmp(fmt, "NV21") == 0) {
                         yuv_format = SDL_PIXELFORMAT_NV21;
                     } else {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --yuvformat option requires one of the: YV12 (default), IYUV, YUY2, UYVY, YVYU, NV12, NV21)\n");
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --yuvformat option requires one of the: YV12 (default), IYUV, YUY2, UYVY, YVYU, NV12, NV21)");
                         quit(10);
                     }
                 } else {
-                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --yuvformat option requires one of the: YV12 (default), IYUV, YUY2, UYVY, YVYU, NV12, NV21)\n");
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The --yuvformat option requires one of the: YV12 (default), IYUV, YUY2, UYVY, YVYU, NV12, NV21)");
                     quit(10);
                 }
             }
@@ -434,20 +435,20 @@ int main(int argc, char **argv)
 
     RawMooseData = (Uint8 *)SDL_malloc(MOOSEFRAME_SIZE * MOOSEFRAMES_COUNT);
     if (!RawMooseData) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Can't allocate memory for movie !\n");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Can't allocate memory for movie !");
         quit(1);
     }
 
     /* load the trojan moose images */
     filename = GetResourceFilename(NULL, "moose.dat");
     if (!filename) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Out of memory\n");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Out of memory");
         quit(2);
     }
     handle = SDL_IOFromFile(filename, "rb");
     SDL_free(filename);
     if (!handle) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Can't find the file moose.dat !\n");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Can't find the file moose.dat !");
         quit(2);
     }
 
@@ -460,7 +461,7 @@ int main(int argc, char **argv)
     window_h = MOOSEPIC_H * scale;
 
     if (state->num_windows != 1) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Only one window allowed\n");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Only one window allowed");
         quit(1);
     }
 
@@ -470,7 +471,7 @@ int main(int argc, char **argv)
         if (streaming) {
             MooseTexture = SDL_CreateTexture(renderer, yuv_format, SDL_TEXTUREACCESS_STREAMING, MOOSEPIC_W, MOOSEPIC_H);
             if (!MooseTexture) {
-                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't set create texture: %s\n", SDL_GetError());
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't set create texture: %s", SDL_GetError());
                 quit(5);
             }
         }
@@ -499,7 +500,7 @@ int main(int argc, char **argv)
         }
 
         /* Convert to YUV SDL_Surface */
-        MooseYUVSurfaces[i] = SDL_ConvertSurfaceFormat(mooseRGBSurface, yuv_format);
+        MooseYUVSurfaces[i] = SDL_ConvertSurface(mooseRGBSurface, yuv_format);
         if (MooseYUVSurfaces[i] == NULL) {
             quit(7);
         }
@@ -524,7 +525,7 @@ int main(int argc, char **argv)
     displayrect.h = (float)window_h;
 
     /* Ignore key up events, they don't even get filtered */
-    SDL_SetEventEnabled(SDL_EVENT_KEY_UP, SDL_FALSE);
+    SDL_SetEventEnabled(SDL_EVENT_KEY_UP, false);
 
     /* Main render loop */
     frames = 0;

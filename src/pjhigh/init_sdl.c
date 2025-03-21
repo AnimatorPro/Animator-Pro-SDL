@@ -4,7 +4,6 @@
 #define VDEV_INTERNALS
 #include <SDL3/SDL.h>
 #include <assert.h>
-#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -15,16 +14,10 @@
 
 #include "aaconfig.h"
 #include "argparse.h"
-#include "dpmiutil.h"
-#include "input.h"
 #include "jimk.h"
 #include "msfile.h"
 #include "pj_sdl.h"
-#include "progids.h"
-#include "rastcurs.h"
-#include "rastlib.h"
 #include "resource.h"
-#include "vdevcall.h"
 
 short pj_crit_errval = 1 - 19;
 
@@ -125,7 +118,7 @@ Errcode open_pj_startup_screen(Errcode (*init_with_screen)(void *data), void *da
 	Screen_mode *open_mode;
 	Screen_mode *alt_mode;
 
-	Uint32 flags = (SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK |
+	Uint32 flags = (SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK |
 					SDL_INIT_GAMEPAD | SDL_INIT_EVENTS);
 
 	SDL_Init(flags);

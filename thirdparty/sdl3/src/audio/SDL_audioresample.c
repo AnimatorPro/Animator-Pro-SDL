@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -444,7 +444,7 @@ static void SincTable(float *table, int len)
 }
 
 // Calculate Sinc(x/y), using a lookup table
-static float Sinc(float *table, int x, int y)
+static float Sinc(const float *table, int x, int y)
 {
     float s = table[x % y];
     s = ((x / y) & 1) ? -s : s;
@@ -453,7 +453,7 @@ static float Sinc(float *table, int x, int y)
 
 static Cubic ResamplerFilter[RESAMPLER_SAMPLES_PER_ZERO_CROSSING][RESAMPLER_SAMPLES_PER_FRAME];
 
-static void GenerateResamplerFilter()
+static void GenerateResamplerFilter(void)
 {
     enum
     {
@@ -533,7 +533,7 @@ static void Transpose4x4(Cubic *data)
 static void SetupAudioResampler(void)
 {
     int i, j;
-    SDL_bool transpose = SDL_FALSE;
+    bool transpose = false;
 
     GenerateResamplerFilter();
 
@@ -542,7 +542,7 @@ static void SetupAudioResampler(void)
         for (i = 0; i < 8; ++i) {
             ResampleFrame[i] = ResampleFrame_Generic_SSE;
         }
-        transpose = SDL_TRUE;
+        transpose = true;
     } else
 #endif
 #ifdef SDL_NEON_INTRINSICS
@@ -550,7 +550,7 @@ static void SetupAudioResampler(void)
         for (i = 0; i < 8; ++i) {
             ResampleFrame[i] = ResampleFrame_Generic_NEON;
         }
-        transpose = SDL_TRUE;
+        transpose = true;
     } else
 #endif
     {
@@ -574,16 +574,11 @@ static void SetupAudioResampler(void)
 
 void SDL_SetupAudioResampler(void)
 {
-    static SDL_SpinLock running = 0;
+    static SDL_InitState init;
 
-    if (!ResampleFrame[0]) {
-        SDL_LockSpinlock(&running);
-
-        if (!ResampleFrame[0]) {
-            SetupAudioResampler();
-        }
-
-        SDL_UnlockSpinlock(&running);
+    if (SDL_ShouldInit(&init)) {
+        SetupAudioResampler();
+        SDL_SetInitialized(&init, true);
     }
 }
 
@@ -592,7 +587,18 @@ Sint64 SDL_GetResampleRate(int src_rate, int dst_rate)
     SDL_assert(src_rate > 0);
     SDL_assert(dst_rate > 0);
 
-    Sint64 sample_rate = ((Sint64)src_rate << 32) / (Sint64)dst_rate;
+    Sint64 numerator = (Sint64)src_rate << 32;
+    Sint64 denominator = (Sint64)dst_rate;
+
+    // Generally it's expected that `dst_frames = (src_frames * dst_rate) / src_rate`
+    // To match this as closely as possible without infinite precision, always round up the resample rate.
+    // For example, without rounding up, a sample ratio of 2:3 would have `sample_rate = 0xAAAAAAAA`
+    // After 3 frames, the position would be 0x1.FFFFFFFE, meaning we haven't fully consumed the second input frame.
+    // By rounding up to 0xAAAAAAAB, we would instead reach 0x2.00000001, fulling consuming the second frame.
+    // Technically you could say this is kicking the can 0x100000000 steps down the road, but I'm fine with that :)
+    // sample_rate = div_ceil(numerator, denominator)
+    Sint64 sample_rate = ((numerator - 1) / denominator) + 1;
+
     SDL_assert(sample_rate > 0);
 
     return sample_rate;
@@ -613,24 +619,24 @@ int SDL_GetResamplerPaddingFrames(Sint64 resample_rate)
 }
 
 // These are not general purpose. They do not check for all possible underflow/overflow
-SDL_FORCE_INLINE Sint64 ResamplerAdd(Sint64 a, Sint64 b, Sint64 *ret)
+SDL_FORCE_INLINE bool ResamplerAdd(Sint64 a, Sint64 b, Sint64 *ret)
 {
     if ((b > 0) && (a > SDL_MAX_SINT64 - b)) {
-        return -1;
+        return false;
     }
 
     *ret = a + b;
-    return 0;
+    return true;
 }
 
-SDL_FORCE_INLINE Sint64 ResamplerMul(Sint64 a, Sint64 b, Sint64 *ret)
+SDL_FORCE_INLINE bool ResamplerMul(Sint64 a, Sint64 b, Sint64 *ret)
 {
     if ((b > 0) && (a > SDL_MAX_SINT64 / b)) {
-        return -1;
+        return false;
     }
 
     *ret = a * b;
-    return 0;
+    return true;
 }
 
 Sint64 SDL_GetResamplerInputFrames(Sint64 output_frames, Sint64 resample_rate, Sint64 resample_offset)
@@ -639,8 +645,8 @@ Sint64 SDL_GetResamplerInputFrames(Sint64 output_frames, Sint64 resample_rate, S
     // ((((output_frames - 1) * resample_rate) + resample_offset) >> 32) + 1
 
     Sint64 output_offset;
-    if (ResamplerMul(output_frames, resample_rate, &output_offset) ||
-        ResamplerAdd(output_offset, -resample_rate + resample_offset + 0x100000000, &output_offset)) {
+    if (!ResamplerMul(output_frames, resample_rate, &output_offset) ||
+        !ResamplerAdd(output_offset, -resample_rate + resample_offset + 0x100000000, &output_offset)) {
         output_offset = SDL_MAX_SINT64;
     }
 
@@ -656,13 +662,13 @@ Sint64 SDL_GetResamplerOutputFrames(Sint64 input_frames, Sint64 resample_rate, S
 
     // input_offset = (input_frames << 32) - resample_offset;
     Sint64 input_offset;
-    if (ResamplerMul(input_frames, 0x100000000, &input_offset) ||
-        ResamplerAdd(input_offset, -resample_offset, &input_offset)) {
+    if (!ResamplerMul(input_frames, 0x100000000, &input_offset) ||
+        !ResamplerAdd(input_offset, -resample_offset, &input_offset)) {
         input_offset = SDL_MAX_SINT64;
     }
 
     // output_frames = div_ceil(input_offset, resample_rate)
-    Sint64 output_frames = (input_offset > 0) ? (((input_offset - 1) / resample_rate) + 1) : 0;
+    Sint64 output_frames = (input_offset > 0) ? ((input_offset - 1) / resample_rate) + 1 : 0;
 
     *inout_resample_offset = (output_frames * resample_rate) - input_offset;
 
