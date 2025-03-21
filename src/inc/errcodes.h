@@ -136,6 +136,7 @@
 #define Err_no_renderer (VDERR-21) /* Unable to create renderer for window */
 #define Err_no_surface (VDERR-22) /* Unable to allocate the surface we draw to from PJ */
 #define Err_no_render_target (VDERR-23) /* Unable to make a matching texture for the render target */
+#define Err_no_palette (VDERR-24) /* Unable allocate 256 color palette */
 
 /* end VDERR */
 #endif

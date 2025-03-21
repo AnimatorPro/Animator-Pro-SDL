@@ -15,11 +15,11 @@ struct SDL_Renderer;
 struct SDL_Rect;
 
 extern struct SDL_Surface*  s_surface;
-extern struct SDL_Surface*  s_buffer;
 extern struct SDL_Window*   window;
 extern struct SDL_Surface*  s_window_surface;
 extern struct SDL_Renderer* renderer;
-extern struct SDL_Texture* render_target;
+extern struct SDL_Texture*  render_target;
+extern struct SDL_Palette*  vga_palette;
 
 
 int pj_sdl_get_video_size(LONG* width, LONG* height);

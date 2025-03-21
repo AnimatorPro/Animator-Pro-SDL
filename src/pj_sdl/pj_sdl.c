@@ -15,11 +15,11 @@
 
 /*--------------------------------------------------------------*/
 SDL_Surface* s_surface		  = NULL;
-SDL_Surface* s_buffer		  = NULL;
 SDL_Window* window			  = NULL;
 SDL_Surface* s_window_surface = NULL;
 SDL_Renderer* renderer		  = NULL;
 SDL_Texture* render_target    = NULL;
+SDL_Palette* vga_palette      = NULL;
 
 // for the file requestors
 static char last_path[PATH_MAX] = "";
@@ -120,33 +120,11 @@ SDL_FRect pj_sdl_fit_surface(const SDL_Surface* source, const int target_w, cons
 /*--------------------------------------------------------------*/
 void pj_sdl_flip_window_surface()
 {
-//	/* SDL_BlitScaled doesn't work from 8 bit to screen,
-//	 * so I'm copying to a second buffer first and then
-//	 * doing my stretched blit. */
-//	SDL_BlitSurface(s_surface, NULL, s_buffer, NULL);
-//
-//	/* With window scaling, we want to center the target rect. */
-//	SDL_Rect target_rect = pj_sdl_fit_surface(s_buffer, s_window_surface);
-//
-//	/* Draw to the window surface, scaled */
-//	//! FIXME: Only clear the parts that aren't drawn from the scaled blit
-//	SDL_FillSurfaceRect(s_window_surface, NULL, 0x000000);
-//	SDL_BlitSurface(s_buffer, &s_buffer->clip_rect, s_window_surface, &target_rect);
-//	SDL_UpdateWindowSurface(window);
-	//	SDL_RenderClear(renderer);
-	//	SDL_RenderTexture(renderer, texture, NULL, NULL);
-	//	SDL_RenderPresent(renderer);
-
 	void* pixels = NULL;
 	int pitch = 0;
 
-	/* SDL_BlitScaled doesn't work from 8 bit to screen,
-	 * so I'm copying to a second buffer first and then
-	 * doing my stretched blit. */
-	SDL_BlitSurface(s_surface, NULL, s_buffer, NULL);
-
 	// Lock the texture so we have access to its pixels for writing
-	if (SDL_LockTexture(render_target, NULL, &pixels, &pitch) != 0) {
+	if (!SDL_LockTexture(render_target, NULL, &pixels, &pitch)) {
 		SDL_Log("Could not lock texture: %s", SDL_GetError());
 		SDL_DestroyTexture(render_target);
 		SDL_DestroyRenderer(renderer);
@@ -155,12 +133,26 @@ void pj_sdl_flip_window_surface()
 	}
 
 	// Copy pixel data from surface to texture
-	memcpy(pixels, s_buffer->pixels, s_buffer->h * s_buffer->pitch);
+	// memcpy(pixels, s_buffer->pixels, s_buffer->h * s_buffer->pitch);
+	SDL_Surface* copy_target = SDL_CreateSurfaceFrom(
+									render_target->w,
+									render_target->h,
+									render_target->format,
+									pixels,
+									pitch);
+
+	if (!copy_target) {
+		SDL_Log("Could create texture from locked pixels: %s", SDL_GetError());
+	}
+
+	SDL_BlitSurface(s_surface, NULL, copy_target, NULL);
+	SDL_DestroySurface(copy_target);
+	copy_target = NULL;
 
 	// Unlock the texture-- commit changes
 	SDL_UnlockTexture(render_target);
 
-	const SDL_FRect source_rect = pj_sdl_rect_convert(&s_surface->clip_rect);
+	const SDL_FRect source_rect = pj_sdl_rect_convert(&(SDL_Rect){0, 0, s_surface->w, s_surface->h});
 	int window_w, window_h;
 	pj_sdl_get_window_size(&window_w, &window_h);
 	const SDL_FRect target_rect = pj_sdl_fit_surface(s_surface, window_w, window_h);

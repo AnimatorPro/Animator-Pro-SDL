@@ -1,7 +1,6 @@
 /* vdr_sdl.c */
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_hints.h>
 #include <assert.h>
 #define VDEV_INTERNALS
 #include "errcodes.h"
@@ -169,34 +168,19 @@ static Errcode sdl_open_graphics(Vdevice *vd, Raster *r, LONG w, LONG h, USHORT 
 			return Err_no_window;
 		}
 
-		SDL_SetWindowResizable(window, SDL_TRUE);
+		SDL_SetWindowResizable(window, true);
 	}
 
-	renderer = SDL_CreateRenderer(window, NULL, 0);
+	renderer = SDL_CreateRenderer(window, NULL);
 	if (!renderer) {
 		SDL_Log("Could not create renderer: %s", SDL_GetError());
 		return Err_no_renderer;
 	}
 
-//	s_window_surface = SDL_GetWindowSurface(window);
-//	if (!s_window_surface) {
-//		return Err_no_display;
-//	}
-
-	// don't kill my beautiful pixels with smoothing
-	//	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-
 	s_surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_INDEX8);
 	if (!s_surface) {
 		SDL_Log("Failed to allocate main windows surface: %s", SDL_GetError());
 		return Err_no_surface;
-	}
-
-	//!TODO: Check to make sure the pixel format is supported on non-Apple platforms
-	s_buffer = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
-	if (!s_buffer) {
-		fprintf(stderr, "%s\n", SDL_GetError());
-		return Err_no_display;
 	}
 
 	render_target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
@@ -208,6 +192,12 @@ static Errcode sdl_open_graphics(Vdevice *vd, Raster *r, LONG w, LONG h, USHORT 
 
 	SDL_SetTextureScaleMode(render_target, SDL_SCALEMODE_NEAREST);
 
+	vga_palette = SDL_CreatePalette(256);
+	if (!vga_palette) {
+		SDL_Log("Failed to allocate main palette: %s", SDL_GetError());
+		return Err_no_render_target;
+	}
+
 	sdl_open_raster(r, w, h);
 	r->hw.bm.bp[0] = s_surface->pixels;
 	r->hw.bm.bpr = s_surface->pitch;
@@ -216,18 +206,19 @@ static Errcode sdl_open_graphics(Vdevice *vd, Raster *r, LONG w, LONG h, USHORT 
 	return Success;
 }
 
+
 static Errcode sdl_close_graphics(Vdevice *vd)
 {
 	(void)vd;
 
+	if (vga_palette) {
+		SDL_DestroyPalette(vga_palette);
+		vga_palette = NULL;
+	}
+
 	if (render_target) {
 		SDL_DestroyTexture(render_target);
 		render_target = NULL;
-	}
-
-	if (s_buffer) {
-		SDL_DestroySurface(s_buffer);
-		s_buffer = NULL;
 	}
 
 	if (s_surface) {
@@ -243,6 +234,7 @@ static Errcode sdl_close_graphics(Vdevice *vd)
 	return Success;
 }
 
+
 /*--------------------------------------------------------------*/
 /* SDL Rastlib.                                                 */
 /*--------------------------------------------------------------*/
@@ -255,12 +247,12 @@ static Errcode sdl_close_rast(Raster *r)
 
 static void sdl_set_colors(Raster *r, LONG start, LONG count, void *cbuf)
 {
+	(void)r;
+	(void)start;
+
 	const uint8_t *cmap = cbuf;
 	SDL_Color colors[256];
 	int c;
-
-	(void)r;
-	//	(void)start;
 
 	assert(0 < count && count <= 256);
 
@@ -268,9 +260,17 @@ static void sdl_set_colors(Raster *r, LONG start, LONG count, void *cbuf)
 		colors[c].r = cmap[3 * c + 0];
 		colors[c].g = cmap[3 * c + 1];
 		colors[c].b = cmap[3 * c + 2];
+		colors[c].a = SDL_ALPHA_OPAQUE;
 	}
 
-	SDL_SetPaletteColors(s_surface->format->palette, colors, start, 256);
+	if (!SDL_SetPaletteColors(vga_palette, colors, 0, 256)) {
+		SDL_Log("Failed to set palette: %s", SDL_GetError());
+	}
+
+	if (!SDL_SetSurfacePalette(s_surface, vga_palette)) {
+		fprintf(stderr, "Couldn't set main buffer palette: %s\n", SDL_GetError());
+		return;
+	}
 }
 
 static void sdl_wait_vsync(Raster *r)
