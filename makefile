@@ -3,17 +3,20 @@
 all: debug run
 
 debug:
-	rm -rf build && mkdir -p build_debug && pushd build_debug && cmake -G "Ninja" -DWITH_POCO=OFF .. && cmake --build . --config debug --target install && popd
+	rm -rf build && mkdir -p _build && pushd _build && cmake -G "Ninja" -DWITH_POCO=OFF .. && cmake --build . --config debug --target install && popd
 
 release:
 	rm -rf build && mkdir -p build && pushd build && cmake -G "Ninja" -DWITH_POCO=OFF .. && cmake --build . --config RelWithDebInfo --target install && popd
 
 run:
-	build_debug/bin/ani
+	@cd _build/bin && lldb ani --batch \
+		 --one-line 'process launch' \
+		 --one-line-on-crash 'bt' \
+	     --one-line-on-crash 'quit'
 
 poco:
-	build_debug/bin/poco
+	_build/bin/poco
 
 clean:
-	rm -rf build build_debug && echo Project Cleaned
+	rm -rf _build && echo Project Cleaned
 
