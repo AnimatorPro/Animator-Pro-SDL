@@ -218,10 +218,10 @@ static Button qmu_zpan_sel = MB_INIT1(&qmu_inkopts_sel,                  /* next
 									  &zpan_cycle_group, 39, 9, 114, 14, /* w,h,x,y */
 									  NODATA, hang_children, NOFEEL, NOOPT, NULL, 0, NOKEY, 0);
 
-static Button qmu_files_sel = MB_INIT1(&qmu_zpan_sel, NOCHILD, 53, 9, 238, 3, NODATA, ccorner_text,
-									   mb_go_files, mb_go_files, NOGROUP, 0, NOKEY, 0);
+static Button qmu_repeat_sel = MB_INIT1(&qmu_zpan_sel, NOCHILD, 53, 9, 238, 3, NODATA,
+									   see_redo, menu_doredo, NOOPT, NOGROUP, 0, NOKEY, 0);
 static Button qmu_std1_sel =
-	MB_INIT1(&qmu_files_sel,                                                /* next */
+	MB_INIT1(&qmu_repeat_sel,                                                /* next */
 			 &std_head1_sel, 0, 0, 129, 3,                                  /* w,h,x,y */
 			 NOTEXT, hang_children, NOFEEL, NOOPT, &qmu_sh1dat, 0, NOKEY, 0 /* flags */
 	);
@@ -286,7 +286,7 @@ Menuhdr quick_menu = MENU_INIT0(320, 55, 0, 165, QUICK_MUID, /* id */
 
 static Smu_button_list home_smblist[] = {
 	{"title", {&qmu_title_sel}}, {"clusid", {&qmu_clusid_sel}}, {"grid", {&qmu_grid_sel}},
-	{"mask", {&qmu_mask_sel}},   {"files", {&qmu_files_sel}},   {"redo", {&qmu_redo_sel}},
+	{"mask", {&qmu_mask_sel}},   {"repeat", {&qmu_repeat_sel}},   {"redo", {&qmu_redo_sel}},
 	{"undo", {&qmu_undo_sel}},
 };
 
