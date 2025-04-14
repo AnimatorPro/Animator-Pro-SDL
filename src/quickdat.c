@@ -39,6 +39,12 @@ void see_redo(Button *b)
 	ccorner_text(b);
 }
 
+void see_repeat(Button *b)
+{
+	set_button_disable(b, (vl.redoit == NULL));
+	ccorner_text(b);
+}
+
 void see_clusid(Button *b)
 {
 	char clusid[2];
@@ -219,7 +225,7 @@ static Button qmu_zpan_sel = MB_INIT1(&qmu_inkopts_sel,                  /* next
 									  NODATA, hang_children, NOFEEL, NOOPT, NULL, 0, NOKEY, 0);
 
 static Button qmu_repeat_sel = MB_INIT1(&qmu_zpan_sel, NOCHILD, 53, 9, 238, 3, NODATA,
-									   see_redo, menu_doredo, NOOPT, NOGROUP, 0, NOKEY, 0);
+									   see_repeat, menu_doredo, NOOPT, NOGROUP, 0, NOKEY, 0);
 static Button qmu_std1_sel =
 	MB_INIT1(&qmu_repeat_sel,                                                /* next */
 			 &std_head1_sel, 0, 0, 129, 3,                                  /* w,h,x,y */
