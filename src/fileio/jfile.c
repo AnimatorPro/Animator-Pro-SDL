@@ -84,6 +84,17 @@ bool pj_exists(const char *title)
 	return true;
 }
 
+bool pj_folder_exists(const char *path) {
+	struct stat st;
+	// stat() returns 0 if successful, meaning the path exists
+	if (stat(path, &st) == 0) {
+		// S_ISDIR returns non-zero if the mode corresponds to a directory
+		return S_ISDIR(st.st_mode);
+	}
+	// If stat() fails, the path does not exist
+	return false;
+}
+
 
 /*
  * Return size of a (closed) file.

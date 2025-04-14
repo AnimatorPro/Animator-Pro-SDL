@@ -40,6 +40,8 @@ typedef void *Jfile;
 /** basic low level dos file calls found in the syslib **/
 
 bool pj_exists(const char *path);
+bool pj_folder_exists(const char *path);
+
 Errcode pj_ioerr(void);
 
 void remove_path_name(char *path);
