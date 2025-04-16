@@ -93,7 +93,7 @@ void cfit_rcel(Rcel *c, struct cmap *dcmap);
 void refit_rcel(Rcel *c, struct cmap *ncmap, struct cmap *ocmap);
 Rcel *clone_rcel(Rcel *s);
 Rcel *clone_any_rcel(Rcel *in);
-void pj_rcel_copy(Rcel *s, Rcel *d);
+void pj_rcel_copy(Rcel *source, Rcel *destination);
 Errcode valloc_ramcel(Rcel **pcel,SHORT w,USHORT h);
 Errcode valloc_anycel(Rcel **pcel,SHORT w,USHORT h);
 void set_one_val(Rcel *rc, UBYTE clearc, UBYTE destc);

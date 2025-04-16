@@ -255,6 +255,19 @@
 #define Err_integ	(FATALERR -0) /* data integrity error */
 #define Err_swap	(FATALERR -1) /* can't restore context of file we swapped */
 
+/* Undo system errors */
+#define UNDOERR -650
+#ifdef UNDOERR
+#define Err_undo_init          (UNDOERR-0)  /* Failed to initialize undo system */
+#define Err_undo_no_operation  (UNDOERR-1)  /* No undo operation available */
+#define Err_undo_create_dir    (UNDOERR-2)  /* Failed to create undo directory */
+#define Err_undo_save_state    (UNDOERR-3)  /* Failed to save undo state */
+#define Err_undo_load_state    (UNDOERR-4)  /* Failed to load undo state */
+#define Err_undo_invalid_type  (UNDOERR-5)  /* Invalid undo operation type */
+#define Err_undo_no_node       (UNDOERR-6)  /* Failure happened during node create / allocate */
+/* end UNDOERR */
+#endif
+
 size_t get_errtext(int err, char *buf);
 	/* buf must be ERRTEXT_SIZE */
 #define ERRTEXT_SIZE 128

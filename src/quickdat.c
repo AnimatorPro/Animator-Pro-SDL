@@ -20,6 +20,9 @@
 #include "softmenu.h"
 #include "zoom.h"
 
+#include "undo_redo/undo_redo.h"
+
+
 static Sgroup1_data qmu_sh1dat = {
 	&flxtime_data,
 };
@@ -27,15 +30,20 @@ static Sgroup1_data qmu_sh1dat = {
 Button qmu_clus_sel = MB_INIT1(NONEXT, NOCHILD, 78, 9, 128, 44, /* w,h,x,y */
 							   NOTEXT, see_crb, feel_crb, ppalette, NULL, 0, NOKEY, 0);
 
+static void do_undo();
+static void do_redo();
+
 void see_undo(Button *b)
 {
-	set_button_disable(b, (vl.undoit == NULL));
+	// set_button_disable(b, (vl.undoit == NULL));
+	set_button_disable(b, !undo_available());
 	ccorner_text(b);
 }
 
 void see_redo(Button *b)
 {
-	set_button_disable(b, (vl.redoit == NULL));
+	// set_button_disable(b, (vl.redoit == NULL));
+	set_button_disable(b, !redo_available());
 	ccorner_text(b);
 }
 
@@ -243,6 +251,27 @@ static Button qmu_undo_sel = MB_INIT1(&qmu_redo_sel, /* next */
 									  NODATA,        /* datme */
 									  see_undo, menu_doundo, NOOPT, NOGROUP, 0, '\b', 0 /* flags */
 );
+
+/* Call the main undo function, then force an undo button redraw */
+static void do_undo()
+{
+	menu_doundo();
+	draw_buttontop(&qmu_undo_sel);
+}
+
+/* Call the main undo function, then force a redo button redraw */
+static void do_redo()
+{
+	menu_doredo();
+	draw_buttontop(&qmu_redo_sel);
+}
+
+/* Redraw both undo and redo buttons */
+void undo_redo_redraw_buttons()
+{
+	draw_buttontop(&qmu_undo_sel);
+	draw_buttontop(&qmu_redo_sel);
+}
 
 static Button qmu_title_sel =
 	MB_INIT1(&qmu_undo_sel, NOCHILD, 53, 9, 3, 3, NODATA, see_titlebar, mb_move_quickmenu,

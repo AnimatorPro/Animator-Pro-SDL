@@ -145,6 +145,7 @@ set(PJMAIN_SRC_FILES
 	tweenhi.c
 	tweenlo.c
 	tweenmag.c
+	undo_redo/undo_redo.c
 	vfeelme.c
 	vmarqi.c
 	vpaint.c
