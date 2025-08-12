@@ -1,3 +1,21 @@
+/* undo_redo.c -- new undo system by kiki
+ *
+ * The old vpaint did a lot of work to not use memory, being a DOS program for
+ * limited machines.  This meant storing temp files in a directory almost like
+ * virtual memory.  A side effect of this is that restarting the application
+ * would see your whole state restored.
+ *
+ * Because the old system only had a single undo step, I wanted to ignore the
+ * memory issues and bring vpaint into the 21st century with more modern undo.
+ * I also want to persist undo state between launches-- this is partly due to
+ * liking how the old app worked, and partly for iOS users who may see the app
+ * killed in the background at any given time.
+ *
+ * This isn't how I'd normally design an undo system, but its whole purpose
+ * is to be a central place where the undo / redo stacks can be managed *and*
+ * where the whole stack can be persisted to disk between launches.
+ */
+
 #include "undo_redo.h"
 
 #include <flx.h>
@@ -9,7 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../pj_sdl/pj_sdl.h"
+#include "pj_sdl.h"
 #include "auto.h"
 #include "broadcas.h"
 #include "errcodes.h"
@@ -31,6 +49,13 @@ extern int flx_get_frames(void);
 
 /* Globals */
 static UndoSystem undo_system;
+
+
+
+/* ======================================================================
+ * data structures
+ * ====================================================================== */
+
 
 /* ======================================================================
  * Forward declarations
@@ -373,7 +398,7 @@ Errcode undo_perform(void)
 		return err;
 	}
 
-	LOG("Undo index now: %d", undo_system.undo_count);
+	LOG("Undo index now: %llu", undo_system.undo_count);
 	undo_free_node(node);
 
 	return Success;
@@ -439,8 +464,7 @@ Errcode redo_perform(void)
  * Undo Pushes
  *
  * The Undo system may save different things depending on the
- * type of operation and on whether time-based editing is
- * active.
+ * type of operation and whether time-based editing is active.
  */
 
 static char* undo_get_full_path_for_push(const UndoType type, const char* file_name)
@@ -453,7 +477,7 @@ static char* undo_get_full_path_for_push(const UndoType type, const char* file_n
 }
 
 /* Persist the current vb.pencel to temp folder on disk-- used for undo and redo. */
-static UndoNode* undo_save_cel(const UndoType type, const char* file_name)
+static UndoNode* undo_save_frame(const UndoType type, const char* file_name)
 {
 	char* full_name = undo_get_full_path_for_push(type, file_name);
 
@@ -473,20 +497,22 @@ static UndoNode* undo_save_cel(const UndoType type, const char* file_name)
 	return node;
 }
 
-static Errcode undo_push_cel(const UndoType type)
+/* Push an undo step that saves the full frame */
+static Errcode undo_push_frame(const UndoType type)
 {
 	const char* file_name = undo_generate_filename(type);
-	UndoNode* node = undo_save_cel(type, file_name);
+	UndoNode* node = undo_save_frame(type, file_name);
 	if (!node) {
 		return Err_undo_no_node;
 	}
 	return undo_push_node(node);
 }
 
-static Errcode redo_push_cel(const UndoType type)
+/* Restore an undo step that saves the full frame */
+static Errcode redo_push_frame(const UndoType type)
 {
 	const char* file_name = redo_generate_filename(type);
-	UndoNode* node = undo_save_cel(type, file_name);
+	UndoNode* node = undo_save_frame(type, file_name);
 	if (!node) {
 		return Err_undo_no_node;
 	}
@@ -530,11 +556,13 @@ Errcode undo_push(const UndoType type)
 	switch (type) {
 		case UNDO_DRAW:
 		case UNDO_FRAME:
-		case UNDO_RCEL:
 		case UNDO_COMPOSITE:
-			if (undo_push_cel(type) != Success) {
+			if (undo_push_frame(type) != Success) {
 				return Err_undo_save_state;
 			};
+			break;
+
+		case UNDO_RCEL:
 			break;
 
 		case UNDO_PALETTE:
@@ -570,11 +598,13 @@ Errcode redo_push(const UndoType type)
 	switch (type) {
 		case UNDO_DRAW:
 		case UNDO_FRAME:
-		case UNDO_RCEL:
 		case UNDO_COMPOSITE:
-			if (redo_push_cel(type) != Success) {
+			if (redo_push_frame(type) != Success) {
 				return Err_undo_save_state;
 			};
+			break;
+
+		case UNDO_RCEL:
 			break;
 
 		case UNDO_PALETTE:
