@@ -781,7 +781,7 @@ title "Home"
 clusid "AB"  // first char is clus #0 2nd #1
 grid "Grid"
 mask "Mask"
-files "Files..."
+repeat "Repeat"
 redo "Redo" "\nr"
 undo "Undo" "\n\b"
 }
