@@ -18,6 +18,7 @@
 #include "progids.h"
 #include "rastcurs.h"
 #include "resource.h"
+#include "undo_redo/undo_redo.h"
 #include "vdevcall.h"
 #include "zoom.h"
 
@@ -306,6 +307,24 @@ static Errcode get_poco_arg(Argparse_list *ap,int argc,
 	return Success;
 }
 
+static Errcode get_temp_path_arg(Argparse_list *ap,int argc,
+							 char **argv,int position)
+{
+	(void)ap;
+	(void)argc;
+	(void)argv;
+	(void)position;
+
+	if (argc < 2 ) {
+		return Err_bad_input;
+	}
+
+	fprintf(stderr, "temp path requested\n");
+	fflush(stderr);
+
+	return Success;
+}
+
 static Errcode get_flic_arg(Argparse_list *ap,int argc,
 							 char **argv,int position)
 {
@@ -423,7 +442,8 @@ int main(int argc, char** argv)
 	Errcode err;
 	static Argparse_list apl[] = {
 		ARGP(apl, 0, "-flic", get_flic_arg),
-		ARGP(apl, APLAST, "-poc", get_poco_arg),
+		ARGP(apl, 1, "-poc", get_poco_arg),
+		ARGP(apl, APLAST, "-temppath", get_temp_path_arg),
 	};
 
 	err = init_pj_startup(apl, get_rest_of_command_line, argc, argv,
@@ -478,13 +498,16 @@ int main(int argc, char** argv)
 		pj_delete(tflxname); /* Delete old tempflx */
 	}
 
-	if((err = force_temp_files()) < Success) {
+	err = force_temp_files();
+	if(err < Success) {
 		goto error;
 	}
 
 	if (cl_flic_name != NULL) {
 		resize_load_fli(cl_flic_name);
 	}
+
+	undo_init();
 
 	err = go_vpaint();
 
@@ -503,10 +526,9 @@ int main(int argc, char** argv)
 				break;
 			case RESET_DEFAULT_FLX:
 				push_close_toscreen();
-				if((err = clear_vtemps(true)) < 0) {
-					goto error;
-				}
-				if((err = open_default_flx()) < 0) {
+				clear_vtemps(true);
+				err = open_default_flx();
+				if(err < 0) {
 					goto error;
 				}
 			case RESTART_VPAINT:
@@ -588,9 +610,7 @@ bool was_zoom;
 			return err;
 		}
 
-		if((err = clear_vtemps(reset)) < Success) {
-			return err;
-		}
+		clear_vtemps(reset);
 
 		if(set_flisize(&newsize) >= Success)
 			break;

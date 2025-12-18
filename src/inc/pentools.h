@@ -92,7 +92,7 @@ extern Errcode text_tool(Pentool *pt, struct wndo *w);
 
 /* pencel.c */
 extern Errcode alloc_pencel(struct rcel **pcel);
-extern void swap_pencels(struct rcel *s, struct rcel *d);
+extern void swap_pencels(struct rcel *source, struct rcel *destination);
 extern struct rcel *clone_pencel(struct rcel *s);
 
 /* penopts.c */

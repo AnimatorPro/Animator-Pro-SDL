@@ -6,16 +6,16 @@ debug:
 	rm -rf build && \
 	mkdir -p _build && \
 	cd _build && \
-	cmake -G "Ninja" -DWITH_POCO=OFF .. && \
-	cmake --build . --config debug --target install && \
+	pixi run cmake -G "Ninja" -DWITH_POCO=ON .. && \
+	pixi run cmake --build . --config debug --target install && \
 	cd ..
 
 release:
 	rm -rf _build && \
 	mkdir -p _build && \
 	cd _build && \
-	cmake -G "Ninja" -DWITH_POCO=OFF .. && \
-	cmake --build . --config RelWithDebInfo --target install && \
+	pixi run cmake -G "Ninja" -DWITH_POCO=ON .. && \
+	pixi run cmake --build . --config RelWithDebInfo --target install && \
 	cd ..
 
 run:

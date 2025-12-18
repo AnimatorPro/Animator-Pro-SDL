@@ -1,6 +1,8 @@
 /* pentools.c - routines that receive input when the cursor is over the
    drawing screen (and not in a sub-menu).  */
 
+#include <stdio.h>
+
 #include "pentools.h"
 
 #include "broadcas.h"
@@ -16,6 +18,8 @@
 #include "render.h"
 #include "util.h"
 #include "zoom.h"
+
+#include "undo_redo/undo_redo.h"
 
 
 static void save_thik_line_undo(SHORT y1, SHORT y2, SHORT brushsize);
@@ -93,15 +97,20 @@ bool pti_input(void)
 /* do it function for a pentool window */
 int do_pen_tool(void *wndo)
 {
+	LOG("start");
+
 	Wndo *w = wndo;
 	Errcode err;
 
 	if (vl.ptool) {
-		if (((err = (*(vl.ptool->doptool))(vl.ptool, w)) < Success) && err != Err_abort) {
+		err = (*(vl.ptool->doptool))(vl.ptool, w);
+		if (err < Success && err != Err_abort) {
 			softerr(err, "!%s", "tool_fail", vl.ptool->ot.name);
 			clear_redo();
 		}
 	}
+
+	LOG("end");
 	return 1;
 }
 
@@ -112,6 +121,8 @@ void do_pentool_once(Pentool *ptool)
 {
 	Pentool *optool;
 	Wndo *w;
+
+	LOG("start");
 
 	optool = vl.ptool;
 	if (set_curptool(ptool) < Success) {
@@ -124,6 +135,8 @@ void do_pentool_once(Pentool *ptool)
 
 done:
 	set_curptool(optool);
+
+	LOG("end");
 }
 
 Errcode box_tool(Pentool *pt, Wndo *w)
@@ -333,7 +346,8 @@ Errcode dtool_loop(Errcode (*get_posp)(Pos_p *pp, void *idata, SHORT mode), void
 				break;
 			case DT_DRAW:
 				save_thik_line_undo(op.y, rp.y, pen_width);
-				if ((err = render_line(op.x, op.y, rp.x, rp.y)) < Success) {
+				err = render_line(op.x, op.y, rp.x, rp.y);
+				if (err < Success) {
 					goto draw_error;
 				}
 				break;
@@ -363,7 +377,8 @@ Errcode dtool_loop(Errcode (*get_posp)(Pos_p *pp, void *idata, SHORT mode), void
 					around = 4;
 				}
 				save_thik_line_undo(op.y, rp.y, bsize);
-				if ((err = render_line(op.x, op.y, rp.x, rp.y)) < Success) {
+				err = render_line(op.x, op.y, rp.x, rp.y);
+				if (err < Success) {
 					goto draw_error;
 				}
 				--around;
@@ -397,6 +412,8 @@ static Errcode dtool(int mode)
 {
 	Errcode err;
 
+	LOG("start");
+
 	for (;;) {
 		if (!pti_input()) {
 			return Success;
@@ -415,9 +432,11 @@ static Errcode dtool(int mode)
 	}
 
 	if (err < Success) {
+		LOG("err - check_input");
 		check_input(ANY_INPUT); /* cause of reuse_input() */
 	}
 
+	LOG("end");
 	return err;
 }
 
@@ -426,16 +445,28 @@ static UBYTE *ychanged;
 
 Errcode start_line_undo(void)
 {
-	pj_cmap_copy(vb.pencel->cmap, undof->cmap);
-	if ((ychanged = pj_zalloc(vb.pencel->height)) == NULL) {
-		return (Err_no_memory);
+	LOG("start");
+	Errcode err = undo_push(UNDO_DRAW);
+	if (err < Success) {
+		LOG("Unable to save undo!");
 	}
+
+	//!TODO: is this necessary any more?
+	pj_cmap_copy(vb.pencel->cmap, undof->cmap);
+
+	ychanged = pj_zalloc(vb.pencel->height);
+	if (ychanged == NULL) {
+		return Err_no_memory;
+	}
+
+	LOG("end");
 	return Success;
 }
 
 void end_line_undo(void)
 {
 	int y;
+	LOG("start");
 
 	if (!ychanged) {
 		return;
@@ -448,27 +479,33 @@ void end_line_undo(void)
 		}
 	}
 	pj_freez(&ychanged);
+	LOG("end");
 }
 
 void save_line_undo(Coor y)
 {
+	// LOG("start");
 	if (y >= 0 && y < vb.pencel->height) {
 		if (!(ychanged[y])) {
 			pj_blitrect(vb.pencel, 0, y, undof, 0, y, undof->width, 1);
 			ychanged[y] = true;
 		}
 	}
+	// LOG("end");
 }
 
 void save_lines_undo(Ucoor start, int count)
 {
+	// LOG("start");
 	while (--count >= 0) {
 		save_line_undo(start++);
 	}
+	// LOG("end");
 }
 
 static void save_thik_line_undo(SHORT y1, SHORT y2, SHORT brushsize)
 {
+	// LOG("start");
 	SHORT height;
 
 	height = y2 - y1;
@@ -479,6 +516,7 @@ static void save_thik_line_undo(SHORT y1, SHORT y2, SHORT brushsize)
 	brushsize += 1;
 	brushsize >>= 1;
 	save_lines_undo(y1 - brushsize, height + (brushsize << 1) + 1);
+	// LOG("end");
 }
 
 /************** End of line-at-a-time undo saver */
@@ -498,10 +536,12 @@ Errcode spray_loop(Errcode (*get_posp)(Pos_p *pp, void *idata, SHORT mode), void
 
 	pj_srandom(1); /* make it repeatable... */
 	set_full_gradrect();
-	if ((err = make_render_cashes()) < 0) {
+	err = make_render_cashes();
+	if (err < 0) {
 		return err;
 	}
-	if ((err = start_line_undo()) < Success) {
+	err = start_line_undo();
+	if (err < Success) {
 		free_render_cashes();
 		return err;
 	}
@@ -511,7 +551,8 @@ Errcode spray_loop(Errcode (*get_posp)(Pos_p *pp, void *idata, SHORT mode), void
 	check_time = (!redoing) && vs.use_brush && (get_brush_size() > 2);
 
 	for (;;) {
-		if ((err = get_posp(&rp, idata, DT_SPRAY)) != Success) {
+		err = get_posp(&rp, idata, DT_SPRAY);
+		if (err != Success) {
 			break;
 		}
 
@@ -625,7 +666,8 @@ Errcode line_tool(Pentool *pt, Wndo *w)
 	if (!pti_input()) {
 		return Success;
 	}
-	if ((err = get_rub_line(xys)) < 0) {
+	err = get_rub_line(xys);
+	if (err < 0) {
 		goto error;
 	}
 	save_undo();

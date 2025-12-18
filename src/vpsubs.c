@@ -18,6 +18,7 @@
 #include "timemenu.h"
 #include "zoom.h"
 
+#include "undo_redo/undo_redo.h"
 
 #ifdef WITH_POCO
 int fli_screen_width(void)
@@ -307,9 +308,12 @@ void swap_undo(void)
 /* undo called from menus */
 void menu_doundo(void)
 {
-	if (vl.undoit != NULL) {
-		(*vl.undoit)();
-	}
+	// if (vl.undoit != NULL) {
+	// 	(*vl.undoit)();
+	// }
+
+	undo_perform();
+
 }
 
 bool check_undo_key(void)
@@ -324,13 +328,17 @@ bool check_undo_key(void)
 /* redo called from menus */
 void menu_doredo(void)
 {
-	if (vl.redoit != NULL) {
-		(*vl.redoit)();
-	}
+	// if (vl.redoit != NULL) {
+	// 	(*vl.redoit)();
+	// }
+
+	redo_perform();
 }
 
 void restore(void)
 {
+	undo_push(UNDO_FRAME);
+
 	save_undo();
 	fli_abs_tseek(vb.pencel, vs.frame_ix);
 	see_cmap();

@@ -712,12 +712,6 @@ Errcode go_load_the_cel(void)
 {
 	Errcode err = Success;
 	char sph_buf[50];
-
-	if (thecel == NULL) {
-		fprintf(stderr, "Attempted to save NULL 'thecel'.\n");
-		return Err_bad_address;
-	}
-
 	static char last_path[PATH_MAX] = "";
 
 	hide_mp();
