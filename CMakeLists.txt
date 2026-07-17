@@ -78,8 +78,6 @@ include_directories(thirdparty/stb)
 
 if (WITH_POCO)
 	add_compile_definitions(-DWITH_POCO=1)
-	add_subdirectory(thirdparty/libffi)
-	add_subdirectory(thirdparty/hashmap)
 	add_subdirectory(thirdparty/imgui/imgui)
 	include_directories(thirdparty/imgui/imgui)
 	include_directories(thirdparty/imgui/imgui/backends)

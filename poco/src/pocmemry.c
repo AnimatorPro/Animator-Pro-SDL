@@ -48,7 +48,6 @@ typedef struct mblk_ctl	  /* This structure is used to track blocks of*/
 } Mblk_ctl;				  /* has meaning only for the current block.	*/
 
 static Mblk_ctl* mblk_cur; /* This outlives PCB, must live in BSS mem. */
-static Poco_cb* ppcb;	   /* Used in error handling, must live in BSS.*/
 
 #define MBLK_CACHED 0x0402 /* Magic #: Block came from struct cache.	*/
 #define MBLK_ALLOCD 0x1126 /* Magic #: Block came from regular memory. */
@@ -80,7 +79,8 @@ static Errcode new_mblk(Poco_cb* pcb)
 		if (pcb != NULL) /* If pcb is NULL, we are doing initial setup, we	*/
 		{				 /* don't have a pcb yet, so we just return err code.*/
 			pcb->global_err = Err_no_memory;
-			po_say_fatal(pcb, "poco: out of memory");
+			pcb->compile_aborted = true;
+			pcb->compile_err = Err_no_memory;
 		}
 		return Err_no_memory;
 	}
@@ -129,7 +129,7 @@ Errcode po_init_memory_management(Poco_cb** pcb)
 	 * set up the poco_cb area, remember its location so we can free it later...
 	 */
 
-	*pcb = ppcb = (Poco_cb*)pmem;
+	*pcb = (Poco_cb*)pmem;
 	pmem += sizeof(Poco_cb);
 
 	/*
@@ -137,13 +137,13 @@ Errcode po_init_memory_management(Poco_cb** pcb)
 	 * another pair of lines for each needs to be added here...
 	 */
 
-	init_cache_ctl(&ppcb->smallblk_cache, pmem, NUM_SBLK, SIZ_SBLK);
+	init_cache_ctl(&(*pcb)->smallblk_cache, pmem, NUM_SBLK, SIZ_SBLK);
 	pmem += TOT_SBLK;
 
-	init_cache_ctl(&ppcb->expf_cache, pmem, NUM_EXPF, SIZ_EXPF);
+	init_cache_ctl(&(*pcb)->expf_cache, pmem, NUM_EXPF, SIZ_EXPF);
 	pmem += TOT_EXPF;
 
-	init_cache_ctl(&ppcb->pocf_cache, pmem, NUM_POCF, SIZ_POCF);
+	init_cache_ctl(&(*pcb)->pocf_cache, pmem, NUM_POCF, SIZ_POCF);
 	pmem += TOT_POCF;
 
 	return new_mblk(NULL);
@@ -154,10 +154,9 @@ Errcode po_init_memory_management(Poco_cb** pcb)
  * all this type of memory is alloc'd in one block.  the first item in the
  * block is the pcb, which we keep a pointer to solely for use in this routine.
  ****************************************************************************/
-void po_free_compile_memory(void)
+void po_free_compile_memory(Poco_cb* pcb)
 {
-	pj_gentle_free(ppcb);
-	ppcb = NULL;
+	pj_gentle_free(pcb);
 }
 
 /*****************************************************************************
@@ -167,7 +166,7 @@ void po_free_compile_memory(void)
  * recompile it.  the memory freed here is that which is used at compile time
  * only & that used during compile and run time.
  ****************************************************************************/
-void po_free_all_memory(void)
+void po_free_all_memory(Poco_cb* pcb)
 {
 	Mblk_ctl *cur, *next;
 
@@ -179,7 +178,7 @@ void po_free_all_memory(void)
 	}
 	mblk_cur = NULL;
 
-	po_free_compile_memory();
+	po_free_compile_memory(pcb);
 }
 
 /*****************************************************************************
@@ -238,8 +237,10 @@ void* po_memalloc(Poco_cb* pcb, register unsigned long size)
 
 	size += sizeof(*pt);
 
-	if (size > mblk_cur->unused)
-		new_mblk(pcb);
+	if (size > mblk_cur->unused) {
+		if (new_mblk(pcb) != Success)
+			return NULL;
+	}
 
 	pt = (USHORT*)(((char*)mblk_cur) + mblk_cur->used);
 	mblk_cur->used += size;
@@ -266,8 +267,10 @@ void* po_memzalloc(Poco_cb* pcb, register size_t size)
 
 	size += sizeof(*pt);
 
-	if (size > mblk_cur->unused)
-		new_mblk(pcb);
+	if (size > mblk_cur->unused) {
+		if (new_mblk(pcb) != Success)
+			return NULL;
+	}
 
 	pt = (USHORT*)(((char*)mblk_cur) + mblk_cur->used);
 	mblk_cur->used += size;
@@ -312,6 +315,8 @@ void* po_cache_malloc(Poco_cb* pcb, register Cache_ctl* pctl)
 	pctl->nxt_slot = pctl->num_slots;
 
 	pmem = po_memalloc(pcb, pctl->slot_size);
+	if (pmem == NULL)
+		return NULL;
 
 OUT:
 

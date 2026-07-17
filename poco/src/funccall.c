@@ -17,15 +17,10 @@
  *				Added handling of ANSI-type indirect function calls, such
  *				that "ptr()" is equivelent to "(*ptr)()".
  *	02/11/91	(Ian)
- *				Added logic to push param size and count for variable args
- *				passed to C (lib and poe) functions.  This allows the C code
- *				to do some parm checking on the variable part of the args,
- *				at least to the degree of ensuring the right number were
- *				passed for the given call.	The count is the count of variable
- *				args only, it does not include the number of fixed args, or
- *				itself; likewise the size.	Thus, the call:
- *					printf(fmtstr, int1, int2, double1, ptr1);
- *				would give a count of 4 and a size of 20.
+ *				Added variadic C-call support.
+ *	06/27/26	(Codex)
+ *				Replaced the retired stack count/byte-size transport with
+ *				typed dynamic libffi variadic metadata.
  *	09/06/91	(Jim)
  *				Changed TYPE_NCPT to TYPE_CPT for parameters to library
  *				functions following the ellipsis.
@@ -48,6 +43,41 @@
  ****************************************************************************/
 
 #include "poco.h"
+
+typedef struct ffi_vararg_type
+{
+	struct ffi_vararg_type* next;
+	IdoType ido_type;
+} Ffi_vararg_type;
+
+static int po_ffi_variadic_push_op(IdoType ido_type)
+{
+	switch (ido_type) {
+		case IDO_INT:
+			if (sizeof(int) == sizeof(int16_t))
+				return OP_FFI_PUSH_SINT16;
+			if (sizeof(int) == sizeof(int32_t))
+				return OP_FFI_PUSH_SINT32;
+			if (sizeof(int) == sizeof(int64_t))
+				return OP_FFI_PUSH_SINT64;
+			break;
+		case IDO_LONG:
+			if (sizeof(long) == sizeof(int16_t))
+				return OP_FFI_PUSH_SINT16;
+			if (sizeof(long) == sizeof(int32_t))
+				return OP_FFI_PUSH_SINT32;
+			if (sizeof(long) == sizeof(int64_t))
+				return OP_FFI_PUSH_SINT64;
+			break;
+		case IDO_DOUBLE:
+			return OP_FFI_PUSH_DOUBLE;
+		case IDO_CPT:
+			return OP_FFI_PUSH_POINTER;
+		default:
+			break;
+	}
+	return OP_BAD;
+}
 
 /*****************************************************************************
  * return the size in bytes of a parameter to a function.
@@ -79,9 +109,11 @@ int po_get_param_size(Poco_cb* pcb, SHORT ido_type)
 #endif /* STRING_EXPERIMENT */
 		case IDO_VPT:
 			po_say_fatal(pcb, "missing '*' in parameter to function??");
+   PO_CHECK_ABORT(pcb, 0);
 			break;
 		default:
 			po_say_fatal(pcb, "cannot pass structure by value (perhaps missing '*'?)");
+   PO_CHECK_ABORT(pcb, 0);
 			break;
 	}
 	return (psize);
@@ -99,17 +131,13 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 	SHORT idot;
 	SHORT param_count	   = 0;
 	int param_size		   = 0;
-	SHORT varg_param_count = 0;
-	int varg_param_size	   = 0;
 	int this_param_size;
 	bool is_cvarg_call = false;
 	Exp_frame* param_exps = NULL;
 	Exp_frame* exp;
+	Ffi_vararg_type* variadic_types = NULL;
+	Ffi_vararg_type* variadic_tail = NULL;
 	Code_buf callcode;
-
-	ffi_type* parameter_types[FFI_MAX_ARGS];
-	int parameter_index = 0;
-	memset(&parameter_types, 0, sizeof(ffi_type*) * FFI_MAX_ARGS);
 
 	po_init_code_buf(pcb, &callcode);
 	param		   = fff->parameters;
@@ -146,18 +174,23 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 #endif /* STRING_EXPERIMENT */
 
 				this_param_size = po_get_param_size(pcb, exp->ctc.ido_type);
-				varg_param_size += this_param_size;
-				varg_param_count += 1;
-
-				parameter_types[parameter_index] = po_ffi_type_from_ido_type(exp->ctc.ido_type);
-				parameter_index += 1;
+				Ffi_vararg_type* variadic_type = po_memalloc(pcb, sizeof(*variadic_type));
+				if (variadic_type == NULL) {
+					PO_CHECK_ABORT_VOID(pcb);
+					return;
+				}
+				variadic_type->next = NULL;
+				variadic_type->ido_type = exp->ctc.ido_type;
+				if (variadic_tail == NULL)
+					variadic_types = variadic_type;
+				else
+					variadic_tail->next = variadic_type;
+				variadic_tail = variadic_type;
 			}
 		} else {
 			// regular parameter
 			po_coerce_expression(pcb, exp, param->ti, false);
 			this_param_size					 = po_get_param_size(pcb, exp->ctc.ido_type);
-			parameter_types[parameter_index] = po_ffi_type_from_ido_type(exp->ctc.ido_type);
-			parameter_index += 1;
 		}
 
 		++param_count;
@@ -202,10 +235,12 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 	if (param_count < expected_count) {
 	NOT_ENOUGH_PARMS:
 		po_say_fatal(pcb, "not enough parameters in call to function '%s'", fff->name);
+  PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	if (pcb->t.toktype == ',') {
 		po_say_fatal(pcb, "too many parameters in call to function '%s'", fff->name);
+  PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	po_eat_rparen(pcb);
@@ -227,42 +262,21 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 	}
 
 	if (is_cvarg_call) {
-		po_code_long(pcb, &e->ecd, OP_LCON, varg_param_size);
-		po_code_long(pcb, &e->ecd, OP_LCON, varg_param_count);
-		param_size += 2 * sizeof(long); /* for stack cleanup instruction later */
-
-		/* new for libffi compat-- add ops for the variable types */
-		// clear current stack of parameter types
+		/* The descriptor contains precisely the actual variadic arguments.
+		 * It has no sentinel and no hidden stack metadata. */
 		po_code_op(pcb, &e->ecd, OP_FFI_POP_ALL);
+		for (; variadic_types != NULL; variadic_types = variadic_types->next) {
+			const int op = po_ffi_variadic_push_op(variadic_types->ido_type);
 
-		/* Only push types for the variadic parameters, not the fixed ones.
-		 * po_ffi_call uses variadic_types[0..vargcount-1] for the variadic
-		 * args only, so we must not include fixed parameter types here. */
-        for (int i = parameter_index - varg_param_count; i < parameter_index; i++) {
-            const ffi_type* type = parameter_types[i];
-            int op = 0;
-
-            if (type == &ffi_type_sint32 || type == &ffi_type_sint) {
-                op = OP_FFI_PUSH_SINT32;
-            } else if (type == &ffi_type_double) {
-                op = OP_FFI_PUSH_DOUBLE;
-            } else if (type == &ffi_type_pointer) {
-                op = OP_FFI_PUSH_POINTER;
-            } else {
-                fprintf(stderr,
-                        "-- Invalid CFFI variadic argument type (%s: %s --> bad %s)!\n",
-                        fff->name,
-                        param->name,
-                        po_ffi_name_for_type(type));
-            }
-
-            if (op) {
-                po_code_op(pcb, &e->ecd, op);
-            }
-        }
-
-		// finish off the list with a NULL pointer
-		po_code_op(pcb, &e->ecd, OP_FFI_PUSH_NULL);
+			if (op == OP_BAD) {
+				po_say_fatal(pcb,
+					"unsupported C variadic argument promotion in call to '%s'",
+					fff->name);
+				PO_CHECK_ABORT_VOID(pcb);
+				return;
+			}
+			po_code_op(pcb, &e->ecd, op);
+		}
 	}
 
 	po_concatenate_code(pcb, &e->ecd, &callcode);
@@ -324,6 +338,7 @@ void po_get_function(Poco_cb* pcb, Exp_frame* e)
 
 	if (end_type != TYPE_FUNCTION) {
 		po_say_fatal(pcb, "trying to call something that's not a function");
+  PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 

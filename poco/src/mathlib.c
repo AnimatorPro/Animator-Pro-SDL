@@ -4,6 +4,7 @@
 #include <signal.h>
 #include "poco_errcodes.h"
 #include "ptrmacro.h"
+#include "standard_library.h"
 
 extern Errcode builtin_err;
 
@@ -47,3 +48,28 @@ Poco_lib po_math_lib = {
 	NULL, "(C Standard) Math",
 	mathlib, Array_els(mathlib),
 	};
+
+const PocoLibrary *poco_standard_math_library(void)
+{
+	static PocoBinding bindings[Array_els(mathlib)];
+	static const PocoLibrary library = {
+		POCO_STANDARD_MATH_LIBRARY_ID,
+		bindings,
+		Array_els(bindings),
+		NULL,
+		NULL,
+		NULL,
+	};
+	static int initialized;
+	size_t index;
+
+	if (!initialized) {
+		for (index = 0; index < Array_els(mathlib); ++index) {
+			bindings[index].prototype = mathlib[index].proto;
+			bindings[index].function = (PocoNativeFunction)mathlib[index].func;
+			bindings[index].contract = mathlib[index].contract;
+		}
+		initialized = 1;
+	}
+	return &library;
+}

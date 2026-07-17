@@ -1,0 +1,39 @@
+/* Verify the default C promotions for each live standalone varargs wrapper.
+ * The static binding audit covers the Animator registry, which requires an
+ * interactive host and cannot safely be driven from CTest.
+ */
+#pragma poco echo "expect>Success"
+
+char output[256];
+
+main()
+{
+	FILE *file;
+	int count;
+	double decimal = 2.5;
+	char *pointer = "pointer";
+	char *null_pointer = NULL;
+
+	count = sprintf(output, "%d|%.1f|%s|%d|%p|%p", 65, decimal, "hello", 99, pointer, null_pointer);
+	if (count != strlen(output) || strncmp(output, "65|2.5|hello|99|", 16) != 0)
+	{
+		printf("FAIL: sprintf variadic promotions");
+		return;
+	}
+
+	file = fopen("live_variadic_bindings.tmp", "w");
+	if (file == NULL)
+	{
+		printf("FAIL: fopen");
+		return;
+	}
+	count = fprintf(file, "%d|%.1f|%s|%d|%p|%p", 65, decimal, "hello", 99, pointer, null_pointer);
+	fclose(file);
+	if (count != strlen(output))
+	{
+		printf("FAIL: fprintf variadic promotions");
+		return;
+	}
+
+	printf("Success");
+}

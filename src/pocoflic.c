@@ -211,16 +211,25 @@ static Errcode flic_integrity_check(Flic *pflic)
  *		func(Flic *flic, void *userdata,
  *			 long cur_loop, long cur_frame, long num_frames);
  *
- *	But we get that effect from here by passing the pflic->event_data
- *	struct by value.
+ *	The typed callback entry receives those five values in source order.
  ****************************************************************************/
 static bool until_poco_event(Flic *pflic)
 {
 	Errcode err;
 	Pt_num	ret;
+	PocoCallbackValue callback_args[5];
 
-	err = poco_cont_ops(pflic->poco_func, &ret,
-				sizeof(pflic->event_data), pflic->event_data);
+	callback_args[0].kind = POCO_CALLBACK_VALUE_POPOT;
+	callback_args[0].value.popot_value = pflic->event_data.pflic;
+	callback_args[1].kind = POCO_CALLBACK_VALUE_POPOT;
+	callback_args[1].value.popot_value = pflic->event_data.userdata;
+	callback_args[2].kind = POCO_CALLBACK_VALUE_LONG;
+	callback_args[2].value.long_value = pflic->event_data.cur_loop;
+	callback_args[3].kind = POCO_CALLBACK_VALUE_LONG;
+	callback_args[3].value.long_value = pflic->event_data.cur_frame;
+	callback_args[4].kind = POCO_CALLBACK_VALUE_LONG;
+	callback_args[4].value.long_value = pflic->event_data.num_frames;
+	err = poco_invoke_callback(pflic->poco_func, &ret, callback_args, 5);
 
 	if (err != Success) {
 		builtin_err = err;

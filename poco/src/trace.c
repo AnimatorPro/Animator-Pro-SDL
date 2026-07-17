@@ -90,6 +90,7 @@ bool po_compress_line_data(Poco_cb *pcb, Line_data *ld)
 	if (ld == NULL) /* added to watch out for trouble with the new concept of */
 	{               /* not tying line_data structs to FTY_STRUCT poco_frames. */
 		po_say_internal(pcb, "NULL line-data pointer in po_compress_line_data");
+  PO_CHECK_ABORT(pcb, false);
 	}
 #endif
 
@@ -125,6 +126,7 @@ bool po_add_line_data(Poco_cb *pcb, Line_data *ld, long offset, long line)
 	if (ld == NULL) /* added to watch out for trouble with the new concept of */
 	{               /* not tying line_data structs to FTY_STRUCT poco_frames. */
 		po_say_internal(pcb, "trying to add using NULL ptr in po_add_line_data");
+  PO_CHECK_ABORT(pcb, false);
 		return false;
 	}
 #endif

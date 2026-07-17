@@ -109,6 +109,7 @@ bool po_eat_lbrace(Poco_cb* pcb)
 void po_get_statements(Poco_cb* pcb, Poco_frame* d)
 {
 	for (;;) {
+		PO_CHECK_ABORT_VOID(pcb);
 		if (po_is_next_token(pcb, TOK_RBRACE))
 			return;
 		statement(pcb, d);
@@ -156,6 +157,7 @@ void po_check_array_dim(Poco_cb* pcb, Symbol* var)
 	if (ti->comp[cct] == TYPE_ARRAY) {
 		if (ti->sdims[cct].l == 0) {
 			po_say_fatal(pcb, "need array dimension or initialization");
+   PO_CHECK_ABORT_VOID(pcb);
 		}
 	}
 }
@@ -423,6 +425,7 @@ static void get_case_after(Poco_cb* pcb, Poco_frame* pf, Loop_frame* lf)
 	po_get_expression(pcb, &ef);
 	if (!ef.pure_const) {
 		po_say_fatal(pcb, "value for case must be a constant expression");
+  PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	po_coerce_expression(pcb, &ef, lft, false);
@@ -469,6 +472,7 @@ static void get_case(Poco_cb* pcb, Poco_frame* pf)
 
 	if ((lf = po_get_top_switch(pcb)) == NULL) {
 		po_say_fatal(pcb, "case outside of a switch");
+  PO_CHECK_ABORT_VOID(pcb);
 	} else {
 		if (lf->got_default)
 			po_say_fatal(pcb,
@@ -488,6 +492,7 @@ static void get_default(Poco_cb* pcb, Poco_frame* pf)
 
 	if ((lf = po_get_top_switch(pcb)) == NULL) {
 		po_say_fatal(pcb, "default outside of a switch");
+  PO_CHECK_ABORT_VOID(pcb);
 	} else {
 		po_eat_token(pcb, ':');
 		lf->got_default = true;
@@ -552,6 +557,7 @@ static void get_return(Poco_cb* pcb, Poco_frame* pf)
 
 	if (pf->frame_type != FTY_FUNC) {
 		po_say_fatal(pcb, "return statement outside of function");
+  PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 	if (!po_need_token(pcb))
@@ -559,6 +565,7 @@ static void get_return(Poco_cb* pcb, Poco_frame* pf)
 	if (pcb->t.toktype != ';') {
 		if (pf->return_type->ido_type == IDO_VOID)
 			po_say_fatal(pcb, "can't return something from a void function");
+   PO_CHECK_ABORT_VOID(pcb);
 		pushback_token(&pcb->t);
 		po_init_expframe(pcb, &ef);
 		po_get_expression(pcb, &ef);
@@ -683,6 +690,7 @@ static void get_break(Poco_cb* pcb, Poco_frame* pf)
 
 	if ((lf = pcb->loops) == NULL) {
 		po_say_fatal(pcb, "break statement outside of while/for/do/switch");
+  PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 	cpos = po_cbuf_code_size(&pf->fcd) + OPY_SIZE;
@@ -709,6 +717,7 @@ static void get_continue(Poco_cb* pcb, Poco_frame* pf)
 	}
 	if (lf == NULL) {
 		po_say_fatal(pcb, "continue statement outside of while/for/do");
+  PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 	cpos = po_cbuf_code_size(&pf->fcd) + OPY_SIZE;
@@ -852,6 +861,7 @@ static void statement(Poco_cb* pcb, Poco_frame* pf)
 				break;
 			case PTOK_ELSE:
 				po_say_fatal(pcb, "else without if");
+    PO_CHECK_ABORT_VOID(pcb);
 				break;
 			case PTOK_BREAK:
 				get_break(pcb, pf);

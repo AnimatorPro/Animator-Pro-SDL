@@ -6,7 +6,7 @@
  * executing the expression on the po_run_ops() interpreter.
  *
  * (Note to self:  Hey, what happens if we get a RUNOPS error during the
- *	compile phase???  Does this have implications for the setjmp/longjmp
+ *	compile phase???  Does this have implications for the error handling
  *	logic?	Can it happen?)
  *
  * MAINTENANCE
@@ -51,6 +51,7 @@ Errcode  err;
 		{
 		pcb->global_err = err;
 		po_say_fatal(pcb, "cannot evaluate constant expression");
+  PO_CHECK_ABORT_VOID(pcb);
 		}
 	csize = po_get_type_size(&exp->ctc);
 	clear_code_buf(pcb, cb);
@@ -72,6 +73,7 @@ Errcode  err;
 
 if (!exp->pure_const)
 	po_say_fatal(pcb, "integer constant expression required");
+ PO_CHECK_ABORT(pcb, 0);
 
 po_coerce_numeric_exp(pcb, exp, IDO_INT);
 
@@ -81,6 +83,7 @@ if (Success > (err = po_run_ops(&foldenv, cb->code_buf, NULL)))
 	{
 	pcb->global_err = err;
 	po_say_fatal(pcb, "cannot evaluate constant expression");
+ PO_CHECK_ABORT(pcb, 0);
 	}
 
 return *(fold_stack + sizeof(fold_stack) - sizeof(int) - sizeof(void *));

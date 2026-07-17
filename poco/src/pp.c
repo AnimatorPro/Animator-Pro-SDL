@@ -142,7 +142,7 @@
  * error message literals...
  *--------------------------------------------------------------------------*/
 
-static Poco_cb* ppcb; /* Used by pp_fatal to hide pcb to keep ppeval generic. */
+
 
 static char recurse_detected[] = "infinite loop detected during macro substitution";
 
@@ -167,7 +167,7 @@ static char pragma_unknown[]	= "'%s' is not a valid poco pragma";
 static char lib_name_missing[]	= "missing or malformed filename for library pragma";
 static char lib_cant_find[]		= "can't find POE library module %s";
 static char lib_open_failed[]	= "can't load POE library module %s";
-static char stksz_value_bad[]	= "stacksize value must be in kbytes, between 32 and 256";
+static char stksz_value_bad[]	= "stacksize value must be in kbytes, between 4 and 64";
 static char unexpected_tok[]	= "Unexpected \"%s\"";
 static char unexpected_eol[]	= "Unexpected end of line.";
 static char if_defined_syntax[] = "syntax error in '#if defined' statement";
@@ -190,7 +190,7 @@ static char eol_in_conditional[] = "end of library prototypes inside #if/#ifdef"
  * po_say_fatal() directly.  this lets us set the error line number to the
  * proper line, instead of taking it from curtoken.
  ****************************************************************************/
-void pp_say_fatal(char* fmt, ...)
+void pp_say_fatal(Poco_cb* pcb, char* fmt, ...)
 {
 	char sbuf[512];
 	va_list args;
@@ -199,10 +199,10 @@ void pp_say_fatal(char* fmt, ...)
 	vsprintf(sbuf, fmt, args);
 	va_end(args);
 
-	if (ppcb->t.file_stack != NULL) {
-		ppcb->error_line_number = ppcb->t.file_stack->line_count;
+	if (pcb->t.file_stack != NULL) {
+		pcb->error_line_number = pcb->t.file_stack->line_count;
 	}
-	po_say_fatal(ppcb, sbuf);
+	po_say_fatal(pcb, sbuf);
 }
 
 /*****************************************************************************
@@ -215,12 +215,12 @@ void pp_say_fatal(char* fmt, ...)
  *	first path in the list).  if no paths are a null string, all file searches
  *	will be rooted in the dirs specified in the include list.
  ****************************************************************************/
-static char* pp_findfile(Names* idirs, char* fname)
+static char* pp_findfile(Poco_cb* pcb, Names* idirs, char* fname)
 {
 	static char path[PATH_SIZE];
 	FILE* f;
 	int namelen;
-	PoBoolean verbose = (ppcb && ppcb->t.verbose);
+	PoBoolean verbose = (pcb && pcb->t.verbose);
 	PoBoolean found = false;
 
 	if (0 == (namelen = strlen(fname))) /* naughty naughty user...	  */
@@ -390,10 +390,13 @@ static void prev_file_stack_entry(Poco_cb* pcb)
 	fs = pcb->t.file_stack;
 
 	if (fs == NULL && pcb->t.ifdef_stack != NULL) {
-		if (fs->flags & FSF_ISFILE)
-			pp_say_fatal(eof_in_conditional);
-		else
-			pp_say_fatal(eol_in_conditional);
+		if (fs->flags & FSF_ISFILE) {
+			pp_say_fatal(pcb, eof_in_conditional);
+			PO_CHECK_ABORT_VOID(pcb);
+		} else {
+			pp_say_fatal(pcb, eol_in_conditional);
+			PO_CHECK_ABORT_VOID(pcb);
+		}
 	}
 }
 
@@ -470,7 +473,8 @@ static void pp_copy_qstring(Poco_cb* pcb, char** out, char** in, char delim)
 	for (;;) {
 		*outptr++ = c = *inptr++;
 		if (c == 0)
-			pp_say_fatal(macro_oneline);
+			pp_say_fatal(pcb, macro_oneline);
+   PO_CHECK_ABORT_VOID(pcb);
 		if (c == '\\' && lastc == '\\')		  /* don't let a slash-slash-delim screw us:*/
 			lastc = ~c;						  /* make 2nd slash invisible when checking */
 		else if (c == delim && lastc != '\\') /* the delim next time around. */
@@ -495,7 +499,8 @@ static void pp_copy_pstring(Poco_cb* pcb, char** out, char** in)
 	for (;;) {
 		*outptr++ = c = *inptr++;
 		if (c == 0)
-			pp_say_fatal(macro_oneline);
+			pp_say_fatal(pcb, macro_oneline);
+   PO_CHECK_ABORT_VOID(pcb);
 		if (c == '(')
 			++pcount;
 		else if (c == ')') {
@@ -745,7 +750,8 @@ static char* pp_expand(Poco_cb* pcb,
 
 		line = po_skip_space(line + wordlen);
 		if (line == NULL || *line != '(') {
-			pp_say_fatal(macro_needparm, ts->name);
+			pp_say_fatal(pcb, macro_needparm, ts->name);
+   PO_CHECK_ABORT(pcb, NULL);
 		} else
 			++line;
 
@@ -764,13 +770,15 @@ static char* pp_expand(Poco_cb* pcb,
 			if (*line++ == ')')	  // just has empty parens, then skip all the
 				goto ENDOFPARMS;  // parm-gathering groodah.
 			else
-				pp_say_fatal(macro_parmcount, macro_toomany);
+				pp_say_fatal(pcb, macro_parmcount, macro_toomany);
+    PO_CHECK_ABORT(pcb, NULL);
 		}
 
 		for (;;) {
 			switch (*line) {
 				case '\0':
-					pp_say_fatal(macro_oneline);
+					pp_say_fatal(pcb, macro_oneline);
+     PO_CHECK_ABORT(pcb, NULL);
 					break;
 				case '"':
 					pp_copy_qstring(pcb, &parmwrk, &line, '"');
@@ -785,7 +793,8 @@ static char* pp_expand(Poco_cb* pcb,
 				case ',':
 					*parmwrk++ = '\0';
 					if (++pcount >= MAX_MACRO_PARMS)
-						pp_say_fatal(macro_parmcount, macro_toomany);
+						pp_say_fatal(pcb, macro_parmcount, macro_toomany);
+      PO_CHECK_ABORT(pcb, NULL);
 					parms[pcount] = pp_strtrim(thisparm);
 					thisparm	  = parmwrk;
 					if (*line++ == ')')
@@ -806,8 +815,9 @@ static char* pp_expand(Poco_cb* pcb,
 		 * the macro, so that we can splice it back on after the expansion.
 		 */
 		if (pcount != ts->parmcount) {
-			pp_say_fatal(
+			pp_say_fatal(pcb, 
 			  macro_parmcount, ((pcount < ts->parmcount) ? macro_toofew : macro_toomany), ts->name);
+     PO_CHECK_ABORT(pcb, NULL);
 		}
 
 		strcpy(savbuf, line);
@@ -838,7 +848,8 @@ static char* pp_expand(Poco_cb* pcb,
 			}
 
 			if (bufrspace <= 0) /* If overflow, die */
-				pp_say_fatal(macro_overflow);
+				pp_say_fatal(pcb, macro_overflow);
+    PO_CHECK_ABORT(pcb, NULL);
 
 			if (c == 0) /* If end of template, exit loop. */
 				break;
@@ -870,14 +881,16 @@ static char* pp_expand(Poco_cb* pcb,
 				--bufrspace;
 			}
 			if (bufrspace <= 0)
-				pp_say_fatal(macro_overflow);
+				pp_say_fatal(pcb, macro_overflow);
+    PO_CHECK_ABORT(pcb, NULL);
 		}
 
 		/*
 		 * make sure the substitution left us enough room to put the tail back.
 		 */
 		if (bufrspace < strlen(savbuf))
-			pp_say_fatal(macro_overflow);
+			pp_say_fatal(pcb, macro_overflow);
+   PO_CHECK_ABORT(pcb, NULL);
 		strcpy(outbuf, savbuf);
 
 		po_freemem(parmbuf);
@@ -909,7 +922,8 @@ static char* pp_expand(Poco_cb* pcb,
 		} else				   /* It's simple, but won't fit in-place. */
 		{
 			if ((bufrspace - diff) < 0) /* Make sure we won't overflow buffer.  */
-				pp_say_fatal(macro_overflow);
+				pp_say_fatal(pcb, macro_overflow);
+    PO_CHECK_ABORT(pcb, NULL);
 			strcpy(savbuf, line + wordlen);			/* Save input line tail,	*/
 			line = pp_join_strings(line, template); /* put new value in line, */
 			strcpy(line, savbuf);					/* copy tail after new.	*/
@@ -935,7 +949,8 @@ static UBYTE* prep_line(Poco_cb* pcb, UBYTE* line_buf, UBYTE* word_buf, int bsiz
 
 	for (;;) {
 		if (++loopcount > RECURSE_LIMIT)
-			pp_say_fatal(recurse_detected);
+			pp_say_fatal(pcb, recurse_detected);
+   PO_CHECK_ABORT(pcb, NULL);
 		if ('\0' == (c = *in++))
 			break;
 		if (c == '\'' || c == '"') {
@@ -1012,7 +1027,8 @@ static bool pp_if(Poco_cb* pcb, char* line, char* word_buf)
 	 */
 	for (;;) {
 		if (++loopcount > RECURSE_LIMIT)
-			pp_say_fatal(recurse_detected);
+			pp_say_fatal(pcb, recurse_detected);
+   PO_CHECK_ABORT(pcb, false);
 		if ('\0' == (c = *in++))
 			break;
 		if (c == '\'' || c == '"') {
@@ -1031,14 +1047,17 @@ static bool pp_if(Poco_cb* pcb, char* line, char* word_buf)
 				if (0 == po_eqstrcmp(word_buf, "defined")) {
 					if (NULL ==
 						(nxtchr = tokenize_word(nxtchr, word_buf, NULL, NULL, &ttype, true)))
-						pp_say_fatal(if_defined_syntax);
+						pp_say_fatal(pcb, if_defined_syntax);
+      PO_CHECK_ABORT(pcb, false);
 					if (ttype == '(') {
 						if (NULL ==
 							(nxtchr = tokenize_word(nxtchr, word_buf, NULL, NULL, &ttype, true)))
-							pp_say_fatal(if_defined_syntax);
-						if (NULL == (nxtchr = po_skip_space(nxtchr)) || *nxtchr != ')')
-							pp_say_fatal(if_defined_syntax);
-						else
+							pp_say_fatal(pcb, if_defined_syntax);
+       PO_CHECK_ABORT(pcb, false);
+						if (NULL == (nxtchr = po_skip_space(nxtchr)) || *nxtchr != ')') {
+							pp_say_fatal(pcb, if_defined_syntax);
+							PO_CHECK_ABORT(pcb, false);
+						} else
 							++nxtchr;
 					}
 					len = nxtchr - in;
@@ -1057,7 +1076,7 @@ static bool pp_if(Poco_cb* pcb, char* line, char* word_buf)
 		}
 	}
 
-	return po_pp_eval(line, word_buf);
+	return po_pp_eval(pcb, line, word_buf);
 }
 
 /*****************************************************************************
@@ -1097,7 +1116,8 @@ static void pp_define(Poco_cb* pcb, char* line, char* wrkbuf)
 			if (ttype != TOK_UNDEF)
 				po_expecting_got_str(pcb, macro_parmname, wrkbuf);
 			if (++pcount >= MAX_MACRO_PARMS)
-				pp_say_fatal(macro_parmexceed);
+				pp_say_fatal(pcb, macro_parmexceed);
+    PO_CHECK_ABORT_VOID(pcb);
 			parms[pcount] = wrkbuf;
 			wrkbuf += 1 + strlen(wrkbuf);
 			line = tokenize_word(line, wrkbuf, NULL, NULL, &ttype, true);
@@ -1171,7 +1191,8 @@ static void pp_define(Poco_cb* pcb, char* line, char* wrkbuf)
 		if (old->parmcount == pcount && 0 == po_eqstrcmp(old->value, value))
 			return;
 		else
-			pp_say_fatal(macro_redefined);
+			pp_say_fatal(pcb, macro_redefined);
+   PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	/*
@@ -1190,11 +1211,13 @@ static void pp_undef(Poco_cb* pcb, char* line, char* word_buf)
 	Text_symbol* ts;
 
 	if (NULL == (line = tokenize_word(line, word_buf, NULL, NULL, &ttype, true)))
-		pp_say_fatal(macro_expect_name);
+		pp_say_fatal(pcb, macro_expect_name);
+  PO_CHECK_ABORT_VOID(pcb);
 
 	if (NULL != (ts = pp_in_hash_list(word_buf, pcb->t.define_list))) {
 		if (ts->flags & TSFL_ISBUILTIN)
-			pp_say_fatal(macro_builtin);
+			pp_say_fatal(pcb, macro_builtin);
+   PO_CHECK_ABORT_VOID(pcb);
 		unhash(word_buf, pcb->t.define_list);
 	}
 }
@@ -1320,7 +1343,8 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 					pcb->run.stack_size = wrksize;
 					goto pragma_done;
 				}
-				pp_say_fatal(stksz_value_bad);
+				pp_say_fatal(pcb, stksz_value_bad);
+    PO_CHECK_ABORT_VOID(pcb);
 			}
 				/***** library cases *****/
 			case 3: /* want a library name */
@@ -1381,7 +1405,8 @@ unexpected:
 	else
 		fatal = unexpected_tok;
 fatal_error:
-	pp_say_fatal(fatal, word_buf);
+	pp_say_fatal(pcb, fatal, word_buf);
+ PO_CHECK_ABORT_VOID(pcb);
 	return;
 }
 
@@ -1393,14 +1418,20 @@ static void pp_include(Poco_cb* pcb, char* line, char* word_buf)
 	FILE* fp;
 	char* path;
 
-	if (NULL == pp_chop_string(pcb, line, word_buf, true))
-		pp_say_fatal(incl_name_missing);
+	if (NULL == pp_chop_string(pcb, line, word_buf, true)) {
+		pp_say_fatal(pcb, incl_name_missing);
+		PO_CHECK_ABORT_VOID(pcb);
+	}
 
-	if (NULL == (path = pp_findfile(pcb->t.include_dirs, word_buf)))
-		pp_say_fatal(incl_open, word_buf);
+	if (NULL == (path = pp_findfile(pcb, pcb->t.include_dirs, word_buf))) {
+		pp_say_fatal(pcb, incl_open, word_buf);
+		PO_CHECK_ABORT_VOID(pcb);
+	}
 
-	if (NULL == (fp = fopen(path, "r")))
-		pp_say_fatal(incl_open, word_buf);
+	if (NULL == (fp = fopen(path, "r"))) {
+		pp_say_fatal(pcb, incl_open, word_buf);
+		PO_CHECK_ABORT_VOID(pcb);
+	}
 
 	new_file_stack_entry(pcb, fp, path, FSF_ISFILE | FSF_MACSUB);
 }
@@ -1443,11 +1474,14 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 		else if (po_eqstrcmp(word_buf, "error") == 0 && pcb->t.out_of_it == 0) {
 			line = po_skip_space(line);
 			if (line != NULL)
-				pp_say_fatal("#error: %s", line);
-			else
-				pp_say_fatal(forced_fatal);
+			if (line != NULL) {
+				pp_say_fatal(pcb, "#error: %s", line);
+				PO_CHECK_ABORT_VOID(pcb);
+			} else {
+				pp_say_fatal(pcb, forced_fatal);
+				PO_CHECK_ABORT_VOID(pcb);
+			}
 		}
-
 		/* line */
 
 		else if (po_eqstrcmp(word_buf, "line") == 0 && pcb->t.out_of_it == 0) {
@@ -1492,7 +1526,8 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 			register Conditional* con;
 
 			if (NULL == (con = pcb->t.ifdef_stack))
-				pp_say_fatal(else_unmatched);
+				pp_say_fatal(pcb, else_unmatched);
+    PO_CHECK_ABORT_VOID(pcb);
 
 			if (con->else_state == PP_NO_ELSE_SEEN) {
 				if (con->state) {
@@ -1504,7 +1539,8 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 						--pcb->t.out_of_it;
 				}
 			} else if (con->else_state == PP_DONE_ELSE)
-				pp_say_fatal(elif_after_else);
+				pp_say_fatal(pcb, elif_after_else);
+    PO_CHECK_ABORT_VOID(pcb);
 		}
 
 		/* else */
@@ -1513,13 +1549,15 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 			register Conditional* con;
 
 			if (NULL == (con = pcb->t.ifdef_stack))
-				pp_say_fatal(else_unmatched);
+				pp_say_fatal(pcb, else_unmatched);
+    PO_CHECK_ABORT_VOID(pcb);
 
 			if (con->else_state ==
 				PP_NO_ELSE_SEEN) { /* C *almost* has the grace of APL.  Consider the next line...*/
 				pcb->t.out_of_it += (con->state = !con->state) ? -1 : 1;
 			} else if (con->else_state == PP_DONE_ELSE)
-				pp_say_fatal(else_multiple);
+				pp_say_fatal(pcb, else_multiple);
+    PO_CHECK_ABORT_VOID(pcb);
 
 			con->else_state = PP_DONE_ELSE;
 		}
@@ -1530,7 +1568,8 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 			register Conditional* con;
 
 			if ((con = pcb->t.ifdef_stack) == NULL)
-				pp_say_fatal(endif_unmatched);
+				pp_say_fatal(pcb, endif_unmatched);
+    PO_CHECK_ABORT_VOID(pcb);
 
 			if (!con->state)
 				--pcb->t.out_of_it;
@@ -1541,7 +1580,8 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 		/* unknown pp command */
 
 		else if (pcb->t.out_of_it == 0) {
-			pp_say_fatal(ppcmd_unknown, word_buf);
+			pp_say_fatal(pcb, ppcmd_unknown, word_buf);
+   PO_CHECK_ABORT_VOID(pcb);
 		}
 	}
 }
@@ -1575,7 +1615,7 @@ bool po_init_pp(Poco_cb* pcb, char* filename)
 	char wrkstr[256];
 	register Names* cldefs;
 
-	ppcb = pcb;
+
 
 	pcb->t.out_of_it = 0;
 
@@ -1665,6 +1705,7 @@ char* po_pp_next_line(Poco_cb* pcb)
 	char* instring;
 
 	do {
+		PO_CHECK_ABORT(pcb, NULL);
 		if ((fs = pcb->t.file_stack) == NULL) /* all out of input */
 			return NULL;
 

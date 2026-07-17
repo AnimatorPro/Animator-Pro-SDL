@@ -1,0 +1,8 @@
+main()
+{
+	char bytes[4];
+	bytes[0] = 'a';
+	bytes[1] = 0;
+	strcat(bytes, "bbb");
+	return 0;
+}

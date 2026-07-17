@@ -1,0 +1,6 @@
+#include "answer.h"
+
+main()
+{
+	return twice(20) + EXTRA;
+}

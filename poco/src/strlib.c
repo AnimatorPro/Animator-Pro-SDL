@@ -5,10 +5,11 @@
 #include <string.h>
 
 #include "poco_errcodes.h"
-#include "pjhost.h"
+#include "port.h"
 #include "poco.h"
 #include "pocolib.h"
 #include "ptrmacro.h"
+#include "standard_library.h"
 
 extern Errcode builtin_err;
 
@@ -41,6 +42,28 @@ static int po_sprintf(char* buf, char* format, ...)
 	rv = vsprintf(buf, format, args);
 	va_end(args);
 
+	return rv;
+}
+
+/*****************************************************************************
+ * int snprintf(char *buf, int maxlen, char *format, ...)
+ *
+ * This is the bounded formatting alternative.  sprintf remains intentionally
+ * trusted for legacy scripts because its prototype carries no destination
+ * capacity for the FFI contract to validate.
+ ****************************************************************************/
+static int po_snprintf(char* buf, int maxlen, char* format, ...)
+{
+	int rv;
+	va_list args;
+
+	if (buf == NULL || format == NULL)
+		return (builtin_err = Err_null_ref);
+	if (maxlen < 0)
+		return (builtin_err = Err_parameter_range);
+	va_start(args, format);
+	rv = vsnprintf(buf, (size_t)maxlen, format, args);
+	va_end(args);
 	return rv;
 }
 
@@ -346,30 +369,125 @@ static char* po_strerror(int err)
  *	you can add or delete protos anywhere in the list below.
  *--------------------------------------------------------------------------*/
 
+#define POCO_NO_PARAMETER POCO_BINDING_PARAMETER_NONE
+
+static void po_release_owned_string(void* pointer, void* user_data)
+{
+	(void)user_data;
+	po_free(pointer);
+}
+
+static const PocoBindingPointerContract one_cstring_read[] = {
+	{0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract two_cstring_read[] = {
+	{0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract bounded_format_spans[] = {
+	{0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+		1, 1, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+	{2, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract strcpy_spans[] = {
+	{0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, 1},
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract strncpy_spans[] = {
+	{0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract strcat_spans[] = {
+	{0, POCO_POINTER_PERMISSION_READ | POCO_POINTER_PERMISSION_WRITE, 1,
+		POCO_BINDING_SPAN_APPEND_C_STRING, 0, POCO_NO_PARAMETER,
+		POCO_NO_PARAMETER, 1},
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract strncmp_spans[] = {
+	{0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract mutable_cstring_span[] = {
+	{0, POCO_POINTER_PERMISSION_READ | POCO_POINTER_PERMISSION_WRITE, 1,
+		POCO_BINDING_SPAN_C_STRING, 0, POCO_NO_PARAMETER,
+		POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+
+static const PocoBindingContract snprintf_contract = {
+	bounded_format_spans, Array_els(bounded_format_spans), {0}
+};
+static const PocoBindingContract strcmp_contract = {
+	two_cstring_read, Array_els(two_cstring_read), {0}
+};
+static const PocoBindingContract strncmp_contract = {
+	strncmp_spans, Array_els(strncmp_spans), {0}
+};
+static const PocoBindingContract strlen_contract = {
+	one_cstring_read, Array_els(one_cstring_read), {0}
+};
+static const PocoBindingContract strcpy_contract = {
+	strcpy_spans, Array_els(strcpy_spans), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract strncpy_contract = {
+	strncpy_spans, Array_els(strncpy_spans), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract strcat_contract = {
+	strcat_spans, Array_els(strcat_spans), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract strdup_contract = {
+	one_cstring_read, Array_els(one_cstring_read),
+	{POCO_POINTER_RETURN_OWNED, POCO_NO_PARAMETER, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, 0,
+		POCO_POINTER_PERMISSION_READ | POCO_POINTER_PERMISSION_WRITE,
+		po_release_owned_string, NULL}
+};
+static const PocoBindingContract first_string_alias_contract = {
+	one_cstring_read, Array_els(one_cstring_read), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract first_of_two_alias_contract = {
+	two_cstring_read, Array_els(two_cstring_read), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract mutable_string_alias_contract = {
+	mutable_cstring_span, Array_els(mutable_cstring_span), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+
 static Lib_proto lib[] = {
 	/* string stuff */
+	/* sprintf is intentionally legacy/unsafe: use snprintf where capacity is known. */
 	{ po_sprintf, "int     sprintf(char *buf, char *format, ...);" },
-	{ po_strcmp, "int     strcmp(char *a, char *b);" },
-	{ po_stricmp, "int     stricmp(char *a, char *b);" },
-	{ po_strncmp, "int     strncmp(char *a, char *b, int maxlen);" },
-	{ po_strlen, "int     strlen(char *a);" },
-	{ po_strcpy, "char    *strcpy(char *dest, char *source);" },
-	{ po_strncpy, "char    *strncpy(char *dest, char *source, int maxlen);" },
-	{ po_strcat, "char    *strcat(char *dest, char *source);" },
-	{ po_strdup, "char    *strdup(char *source);" },
-	{ po_strchr, "char    *strchr(char *source, int c);" },
-	{ po_strrchr, "char    *strrchr(char *source, int c);" },
-	{ po_strstr, "char    *strstr(char *string, char *substring);" },
-	{ po_stristr, "char    *stristr(char *string, char *substring);" },
-	{ po_atoi, "int     atoi(char *string);" },
-	{ po_atof, "double  atof(char *string);" },
-	{ po_strpbrk, "char    *strpbrk(char *string, char *breakset);" },
-	{ po_strspn, "int     strspn(char *string, char *breakset);" },
-	{ po_strcspn, "int     strcspn(char *string, char *breakset);" },
+	{ po_snprintf, "int     snprintf(char *buf, int maxlen, char *format, ...);", &snprintf_contract },
+	{ po_strcmp, "int     strcmp(char *a, char *b);", &strcmp_contract },
+	{ po_stricmp, "int     stricmp(char *a, char *b);", &strcmp_contract },
+	{ po_strncmp, "int     strncmp(char *a, char *b, int maxlen);", &strncmp_contract },
+	{ po_strlen, "int     strlen(char *a);", &strlen_contract },
+	{ po_strcpy, "char    *strcpy(char *dest, char *source);", &strcpy_contract },
+	{ po_strncpy, "char    *strncpy(char *dest, char *source, int maxlen);", &strncpy_contract },
+	{ po_strcat, "char    *strcat(char *dest, char *source);", &strcat_contract },
+	{ po_strdup, "char    *strdup(char *source);", &strdup_contract },
+	{ po_strchr, "char    *strchr(char *source, int c);", &first_string_alias_contract },
+	{ po_strrchr, "char    *strrchr(char *source, int c);", &first_string_alias_contract },
+	{ po_strstr, "char    *strstr(char *string, char *substring);", &first_of_two_alias_contract },
+	{ po_stristr, "char    *stristr(char *string, char *substring);", &first_of_two_alias_contract },
+	{ po_atoi, "int     atoi(char *string);", &strlen_contract },
+	{ po_atof, "double  atof(char *string);", &strlen_contract },
+	{ po_strpbrk, "char    *strpbrk(char *string, char *breakset);", &first_of_two_alias_contract },
+	{ po_strspn, "int     strspn(char *string, char *breakset);", &strcmp_contract },
+	{ po_strcspn, "int     strcspn(char *string, char *breakset);", &strcmp_contract },
 	{ po_strtok, "char    *strtok(char *string, char *delimset);" },
-	{ po_getenv, "char    *getenv(char *varname);" },
-	{ po_strlwr, "char    *strlwr(char *string);" },
-	{ po_strupr, "char    *strupr(char *string);" },
+	{ po_getenv, "char    *getenv(char *varname);", &strlen_contract },
+	{ po_strlwr, "char    *strlwr(char *string);", &mutable_string_alias_contract },
+	{ po_strupr, "char    *strupr(char *string);", &mutable_string_alias_contract },
 	{ po_strerror, "char    *strerror(int errnum);" },
 };
 
@@ -379,3 +497,28 @@ Poco_lib po_str_lib = {
 	lib,
 	Array_els(lib),
 };
+
+const PocoLibrary *poco_standard_string_library(void)
+{
+	static PocoBinding bindings[Array_els(lib)];
+	static const PocoLibrary library = {
+		POCO_STANDARD_STRING_LIBRARY_ID,
+		bindings,
+		Array_els(bindings),
+		NULL,
+		NULL,
+		NULL,
+	};
+	static int initialized;
+	size_t index;
+
+	if (!initialized) {
+		for (index = 0; index < Array_els(lib); ++index) {
+			bindings[index].prototype = lib[index].proto;
+			bindings[index].function = (PocoNativeFunction)lib[index].func;
+			bindings[index].contract = lib[index].contract;
+		}
+		initialized = 1;
+	}
+	return &library;
+}

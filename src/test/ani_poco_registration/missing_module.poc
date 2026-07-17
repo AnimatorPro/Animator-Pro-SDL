@@ -1,0 +1,11 @@
+/*
+ * Requesting a POE module that does not exist must report a compile error, not
+ * crash.  The Animator errline() path used to draw a windowed error box through
+ * a NULL Wscreen in the headless runtime and segfaulted.
+ */
+#pragma poco library "poco_absent_test_module.poe"
+
+int main()
+{
+	return 0;
+}

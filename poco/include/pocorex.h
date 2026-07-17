@@ -1,5 +1,9 @@
 /*****************************************************************************
- * POCOREX.H - Minimal header defining structures used by POE loadable modules.
+ * POCOREX.H - Compatibility-only legacy POE module ABI.
+ *
+ * Deprecated for new modules: export poco_module_get from <poco/poco.h> and
+ * return a PocoModuleDescriptor.  Pocorex/poco_rexlib_get remain available
+ * only while existing Animator POE modules migrate.
  ****************************************************************************/ 
 
 #ifndef POCOREX_H
@@ -45,5 +49,4 @@ typedef Pocorex* (*Poco_rexlib_get_func)(void);
  POCO_EXPORT Pocorex* poco_rexlib_get(void) { return &rexlib_header; }
 
 #endif /* POCOREX_H */
-
 

@@ -72,10 +72,13 @@ void po_trash_code_buf(Poco_cb* pcb, Code_buf* c)
 
 #ifdef DEVELOPMENT
 	if (c->cryptic != CCRYPTIC) {
-		if (c->cryptic == CTRASHED)
+		if (c->cryptic == CTRASHED) {
 			po_say_internal(pcb, "trashing code_buf twice");
-		else
+			PO_CHECK_ABORT_VOID(pcb);
+		} else {
 			po_say_internal(pcb, "trashing uninitted code_buf");
+			PO_CHECK_ABORT_VOID(pcb);
+		}
 		return;
 	}
 #endif /* DEVELOPMENT */
@@ -96,9 +99,11 @@ static bool add_code(Poco_cb* pcb, Code_buf* cbuf, void* ops, SHORT op_size)
 #ifdef DEVELOPMENT
 	if (ropsize <= 0) {
 		po_say_internal(pcb, "add_code called with ropsize == 0!");
+		PO_CHECK_ABORT(pcb, false);
 	}
 	if (cbuf->cryptic != CCRYPTIC) {
 		po_say_internal(pcb, "add_code using uninitialized code_buf");
+		PO_CHECK_ABORT(pcb, false);
 		return (false);
 	}
 #endif
@@ -153,6 +158,7 @@ bool po_add_op(Poco_cb* pcb, Code_buf* cbuf, int op, void* data, SHORT data_size
 #ifdef DEVELOPMENT
 	if (op <= OP_BAD || op >= OP_PAST_LAST) {
 		po_say_fatal(pcb, "Trying to code invalid opcode %d (not %d-%d)", op, OP_BAD, OP_PAST_LAST);
+		PO_CHECK_ABORT(pcb, false);
 	}
 #endif /* DEVELOPMENT */
 	if (!add_code(pcb, cbuf, &op, sizeof(op))) {
@@ -172,9 +178,10 @@ void po_backup_code(Poco_cb* pcb, Code_buf* cb, int op_size)
 {
 
 #ifdef DEVELOPMENT
-	if (cb->code_pt - cb->code_buf < op_size) /* should never happen */
+	if (cb->code_pt - cb->code_buf < op_size) { /* should never happen */
 		po_say_internal(pcb, "error in po_backup_code");
-	else
+		PO_CHECK_ABORT_VOID(pcb);
+	} else
 #endif
 		cb->code_pt -= op_size;
 }

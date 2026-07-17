@@ -1,0 +1,6 @@
+main()
+{
+	char bytes[4];
+	strcpy(bytes, "four");
+	return 0;
+}

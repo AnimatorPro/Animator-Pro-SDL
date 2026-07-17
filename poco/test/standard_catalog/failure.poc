@@ -1,0 +1,16 @@
+int zero = 0;
+
+main()
+{
+	FILE *file;
+	void *memory;
+
+	memory = malloc(16);
+	if (memory == NULL)
+		return 1;
+	memset(memory, 'F', 16);
+	file = fopen("poco-standard-catalog-failure.txt", "w");
+	if (file == NULL || fputs("failure", file) < 0)
+		return 2;
+	return 1 / zero;
+}

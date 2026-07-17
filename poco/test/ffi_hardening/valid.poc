@@ -1,0 +1,4 @@
+main()
+{
+	return fixture_add(20, 22);
+}

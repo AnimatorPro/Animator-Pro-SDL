@@ -11,6 +11,8 @@
 #define Err_poco_ffi_no_func_map     (-1203)
 #define Err_poco_ffi_no_map_insert   (-1204)
 #define Err_poco_ffi_variadic_overflow (-1205)
+#define Err_poco_ffi_invalid_binding (-1206)
+#define Err_poco_ffi_bounds          (-1207)
 #endif
 
 #ifndef Err_poco_lib_not_found
@@ -77,6 +79,8 @@ typedef enum Errcode {
 	Err_poco_ffi_no_func_map = -1203,
 	Err_poco_ffi_no_map_insert = -1204,
 	Err_poco_ffi_variadic_overflow = -1205,
+	Err_poco_ffi_invalid_binding = -1206,
+	Err_poco_ffi_bounds = -1207,
 	/* poco library loading errors */
 	Err_poco_lib_not_found = -1300,
 	Err_poco_lib_load_failed = -1301,

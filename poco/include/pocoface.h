@@ -1,9 +1,17 @@
-
+/*
+ * Compatibility-only legacy compiler API.
+ *
+ * Deprecated for new hosts: use <poco/poco.h> and the PocoVm/PocoProgram
+ * lifecycle.  compile_poco(), run_poco(), and free_poco() preserve the
+ * existing ABI solely for Animator and legacy callers during migration.
+ */
 #ifndef POCOFACE_H
 #define POCOFACE_H
 
-#ifndef COMMONST_H
+#ifndef POCO_LEGACY_NAMES_TYPE
 #include "commonst.h"
+#define POCO_LEGACY_NAMES_TYPE Names
+#define POCO_UNDEF_LEGACY_NAMES_TYPE
 #endif
 #ifndef POCOLIB_H
     #include "pocolib.h"
@@ -26,7 +34,7 @@ Errcode compile_poco(void **ppev,	/* returns executable pexe on Success */
 	char *err_fname,	/* file where error detected */
 	long *err_line, 	/* line where error detected */
 	int *err_char,		/* character in line where err detected */
-	Names *include_dirs, /* include search path */
+	POCO_LEGACY_NAMES_TYPE *include_dirs, /* include search path */
 	bool verbose		/* enable verbose debug output */
 	);
 /* Compile poco function.  Leave error messages in a file named errors.
@@ -67,5 +75,10 @@ char *po_fuf_name(void *fuf);
 /* Retrieve last error message from libpoco.
  * Returns pointer to static buffer; cleared at start of compile/run. */
 const char* poco_get_error(void);
+
+#ifdef POCO_UNDEF_LEGACY_NAMES_TYPE
+#undef POCO_UNDEF_LEGACY_NAMES_TYPE
+#undef POCO_LEGACY_NAMES_TYPE
+#endif
 
 #endif /* POCOFACE_H */

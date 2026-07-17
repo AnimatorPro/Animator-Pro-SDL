@@ -1,0 +1,14 @@
+/*
+ * Passes a char*[] to TestStrChecksum (registered by the harness), which sums
+ * each string's bytes via po_array_str.  'A'+'B'+'C' = 198; a char**
+ * marshalling regression yields a wrong sum and main() returns non-zero.
+ */
+char *strs[] = { "AB", "C" };
+
+int main()
+{
+	if (TestStrChecksum(strs, 2) != 198) {
+		return 1;
+	}
+	return 0;
+}

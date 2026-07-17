@@ -1,0 +1,50 @@
+/*
+ * Calls are unreachable so the fixture compiles every adapter category
+ * without requiring a live Animator window.  GetAbort() is safe in the
+ * minimal runtime and proves the registered program executes as well.
+ */
+
+/*
+ * char** input-array bindings.  These regression-guard the multi-level
+ * pointer path: the registered prototypes keep their "char **" spelling (a
+ * "char **" -> "char *" collapse at registration would make these calls fail
+ * to compile against the char*[] arguments passed here).
+ */
+char *menu_choices[] = { "One", "Two", "Cancel" };
+char *scroll_items[] = { "Item A", "Item B" };
+char *scroll_btns[]  = { "Ok", "Info", "Cancel" };
+
+int main()
+{
+	int choice_ix;
+	int ipos;
+
+	if (0) {
+		GetAbort();
+		GetColor();
+		GetJustify();
+		GetFilled();
+		Home();
+		Clock1000();
+		CelExists();
+		SwapExists();
+		OptClearState();
+		GetPicScreen();
+		PocoChainTo("");
+		LoadFlic("");
+		GlobalVarFlush();
+		TitleGetMovement();
+		TweenClearLinks();
+		FlicClose(FlicOpen(""));
+		PicDriverUnload();
+
+		/* char** parameter bindings */
+		Qmenu(menu_choices, 3, "Header");
+		Qchoice(menu_choices, 3, "Pick %d", 1);
+		Qscroll(&choice_ix, scroll_items, 2, &ipos, scroll_btns, "Scroll");
+	}
+	if (GetAbort()) {
+		return 1;
+	}
+	return 0;
+}

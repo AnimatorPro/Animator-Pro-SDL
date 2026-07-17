@@ -12,13 +12,27 @@
 #include "ptrmacro.h"
 #include "poco_errcodes.h"
 #include "linklist.h"
-#include "poco_port.h"
+#include "standard_library.h"
 
 void po_free(void* pt);
 
 extern Errcode builtin_err;
 
 extern Poco_lib po_FILE_lib, po_mem_lib;
+
+static Poco_lib *current_file_library(void)
+{
+	Poco_lib *library = poco_active_library(POCO_STANDARD_FILE_LIBRARY_ID);
+
+	return library != NULL ? library : &po_FILE_lib;
+}
+
+static Poco_lib *current_memory_library(void)
+{
+	Poco_lib *library = poco_active_library(POCO_STANDARD_MEMORY_LIBRARY_ID);
+
+	return library != NULL ? library : &po_mem_lib;
+}
 
 
 /*****************************************************************************
@@ -28,12 +42,13 @@ extern Poco_lib po_FILE_lib, po_mem_lib;
 /*****************************************************************************
  *
  ****************************************************************************/
-static void free_safe_files(Poco_lib *lib)
+void poco_standard_file_cleanup(Poco_lib *lib)
 {
 	Dlheader *sfi = &lib->resources;
 	Dlnode *node, *next;
 
-	for (node = sfi->head; node != NULL; node = next)
+	/* Dlheader uses Animator-compatible head/tail sentinels in the legacy ABI. */
+	for (node = sfi->head; node->next != NULL; node = next)
 		{
 		next = node->next;
 		fclose(((Rnode *)node)->resource);
@@ -49,7 +64,7 @@ Rnode *po_in_rlist(Dlheader *sfi, void *f)
 {
 	Dlnode *node;
 
-	for(node = sfi->head; node != NULL; node = node->next)
+	for(node = sfi->head; node->next != NULL; node = node->next)
 		{
 		if (((Rnode *)node)->resource == f)
 			return (Rnode *)node;
@@ -65,7 +80,7 @@ static Errcode safe_file_check(void* f, void* buf, size_t size)
 	(void)size;
 	if (f == NULL)
 		return builtin_err = Err_null_ref;
-	if (po_in_rlist(&po_FILE_lib.resources, f) == NULL)
+	if (po_in_rlist(&current_file_library()->resources, f) == NULL)
 		return builtin_err = Err_invalid_FILE;
 	if (buf == NULL && size > 0)
 		return builtin_err = Err_null_ref;
@@ -114,7 +129,7 @@ static FILE* po_fopen(char* name, char* mode)
 		builtin_err = Err_no_memory;
 		return NULL;
 		}
-	add_head(&po_FILE_lib.resources, &sn->node);
+	add_head(&current_file_library()->resources, &sn->node);
 	sn->resource = f;
 	return f;
 }
@@ -131,13 +146,13 @@ static void po_fclose(FILE* f)
 		builtin_err = Err_null_ref;
 		return;
 		}
-	if ((sn = po_in_rlist(&po_FILE_lib.resources, f)) == NULL)
+	if ((sn = po_in_rlist(&current_file_library()->resources, f)) == NULL)
 		{
 		builtin_err = Err_invalid_FILE;
 		return;
 		}
 	fclose(f);
-	rem_from_list(&po_FILE_lib.resources, (Dlnode *)sn);
+	rem_from_list(&current_file_library()->resources, (Dlnode *)sn);
 	pj_free(sn);
 }
 
@@ -166,19 +181,21 @@ static long po_ftell(FILE* f)
  ****************************************************************************/
 static int po_fprintf(FILE* f, char* format, ...)
 {
-	va_list   args;
+	va_list args;
+	int result;
 
 	if (Success != safe_file_check(f, NULL, 0))
 		return builtin_err;
 
 	va_start(args, format);
-	if (vfprintf(f, format, args) < 0)
+	result = vfprintf(f, format, args);
+	if (result < 0)
 		{
 		va_end(args);
 		return Err_write;
 		}
 	va_end(args);
-	return 0;
+	return result;
 }
 
 /*****************************************************************************
@@ -199,6 +216,19 @@ static int po_putc(int c, FILE* f)
 	if (Success != safe_file_check(f, NULL, 0))
 		return builtin_err;
 	return putc(c, f);
+}
+
+/* Keep the standard aliases as distinct FFI targets.  The descriptor map is
+ * keyed by native address, so registering fgetc/fputc through these same
+ * wrappers would make the library ambiguous. */
+static int po_fgetc(FILE* f)
+{
+	return po_getc(f);
+}
+
+static int po_fputc(int c, FILE* f)
+{
+	return po_putc(c, f);
 }
 
 /*****************************************************************************
@@ -280,7 +310,7 @@ Popot poco_lmalloc(long size)
 		{
 		pp.max = OPTR(pp.max,size-1);
 		sn->size = size;
-		add_head(&po_mem_lib.resources,&sn->node);
+		add_head(&current_memory_library()->resources,&sn->node);
 		}
 	else
 		pj_free(sn);
@@ -310,14 +340,17 @@ void* po_calloc(int size_el, int el_count)
 /*****************************************************************************
  *
  ****************************************************************************/
-static void free_safe_mem(Poco_lib *lib)
+void poco_standard_memory_cleanup(Poco_lib *lib)
 {
 	Dlheader *sfi = &lib->resources;
 	Dlnode *node, *next;
 
-	for (node = sfi->head; node != NULL; node = next)
+	/* Dlheader uses Animator-compatible head/tail sentinels in the legacy ABI. */
+	for (node = sfi->head; node->next != NULL; node = next)
 		{
 		next = node->next;
+		poco_pointer_registry_release_owned(poco_active_pointer_registry(),
+			((Rnode *)node)->resource);
 		pj_free(((Rnode *)node)->resource);
 		pj_free(node);
 		}
@@ -338,13 +371,14 @@ void po_free(void* pt)
 		return;
 		}
 
-	if ((sn = (Mem_node *)po_in_rlist(&po_mem_lib.resources, pt)) == NULL)
+	if ((sn = (Mem_node *)po_in_rlist(&current_memory_library()->resources, pt)) == NULL)
 		builtin_err = Err_poco_free;
 	else
 		{
 		poco_zero_bytes(sn->resource, sn->size);
+		poco_pointer_registry_release_owned(poco_active_pointer_registry(), pt);
 		pj_free(pt);
-		rem_from_list(&po_mem_lib.resources, (Dlnode *)sn);
+		rem_from_list(&current_memory_library()->resources, (Dlnode *)sn);
 		pj_free(sn);
 		}
 }
@@ -354,7 +388,9 @@ void po_free(void* pt)
  *
  * NOTE: This function now uses direct C pointers instead of Popot to match
  * the prototype string and work correctly with the FFI calling convention.
- * Bounds checking is no longer performed.
+ * Contracted FFI calls validate the source and destination spans before this
+ * native implementation receives their raw pointers.  Uncontracted callers
+ * retain the legacy trusted-pointer behavior.
  ****************************************************************************/
 void* po_memcpy(void* dest, void* source, int size)
 {
@@ -444,17 +480,101 @@ void* po_memchr(void* a, int match_char, int size)
  * protos for file functions...
  *--------------------------------------------------------------------------*/
 
+#define POCO_NO_PARAMETER POCO_BINDING_PARAMETER_NONE
+
+static void po_release_owned_memory(void* pointer, void* user_data)
+{
+	(void)user_data;
+	po_free(pointer);
+}
+
+static const PocoBindingPointerContract file_read_span[] = {
+	{0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+		1, 1, 2, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract file_write_span[] = {
+	{0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+		1, 1, 2, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract fgets_span[] = {
+	{0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+		1, 1, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract string_read_span[] = {
+	{0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract format_read_span[] = {
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_C_STRING,
+		0, POCO_NO_PARAMETER, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract memory_copy_spans[] = {
+	{0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract memory_compare_spans[] = {
+	{0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+	{1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract memory_set_span[] = {
+	{0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+static const PocoBindingPointerContract memory_find_span[] = {
+	{0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+		1, 2, POCO_NO_PARAMETER, POCO_NO_PARAMETER},
+};
+
+static const PocoBindingContract fread_contract = {file_read_span, Array_els(file_read_span), {0}};
+static const PocoBindingContract fwrite_contract = {file_write_span, Array_els(file_write_span), {0}};
+static const PocoBindingContract fgets_contract = {
+	fgets_span, Array_els(fgets_span), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract fputs_contract = {string_read_span, Array_els(string_read_span), {0}};
+static const PocoBindingContract fprintf_contract = {format_read_span, Array_els(format_read_span), {0}};
+static const PocoBindingContract malloc_contract = {
+	NULL, 0, {POCO_POINTER_RETURN_OWNED, POCO_NO_PARAMETER, POCO_BINDING_SPAN_BYTES,
+		1, 0, POCO_NO_PARAMETER, POCO_NO_PARAMETER,
+		POCO_POINTER_PERMISSION_READ | POCO_POINTER_PERMISSION_WRITE,
+		po_release_owned_memory, NULL}
+};
+static const PocoBindingContract calloc_contract = {
+	NULL, 0, {POCO_POINTER_RETURN_OWNED, POCO_NO_PARAMETER, POCO_BINDING_SPAN_BYTES,
+		1, 0, 1, POCO_NO_PARAMETER,
+		POCO_POINTER_PERMISSION_READ | POCO_POINTER_PERMISSION_WRITE,
+		po_release_owned_memory, NULL}
+};
+static const PocoBindingContract memcpy_contract = {
+	memory_copy_spans, Array_els(memory_copy_spans), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract memmove_contract = {
+	memory_copy_spans, Array_els(memory_copy_spans), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract memcmp_contract = {
+	memory_compare_spans, Array_els(memory_compare_spans), {0}
+};
+static const PocoBindingContract memset_contract = {
+	memory_set_span, Array_els(memory_set_span), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+static const PocoBindingContract memchr_contract = {
+	memory_find_span, Array_els(memory_find_span), {POCO_POINTER_RETURN_ALIAS, 0}
+};
+
 static Lib_proto filelib[] = {
 {po_fopen,
 	"FILE    *fopen(char *name, char *mode);"},
 {po_fclose,
 	"void    fclose(FILE *f);"},
 {po_fread,
-	"int     fread(void *buf, int size, int count, FILE *f);"},
+	"int     fread(void *buf, int size, int count, FILE *f);", &fread_contract},
 {po_fwrite,
-	"int     fwrite(void *buf, int size, int count, FILE *f);"},
+	"int     fwrite(void *buf, int size, int count, FILE *f);", &fwrite_contract},
 {po_fprintf,
-	"int     fprintf(FILE *f, char *format, ...);"},
+	"int     fprintf(FILE *f, char *format, ...);", &fprintf_contract},
 {po_fseek,
 	"int     fseek(FILE *f, long offset, int mode);"},
 {po_ftell,
@@ -463,16 +583,16 @@ static Lib_proto filelib[] = {
 	"int     fflush(FILE *f);"},
 {po_getc,
 	"int     getc(FILE *f);"},
-{po_getc,
+{po_fgetc,
 	"int     fgetc(FILE *f);"},
 {po_putc,
 	"int     putc(int c, FILE *f);"},
-{po_putc,
+{po_fputc,
 	"int     fputc(int c, FILE *f);"},
 {po_fgets,
-	"char    *fgets(char *s, int maxlen, FILE *f);"},
+	"char    *fgets(char *s, int maxlen, FILE *f);", &fgets_contract},
 {po_fputs,
-	"int     fputs(char *s, FILE *f);"},
+	"int     fputs(char *s, FILE *f);", &fputs_contract},
 
 {po_get_errno_pointer,
 	"int     *__GetErrnoPointer(void);"},
@@ -485,7 +605,7 @@ Poco_lib po_FILE_lib =
 	{
 	NULL, "(C Standard) FILE",
 	filelib, Array_els(filelib),
-	NULL, free_safe_files,
+	NULL, poco_standard_file_cleanup,
 	};
 
 /*----------------------------------------------------------------------------
@@ -494,29 +614,84 @@ Poco_lib po_FILE_lib =
 
 static Lib_proto memlib[] = {
 { po_malloc,
-	"void    *malloc(int size);"},
+	"void    *malloc(int size);", &malloc_contract},
 { po_calloc,
-	"void    *calloc(int size_el, int el_count);"},
+	"void    *calloc(int size_el, int el_count);", &calloc_contract},
 { po_free,
 	"void    free(void *pt);"},
 { po_memcpy,
-	"void    *memcpy(void *dest, void *source, int size);"},
+	"void    *memcpy(void *dest, void *source, int size);", &memcpy_contract},
 { po_memmove,
-	"void    *memmove(void *dest, void *source, int size);"},
+	"void    *memmove(void *dest, void *source, int size);", &memmove_contract},
 { po_memcmp,
-	"int     memcmp(void *a, void *b, int size);"},
+	"int     memcmp(void *a, void *b, int size);", &memcmp_contract},
 { po_memset,
-	"void    *memset(void *dest, int fill_char, int size);"},
+	"void    *memset(void *dest, int fill_char, int size);", &memset_contract},
 { po_memchr,
-	"void    *memchr(void *a, int match_char, int size);"},
+	"void    *memchr(void *a, int match_char, int size);", &memchr_contract},
 };
 
 Poco_lib po_mem_lib =
 	{
 	NULL, "(C Standard) Memory Manager",
 	memlib, Array_els(memlib),
-	NULL, free_safe_mem,
+	NULL, poco_standard_memory_cleanup,
 	};
+
+const PocoLibrary *poco_standard_file_library(void)
+{
+	static PocoBinding bindings[Array_els(filelib) - 1];
+	static PocoLibrary library = {
+		POCO_STANDARD_FILE_LIBRARY_ID,
+		bindings,
+		0,
+		NULL,
+		NULL,
+		NULL,
+	};
+	static int initialized;
+	size_t source_index;
+	size_t binding_index = 0;
+
+	if (!initialized) {
+		for (source_index = 0; source_index < Array_els(filelib); ++source_index) {
+			if (filelib[source_index].func == NULL)
+				continue;
+			bindings[binding_index].prototype = filelib[source_index].proto;
+			bindings[binding_index].function = (PocoNativeFunction)filelib[source_index].func;
+			bindings[binding_index].contract = filelib[source_index].contract;
+			++binding_index;
+		}
+		library.binding_count = binding_index;
+		initialized = 1;
+	}
+	return &library;
+}
+
+const PocoLibrary *poco_standard_memory_library(void)
+{
+	static PocoBinding bindings[Array_els(memlib)];
+	static const PocoLibrary library = {
+		POCO_STANDARD_MEMORY_LIBRARY_ID,
+		bindings,
+		Array_els(bindings),
+		NULL,
+		NULL,
+		NULL,
+	};
+	static int initialized;
+	size_t index;
+
+	if (!initialized) {
+		for (index = 0; index < Array_els(memlib); ++index) {
+			bindings[index].prototype = memlib[index].proto;
+			bindings[index].function = (PocoNativeFunction)memlib[index].func;
+			bindings[index].contract = memlib[index].contract;
+		}
+		initialized = 1;
+	}
+	return &library;
+}
 
 #ifdef DEADWOOD
 

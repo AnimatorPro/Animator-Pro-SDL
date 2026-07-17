@@ -1,0 +1,6 @@
+#pragma poco library "poco_legacy_poe_fixture.poe"
+
+main()
+{
+	return LegacyPoeAnswer();
+}

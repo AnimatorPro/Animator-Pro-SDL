@@ -128,6 +128,7 @@ static void pf_to_sif(Poco_cb* pcb, Poco_frame* pf, Struct_info* sif, SHORT ttyp
 		size = po_get_type_size(s->ti);
 		if (size == 0) {
 			po_say_fatal(pcb, "element %s in structure/union is of unknown size/type", s->name);
+   PO_CHECK_ABORT_VOID(pcb);
 		}
 		if (ttype == TYPE_STRUCT) {
 			s->symval.doff = sif->size;
@@ -179,6 +180,7 @@ static void get_enum_block(Poco_cb* pcb, Poco_frame* pf)
 	(void)pf;
 
 	do {
+		PO_CHECK_ABORT_VOID(pcb);
 		po_need_token(pcb);
 		ttype = pcb->t.toktype;
 		switch (ttype) {
@@ -201,6 +203,7 @@ static void get_enum_block(Poco_cb* pcb, Poco_frame* pf)
 				break;
 			case PTOK_VAR:
 				po_say_fatal(pcb, "enum constant name redefined");
+    PO_CHECK_ABORT_VOID(pcb);
 				break;
 			default:
 				po_expecting_got(pcb, "name of enum constant or }");
@@ -249,6 +252,7 @@ Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf, SHORT struct_union_ttyp
 
 		default:
 			po_say_fatal(pcb, "malformed name for struct/union/enum...");
+   PO_CHECK_ABORT(pcb, NULL);
 			goto ERROR;
 	}
 
@@ -257,6 +261,7 @@ Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf, SHORT struct_union_ttyp
 	if (pcb->t.toktype == TOK_LBRACE) {
 		if (sif->size != 0) {
 			po_say_fatal(pcb, "struct/union/enum tag redefined");
+   PO_CHECK_ABORT(pcb, NULL);
 			goto ERROR;
 		}
 		if (struct_union_ttype == TYPE_ENUM) {

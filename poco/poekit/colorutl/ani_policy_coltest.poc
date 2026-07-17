@@ -1,0 +1,11 @@
+/* The retained colorutl POE is Animator-compatible.  This smoke test
+ * deliberately runs it through colorutl_test_host, which installs an Ani
+ * module hook before legacy POE entry resolution.  Full pointer-heavy module
+ * behavior remains under the later Ani adapter test coverage. */
+
+#pragma poco library "colorutl.poe"
+
+main()
+{
+	return 0;
+}

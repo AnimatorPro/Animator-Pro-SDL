@@ -250,11 +250,9 @@
 
 #include "poco.h"
 #include <limits.h> /* so we can properly determine max int value */
-#include <setjmp.h>
 #include <stdarg.h>
 #include <string.h>
 
-extern jmp_buf po_compile_errhandler;
 
 /* internal predeclarations */
 
@@ -333,7 +331,11 @@ void po_say_fatal(Poco_cb* pcb, char* fmt, ...)
 
 	po_say_err(pcb, sbuf);
 
-	longjmp(po_compile_errhandler, pcb->global_err);
+	pcb->compile_aborted = true;
+	if (pcb->global_err >= 0)
+		pcb->compile_err = Err_syntax;
+	else
+		pcb->compile_err = pcb->global_err;
 }
 
 /*****************************************************************************
@@ -350,6 +352,7 @@ void po_say_internal(Poco_cb* pcb, char* fmt, ...)
 
 	pcb->global_err = Err_poco_internal;
 	po_say_fatal(pcb, "poco internal error: %s", sbuf);
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -366,6 +369,7 @@ void po_expecting_got(Poco_cb* pcb, char* expecting)
 void po_expecting_got_str(Poco_cb* pcb, char* expecting, char* got)
 {
 	po_say_fatal(pcb, "expecting %s got '%s'", expecting, got);
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -376,7 +380,7 @@ bool po_need_token(Poco_cb* pcb)
 	lookup_token(pcb);
 	if (pcb->t.toktype == TOK_EOF) {
 		po_say_fatal(pcb, "unexpected end of file");
-		return (false);
+		PO_CHECK_ABORT(pcb, false);
 	}
 	return (true);
 }
@@ -387,6 +391,7 @@ bool po_need_token(Poco_cb* pcb)
 void po_redefined(Poco_cb* pcb, char* s)
 {
 	po_say_fatal(pcb, "%s redefined", s);
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -395,6 +400,7 @@ void po_redefined(Poco_cb* pcb, char* s)
 void po_undefined(Poco_cb* pcb, char* s)
 {
 	po_say_fatal(pcb, "%s undefined", s);
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -403,6 +409,7 @@ void po_undefined(Poco_cb* pcb, char* s)
 void po_unmatched_paren(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "unmatched parenthesis");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -722,6 +729,7 @@ static Tstack* build_token_list(Poco_cb* pcb)
 	long line_count;
 	short strlit_len;
 	short ctoke_size;
+	SHORT token_type;
 
 	ts = new_token(pcb);
 
@@ -758,9 +766,10 @@ NEED_MORE:
 		ts->line_num  = line_count;
 
 		line_pos = (char*)tokenize_word(
-		  (UBYTE*)line_pos, (UBYTE*)ts->ctoke, (UBYTE*)strwrk, &ctoke_size, &ts->type, false);
+		  (UBYTE*)line_pos, (UBYTE*)ts->ctoke, (UBYTE*)strwrk, &ctoke_size, &token_type, false);
 		if (line_pos == NULL)
 			goto ENDLINE;
+		ts->type = (PToken_t)token_type;
 
 		ts->char_num = 1 + ((line_pos - ctoke_size) - line_start);
 
@@ -804,10 +813,13 @@ NEED_MORE:
 			case TOK_SQUO:
 
 				if (ctoke_size > 1)
-					po_say_fatal(pcb, "invalid character constant '%s'", ts->ctoke);
-				ts->val.num = (unsigned char)(ts->ctoke[0]);
-				ts->type	= TOK_INT;
-				break;
+					if (ctoke_size > 1) {
+						po_say_fatal(pcb, "invalid character constant '%s'", ts->ctoke);
+						PO_CHECK_ABORT(pcb, NULL);
+					}
+					ts->val.num = (unsigned char)(ts->ctoke[0]);
+					ts->type	= TOK_INT;
+					break;
 
 			case TOK_QUO:
 
@@ -881,8 +893,11 @@ void po_lookup_freshtoken(Poco_cb* pcb)
 	Tstack* ts;
 	Symbol* s;
 
+	PO_CHECK_ABORT_VOID(pcb);
+
 	if (((char*)&pcb) < pcb->stack_bottom)
 		po_say_fatal(pcb, "stack overflow (statements too deeply nested)");
+  PO_CHECK_ABORT_VOID(pcb);
 
 	ts = pcb->curtoken->next;
 	free_token(pcb, pcb->curtoken);
@@ -1000,6 +1015,7 @@ static SHORT inv_ido[] = {
 static void no_assign_void(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "can't assign to void variable");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1008,6 +1024,7 @@ static void no_assign_void(Poco_cb* pcb)
 static void unknown_assignment(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "unknown type in assignment");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1016,6 +1033,7 @@ static void unknown_assignment(Poco_cb* pcb)
 static void no_struct_assign(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "poco can't do struct assignments");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1061,9 +1079,10 @@ SHORT po_find_local_assign(Poco_cb* pcb, Type_info* ti)
 				break;
 		}
 	} else {
-		if (po_is_array(ti))
+		if (po_is_array(ti)) {
 			po_say_fatal(pcb, "lvalue required");
-		else
+			PO_CHECK_ABORT(pcb, 0);
+		} else
 			aop = OP_LOC_PASS;
 	}
 	return aop;
@@ -1112,9 +1131,10 @@ static SHORT find_global_assign(Poco_cb* pcb, Type_info* ti)
 				break;
 		}
 	} else {
-		if (po_is_array(ti))
+		if (po_is_array(ti)) {
 			po_say_fatal(pcb, "lvalue required");
-		else
+			PO_CHECK_ABORT(pcb, 0);
+		} else
 			aop = OP_GLO_PASS;
 	}
 	return (aop);
@@ -1135,6 +1155,7 @@ SHORT po_find_assign_op(Poco_cb* pcb, Symbol* var, Type_info* ti)
 static void no_use_void(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "can't use void value");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1143,6 +1164,7 @@ static void no_use_void(Poco_cb* pcb)
 void po_var_too_complex(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "variable too complicated to use...");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 Ido_table po_ido_table[] =
@@ -1207,6 +1229,7 @@ static bool po_check_ido_table(Poco_cb* pcb)
 		if (i != (size_t)po_ido_table[i].ido_type) {
 			fprintf(pcb->t.err_file, "%d != %d\n", i, po_ido_table[i].ido_type);
 			po_say_internal(pcb, "po_ido_table doesn't check");
+   PO_CHECK_ABORT(pcb, false);
 			return (false);
 		}
 	}
@@ -1411,6 +1434,7 @@ void po_code_elsize(Poco_cb* pcb, Exp_frame* e, int el_size)
 
 	if (el_size == 0)
 		po_say_fatal(pcb, "size of type is zero (eg, pointer to void)");
+  PO_CHECK_ABORT_VOID(pcb);
 
 	if (el_size != 1) {
 		bipower = 2;
@@ -1448,6 +1472,7 @@ static void get_array(Poco_cb* pcb, Exp_frame* e)
 
 	if (!any_code(pcb, &e->left)) {
 		po_say_fatal(pcb, "bizarre circumstances for array.");
+  PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 	if (end_type == TYPE_POINTER) {
@@ -1457,6 +1482,7 @@ static void get_array(Poco_cb* pcb, Exp_frame* e)
 		/* do nothing */
 	} else {
 		po_say_fatal(pcb, "indexing non-pointer");
+  PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 	ti = &e->ctc;
@@ -1496,17 +1522,20 @@ void po_make_deref(Poco_cb* pcb, Exp_frame* e)
 	if (e->ctc.ido_type != IDO_VPT) {
 		po_copy_code(pcb, &e->ecd, &e->left);
 		if ((op = ref_op(pcb, &e->ctc)) < 0) {
-			if (e->ctc.ido_type == IDO_VOID)
+			if (e->ctc.ido_type == IDO_VOID) {
 				po_say_fatal(pcb, "cannot dereference a void pointer");
-			else if (e->ctc.comp[e->ctc.comp_count - 1] == TYPE_ARRAY) {
+				PO_CHECK_ABORT_VOID(pcb);
+			} else if (e->ctc.comp[e->ctc.comp_count - 1] == TYPE_ARRAY) {
 				/* if we got a negative (bad) refop because the current
 				   end type is TYPE_ARRAY, then we do nothing, because we
 				   will generate the refop (if even needed) when we see
 				   the subscript expression or when we unrecurse and
 				   generate the code for the '*' in front of the name.
 				*/
-			} else
+			} else {
 				po_say_fatal(pcb, "confused pointer dereference");
+				PO_CHECK_ABORT_VOID(pcb);
+			}
 		} else {
 			po_code_op(pcb, &e->ecd, op);
 		}
@@ -1530,10 +1559,13 @@ static void not_a_member(Poco_cb* pcb, Struct_info* si, char* mbrname)
 
 	type = (si->type == TYPE_UNION) ? "union" : "struct";
 
-	if (si->size == 0)
+	if (si->size == 0) {
 		po_say_fatal(pcb, "elements for %s type %s have not been defined", type, structname);
-	else
+		PO_CHECK_ABORT_VOID(pcb);
+	} else {
 		po_say_fatal(pcb, "%s isn't a member of %s %s", mbrname, type, structname);
+		PO_CHECK_ABORT_VOID(pcb);
+	}
 }
 
 /*****************************************************************************
@@ -1541,16 +1573,19 @@ static void not_a_member(Poco_cb* pcb, Struct_info* si, char* mbrname)
  ****************************************************************************/
 static void get_pmember(Poco_cb* pcb, Exp_frame* e)
 {
+	PO_CHECK_ABORT_VOID(pcb);
 	Struct_info* si;
 	Symbol* msym;
 	int doff;
 
 	if (e->ctc.comp[0] != TYPE_STRUCT || e->ctc.comp_count > 2) {
 		po_say_fatal(pcb, "using -> on something that isn't a struct");
+  PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	if (e->ctc.comp_count == 1) {
 		po_say_fatal(pcb, "-> where there should be a . perhaps?");
+  PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	si = e->ctc.sdims[0].pt;
@@ -1576,6 +1611,7 @@ OUT:
  ****************************************************************************/
 static void get_member(Poco_cb* pcb, Exp_frame* e)
 {
+	PO_CHECK_ABORT_VOID(pcb);
 	Struct_info* si;
 	Symbol* vsym;
 	Symbol* msym;
@@ -1591,9 +1627,11 @@ static void get_member(Poco_cb* pcb, Exp_frame* e)
 	if (e->ctc.comp_count != 1) {
 		if (po_is_pointer(&e->ctc)) {
 			po_say_fatal(pcb, ". where there should be a -> perhaps?");
+   PO_CHECK_ABORT_VOID(pcb);
 			goto OUT;
 		} else if (po_is_array(&e->ctc)) {
 			po_say_fatal(pcb, "need [] before .");
+   PO_CHECK_ABORT_VOID(pcb);
 			goto OUT;
 		} else
 			goto NOTSTRUCT;
@@ -1640,6 +1678,7 @@ OUT:
 	return;
 NOTSTRUCT:
 	po_say_fatal(pcb, "using . on something that isn't a struct");
+ PO_CHECK_ABORT_VOID(pcb);
 	return;
 }
 
@@ -1824,6 +1863,7 @@ static void upgrade_numerical_expression(Poco_cb* pcb, Exp_frame* e, SHORT ido_t
 						break;
 					default:
 						po_say_fatal(pcb, "cannot do pointer<->number conversion");
+      PO_CHECK_ABORT_VOID(pcb);
 						break;
 				}
 			} break;
@@ -1887,6 +1927,7 @@ void po_coerce_to_boolean(Poco_cb* pcb, Exp_frame* e)
 				break;
 			default:
 				po_say_fatal(pcb, "expecting boolean expression");
+    PO_CHECK_ABORT_VOID(pcb);
 				return;
 		}
 		e->ctc.comp[0]	  = TYPE_INT;
@@ -1927,6 +1968,7 @@ static void cant_convert_to_String(Poco_cb* pcb)
  ****************************************************************************/
 {
 	po_say_fatal(pcb, "expression can't be converted to String type");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 #endif /* STRING_EXPERIMENT */
 
@@ -1986,6 +2028,7 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 		{
 			if (recast && start_count != 1)
 				po_say_fatal(pcb, "cannot recast pointer expression to numeric type");
+    PO_CHECK_ABORT_VOID(pcb);
 			po_coerce_numeric_exp(pcb, e, ti->ido_type);
 		}
 	} else {
@@ -2071,14 +2114,16 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 				fprintf(pcb->t.err_file, "\n");
 #endif
 				po_say_fatal(pcb, "type mismatch in pointer evaluation");
+    PO_CHECK_ABORT_VOID(pcb);
 			}
 		}
 	}
 	return;
 WANT_POINTER : {
-	if (recast)
+	if (recast) {
 		po_say_fatal(pcb, "cannot recast numeric expression to pointer type");
-	else
+		PO_CHECK_ABORT_VOID(pcb);
+	} else
 		po_expecting_got(pcb, "pointer expression");
 }
 }
@@ -2088,12 +2133,14 @@ WANT_POINTER : {
  ****************************************************************************/
 void po_get_prim(Poco_cb* pcb, Exp_frame* e)
 {
+	PO_CHECK_ABORT_VOID(pcb);
 	switch (pcb->t.toktype) {
 		case TOK_LPAREN: {
 			po_get_expression(pcb, e);
 			lookup_token(pcb);
 			if (pcb->t.toktype != TOK_RPAREN) {
 				po_say_fatal(pcb, "missing right parenthesis");
+    PO_CHECK_ABORT_VOID(pcb);
 			}
 			break;
 		}
@@ -2157,8 +2204,10 @@ static void get_prec1(Poco_cb* pcb, Exp_frame* e)
 {
 	SHORT ttype;
 
+	PO_CHECK_ABORT_VOID(pcb);
 	po_get_prim(pcb, e);
 	for (;;) {
+		PO_CHECK_ABORT_VOID(pcb);
 		lookup_token(pcb);
 		ttype = pcb->t.toktype;
 		switch (ttype) {
@@ -2288,6 +2337,7 @@ static void get_post_increment(Poco_cb* pcb, Exp_frame* e, Op_type op_group[NUM_
 		}
 	} else {
 		po_say_fatal(pcb, "trying to increment a non-variable");
+  PO_CHECK_ABORT_VOID(pcb);
 	}
 }
 
@@ -2309,6 +2359,7 @@ static void get_pre_increment(Poco_cb* pcb, Exp_frame* e, Op_type op_group[NUM_I
 		}
 	} else {
 		po_say_fatal(pcb, "trying to increment a non-variable");
+  PO_CHECK_ABORT_VOID(pcb);
 	}
 }
 
@@ -2327,6 +2378,7 @@ static void get_dereference(Poco_cb* pcb, Exp_frame* e)
 	}
 
 	po_say_fatal(pcb, " '*' on non-pointer expression");
+ PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -2340,6 +2392,7 @@ static void get_address(Poco_cb* pcb, Exp_frame* e)
 	po_get_unop_expression(pcb, &ex);
 	if (!any_code(pcb, &ex.left)) {
 		po_say_fatal(pcb, "trying to take address of non-variable");
+  PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	po_copy_type(pcb, &ex.ctc, &e->ctc);
@@ -2356,6 +2409,7 @@ OUT:
  ****************************************************************************/
 void po_get_unop_expression(Poco_cb* pcb, Exp_frame* e)
 {
+	PO_CHECK_ABORT_VOID(pcb);
 	TypeComp t1;
 	Op_type* op_group;
 	int fok = false; /* float ok? */
@@ -2417,6 +2471,7 @@ void po_get_unop_expression(Poco_cb* pcb, Exp_frame* e)
 	if (op_group != NULL) {
 		if ((t1 == IDO_DOUBLE) && !fok) {
 			po_say_fatal(pcb, "~ and ! operators can't be used with floats or doubles");
+   PO_CHECK_ABORT_VOID(pcb);
 			return;
 		}
 		po_code_op(pcb, &e->ecd, op_group[t1]);
@@ -2484,6 +2539,7 @@ bool po_assign_after_equals(Poco_cb* pcb,
 		if (!val_eee.pure_const) {
 			if (!po_is_static_init_const(pcb, &val_eee.ecd)) {
 				po_say_fatal(pcb, "constant expression required for static initializer");
+    PO_CHECK_ABORT(pcb, false);
 			}
 		}
 	}
@@ -2533,6 +2589,7 @@ TRASH:
  ****************************************************************************/
 void po_get_expression(Poco_cb* pcb, Exp_frame* e)
 {
+	PO_CHECK_ABORT_VOID(pcb);
 	Symbol* var;
 
 	po_get_binop_expression(pcb, e);
@@ -2794,19 +2851,22 @@ bool po_check_undefined_funcs(Poco_cb* pcb, Symbol* sl)
  ****************************************************************************/
 bool po_compile_file(Poco_cb* pcb, char* name)
 {
-	Tstack dummy_token;
+	Tstack* dummy_token;
 	Func_frame* fuf = NULL;
 	Poco_frame* pf	= NULL;
 
 #ifdef DEVELOPMENT
 	if (!po_check_instr_table(pcb)) {
 		po_say_internal(pcb, "instruction table failed self-check\n");
+  PO_CHECK_ABORT(pcb, false);
 	}
 	if (!po_check_type_names(pcb)) {
 		po_say_internal(pcb, "type_names table failed self-check\n");
+  PO_CHECK_ABORT(pcb, false);
 	}
 	if (!po_check_ido_table(pcb)) {
 		po_say_internal(pcb, "ido_table table failed self-check\n");
+  PO_CHECK_ABORT(pcb, false);
 	}
 #endif
 
@@ -2820,15 +2880,21 @@ bool po_compile_file(Poco_cb* pcb, char* name)
 			goto BADOUT;
 		}
 
-		memset(&dummy_token, 0, sizeof(dummy_token));
-		pcb->curtoken	 = &dummy_token;
+		/*
+		 * The lookahead sentinel is returned to free_tokens by the first
+		 * lookup.  Allocate it from Poco's managed heap so cleanup can safely
+		 * walk that list on every parser exit path.
+		 */
+		dummy_token = po_memzalloc(pcb, sizeof(*dummy_token));
+		pcb->curtoken	 = dummy_token;
 		pcb->free_tokens = NULL;
-		dummy_token.next = build_token_list(pcb);
+		dummy_token->next = build_token_list(pcb);
 
 		po_get_statements(pcb, pf); /* returns on EOF or unexpected RBRACE */
 		lookup_token(pcb);
 		if (pcb->t.toktype != TOK_EOF) {
 			po_say_fatal(pcb, "unexpected '}'");
+   PO_CHECK_ABORT(pcb, false);
 		}
 
 		po_code_op(pcb, &pf->fcd, OP_END);
@@ -2893,6 +2959,7 @@ static void free_fuf_list(Func_frame** pff)
  ****************************************************************************/
 void po_free_run_env(Poco_run_env* pev)
 {
+	po_ffi_free_structures(pev);
 	po_freelist(&pev->literals);
 	free_fuf_list(&pev->protos);
 }

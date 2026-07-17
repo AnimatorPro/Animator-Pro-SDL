@@ -20,21 +20,21 @@
 
 #include "aaconfig.h"
 #include "commonst.h"
+#include "filepath.h"
 #include "poco_errcodes.h"
-#include "jimk.h"
 #include "poco.h"
 #include "pocoface.h"
 #include "ptrmacro.h"
-#include "xfile.h"
-#include "pjhost.h"
 
 #ifdef _MSC_VER
 #include <float.h>
 #endif
 
-#ifdef SDL_PLATFORM_APPLE
-/* Empty implementation for now-- seems to be a Windows-only thing? */
-static void _fpreset() {}
+#ifndef _MSC_VER
+/* _fpreset is a Microsoft CRT operation; standalone Unix builds need no-op. */
+static void _fpreset(void)
+{
+}
 #endif
 
 #if defined(IAN) /* Where Ian keeps poco source */
@@ -63,9 +63,6 @@ AA_config vconfg;
  * (simulation of the facilities available in PJ)
  ***************************************************************************/
 
-#define MMAG 0x1253
-#define FMAG 0x2291
-
 /* other forwards prototypes */
 int matherr(void);
 Errcode boxf(char* fmt, ...);
@@ -80,75 +77,6 @@ void dump_func_frame(const char* name, const Func_frame* frame_in);
 /****************************************************************************
  *
  ***************************************************************************/
-#ifndef USE_EXTERNAL_PJ_HOST
-void* pj_malloc(size_t i)
-{
-    USHORT* pt;
-    pt = malloc(i + sizeof(*pt));
-    if (pt != NULL) {
-        *pt++ = MMAG;
-    }
-    return pt;
-}
-
-/****************************************************************************
- *
- ***************************************************************************/
-void* pj_zalloc(size_t size)
-{
-    void* pt;
-    pt = pj_malloc(size);
-    if (pt == NULL) {
-        return NULL;
-    }
-    poco_zero_bytes(pt, size);
-    return pt;
-}
-
-/****************************************************************************
- *
- ***************************************************************************/
-void pj_free(void* v)
-{
-    USHORT* pt = v;
-
-    if (pt == NULL) {
-        fprintf(stdout, "main_freemem: freeing NULL!\n");
-        exit(-1);
-    }
-    if (*(--pt) != MMAG) {
-        if (*pt == FMAG) {
-            fprintf(stdout, "main_freemem: freeing memory twice\n");
-            exit(-1);
-        } else {
-            fprintf(stdout, "main_freemem: Bad start magic\n");
-            exit(-1);
-        }
-    }
-    *pt = FMAG;
-    free(pt);
-}
-
-/****************************************************************************
- *
- ***************************************************************************/
-void pj_gentle_free(void* p)
-{
-    if (p != NULL) {
-        pj_free(p);
-    }
-}
-
-/****************************************************************************
- *
- ***************************************************************************/
-void pj_freez(void* p)
-{
-    pj_gentle_free(*(void**)p);
-    *(void**)p = NULL;
-}
-#endif
-
 /* real implementations are provided in libpoco (pocoload.c) */
 
 /*****************************************************************************
@@ -166,14 +94,13 @@ void pj_freez(void* p)
  *	 despite what the watcom docs say, the 'errno' variable is NOT valid
  *	 upon entry to this routine!
  ****************************************************************************/
-static int fpe_handler(int signum)
+static void fpe_handler(int signum)
 {
 	(void)signum;
 
 	_fpreset();                  /* clear status & re-init chip/emulator */
 	builtin_err = Err_float;     /* remember error for poco interpreter */
 	signal(SIGFPE, fpe_handler); /* re-install self */
-	return (0);                  /* don't know who looks at this... */
 }
 
 /*****************************************************************************
@@ -211,117 +138,6 @@ bool check_abort(void* nobody)
 	return false;
 }
 
-/**
- * Logs an error message and an error code to the standard output.
- *
- * This function uses a formatted string with variable arguments to construct
- * the message to be logged. It appends the provided error code to the output
- * and ensures proper formatting with line breaks.
- *
- * IMPORTANT NOTES:
- * - Ensure the provided format string (`fmt`) is accurate and accommodates
- *   the variable arguments appropriately to avoid runtime errors.
- * - The function outputs messages to `stdout`. If output redirection
- *   or different logging behavior is required, adapt the function accordingly.
- *
- * @param err The error code that will be appended to the message.
- * @param fmt A formatted string specifying how subsequent arguments are
- *            interpreted and output.
- * @param ... Additional arguments to match format specifiers in `fmt`.
- * @return Always returns the error code passed as `err`.
- */
-Errcode errline(int err, char* fmt, ...)
-{
-	va_list argptr;
-
-	va_start(argptr, fmt);
-	vfprintf(stdout, fmt, argptr);
-	va_end(argptr);
-	fprintf(stdout, "\nerr code %d\n", err);
-}
-
-/****************************************************************************
- *
- ***************************************************************************/
-size_t get_errtext(Errcode err, char* buf)
-{
-	buf[0] = 0;
-	if (err < Success) {
-		switch (err) {
-			case Err_stack:
-				strcpy(buf, "Poco out of stack space");
-				break;
-			case Err_bad_instruction:
-				strcpy(buf, "Illegal instruction in poco interpreter");
-				break;
-			case Err_null_ref:
-				strcpy(buf, "Trying to use a NULL pointer");
-				break;
-			case Err_no_main:
-				strcpy(buf, "No main function.");
-				break;
-			case Err_zero_divide:
-				strcpy(buf, "Attempt to divide by zero");
-				break;
-			case Err_float:
-				strcpy(buf, "Floating point math error (overflow/zero divide)");
-				break;
-			case Err_invalid_FILE:
-				strcpy(buf, "Invalid FILE *");
-				break;
-			case Err_index_small:
-				strcpy(buf, "Pointer/array index too small");
-				break;
-			case Err_index_big:
-				strcpy(buf, "Pointer/array index too big");
-				break;
-			case Err_poco_free:
-				strcpy(buf, "Trying to free an invalid block of memory");
-				break;
-			case Err_free_null:
-				strcpy(buf, "Trying to free(NULL)");
-				break;
-			case Err_free_resources:
-				strcpy(buf, "File/memory management damaged by Poco program");
-				break;
-			case Err_zero_malloc:
-				strcpy(buf, "negative or zero size to malloc/calloc");
-				break;
-			case Err_string:
-				strcpy(buf, "String too small in string operation");
-				break;
-			case Err_fread_buf:
-				strcpy(buf, "Trying to fread past end of buffer");
-				break;
-		case Err_fwrite_buf:
-			strcpy(buf, "Trying to fwrite past end of buffer");
-			break;
-		case Err_poco_lib_not_found:
-			strcpy(buf, "Poco library file not found");
-			break;
-		case Err_poco_lib_load_failed:
-			strcpy(buf, "Failed to load poco library");
-			break;
-		case Err_poco_lib_no_entry:
-			strcpy(buf, "Poco library missing entry point poco_rexlib_get");
-			break;
-		case Err_poco_lib_invalid:
-			strcpy(buf, "Poco library returned invalid structure");
-			break;
-		case Err_poco_lib_version:
-			strcpy(buf, "Poco library version mismatch");
-			break;
-		case Err_poco_lib_empty:
-			strcpy(buf, "Poco library contains no functions");
-			break;
-		default:
-			sprintf(buf, "Error code %d\n", err);
-			break;
-		}
-	}
-	return strlen(buf);
-}
-
 /****************************************************************************
  *
  ***************************************************************************/
@@ -348,7 +164,7 @@ static Lib_proto proto_lines[] = {
 	/*	{tryme, 	"int ptryme(int (*v)(long a, long b, long c));"}, */
 	{puts, "int puts(char *s);"},
 	{printf, "int printf(char *format, ...);"},
-	{po_qtext, "int Qtext(char *format, ...);"},
+	{po_qtext, "void Qtext(char *format, ...);"},
 };
 
 Poco_lib po_main_lib = {.next = NULL,
@@ -366,13 +182,10 @@ extern Poco_lib po_mem_lib;
 extern Poco_lib po_FILE_lib;
 extern Poco_lib po_math_lib;
 extern Poco_lib po_str_lib;
-extern Poco_lib po_dummy_lib;
 extern Poco_lib po_dos_standalone_lib;
 
 static Poco_lib* poco_libs[] = {
-	&po_main_lib, &po_str_lib, &po_mem_lib, &po_FILE_lib, &po_math_lib,
-	&po_dos_standalone_lib, /* real fnsplit/fnmerge; searched before dummy */
-	&po_dummy_lib,
+	&po_main_lib, &po_str_lib, &po_mem_lib, &po_FILE_lib, &po_math_lib, &po_dos_standalone_lib,
 };
 
 /****************************************************************************
@@ -421,7 +234,7 @@ static void close_redirect_stdout(void)
 	*stdout = redirection_save; /* restore stdout state */
 }
 
-Errcode builtin_err; /* Error status for libraries. */
+extern Errcode builtin_err; /* Defined by the embeddable Poco runtime. */
 
 #ifdef DEVELOPMENT
 /* variables for runops tracing */
@@ -534,7 +347,7 @@ static void replace_file_extension(char* dest, const char* buffer, size_t max_le
  ***************************************************************************/
 int main(int argc, char* argv[])
 {
-	char err_file[100];
+	char err_file[PATH_SIZE];
 	long err_line;
 	int err_char;
 	int err = Success;
@@ -608,10 +421,10 @@ int main(int argc, char* argv[])
 		}
 	}
 
-    if (sfname == NULL) {
-        usage();
-        return 0;
-    }
+	if (sfname == NULL) {
+		usage();
+		return 0;
+	}
 
 	if (strchr(sfname, '.') == NULL) {
 		/* If no '.' in name, tack on .POC */
@@ -630,9 +443,8 @@ int main(int argc, char* argv[])
 	//		poco_gui();
 	//	}
 
-	const int compile_status = compile_poco(&pexe, sfname, NULL,
-									dfname, builtin_libs, err_file, &err_line,
-											&err_char, incdirs, verbose);
+	const int compile_status = compile_poco(&pexe, sfname, NULL, dfname, builtin_libs, err_file,
+											&err_line, &err_char, incdirs, verbose);
 
 	if (compile_status == Success) {
 #ifdef DEVELOPMENT
@@ -659,8 +471,7 @@ int main(int argc, char* argv[])
 
 		fprintf(stderr, "Return value: %d\n", ((Poco_run_env*)pexe)->result.i);
 		free_poco(&pexe);
-	}
-	else {
+	} else {
 		/* Propagate compile error to process exit code for test harnesses */
 		err = compile_status;
 	}
@@ -682,16 +493,17 @@ int main(int argc, char* argv[])
 			case Err_poco_internal:
 				fprintf(stdout, "Poco compiler failed self-check.\n");
 				break;
+			case Err_poco_ffi_invalid_binding:
+				fprintf(stdout, "%s\n", poco_get_error());
+				break;
 			case Err_no_main:
 				fprintf(stdout, "Program does not contain a main() routine.\n");
 				break;
-			case Err_in_err_file: {
-				const char* errmsg = poco_get_error();
-				if (errmsg && errmsg[0]) {
-					fprintf(stdout, "%s", errmsg);
+			case Err_in_err_file:
+				if (poco_get_error()[0] != '\0') {
+					fprintf(stdout, "%s", poco_get_error());
 				}
 				break;
-			}
 			case Err_abort:
 			default:
 				break;
