@@ -33,42 +33,30 @@ add_subdirectory(softmenu)
 add_subdirectory(util)
 add_subdirectory(wndo)
 
-## Even if WITH_POCO is 0, these files are
-## still needed for softmenu parsing
-include_directories("${CMAKE_SOURCE_DIR}/poco/include")
-set(PJ_POCO_FILES
-	"${CMAKE_SOURCE_DIR}/poco/src/token.c"
-	"${CMAKE_SOURCE_DIR}/poco/src/bcutil.c"
-)
+if (WITH_POCO AND WITH_ANI)
+	add_subdirectory(ani_poco)
 
-if (WITH_POCO)
-	list(APPEND
-		PJ_POCO_FILES
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocoa3d.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocoalt.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocoblit.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pococel.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pococolo.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocodos.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocodraw.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocofile.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocoflic.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocofunc.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocogvar.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocolibs.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocomode.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocoqnum.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocorex.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocotext.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocotime.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocotur.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocotwee.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocouser.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/pocopicdrive.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/packcmap.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/qpoco.c"
-		"${CMAKE_CURRENT_SOURCE_DIR}/qpocoed.c"
+	add_test(
+		NAME ani_poco_adapter_target
+		COMMAND ${CMAKE_COMMAND}
+			-DANI_SOURCE_CMAKE_FILE=${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
+			-DADAPTER_CMAKE_FILE=${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/CMakeLists.txt
+			-DADAPTER_POLICY_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/module_policy.c
+			-DPOCO_CORE_CMAKE_FILE=${CMAKE_SOURCE_DIR}/poco/CMakeLists.txt
+			-DPOCO_CORE_SOURCE_DIR=${CMAKE_SOURCE_DIR}/poco/src
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-adapter-target.cmake
 	)
+	set_tests_properties(ani_poco_adapter_target PROPERTIES TIMEOUT 10)
+
+	add_test(
+		NAME ani_poco_module_tooling
+		COMMAND ${CMAKE_COMMAND}
+			-DPOCO_POE_HELPER=${CMAKE_SOURCE_DIR}/poco/cmake/PocoPoeLibrary.cmake
+			-DANI_POE_HELPER=${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/AniPocoPoeLibrary.cmake
+			-DPOEKIT_CMAKE_FILE=${CMAKE_SOURCE_DIR}/poco/poekit/CMakeLists.txt
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-module-tooling.cmake
+	)
+	set_tests_properties(ani_poco_module_tooling PROPERTIES TIMEOUT 10)
 endif() ## WITH_POCO
 
 set(PJMAIN_SRC_FILES
@@ -185,7 +173,6 @@ if (WITH_ANI)
 	add_executable(
 		${PROJECT_NAME}
 			${PJMAIN_SRC_FILES}
-			${PJ_POCO_FILES}
 	)
 
 	## VS-specific stuff
@@ -242,9 +229,102 @@ target_link_libraries(
 	endif()
 
 	if (WITH_POCO)
-		target_link_libraries(${PROJECT_NAME} libpoco)
-		# Animator uses internal pj_* from src/util/memalloc.c and links only animhost for _a_a_* handles
-		target_link_libraries(${PROJECT_NAME} animhost)
+		target_link_libraries(${PROJECT_NAME} ani_poco_adapter)
+		if (APPLE)
+			set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY INSTALL_RPATH "@loader_path/lib")
+		elseif(UNIX)
+			set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY INSTALL_RPATH "$ORIGIN/lib")
+		endif()
+		# UdQnumber crosses both the libffi C-varargs boundary and the legacy
+		# host-to-Poco callback boundary.  Keep this Animator-specific regression
+		# outside the standalone Poco project, but consume its implementation
+		# through the Ani adapter rather than compiling a second copy.
+		add_executable(poco_udqnumber_callback
+			"${CMAKE_CURRENT_SOURCE_DIR}/test/udqnumber_callback/udqnumber_callback.c"
+		)
+		target_compile_definitions(poco_udqnumber_callback PRIVATE
+			POCO_UDQNUMBER_CALLBACK_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/udqnumber_callback"
+		)
+		target_link_libraries(poco_udqnumber_callback PRIVATE ani_poco_adapter)
+		add_test(NAME poco_udqnumber_callback COMMAND $<TARGET_FILE:poco_udqnumber_callback>)
+		set_tests_properties(poco_udqnumber_callback PROPERTIES TIMEOUT 10)
+
+		# Verify the production runner only reaches Animator bindings through the
+		# adapter's public VM registration path.  The adapter is intentionally a
+		# static archive of all Animator bindings, so source ownership is checked
+		# separately from the real linked-runtime fixture below.
+		add_test(
+			NAME ani_poco_registration_source
+			COMMAND ${CMAKE_COMMAND}
+				-DANI_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+				-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-registration.cmake
+		)
+		set_tests_properties(ani_poco_registration_source PROPERTIES TIMEOUT 10)
+
+		# Link a complete Animator runtime with a renamed application entry point.
+		# This lets the fixture use the exact binding objects and host globals that
+		# production ani uses, while keeping a small test main() for the VM API.
+		set(ANI_POCO_REGISTRATION_RUNTIME_SOURCES ${PJMAIN_SRC_FILES})
+		list(REMOVE_ITEM ANI_POCO_REGISTRATION_RUNTIME_SOURCES main.c)
+		add_executable(ani_poco_registration
+			"${CMAKE_CURRENT_SOURCE_DIR}/test/ani_poco_registration/ani_poco_registration.c"
+			"${CMAKE_CURRENT_SOURCE_DIR}/test/ani_poco_registration/animator_runtime_main.c"
+			${ANI_POCO_REGISTRATION_RUNTIME_SOURCES}
+		)
+		target_compile_definitions(ani_poco_registration PRIVATE
+			CLIB_MEMORY
+			ANI_POCO_REGISTRATION_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/ani_poco_registration"
+		)
+		target_link_libraries(ani_poco_registration PRIVATE
+			trdfile flilib fontlib gfxlib macinput menulib picdrive pjhigh pj_sdl
+			raster minirex softmenu trdutil wndolib SDL3-static SDL3_image-static
+			miniz giflib ani_poco_adapter
+		)
+		if (UNIX)
+			target_link_libraries(ani_poco_registration PRIVATE m)
+		endif()
+		add_test(NAME ani_poco_registration COMMAND $<TARGET_FILE:ani_poco_registration>)
+		set_tests_properties(ani_poco_registration PROPERTIES TIMEOUT 10)
+
+		# A #pragma poco library for a missing POE module must report a compile
+		# error in the Animator runtime, not crash through the windowed error
+		# box (errline -> continu_box -> NULL Wscreen).
+		add_test(
+			NAME ani_poco_missing_module
+			COMMAND ${CMAKE_COMMAND}
+				-DHARNESS=$<TARGET_FILE:ani_poco_registration>
+				-DSCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/test/ani_poco_registration/missing_module.poc
+				-P ${CMAKE_CURRENT_SOURCE_DIR}/test/ani_poco_registration/verify-missing-module.cmake
+		)
+		set_tests_properties(ani_poco_missing_module PROPERTIES TIMEOUT 30)
+
+		# Runtime coverage: a char** input array must reach a native binding as
+		# Popot elements (what po_array_str decodes for Qmenu/Qchoice/Qscroll).
+		# The fixture returns non-zero if the string bytes don't survive.
+		add_test(
+			NAME ani_poco_char_array
+			COMMAND $<TARGET_FILE:ani_poco_registration>
+				${CMAKE_CURRENT_SOURCE_DIR}/test/ani_poco_registration/char_array_runtime.poc
+		)
+		set_tests_properties(ani_poco_char_array PROPERTIES TIMEOUT 30)
+
+		# Verify the built Poco-enabled Animator runtime.  Its no-Poco dependency
+		# configures a separate Animator build; this verifier checks the installed
+		# generic/Ani module locations and the category inventory.
+		add_test(
+			NAME ani_poco_configurations
+			COMMAND ${CMAKE_COMMAND}
+				-DBASELINE_MANIFEST=${CMAKE_SOURCE_DIR}/poco/test/binding-baseline.json
+				-DBUILD_DIR=${CMAKE_BINARY_DIR}
+				-DINSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+				-DANI_EXECUTABLE=$<TARGET_FILE:ani>
+				-DANI_REGISTRATION_EXECUTABLE=$<TARGET_FILE:ani_poco_registration>
+				-DPOCO_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/poco${CMAKE_EXECUTABLE_SUFFIX}
+				-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-configurations.cmake
+		)
+		set_tests_properties(ani_poco_configurations PROPERTIES
+			DEPENDS softmenu_without_poco
+			TIMEOUT 30)
 	endif()
 	
 	if (CMAKE_GENERATOR STREQUAL "Xcode")
@@ -282,4 +362,3 @@ target_link_libraries(
 	endif()
 	
 endif()
-

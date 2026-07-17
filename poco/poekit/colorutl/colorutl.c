@@ -3,8 +3,8 @@
  *
  *	Major POE items/features demonstrated herein:
  *
- *		- Receiving and returning values to Poco caller via pointers,
- *		  with full required pointer bounds checking.
+ *		- Receiving and returning values to Poco callers through raw libffi
+ *		  pointers, with required spans enforced by binding contracts.
  *		- Providing a library of several functions to the Poco program.
  *		- Mixed C and ASM code implement functions.
  *
@@ -79,51 +79,6 @@
 // #include <hliblist.h>
 
 /*****************************************************************************
-* check a Popot for use as read-only in our code.
-*	we ensure the pointer is not NULL, and that it points to memory within
-*	the min/max range.	we *don't* check to make sure that any specific
-*	amount of space is available between the pointer and the max range,
-*	because we're not going to write into the space anyway.
-****************************************************************************/
-static Errcode popot_rdcheck(Popot *p)
-{
-	Errcode err;
-
-	if (p->pt == NULL)
-		err = Err_null_ref;
-	else if (p->pt < p->min)
-		err = Err_index_small;
-	else if (p->pt > p->max)
-		err= Err_index_big;
-	else
-		err = Success;
-
-	return builtin_err = err;
-}
-
-/*****************************************************************************
-* check a Popot for use as read/write in our code.
-*	we ensure the pointer is not NULL, and that it points to memory within
-*	the min/max range.	we also check to make sure that the requested
-*	amount of space is available between the pointer and the max range.
-****************************************************************************/
-static Errcode popot_wrcheck(Popot *p, int size)
-{
-	Errcode err;
-
-	if (p->pt == NULL)
-		err = Err_null_ref;
-	else if (p->pt < p->min)
-		err = Err_index_small;
-	else if (((char *)p->pt + size - 1) > p->max)
-		err = Err_buf_too_small;
-	else
-		err = Success;
-
-	return builtin_err = err;
-}
-
-/*****************************************************************************
 * convert unsigned byte rgb triplets used internally to integer triplets.
 ****************************************************************************/
 static void rgb_to_irgb(void *irgb, void *rgb, int count)
@@ -138,37 +93,58 @@ static void rgb_to_irgb(void *irgb, void *rgb, int count)
 	}
 }
 
+/* Poco exposes each RGB component as an int, unlike Animator's packed Rgb3. */
+static int color_difference_values(const int *c1, const int *c2)
+{
+	int dr = c1[0] - c2[0];
+	int dg = c1[1] - c2[1];
+	int db = c1[2] - c2[2];
+
+	return dr*dr + dg*dg + db*db;
+}
+
+static int closest_color_index(const int *rgb, const int *table, int count)
+{
+	int index;
+	int best = 0;
+	int best_difference = 0x7fffffff;
+
+	for (index = 0; index < count; ++index) {
+		int difference = color_difference_values(rgb, &table[index * 3]);
+
+		if (difference < best_difference) {
+			best_difference = difference;
+			best = index;
+			if (difference == 0)
+				break;
+		}
+	}
+	return best;
+}
+
 /*****************************************************************************
 * find the difference between two rgb colors.
 *
-*	this routine just checks parameter validity, then calls the assembler
-*	routine that does the real work.
+*	The binding contract validates both three-component input spans before
+*	libffi calls this raw-pointer implementation.
 ****************************************************************************/
-int safe_color_dif(Popot pcolor1, Popot pcolor2)
+int safe_color_dif(const int *pcolor1, const int *pcolor2)
 {
-	if (popot_rdcheck(&pcolor1) ||
-		popot_rdcheck(&pcolor2))
-		return builtin_err;
-
-	return color_dif((Rgb3 *)pcolor1.pt, (Rgb3 *)pcolor2.pt);
+	return color_difference_values(pcolor1, pcolor2);
 }
 
 /*****************************************************************************
 * find the rgb color in a table that is closest to the requested color.
 *
-*	this routine just checks parameter validity, then calls the assembler
-*	routine that does the real work.
+*	The binding contract validates the query and tabcount-sized table spans
+*	before libffi calls this raw-pointer implementation.
 ****************************************************************************/
-int safe_closestc(Popot pcolor, Popot ptab, int tabcount)
+int safe_closestc(const int *pcolor, const int *ptab, int tabcount)
 {
-	if (popot_rdcheck(&pcolor) ||
-		popot_rdcheck(&ptab))
-		return builtin_err;
-
 	if (tabcount < 0)
 		return builtin_err = Err_parameter_range;
 
-	return closestc((Rgb3 *)pcolor.pt, (Rgb3 *)ptab.pt, tabcount);
+	return closest_color_index(pcolor, ptab, tabcount);
 
 }
 
@@ -179,23 +155,19 @@ int safe_closestc(Popot pcolor, Popot ptab, int tabcount)
 *	that set of colors returned.  (both could be NULL, but that would be
 *	pretty pointless, huh?)
 ****************************************************************************/
-void menu_colors(Popot current, Popot preferred)
+void menu_colors(void *current, void *preferred)
 {
 	Rgb3	*pl_currents;
 	Rgb3	*pl_preferreds;
 
 	GetMenuColors(NULL, &pl_currents, &pl_preferreds);
 
-	if (current.pt != NULL) {
-		if (popot_wrcheck(&current, 5*sizeof(Rgb3)))
-			return;
-		rgb_to_irgb(current.pt, pl_currents, 5);
+	if (current != NULL) {
+		rgb_to_irgb(current, pl_currents, 5);
 	}
 
-	if (preferred.pt != NULL) {
-		if (popot_wrcheck(&preferred, 5*sizeof(Rgb3)))
-			return;
-		rgb_to_irgb(preferred.pt, pl_preferreds, 5);
+	if (preferred != NULL) {
+		rgb_to_irgb(preferred, pl_preferreds, 5);
 	}
 
 	return;
@@ -210,18 +182,15 @@ void menu_colors(Popot current, Popot preferred)
 *	go look in the color palette, you'd find the rgb values returned by
 *	the 'currents' portion of the function above.
 ****************************************************************************/
-void menu_indexes(Popot pindexes)
+void menu_indexes(int *pindexes)
 {
 	int 	i;
 	Pixel	*indexes;
 	int 	*pret;
 
-	if (popot_wrcheck(&pindexes, 5*sizeof(int)))
-		return;
-
 	GetMenuColors(&indexes, NULL, NULL);
 
-	pret = pindexes.pt;
+	pret = pindexes;
 	for (i = 0; i < 5; ++i)
 		*pret++ = *indexes++;
 
@@ -229,41 +198,31 @@ void menu_indexes(Popot pindexes)
 }
 
 /*****************************************************************************
-* check the validity of the poco pointers, then call the real-work routine.
+* The binding contract validates the three writable integer outputs.
 ****************************************************************************/
-void safe_rgb2hls(int r, int g, int b, Popot ph, Popot pl, Popot ps)
+void safe_rgb2hls(int r, int g, int b, int *ph, int *pl, int *ps)
 {
 
 	r &= 0x00FF;	/* force color components to be in 0-255 range */
 	g &= 0x00FF;
 	b &= 0x00FF;
 
-	if (popot_wrcheck(&ph, sizeof(int)) ||
-		popot_wrcheck(&pl, sizeof(int)) ||
-		popot_wrcheck(&ps, sizeof(int)))
-		return;
-
-	rgb_to_hls(r, g, b, ph.pt, pl.pt, ps.pt);
+	rgb_to_hls(r, g, b, ph, pl, ps);
 
 	return;
 }
 
 /*****************************************************************************
-* check the validity of the poco pointers, then call the real-work routine.
+* The binding contract validates the three writable integer outputs.
 ****************************************************************************/
-void safe_hls2rgb(Popot pr, Popot pg, Popot pb, int h, int l, int s)
+void safe_hls2rgb(int *pr, int *pg, int *pb, int h, int l, int s)
 {
 
 	h &= 0x00FF;	/* force color components to be in 0-255 range */
 	l &= 0x00FF;
 	s &= 0x00FF;
 
-	if (popot_wrcheck(&pr, sizeof(int)) ||
-		popot_wrcheck(&pg, sizeof(int)) ||
-		popot_wrcheck(&pb, sizeof(int)))
-		return;
-
-	hls_to_rgb(pr.pt, pg.pt, pb.pt, h, l, s);
+	hls_to_rgb(pr, pg, pb, h, l, s);
 
 	return;
 }
@@ -272,14 +231,61 @@ void safe_hls2rgb(Popot pr, Popot pg, Popot pb, int h, int l, int s)
  * Setup rexlib/pocorex interface structures...
  *--------------------------------------------------------------------------*/
 
+static const PocoBindingPointerContract color_difference_spans[] = {
+  { 0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+    3*sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+  { 1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+    3*sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+};
+static const PocoBindingPointerContract closest_color_spans[] = {
+  { 0, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+    3*sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+  { 1, POCO_POINTER_PERMISSION_READ, 1, POCO_BINDING_SPAN_BYTES,
+    3*sizeof(int), 2, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+};
+static const PocoBindingPointerContract menu_indexes_spans[] = {
+  { 0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+    5*sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+};
+static const PocoBindingPointerContract rgb_to_hls_spans[] = {
+  { 3, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+    sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+  { 4, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+    sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+  { 5, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+    sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+};
+static const PocoBindingPointerContract hls_to_rgb_spans[] = {
+  { 0, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+    sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+  { 1, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+    sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+  { 2, POCO_POINTER_PERMISSION_WRITE, 1, POCO_BINDING_SPAN_BYTES,
+    sizeof(int), POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE, POCO_BINDING_PARAMETER_NONE },
+};
+static const PocoBindingContract color_difference_contract = {
+  color_difference_spans, Array_els(color_difference_spans), {0}
+};
+static const PocoBindingContract closest_color_contract = {
+  closest_color_spans, Array_els(closest_color_spans), {0}
+};
+static const PocoBindingContract menu_indexes_contract = {
+  menu_indexes_spans, Array_els(menu_indexes_spans), {0}
+};
+static const PocoBindingContract rgb_to_hls_contract = {
+  rgb_to_hls_spans, Array_els(rgb_to_hls_spans), {0}
+};
+static const PocoBindingContract hls_to_rgb_contract = {
+  hls_to_rgb_spans, Array_els(hls_to_rgb_spans), {0}
+};
+
 static Lib_proto poe_calls[] = {
-  { safe_color_dif, "int  ColorDifference(int *pcolor1, int *pcolor2);" },
-  { safe_closestc,	"int  ClosestColor(int *pcolor, int *ptab, int tabcount);" },
+  { safe_color_dif, "int  ColorDifference(int *pcolor1, int *pcolor2);", &color_difference_contract },
+  { safe_closestc,	"int  ClosestColor(int *pcolor, int *ptab, int tabcount);", &closest_color_contract },
   { menu_colors,	"void GetMenuRGB(int *current, int *preferred);" },
-  { menu_indexes,	"void GetMenuIndexes(int *indexes);" },
-  { safe_rgb2hls,	"void RgbToHls(int r, int g, int b, int *h, int *l, int *s);"},
-  { safe_hls2rgb,	"void HlsToRgb(int *r, int *g, int *b, int h, int l, int s);"},
+  { menu_indexes,	"void GetMenuIndexes(int *indexes);", &menu_indexes_contract },
+  { safe_rgb2hls,	"void RgbToHls(int r, int g, int b, int *h, int *l, int *s);", &rgb_to_hls_contract},
+  { safe_hls2rgb,	"void HlsToRgb(int *r, int *g, int *b, int h, int l, int s);", &hls_to_rgb_contract},
 };
 
 Setup_Pocorex(NOFUNC, NOFUNC, "Color Utilities v1.1", poe_calls);
-

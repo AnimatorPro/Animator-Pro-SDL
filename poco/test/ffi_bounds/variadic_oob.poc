@@ -1,0 +1,5 @@
+main()
+{
+	char bytes[4];
+	return read_variadic(bytes, 5, 100);
+}

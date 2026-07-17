@@ -113,6 +113,7 @@ static void integral_init(Poco_cb *pcb, InitControl *ctl,
 	if (ctl->frame_type != FTY_FUNC &&
 		(exp->includes_assignment > 1 || exp->includes_function)) {
 		po_say_fatal(pcb, "illegal initialization (code outside of function)");
+  PO_CHECK_ABORT_VOID(pcb);
 	}
 }
 
@@ -133,6 +134,7 @@ static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 
 	if (ti->comp_count != 2 && ti->comp[0] != TYPE_CHAR) {
 		po_say_fatal(pcb, "quoted string initializing non-char array");
+  PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	/*------------------------------------------------------------------------
@@ -165,6 +167,7 @@ static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 	} else {
 		if (asize < dsize-1) {
 			po_say_fatal(pcb, "string too big for array");
+   PO_CHECK_ABORT_VOID(pcb);
 			return;
 		}
 	}
@@ -227,7 +230,8 @@ static void array_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 		}
 
 		if (dim != 0 && rdim >= dim) {					/* if array allocated */
-			po_say_fatal(pcb, "too many initializers.");/* and more inits than*/
+			po_say_fatal(pcb, "too many initializers.");
+   PO_CHECK_ABORT_VOID(pcb);
 		}												/* array elements, die*/
 
 		anytype_init(pcb, ctl, ti, doff);	  /* recurse to handle expression */

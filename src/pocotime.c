@@ -121,7 +121,7 @@ return(insert_frames(count, vs.frame_ix));
 typedef struct poco1_dat
 	{
 	void *code;
-	Popot pdata;  /* Popot reconstructed from raw void* for poco_cont_ops callback */
+	Popot pdata;  /* Popot reconstructed from raw void* for the Poco callback */
 	} Poco1_dat;
 
 Errcode poco1(Poco1_dat *pd, int ix, int total, int scale)
@@ -132,11 +132,15 @@ Errcode poco1(Poco1_dat *pd, int ix, int total, int scale)
 double time;
 Errcode err;
 Pt_num ret;
+PocoCallbackValue callback_args[2];
 
 time = 1.0 * scale / SCALE_ONE;
 
-err = poco_cont_ops(pd->code, &ret,
-			(sizeof(Popot)+sizeof(time)), time, pd->pdata);
+callback_args[0].kind = POCO_CALLBACK_VALUE_DOUBLE;
+callback_args[0].value.double_value = time;
+callback_args[1].kind = POCO_CALLBACK_VALUE_POPOT;
+callback_args[1].value.popot_value = pd->pdata;
+err = poco_invoke_callback(pd->code, &ret, callback_args, 2);
 
 if ((builtin_err = err) >= Success)
 	{
@@ -480,5 +484,3 @@ Poco_lib po_time_lib = {
 	NULL, "Time Oriented Function",
 	(Lib_proto *)&po_libtime, POLIB_TIME_SIZE,
 	};
-
-

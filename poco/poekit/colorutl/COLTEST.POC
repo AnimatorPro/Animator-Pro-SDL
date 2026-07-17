@@ -1,7 +1,8 @@
-/* Headless test for colorutl.poe — exercises pure-computation functions
- * that don't require the Animator runtime.
+/* Headless test for colorutl.poe — exercises pointer-heavy pure-computation
+ * functions through Animator's registered Poco adapter without constructing a
+ * GUI screen.
  *
- * Tests: ColorDifference, ClosestColor (local table), RgbToHls
+ * Tests: ColorDifference, ClosestColor (local table), RgbToHls, HlsToRgb
  */
 
 #pragma poco library "colorutl.poe"
@@ -10,17 +11,15 @@
   int  ColorDifference(int *pcolor1, int *pcolor2);
   int  ClosestColor(int *pcolor, int *ptab, int tabcount);
   void RgbToHls(int r, int g, int b, int *h, int *l, int *s);
+  void HlsToRgb(int *r, int *g, int *b, int h, int l, int s);
 #endif /* __POCO__ */
 
 int errors = 0;
 
-void check_int(char *label, int expected, int actual)
+void check_int(int expected, int actual)
 {
 	if (expected != actual) {
-		printf("FAIL %s: expected %d, got %d\n", label, expected, actual);
 		errors += 1;
-	} else {
-		printf("  ok %s = %d\n", label, actual);
 	}
 }
 
@@ -35,19 +34,17 @@ void test_ColorDifference()
 	white[0] = 255; white[1] = 255; white[2] = 255;
 	red[0]   = 255; red[1]   = 0;   red[2]   = 0;
 
-	printf("-- ColorDifference --\n");
-
 	/* black vs black should be 0 */
 	dif = ColorDifference(black, black);
-	check_int("black-black", 0, dif);
+	check_int(0, dif);
 
 	/* black vs white = 255^2 * 3 = 195075 */
 	dif = ColorDifference(black, white);
-	check_int("black-white", 195075, dif);
+	check_int(195075, dif);
 
 	/* red vs black = 255^2 = 65025 */
 	dif = ColorDifference(red, black);
-	check_int("red-black", 65025, dif);
+	check_int(65025, dif);
 }
 
 void test_ClosestColor()
@@ -61,58 +58,57 @@ void test_ClosestColor()
 	table[3] = 128; table[4] = 128; table[5] = 128;    /* 1: grey   */
 	table[6] = 255; table[7] = 255; table[8] = 255;    /* 2: white  */
 
-	printf("-- ClosestColor --\n");
-
 	/* Query white — should match index 2 */
 	query[0] = 255; query[1] = 255; query[2] = 255;
 	idx = ClosestColor(query, table, 3);
-	check_int("closest-to-white", 2, idx);
+	check_int(2, idx);
 
 	/* Query black — should match index 0 */
 	query[0] = 0; query[1] = 0; query[2] = 0;
 	idx = ClosestColor(query, table, 3);
-	check_int("closest-to-black", 0, idx);
+	check_int(0, idx);
 
 	/* Query near-grey (120,120,120) — should match index 1 */
 	query[0] = 120; query[1] = 120; query[2] = 120;
 	idx = ClosestColor(query, table, 3);
-	check_int("closest-to-grey", 1, idx);
+	check_int(1, idx);
 }
 
 void test_RgbToHls()
 {
 	int h, l, s;
 
-	printf("-- RgbToHls --\n");
-
 	/* Pure red (255,0,0) */
 	RgbToHls(255, 0, 0, &h, &l, &s);
-	printf("  RGB(255,0,0) -> HLS(%d,%d,%d)\n", h, l, s);
-	check_int("red-L", 127, l);
+	check_int(127, l);
 
 	/* Pure white (255,255,255) — saturation should be 0 */
 	RgbToHls(255, 255, 255, &h, &l, &s);
-	printf("  RGB(255,255,255) -> HLS(%d,%d,%d)\n", h, l, s);
-	check_int("white-S", 0, s);
-	check_int("white-L", 255, l);
+	check_int(0, s);
+	check_int(255, l);
 
 	/* Pure black (0,0,0) — saturation should be 0 */
 	RgbToHls(0, 0, 0, &h, &l, &s);
-	printf("  RGB(0,0,0) -> HLS(%d,%d,%d)\n", h, l, s);
-	check_int("black-S", 0, s);
-	check_int("black-L", 0, l);
+	check_int(0, s);
+	check_int(0, l);
 }
 
-void main()
+void test_HlsToRgb()
 {
-	printf("colorutl.poe headless test\n\n");
+	int r, g, b;
+
+	/* Zero saturation produces an equal RGB triplet through three writes. */
+	HlsToRgb(&r, &g, &b, 0, 100, 0);
+	check_int(102, r);
+	check_int(102, g);
+	check_int(102, b);
+}
+
+int main()
+{
 	test_ColorDifference();
 	test_ClosestColor();
 	test_RgbToHls();
-
-	if (errors == 0) {
-		printf("\nAll tests passed.\n");
-	} else {
-		printf("\n%d test(s) FAILED.\n", errors);
-	}
+	test_HlsToRgb();
+	return errors;
 }

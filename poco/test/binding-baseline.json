@@ -1,0 +1,97 @@
+{
+  "schema_version": 2,
+  "captured_on": "2026-06-27",
+  "purpose": "Pre-refactor registration, variadic, callback, and native-POE compatibility baseline. Source locations identify the current evidence; the entries below are the reviewable snapshot.",
+  "catalogs": {
+    "core": [
+      {"library": "Poco Library", "script_prototype_table": "poco/src/main.c:proto_lines", "native_target": "Poco_lib po_main_lib", "host_scope": "standalone CLI", "status": "active"},
+      {"library": "(C standard) String", "script_prototype_table": "poco/src/strlib.c:lib", "native_target": "Poco_lib po_str_lib", "host_scope": "host-neutral core", "status": "active"},
+      {"library": "(C Standard) FILE", "script_prototype_table": "poco/src/safefile.c:filelib", "native_target": "Poco_lib po_FILE_lib", "host_scope": "host-neutral core", "status": "active"},
+      {"library": "(C Standard) Memory Manager", "script_prototype_table": "poco/src/safefile.c:memlib", "native_target": "Poco_lib po_mem_lib", "host_scope": "host-neutral core", "status": "active"},
+      {"library": "(C Standard) Math", "script_prototype_table": "poco/src/mathlib.c:mathlib", "native_target": "Poco_lib po_math_lib", "host_scope": "host-neutral core", "status": "active"},
+      {"library": "DOS", "script_prototype_table": "poco/src/pocodos_standalone.c:dos_lib", "native_target": "Poco_lib po_dos_standalone_lib", "host_scope": "host-neutral core", "status": "active"}
+    ],
+    "animator": [
+      {"library": "User Interface", "script_prototype_table": "src/pocouser.c:po_libuser (PolibUser)", "native_target": "Poco_lib po_user_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Graphics", "script_prototype_table": "src/pocodraw.c:po_libdraw (PolibDraw)", "native_target": "Poco_lib po_draw_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Text", "script_prototype_table": "src/pocotext.c:po_libtext (PolibText)", "native_target": "Poco_lib po_text_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Graphics Modes", "script_prototype_table": "src/pocomode.c:po_libmode (PolibMode)", "native_target": "Poco_lib po_mode_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Turtle Graphics", "script_prototype_table": "src/pocotur.c:po_libturtle (PolibTurtle)", "native_target": "Poco_lib po_turtle_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Time Oriented Function", "script_prototype_table": "src/pocotime.c:po_libtime (PolibTime)", "native_target": "Poco_lib po_time_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Cel", "script_prototype_table": "src/pococel.c:po_libcel (PolibCel)", "native_target": "Poco_lib po_cel_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Swap Screen", "script_prototype_table": "src/pocoalt.c:po_libswap (PolibSwap)", "native_target": "Poco_lib po_alt_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Optics", "script_prototype_table": "src/pocoa3d.c:po_liboptics (PolibOptics)", "native_target": "Poco_lib po_optics_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Screen", "script_prototype_table": "src/pocoblit.c:po_libscreen (PolibScreen)", "native_target": "Poco_lib po_blit_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Misc. Functions", "script_prototype_table": "src/pocofunc.c:po_libmisc (PolibMisc)", "native_target": "Poco_lib po_misc_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Autodesk Animator File", "script_prototype_table": "src/pocofile.c:po_libaafile (PolibAAFile)", "native_target": "Poco_lib po_load_save_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "DOS", "script_prototype_table": "src/pocodos.c:po_libdos (PolibDos)", "native_target": "Poco_lib po_dos_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Global Variable", "script_prototype_table": "src/pocogvar.c:po_libglobalv (PolibGlobalv)", "native_target": "Poco_lib po_globalv_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Title", "script_prototype_table": "src/pocotext.c:po_libtitle (PolibTitle)", "native_target": "Poco_lib po_title_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Tween", "script_prototype_table": "src/pocotwee.c:po_libtween (PolibTween)", "native_target": "Poco_lib po_tween_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Flic Playback", "script_prototype_table": "src/pocoflic.c:po_libflicplay (PolibFlicPlay)", "native_target": "Poco_lib po_flicplay_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "Picture Driver", "script_prototype_table": "src/pocopicdrive.c:po_picdrive_protos", "native_target": "Poco_lib po_picdrive_lib", "host_scope": "Animator host", "status": "active"},
+      {"library": "(C Standard) FILE", "script_prototype_table": "poco/src/safefile.c:filelib", "native_target": "Poco_lib po_FILE_lib", "host_scope": "shared host-neutral core", "status": "active"},
+      {"library": "(C standard) String", "script_prototype_table": "poco/src/strlib.c:lib", "native_target": "Poco_lib po_str_lib", "host_scope": "shared host-neutral core", "status": "active"},
+      {"library": "(C Standard) Memory Manager", "script_prototype_table": "poco/src/safefile.c:memlib", "native_target": "Poco_lib po_mem_lib", "host_scope": "shared host-neutral core", "status": "active"},
+      {"library": "(C Standard) Math", "script_prototype_table": "poco/src/mathlib.c:mathlib", "native_target": "Poco_lib po_math_lib", "host_scope": "shared host-neutral core", "status": "active"}
+    ]
+  },
+  "live_standard_varargs": [
+    {"binding": "printf", "library": "Poco Library", "prototype": "int printf(char *format, ...);", "native_target": "libc printf", "host_scope": "standalone CLI", "status": "active"},
+    {"binding": "Qtext", "library": "Poco Library", "prototype": "void Qtext(char *format, ...);", "native_target": "po_qtext", "host_scope": "standalone CLI", "status": "active"},
+    {"binding": "sprintf", "library": "(C standard) String", "prototype": "int sprintf(char *buf, char *format, ...);", "native_target": "po_sprintf", "host_scope": "host-neutral core", "status": "active"},
+    {"binding": "fprintf", "library": "(C Standard) FILE", "prototype": "int fprintf(FILE *f, char *format, ...);", "native_target": "po_fprintf", "host_scope": "host-neutral core", "status": "active"},
+    {"binding": "printf", "library": "User Interface", "prototype": "int printf(char *format, ...);", "native_target": "po_ttextf", "host_scope": "Animator host", "status": "active"},
+    {"binding": "Qtext", "library": "User Interface", "prototype": "void Qtext(char *format, ...);", "native_target": "po_TextBox", "host_scope": "Animator host", "status": "active"},
+    {"binding": "Qchoice", "library": "User Interface", "prototype": "int Qchoice(char **buttons, int bcount, char *header, ...);", "native_target": "po_ChoiceBox", "host_scope": "Animator host", "status": "active"},
+    {"binding": "Qquestion", "library": "User Interface", "prototype": "Boolean Qquestion(char *question, ...);", "native_target": "po_YesNo", "host_scope": "Animator host", "status": "active"},
+    {"binding": "Qerror", "library": "User Interface", "prototype": "ErrCode Qerror(ErrCode err, char *format, ...);", "native_target": "po_ErrBox", "host_scope": "Animator host", "status": "active"},
+    {"binding": "UdQnumber", "library": "User Interface", "prototype": "Boolean UdQnumber(int *num, int min, int max, Errcode (*update)(void *data, int num), void *data, char *fmt,...);", "native_target": "po_UdSlider", "host_scope": "Animator host", "status": "active", "compatibility_note": "also invokes a Poco callback"}
+  ],
+  "removed_dummy_catalog": {
+    "former_source": "poco/src/dummylib.c",
+    "status": "removed",
+    "reason": "One void no-op target could not satisfy the libffi contracts advertised by the Animator-shaped declarations.",
+    "former_active_variadics": [
+      "Qchoice(char **buttons, int bcount, char *header, ...)",
+      "Qquestion(char *question, ...)",
+      "Qbusy(char *format, ...)",
+      "Qerror(ErrCode err, char *format, ...)",
+      "RunPoe(void **prex, int magic, ...)"
+    ],
+    "former_non_variadic_catalog": "Removed with the dummy source; Animator-only APIs are registered only by the Animator host.",
+    "former_commented_entries": ["printf", "Qtext", "fprintf", "sprintf"],
+    "standalone_behavior": "Requests for an Animator-only API fail during Poco compilation with an undefined-symbol diagnostic."
+  },
+  "c_varargs_callbacks_into_poco": [
+    {"name": "abort handler", "source": "src/pocouser.c:po_check_abort", "callback_shape": "Boolean handler(void *data)", "call": "poco_invoke_callback(..., Popot)", "argument_kinds": ["Popot"]},
+    {"name": "UdQnumber update", "source": "src/pocoqnum.c:ppupdate", "callback_shape": "Errcode update(void *data, int num)", "call": "poco_invoke_callback(..., Popot, int)", "argument_kinds": ["Popot", "int"]},
+    {"name": "OverTime effect", "source": "src/pocotime.c:poco1", "callback_shape": "ErrCode effect(double time, void *data)", "call": "poco_invoke_callback(..., double, Popot)", "argument_kinds": ["double", "Popot"]},
+    {"name": "FLIC event", "source": "src/pocoflic.c:until_poco_event", "callback_shape": "int eventfunc(Flic *flic, void *userdata, long cur_loop, long cur_frame, long num_frames)", "call": "poco_invoke_callback(..., Popot, Popot, long, long, long)", "argument_kinds": ["Popot", "Popot", "long", "long", "long"]}
+  ],
+  "native_poe_compatibility": {
+    "vtable": "src/inc/pocolib.h:PolibUser",
+    "status": "Animator-only legacy native-POE ABI; not script-to-C libffi dispatch",
+    "variadic_entries": [
+      {"field": "plprintf", "prototype": "int (*plprintf)(char* format, ...)"},
+      {"field": "plQtext", "prototype": "void (*plQtext)(char* format, ...)"},
+      {"field": "plQchoice", "prototype": "int (*plQchoice)(Popot* buttons, int bcount, char* header, ...)"},
+      {"field": "plQquestion", "prototype": "bool (*plQquestion)(char* question, ...)"},
+      {"field": "plQerror", "prototype": "Errcode (*plQerror)(Errcode err, char* format, ...)"},
+      {"field": "plUdQnumber", "prototype": "bool (*plUdQnumber)(int* inum, int min, int max, void* update, void* data, char* fmt, ...)"}
+    ],
+    "users": [
+      {"module": "flicplay", "source": "poco/poekit/flicplay/flicplay.c", "state": "legacy source-only", "evidence": "poeQerror"},
+      {"module": "pstamp", "source": "poco/poekit/pstamp/pstamp.c", "state": "built by poco/poekit/CMakeLists.txt", "evidence": "poeQerror"},
+      {"module": "eco", "source": "poco/poekit/eco/eco.c", "state": "legacy source-only", "evidence": "poeQerror, poeQquestion, poeprintf"},
+      {"module": "lookup", "source": "poco/poekit/lookup/lookup.c", "state": "legacy source-only", "evidence": "poeQtext"},
+      {"module": "otdemo", "source": "poco/poekit/otdemo/otdemo.c", "state": "legacy source-only", "evidence": "poeQquestion and OverTime"}
+    ]
+  },
+  "behavior_fixtures": [
+    {"id": "sprintf_variadic", "script": "poco/test/pos/sprintf_variadic.poc", "expected_exit": 0, "expected_stdout": "Success", "coverage": "multiple integer, string, and hexadecimal variadic arguments"},
+    {"id": "pointer_return", "script": "poco/test/pos/pointer_return.poc", "expected_exit": 0, "expected_stdout": "Success", "coverage": "string-library pointer results alongside standard printf"},
+    {"id": "undefined_variable", "script": "poco/test/neg/undefined_var.poc", "expected_exit": "nonzero", "coverage": "representative script compile failure; registered bindings are not executed after compilation fails"},
+    {"id": "cli_qtext", "script": "poco/test/ATOF.POC", "expected_exit": "interactive", "coverage": "CLI Qtext prints a dialog banner and waits for a key; not an automated CTest fixture"}
+  ]
+}

@@ -14,7 +14,6 @@ LIBRARY
   \paa\fileio\doslfile.lib
 
 FILE
-  dummylib.obj,
   pocmemry.obj,
   fold.obj,
   bop.obj,

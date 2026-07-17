@@ -18,6 +18,7 @@
 #include "marqi.h"
 #include "wildlist.h"
 #include "scroller.h"
+#include "poco_array.h"
 
 extern bool hide_mouse(void);
 extern bool show_mouse(void);
@@ -27,8 +28,8 @@ extern void disp_line_alot(Short_xy* v);
 void cleanup_toptext();
 Errcode po_poly_to_arrays(Poly* p, Popot* x, Popot* y);
 Errcode po_arrays_to_poly(Poly* p, int ptcount, Popot* px, Popot* py);
-extern bool po_UdSlider(int* inum, int min, int max, void* update,
-						void* data, char* fmt, ...);
+extern int po_UdSlider(int* inum, int min, int max, void* update,
+					   void* data, char* fmt, ...);
 
 extern void full_screen_edit(Text_file* gf);  // from qpocoed.c
 
@@ -117,6 +118,7 @@ bool po_check_abort(void* nobody)
 	bool mouse_was_on;
 	Errcode err;
 	Pt_num retval;
+	PocoCallbackValue callback_args[1];
 
 	if (abort_control.abortable) {
 		if (poll_abort() < Success) {
@@ -126,8 +128,10 @@ bool po_check_abort(void* nobody)
 					return true;
 				} else {
 					abort_control.abortable = false; /* prevent bad recursion */
-					err = poco_cont_ops(abort_control.abort_handler, &retval, sizeof(Popot),
-										abort_control.abort_data);
+					callback_args[0].kind = POCO_CALLBACK_VALUE_POPOT;
+					callback_args[0].value.popot_value = abort_control.abort_data;
+					err = poco_invoke_callback(abort_control.abort_handler, &retval,
+						callback_args, 1);
 					if (err < Success) {
 						return builtin_err = err;
 					}
@@ -506,9 +510,9 @@ static void po_TextBox(char* fmt, ...)
 }
 
 /*****************************************************************************
- * bool Qquestion(char *question, ...)
+ * Boolean Qquestion(char *question, ...)
  ****************************************************************************/
-static bool po_YesNo(char* question, ...)
+static int po_YesNo(char* question, ...)
 {
 	va_list args;
 	bool rv;
@@ -560,6 +564,12 @@ static bool po_Slider(int* inum, int min, int max, char* hailing)
 	return cancel;
 }
 
+/* Decode one element of a poco char* array; see poco_array.h for the why. */
+char* po_array_str(char** poco_array, int index)
+{
+	return (char*)((Popot*)poco_array)[index].pt;
+}
+
 /*****************************************************************************
  * int Qchoice(char **buttons, int bcount, char *header, ...)
  ****************************************************************************/
@@ -581,7 +591,7 @@ static Errcode po_ChoiceBox(char** pchoices, int ccount, char* fmt, ...)
 		return (builtin_err = Err_null_ref);
 	}
 	for (i = 0; i < ccount; ++i) {
-		if (NULL == (choices[i] = pchoices[i])) {
+		if (NULL == (choices[i] = po_array_str(pchoices, i))) {
 			return (builtin_err = Err_null_ref);
 		}
 	}
@@ -686,7 +696,7 @@ static int po_some_choice(char** pchoices, int ccount, USHORT* flags, char* head
 		return (builtin_err = Err_null_ref);
 	}
 	for (i = 0; i < ccount; ++i) {
-		if (NULL == (pbuf[i] = pchoices[i])) {
+		if (NULL == (pbuf[i] = po_array_str(pchoices, i))) {
 			return (builtin_err = Err_null_ref);
 		}
 	}
@@ -752,7 +762,7 @@ static Errcode strarr_to_names(char** pp, int pcount, Names** pnames)
 		goto ERR;
 	}
 	for (i = 0; i < pcount; i++) {
-		if ((s = pp[i]) == NULL) {
+		if ((s = po_array_str(pp, i)) == NULL) {
 			err = Err_null_ref;
 			goto ERR;
 		}
@@ -893,11 +903,12 @@ static int po_Qscroll(int* choice_ix, char** items, int icount, int* ipos, char*
 		usebtexts = NULL;
 	} else {
 		usebtexts = btexts;
-		if ((NULL == (btexts[0] = button_texts[0])) || (NULL == (btexts[2] = button_texts[2]))) {
+		if ((NULL == (btexts[0] = po_array_str(button_texts, 0))) ||
+			(NULL == (btexts[2] = po_array_str(button_texts, 2)))) {
 			builtin_err = Err_null_ref;
 			goto OUT;
 		}
-		if (NULL == (btexts[1] = button_texts[1])) {
+		if (NULL == (btexts[1] = po_array_str(button_texts, 1))) {
 			btexts[1] = "";
 		}
 	}

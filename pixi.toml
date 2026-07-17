@@ -10,9 +10,11 @@ configure = { cmd="cmake -B _build -S . -G Ninja -DCMAKE_INSTALL_PREFIX=_install
 build = { cmd="cmake --build _build --config debug --target install", depends-on=["configure"] }
 test = { cmd="ctest --test-dir _build --output-on-failure", depends-on=["build"] }
 ani = { cmd="./ani", cwd="_install", depends-on=["build"] }
+format = { cmd="git ls-files '*.c' '*.h' | grep -vE '^(thirdparty/|src/picdrive/jpeg/LIB/|src/stb_impl\\.c$)' | xargs clang-format -i" }
 clean = "rm -rf _*"
 
 [dependencies]
 cmake = ">=4.1.2,<5"
 ninja = ">=1.13.1,<2"
 git = ">=2.51.0,<3"
+clang-format = ">=22.1.8,<23"

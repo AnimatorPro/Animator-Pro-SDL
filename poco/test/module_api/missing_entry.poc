@@ -1,0 +1,5 @@
+#pragma poco library "poco_generic_missing_entry.poe"
+
+main()
+{
+}

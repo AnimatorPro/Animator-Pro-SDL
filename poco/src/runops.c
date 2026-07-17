@@ -63,7 +63,7 @@
  ****************************************************************************/
 
 #include "poco.h"
-#include <stdarg.h>
+#include <limits.h>
 #include <string.h>
 
 #define MIN_PCALL_STACK 512	 /* we check real often, small is fine. */
@@ -111,6 +111,13 @@ typedef struct
 
 static Poco_run_env* pe;
 
+#define RECORD_VARIADIC_TYPE(type) \
+	do { \
+		err = po_ffi_variadic_types_append(&pe->variadic, (type)); \
+		if (err != Success) \
+			goto ERR_IN_FFI; \
+	} while (0)
+
 #ifdef DEVELOPMENT
 /* variables for runops tracing */
 C_frame* po_run_protos;
@@ -118,23 +125,10 @@ FILE* po_trace_file;
 bool po_trace_flag = false;
 #endif /* DEVELOPMENT */
 
-/* libffi helpers */
-#define CHECK_VAR_TYPE_INDEX()                     \
-	if (pe->variadic_type_index == FFI_MAX_ARGS) { \
-		err = Err_poco_ffi_variadic_overflow;      \
-		goto ERR_IN_FFI;                           \
-		break;                                     \
-	}
-#define INC_VAR_TYPE_INDEX() \
-	(pe->variadic_type_index += pe->variadic_type_index < FFI_MAX_ARGS ? 1 : 0)
-#define CHECK_AND_INC_VAR_TYPE() \
-	CHECK_VAR_TYPE_INDEX();      \
-	INC_VAR_TYPE_INDEX()
-
 /*****************************************************************************
  * used as a dummy check_abort function when none is provided.
  ****************************************************************************/
-static int nofunc(void* d)
+static bool nofunc(void* d)
 {
 	(void)d;
 	return false;
@@ -143,24 +137,63 @@ static int nofunc(void* d)
 /*****************************************************************************
  * interpret code stream - the heart of the runtime interpreter.
  ****************************************************************************/
-Errcode poco_cont_ops(void* code_pt, Pt_num* pret, int arglength, ...)
+Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
+	const PocoCallbackValue* values, size_t value_count)
 {
 	int end_op		= OP_END;
 	FILE* tfile		= NULL;
-	Pt_num* ip		= code_pt;
-	Pt_num* globals = (Pt_num*)(pe->data + pe->data_size);
+	Pt_num* ip;
+	Pt_num* globals;
 	Errcode err;
-	va_list args;
 	Pt_num* stack;
 	Pt_num* base;
 	UBYTE* stack_area;
 	Eax acc;
 	int op;
 	Po_FFI* binding = NULL;
+	size_t argument_bytes = 0;
+	size_t value_index;
+	char* argument_data;
 
 
 #define STACK_OVERFLOW(limit) ((UBYTE*)stack < (stack_area + (limit)))
 
+
+	if (pe == NULL || code_pt == NULL || pret == NULL ||
+		(value_count != 0 && values == NULL)) {
+		return Err_null_ref;
+	}
+
+	for (value_index = 0; value_index < value_count; ++value_index) {
+		size_t value_size;
+
+		switch (values[value_index].kind) {
+			case POCO_CALLBACK_VALUE_INT:
+				value_size = sizeof(values[value_index].value.int_value);
+				break;
+			case POCO_CALLBACK_VALUE_LONG:
+				value_size = sizeof(values[value_index].value.long_value);
+				break;
+			case POCO_CALLBACK_VALUE_DOUBLE:
+				value_size = sizeof(values[value_index].value.double_value);
+				break;
+			case POCO_CALLBACK_VALUE_POPOT:
+				value_size = sizeof(values[value_index].value.popot_value);
+				break;
+			default:
+				return Err_parameter_range;
+		}
+		if (argument_bytes > (size_t)LONG_MAX - value_size) {
+			return Err_parameter_range;
+		}
+		argument_bytes += value_size;
+	}
+	if (pe->stack_size <= (long)sizeof(ip) ||
+		argument_bytes > (size_t)(pe->stack_size - (long)sizeof(ip))) {
+		return Err_stack;
+	}
+	ip = code_pt;
+	globals = (Pt_num*)(pe->data + pe->data_size);
 
 	if (pe->stack == NULL) {
 		stack_area = pj_malloc(pe->stack_size);
@@ -173,12 +206,35 @@ Errcode poco_cont_ops(void* code_pt, Pt_num* pret, int arglength, ...)
 
 	stack = (Pt_num*)(stack_area + pe->stack_size);
 
-	if (arglength > 0) {
-		va_start(args, arglength);
-		stack = OPTR(stack, -arglength);
-		// kiki note: this seems highly suspect
-		poco_copy_bytes((void*)&args[0], stack, arglength);
-		va_end(args);
+	if (argument_bytes > 0) {
+		stack = OPTR(stack, -(long)argument_bytes);
+		argument_data = (char*)stack;
+		for (value_index = 0; value_index < value_count; ++value_index) {
+			switch (values[value_index].kind) {
+				case POCO_CALLBACK_VALUE_INT:
+					memcpy(argument_data, &values[value_index].value.int_value,
+						sizeof(values[value_index].value.int_value));
+					argument_data += sizeof(values[value_index].value.int_value);
+					break;
+				case POCO_CALLBACK_VALUE_LONG:
+					memcpy(argument_data, &values[value_index].value.long_value,
+						sizeof(values[value_index].value.long_value));
+					argument_data += sizeof(values[value_index].value.long_value);
+					break;
+				case POCO_CALLBACK_VALUE_DOUBLE:
+					memcpy(argument_data, &values[value_index].value.double_value,
+						sizeof(values[value_index].value.double_value));
+					argument_data += sizeof(values[value_index].value.double_value);
+					break;
+				case POCO_CALLBACK_VALUE_POPOT:
+					memcpy(argument_data, &values[value_index].value.popot_value,
+						sizeof(values[value_index].value.popot_value));
+					argument_data += sizeof(values[value_index].value.popot_value);
+					break;
+				default:
+					return Err_parameter_range;
+			}
+		}
 	}
 
 	/* final return address is to an end-op */
@@ -335,7 +391,8 @@ Errcode poco_cont_ops(void* code_pt, Pt_num* pret, int arglength, ...)
 					goto ERR_IN_LIBROUTINE;
 				}
 
-					acc.ret = po_ffi_call(binding, stack, pe->variadic_types);
+				acc.ret = po_ffi_call(binding, stack, &pe->variadic,
+					pe->pointer_registry);
 				if (builtin_err < Success) {
 					goto ERR_IN_LIBROUTINE;
 				}
@@ -1554,41 +1611,57 @@ Errcode poco_cont_ops(void* code_pt, Pt_num* pret, int arglength, ...)
 //			 * LIBFFI HELPERS
 			 *--------------------------------------------------------------------------*/
 			case OP_FFI_POP_ALL:
-				pe->variadic_type_index = 0;
-				pe->variadic_types[0]	= NULL;
+				po_ffi_variadic_types_reset(&pe->variadic);
 				break;
 
-				/*
-					kiki note:
-
-					To avoid if checks and runtime errors, we're just overwriting the final
-					ffi_type in release mode.
-				*/
-
 			case OP_FFI_PUSH_POINTER:
-				pe->variadic_types[pe->variadic_type_index] = &ffi_type_pointer;
-				CHECK_AND_INC_VAR_TYPE();
+				RECORD_VARIADIC_TYPE(&ffi_type_pointer);
 				break;
 
 			case OP_FFI_PUSH_SINT32:
-				pe->variadic_types[pe->variadic_type_index] = &ffi_type_sint32;
-				CHECK_AND_INC_VAR_TYPE();
+				RECORD_VARIADIC_TYPE(&ffi_type_sint32);
 				break;
 
 			case OP_FFI_PUSH_FLOAT:
-				pe->variadic_types[pe->variadic_type_index] = &ffi_type_float;
-				CHECK_AND_INC_VAR_TYPE();
+				RECORD_VARIADIC_TYPE(&ffi_type_float);
 				break;
 
 			case OP_FFI_PUSH_DOUBLE:
-				pe->variadic_types[pe->variadic_type_index] = &ffi_type_double;
-				CHECK_AND_INC_VAR_TYPE();
+				RECORD_VARIADIC_TYPE(&ffi_type_double);
 				break;
 
-			case OP_FFI_PUSH_NULL:
-				pe->variadic_types[pe->variadic_type_index] = NULL;
-				CHECK_AND_INC_VAR_TYPE();
+			case OP_FFI_PUSH_UINT8:
+				RECORD_VARIADIC_TYPE(&ffi_type_uint8);
 				break;
+
+			case OP_FFI_PUSH_SINT8:
+				RECORD_VARIADIC_TYPE(&ffi_type_sint8);
+				break;
+
+			case OP_FFI_PUSH_UINT16:
+				RECORD_VARIADIC_TYPE(&ffi_type_uint16);
+				break;
+
+			case OP_FFI_PUSH_SINT16:
+				RECORD_VARIADIC_TYPE(&ffi_type_sint16);
+				break;
+
+			case OP_FFI_PUSH_UINT32:
+				RECORD_VARIADIC_TYPE(&ffi_type_uint32);
+				break;
+
+			case OP_FFI_PUSH_UINT64:
+				RECORD_VARIADIC_TYPE(&ffi_type_uint64);
+				break;
+
+			case OP_FFI_PUSH_SINT64:
+				RECORD_VARIADIC_TYPE(&ffi_type_sint64);
+				break;
+
+			case OP_FFI_PUSH_VOID:
+			case OP_FFI_PUSH_NULL:
+				err = Err_poco_ffi_invalid_binding;
+				goto ERR_IN_FFI;
 
 			case OP_NOP:
 				break;
@@ -1678,7 +1751,7 @@ DEALLOC_AND_EXIT:
  *
  * this must be called only by the routines in pocoface.c or fold.c.
  * to call from a lib/poe routine back into poco via a pointer passed to
- * you from a poco program you must enter at the poco_cont_ops routine above.
+ * you from a Poco program you must enter through poco_invoke_callback().
  ****************************************************************************/
 Errcode po_run_ops(Poco_run_env* p, Code* code_pt, Pt_num* pret)
 {
@@ -1688,5 +1761,5 @@ Errcode po_run_ops(Poco_run_env* p, Code* code_pt, Pt_num* pret)
 	if (pret == NULL)
 		pret = &dummy_ret;
 
-	return poco_cont_ops(code_pt, pret, 0);
+	return poco_invoke_callback(code_pt, pret, NULL, 0);
 }

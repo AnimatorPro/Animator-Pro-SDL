@@ -1,0 +1,5 @@
+main()
+{
+	char *bytes = owned_span(4);
+	return write_span(bytes, 5);
+}

@@ -1,0 +1,6 @@
+main()
+{
+	char bytes[4];
+	bytes[0] = 3;
+	return read_span(bytes, 4) + write_span(bytes, 4) + read_variadic(bytes, 4, 100);
+}

@@ -372,7 +372,12 @@ UBYTE	c2;
 		{
 
 		c1 = line[1];		/* lookahead characters */
-		c2 = line[2];
+		/*
+		 * A one-character token at the end of a line has only its trailing
+		 * NUL available for lookahead.  Do not read past that terminator while
+		 * checking for three-character operators.
+		 */
+		c2 = (c1 == '\0') ? '\0' : line[2];
 
 		switch (c)
 			{

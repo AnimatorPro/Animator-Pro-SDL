@@ -1,0 +1,6 @@
+#pragma poco library "poco_module_hook_invalid.poe"
+
+main()
+{
+	return 0;
+}

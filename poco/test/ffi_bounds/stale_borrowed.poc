@@ -1,0 +1,6 @@
+main()
+{
+	char *bytes = borrowed_span();
+	unregister_borrowed_span();
+	return read_span(bytes, 1);
+}

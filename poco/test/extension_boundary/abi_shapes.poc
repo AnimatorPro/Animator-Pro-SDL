@@ -1,0 +1,34 @@
+main()
+{
+	char promoted = 7;
+	long long_value = 123456789;
+	double double_value = 1.5;
+	int value = 41;
+	int *pointer = &value;
+
+	if (FixedInt(value) != 42)
+		return -1;
+	if (FixedLong(long_value) != 123456790)
+		return -2;
+	if (FixedDouble(double_value) != 1.75)
+		return -3;
+	if (FixedPointer(pointer) != pointer)
+		return -4;
+	if (FixedPopot(pointer) != pointer)
+		return -5;
+	FixedVoid(pointer);
+	if (*pointer != 52)
+		return -6;
+
+	if (MixedVariadic(0) != 77)
+		return -7;
+	if (MixedVariadic(4, promoted, long_value, double_value, NULL) != 99)
+		return -8;
+	if (VariadicSum(16, 1, 2, 3, 4, 5, 6, 7, 8,
+		9, 10, 11, 12, 13, 14, 15, 16) != 136)
+		return -9;
+	if (VariadicSum(17, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+		10, 11, 12, 13, 14, 15, 16, 17) != 153)
+		return -10;
+	return 0;
+}

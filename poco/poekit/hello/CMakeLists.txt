@@ -1,28 +1,22 @@
 cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
-# Include the Poco POE library helper
+# This example intentionally uses the generic module helper.  It has no
+# Animator headers, direct function tables, or legacy Pocorex entry point.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/poco/cmake")
-include(PocoPoeLibrary)
+include(PocoModule)
 
-# Build hello.poe using the helper function
-# The helper automatically:
-#   - Creates a shared library with .poe extension
-#   - Sets up include paths to src/inc and poco/include
-#   - Installs library to INSTALL_DIR
-#   - Installs and registers the test file
-add_poe_library(hello
+# Build hello.poe using the host-neutral Poco module ABI.
+poco_add_module(hello
     SOURCES hello.c
-    DEPS libpoco
     INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/tests
-    TEST_FILE hello.poc
 )
-
-# For Windows, symbols are exported via __declspec(dllexport) in source
-if(WIN32)
-    set_target_properties(hello PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS FALSE
-    )
-else()
-    # Set visibility defaults for Linux/macOS
-    target_compile_options(hello PRIVATE -fvisibility=default)
-endif()
+install(FILES hello.poc DESTINATION ${CMAKE_INSTALL_PREFIX}/tests)
+add_test(
+    NAME poco_generic_hello
+    COMMAND ${CMAKE_INSTALL_PREFIX}/poco ${CMAKE_INSTALL_PREFIX}/tests/hello.poc
+    WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+)
+set_tests_properties(poco_generic_hello PROPERTIES
+    PASS_REGULAR_EXPRESSION "Test completed successfully!"
+    TIMEOUT 10
+)

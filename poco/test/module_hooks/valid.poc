@@ -1,0 +1,6 @@
+#pragma poco library "poco_module_hook_valid.poe"
+
+main()
+{
+	return ModuleHookAnswer();
+}

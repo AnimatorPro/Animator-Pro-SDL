@@ -1,0 +1,30 @@
+int abort_callback(void *data)
+{
+	return data != NULL;
+}
+
+int update_callback(void *data, int value)
+{
+	if (data == NULL || value != 41) {
+		return -1;
+	}
+	return 42;
+}
+
+int overtime_callback(double time, void *data)
+{
+	if (data == NULL || time != 0.25) {
+		return -1;
+	}
+	return 43;
+}
+
+int flic_callback(void *flic, void *userdata, long loop, long frame, long count)
+{
+	return flic != NULL && userdata != NULL && loop == 7 && frame == 8 && count == 9;
+}
+
+int main()
+{
+	return InvokeCallbacks(abort_callback, update_callback, overtime_callback, flic_callback);
+}

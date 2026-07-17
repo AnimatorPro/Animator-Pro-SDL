@@ -54,6 +54,7 @@ static SHORT enforce_simple(Poco_cb* pcb, Type_info* ti)
 			return (nt);
 		default:
 			po_say_fatal(pcb, "Simple data type expected.");
+   PO_CHECK_ABORT(pcb, 0);
 			return (-1);
 	}
 }
@@ -138,6 +139,7 @@ static void cat_exp(Poco_cb* pcb, Exp_frame* dest, Exp_frame* tail, short copy_t
  ****************************************************************************/
 void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 {
+	PO_CHECK_ABORT_VOID(pcb);
 	Exp_frame *exp_buf[PREC_COUNT], **exp_stack;
 	Bop_info *bop_buf[PREC_COUNT], **bop_stack;
 	Exp_frame *exp0, *exp1;
@@ -151,8 +153,10 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 	stack_size = 0;
 
 	for (;;) {
+		PO_CHECK_ABORT_VOID(pcb);
 		exp0 = po_new_expframe(pcb);
 		po_get_unop_expression(pcb, exp0);
+		PO_CHECK_ABORT_VOID(pcb);
 		lookup_token(pcb);
 		bi			   = &bi_table[pcb->qbop_table[pcb->t.toktype]];
 		*(--exp_stack) = exp0;
@@ -189,13 +193,16 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 							int typesize;
 							if (bi->ido_ops == po_add_ops)
 								po_say_fatal(pcb, "cannot add two pointers");
+        PO_CHECK_ABORT_VOID(pcb);
 							/*
 							 * code the subtraction of two pointers...
 							 */
 							if (!po_types_same(&exp1->ctc, &exp0->ctc, 0))
 								po_say_fatal(pcb, "type mismatch in pointer subtraction");
+        PO_CHECK_ABORT_VOID(pcb);
 							if (0 == (typesize = po_get_subtype_size(pcb, &(exp1->ctc))))
 								po_say_fatal(pcb, "size of type is zero (void pointer)");
+        PO_CHECK_ABORT_VOID(pcb);
 							cat_exp(pcb, exp1, exp0, NOCOPY_TYPE);
 							clear_code_buf(pcb, &exp1->left);
 							po_code_int(pcb, &(exp1->ecd), OP_PTRDIFF, typesize);
@@ -229,8 +236,10 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 						 * 'normal' expression (ie, no pointer arithmetic)...
 						 */
 						if (dot0 != dot1) {
-							if (dot0 == IDO_VOID || dot1 == IDO_VOID)
+							if (dot0 == IDO_VOID || dot1 == IDO_VOID) {
 								po_say_fatal(pcb, "can't operate on a void");
+								PO_CHECK_ABORT_VOID(pcb);
+							}
 #ifdef STRING_EXPERIMENT
 							if (dot0 == IDO_STRING || dot1 == IDO_STRING) {
 								po_coerce_to_string(pcb, exp0);
@@ -242,6 +251,8 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 							else
 								po_coerce_numeric_exp(pcb, exp0, dot1);
 						}
+						/*
+						 * ensure the op is legal for the target type...
 						/*
 						 * ensure the op is legal for the target type...
 						 * if so, everything has checked out, code it...

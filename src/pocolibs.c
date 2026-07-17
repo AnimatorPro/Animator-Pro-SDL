@@ -3,6 +3,10 @@
  *			   the AA_POCOLIB host library for POE modules.
  ****************************************************************************/
 #define REXLIB_INTERNALS
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "errcodes.h"
 #include "memory.h"
 #include "ptrmacro.h"
@@ -12,42 +16,275 @@
 #include "pocolib.h"
 #include "pocoface.h"
 #include "poly.h"
+#include "ani_poco_adapter.h"
 
 extern bool po_check_abort(void* data);
 extern Errcode clone_ppoints(Poly* s, Poly* d); // from polytool.c
 
-/* Forward declarations for hostlib wiring (see get_poco_libs) */
+/* Forward declarations for Animator's retained native-POE table. */
 extern Hostlib _a_a_pocolib; /* from animhost/hostlib_table.c */
 extern Porexlib aa_pocolib;  /* defined later in this file */
 
-static Poco_lib* poco_libs[] = {
-	&po_user_lib,  &po_draw_lib,  &po_text_lib,     &po_mode_lib, &po_turtle_lib, &po_time_lib,
-	&po_cel_lib,   &po_alt_lib,   &po_optics_lib,   &po_blit_lib, &po_misc_lib,   &po_load_save_lib,
-	&po_FILE_lib,  &po_str_lib,   &po_mem_lib,      &po_math_lib, &po_dos_lib,    &po_globalv_lib,
-	&po_title_lib, &po_tween_lib, &po_flicplay_lib, &po_picdrive_lib,
+/*
+ * The source tables remain the compatibility definition used by retained
+ * Animator-native POE modules.  Animator scripts receive their bindings only
+ * when ani_poco_register_libraries() converts these entries to public
+ * PocoLibrary registrations on a VM.
+ */
+typedef struct AniPocoLegacyBinding
+{
+	PocoNativeFunction function;
+	char *prototype;
+} AniPocoLegacyBinding;
+
+typedef struct AniPocoLibrarySource
+{
+	Poco_lib *library;
+	size_t binding_stride;
+} AniPocoLibrarySource;
+
+/*
+ * Polib* tables are a compatibility ABI of alternating function/prototype
+ * pairs.  Generic Lib_proto arrays additionally carry an optional contract.
+ * Keep that distinction here instead of treating the direct-table ABI as a
+ * Lib_proto array (whose three-field stride would corrupt registrations).
+ */
+static const AniPocoLibrarySource animator_libraries[] = {
+	{&po_user_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_draw_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_text_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_mode_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_turtle_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_time_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_cel_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_alt_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_optics_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_blit_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_misc_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_load_save_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_FILE_lib, sizeof(Lib_proto)},
+	{&po_str_lib, sizeof(Lib_proto)},
+	{&po_mem_lib, sizeof(Lib_proto)},
+	{&po_math_lib, sizeof(Lib_proto)},
+	{&po_dos_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_globalv_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_title_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_tween_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_flicplay_lib, sizeof(AniPocoLegacyBinding)},
+	{&po_picdrive_lib, sizeof(Lib_proto)},
 };
 
-/*****************************************************************************
- *
- ****************************************************************************/
-Poco_lib* get_poco_libs()
+static void get_animator_binding(const AniPocoLibrarySource *source,
+	int index, PocoBinding *binding)
 {
-	static Poco_lib* list = NULL;
-	int i;
+	char *entry;
 
-	if (list == NULL) {
-		/* Wire the hostlib chain so POE modules can access host functions
-		 * via _plptr (which dereferences _a_a_pocolib.next as Porexlib*).
-		 * Without this, _a_a_pocolib.next stays NULL and any POE module
-		 * that calls GetPicScreen(), poePicDirtied(), etc. will segfault. */
-		_a_a_pocolib.next = &aa_pocolib;
+	entry = (char *)source->library->lib + (size_t)index * source->binding_stride;
+	if (source->binding_stride == sizeof(Lib_proto)) {
+		Lib_proto *legacy_binding = (Lib_proto *)entry;
 
-		for (i = Array_els(poco_libs); --i >= 0;) {
-			poco_libs[i]->next = list;
-			list = poco_libs[i];
+		binding->prototype = legacy_binding->proto;
+		binding->function = (PocoNativeFunction)legacy_binding->func;
+		binding->contract = legacy_binding->contract;
+	} else {
+		AniPocoLegacyBinding *legacy_binding = (AniPocoLegacyBinding *)entry;
+
+		binding->prototype = legacy_binding->prototype;
+		binding->function = legacy_binding->function;
+		binding->contract = NULL;
+	}
+}
+
+/* Public descriptors require a function pointer even for a typedef line. */
+static void ani_poco_typedef_placeholder(void)
+{
+}
+
+/*
+ * Duplicate a source/POE prototype string for public registration.
+ *
+ * The Poco parser handles any pointer depth in a prototype (a declarator's
+ * stars are counted and each becomes a TYPE_POINTER; see declare.c:dcl).
+ * Multi-level spellings such as "char **choices" (Qmenu, Qchoice, ...) must
+ * therefore be registered verbatim: collapsing "**" to "*" makes the
+ * registered parameter a shallower pointer than the char*[] arguments callers
+ * pass, which the compiler rejects as a pointer type mismatch.
+ */
+static char *copy_animator_prototype(const char *prototype)
+{
+	char *copy;
+
+	if (prototype == NULL)
+		return NULL;
+	copy = malloc(strlen(prototype) + 1);
+	if (copy == NULL)
+		return NULL;
+	strcpy(copy, prototype);
+	return copy;
+}
+
+static void free_animator_binding_prototypes(PocoBinding *bindings,
+	int binding_count)
+{
+	int index;
+
+	for (index = 0; index < binding_count; ++index)
+		free((void *)bindings[index].prototype);
+}
+
+static PocoStatus initialize_animator_library(PocoLibrary *library)
+{
+	Poco_lib *legacy_library = library != NULL ? library->user_data : NULL;
+
+	if (legacy_library == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	return (PocoStatus)po_init_libs(legacy_library);
+}
+
+static void cleanup_animator_library(PocoLibrary *library)
+{
+	Poco_lib *legacy_library = library != NULL ? library->user_data : NULL;
+
+	if (legacy_library != NULL)
+		po_cleanup_libs(legacy_library);
+}
+
+static void ani_poco_install_legacy_poe_table(void)
+{
+	_a_a_pocolib.next = &aa_pocolib;
+}
+
+static PocoStatus register_animator_library(PocoVm *vm,
+	const AniPocoLibrarySource *source)
+{
+	PocoBinding *bindings;
+	PocoLibrary library;
+	PocoStatus status;
+	Poco_lib *legacy_library;
+	int index;
+	int binding_count = 0;
+	int binding_index = 0;
+
+	if (source == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	legacy_library = source->library;
+	if (vm == NULL || legacy_library == NULL || legacy_library->name == NULL ||
+		legacy_library->lib == NULL || legacy_library->count <= 0)
+		return POCO_STATUS_PARAMETER_RANGE;
+	for (index = 0; index < legacy_library->count; ++index) {
+		PocoBinding binding;
+
+		get_animator_binding(source, index, &binding);
+		if (binding.function == NULL && binding.prototype != NULL &&
+			strncmp(binding.prototype, "typedef", strlen("typedef")) == 0)
+			binding.function = ani_poco_typedef_placeholder;
+		if (binding.function != NULL)
+			++binding_count;
+	}
+	if (binding_count == 0)
+		return POCO_STATUS_PARAMETER_RANGE;
+	bindings = calloc((size_t)binding_count, sizeof(*bindings));
+	if (bindings == NULL)
+		return POCO_STATUS_OUT_OF_MEMORY;
+	for (index = 0; index < legacy_library->count; ++index) {
+		PocoBinding binding;
+
+		/* Typedef lines use a placeholder because public descriptors require a function. */
+		get_animator_binding(source, index, &binding);
+		if (binding.function == NULL && binding.prototype != NULL &&
+			strncmp(binding.prototype, "typedef", strlen("typedef")) == 0)
+			binding.function = ani_poco_typedef_placeholder;
+		if (binding.function == NULL)
+			continue;
+		binding.prototype = copy_animator_prototype(binding.prototype);
+		if (binding.prototype == NULL) {
+			free_animator_binding_prototypes(bindings, binding_index);
+			free(bindings);
+			return POCO_STATUS_OUT_OF_MEMORY;
+		}
+		bindings[binding_index] = binding;
+		++binding_index;
+	}
+	library.identity = legacy_library->name;
+	library.bindings = bindings;
+	library.binding_count = (size_t)binding_count;
+	library.initialize = initialize_animator_library;
+	library.cleanup = cleanup_animator_library;
+	library.user_data = legacy_library;
+	status = poco_vm_register_library(vm, &library);
+	free_animator_binding_prototypes(bindings, binding_count);
+	free(bindings);
+	return status;
+}
+
+PocoStatus ani_poco_register_libraries(PocoVm *vm)
+{
+	size_t index;
+	PocoStatus status;
+
+	if (vm == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	ani_poco_install_legacy_poe_table();
+	for (index = 0; index < Array_els(animator_libraries); ++index) {
+		status = register_animator_library(vm, &animator_libraries[index]);
+		if (status != POCO_STATUS_OK)
+			return status;
+	}
+	return POCO_STATUS_OK;
+}
+
+PocoStatus ani_poco_write_library_list(const char *filename)
+{
+	FILE *file;
+	size_t library_index;
+	int binding_index;
+
+	if (filename == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	file = fopen(filename, "w");
+	if (file == NULL)
+		return POCO_STATUS_CREATE_FAILED;
+	for (library_index = 0; library_index < Array_els(animator_libraries);
+		++library_index) {
+		const AniPocoLibrarySource *source = &animator_libraries[library_index];
+		Poco_lib *library = source->library;
+
+		for (binding_index = 0; binding_index < library->count; ++binding_index) {
+			PocoBinding binding;
+
+			get_animator_binding(source, binding_index, &binding);
+			if (binding.prototype != NULL)
+				fprintf(file, "%s\n", binding.prototype);
 		}
 	}
-	return list;
+	if (fclose(file) != 0)
+		return POCO_STATUS_WRITE_FAILED;
+	return POCO_STATUS_OK;
+}
+
+PocoStatus ani_poco_write_library_inventory(const char *filename)
+{
+	FILE *file;
+	size_t library_index;
+
+	if (filename == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	file = fopen(filename, "w");
+	if (file == NULL)
+		return POCO_STATUS_CREATE_FAILED;
+	for (library_index = 0; library_index < Array_els(animator_libraries);
+		++library_index) {
+		Poco_lib *library = animator_libraries[library_index].library;
+
+		if (library == NULL || library->name == NULL ||
+			fprintf(file, "%s\n", library->name) < 0) {
+			fclose(file);
+			return POCO_STATUS_WRITE_FAILED;
+		}
+	}
+	if (fclose(file) != 0)
+		return POCO_STATUS_WRITE_FAILED;
+	return POCO_STATUS_OK;
 }
 
 /*****************************************************************************

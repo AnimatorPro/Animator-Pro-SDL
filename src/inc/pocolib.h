@@ -1,112 +1,24 @@
-#ifndef POCOLIB_H
-#define POCOLIB_H
-
-#ifndef LINKLIST_H
-#include "linklist.h"
-#endif
-
-#ifndef STDTYPES_H
-#include "stdtypes.h"
-#endif
-
-#ifdef PUBLIC_CODE
-#include "rexlib.h"
-#endif
-
-#include "stdarg.h"
-
-/******************************************************************************
- * Basic poco data structures everyone needs to know about...
- *****************************************************************************/
-
-typedef struct popot /* The poco bounds-checked pointer type */
-{
-	void* pt;
-	void* min;
-	void* max;
-} Popot;
-
-extern Popot empty_popot;
-
-typedef struct string_ref
-{
-	Dlnode node;
-	int ref_count;
-	Popot string;
-} String_ref;
-
-typedef String_ref* PoString;
-
-/* Macro to extract the char * from a poString */
-#define PoStringBuf(s) ((*(s))->string.pt)
-
-typedef union pt_num /* Overlap popular datatypes in the same space */
-{
-	int i;
-	int inty;
-	short s;
-	UBYTE* bpt;
-	char c;
-	long l;
-	ULONG ul;
-	float f;
-	double d;
-	void* p;
-	int doff;	   /* data offset */
-	int (*func)(); /* code pointer */
-	Popot ppt;
-	PoString postring;
-} Pt_num;
-
-typedef struct lib_proto /* Poco library prototype lines */
-{
-	void* func;
-	char* proto;
-} Lib_proto;
-
-typedef struct poco_lib /* Poco library main control structure */
-{
-	struct poco_lib* next;
-	char* name;
-	Lib_proto* lib;
-	int count;
-	Errcode (*init)(struct poco_lib* lib);
-	void (*cleanup)(struct poco_lib* lib);
-	void* local_data;
-	Dlheader resources;
-	void* rexhead;		/* For loaded POE modules: points to internal structure containing
-				 * the library handle and Pocorex* pointer. Used for cleanup
-				 * when unloading the library. Set to NULL for builtin libraries. */
-	char reserved[12];
-} Poco_lib;
-
-#define RNODE_FIELDS \
-	Dlnode node;     \
-	void* resource;
-
-typedef struct rnode /* Used for resource tracking in builtin libs */
-{
-	RNODE_FIELDS
-} Rnode;
-
-/*****************************************************************************
- * handy macros for library and poe routines...
+/*
+ * Compatibility-only Animator header.
  *
- *	Popot_bufsize	- Evaluates to the number of bytes available between the
- *					  current pointer location and the end of the buffer.
- *	Popot_bufcheck	- Evaluates to Err_null_ref if the pointer is NULL, to
- *					  Err_buf_too_small if there aren't at least 'length'
- *					  bytes available in the buffer, or Success if all is well.
- *					  Sets builtin_err.
- *	Popot_make_null 	- Set a Popot to NULL.
- ****************************************************************************/
+ * Deprecated for new Animator code: use <poco/poco.h>.  Legacy Poco ABI
+ * types are defined only by poco/include/pocolib.h; this file retains solely
+ * Animator's private library-table declarations for the migration period.
+ *
+ * The Polib* layouts below are the Animator-only native-POE function-table ABI.
+ * They are not Poco script-to-C/libffi binding dispatch and must not be
+ * used by generic PocoModuleDescriptor modules.  Direct _plptr calls remain
+ * available only to an Ani compatibility host that explicitly installs the
+ * legacy table while supported POE modules migrate.
+ */
+#ifndef ANIMATOR_POCOLIB_COMPAT_H
+#define ANIMATOR_POCOLIB_COMPAT_H
 
-#define Popot_bufsize(p) ((size_t)((char*)((p)->max) - (char*)((p)->pt) + 1))
-#define Popot_bufcheck(p, length)        \
-	(builtin_err =                       \
-	   (((p)->pt == NULL) ? Err_null_ref \
-						  : ((Popot_bufsize((p)) < (length)) ? Err_buf_too_small : Success)))
-#define Popot_make_null(p) ((p)->pt = (p)->min = (p)->max = NULL)
+/* Keep the Animator error/type domain at this adapter boundary. */
+#include "errcodes.h"
+#include "stdtypes.h"
+#include "linklist.h"
+#include "../../poco/include/pocolib.h"
 
 #ifndef PUBLIC_CODE
 
@@ -114,15 +26,7 @@ typedef struct rnode /* Used for resource tracking in builtin libs */
  * Private prototypes for PJ's use...
  *****************************************************************************/
 
-extern Errcode po_init_libs(Poco_lib* lib);
-extern void po_cleanup_libs(Poco_lib* lib);
-extern Errcode poco_cont_ops(void* code_pt, Pt_num* pret, int argslen, ...);
-extern Errcode po_check_formatf(int maxlen, int vargcount, int vargsize, char* fmt, va_list pargs);
-extern void po_free(void* pt);
-extern void* po_malloc(int size);
-extern Popot poco_lmalloc(long size);
-extern void* po_calloc(int size_el, int el_count);
-extern void poco_freez(Popot* pt);
+/* Typed legacy callback entry declared by Poco's compatibility header. */
 extern char* po_fuf_name(void* fuf);
 extern void* po_fuf_code(void* fuf);
 extern Rnode* po_in_rlist(Dlheader* sfi, void* f);
@@ -761,6 +665,13 @@ typedef struct polib_turtle
  * User interface library
  *--------------------------------------------------------------------------*/
 
+/*
+ * ABI fence: these variadic pointers are native calls made by legacy POE
+ * binaries through _plptr.  Poco's libffi binding descriptors never consume
+ * this layout.  Preserve field order and signatures until every supported
+ * Animator POE module has migrated to PocoModuleDescriptor.
+ */
+
 typedef struct polib_user
 {
 	int (*plprintf)(char* format, ...);
@@ -773,7 +684,7 @@ typedef struct polib_user
 	char* protostr4;
 	int (*plQmenu)(Popot* choices, int ccount, char* header);
 	char* protostr5;
-	bool (*plQquestion)(char* question, ...);
+	int (*plQquestion)(char* question, ...);
 	char* protostr6;
 	bool (*plQnumber)(int* num, int min, int max, char* header);
 	char* protostr7;
@@ -816,8 +727,8 @@ typedef struct polib_user
 	char* protostr24;
 	int (*plQscroll)(int* choice, Popot* items, int icount, int* ipos, Popot* button_texts, char* hdr);
 	char* protostr25;
-	bool (*plUdQnumber)(int* inum, int min, int max, void* update,
-						void* data, char* fmt, ...);
+	int (*plUdQnumber)(int* inum, int min, int max, void* update,
+					  void* data, char* fmt, ...);
 	char* protostr26;
 	int (*plQedit)(char* text, int max_size, int* cursor_position, int* top_line);
 	char* protostr27;
@@ -1513,4 +1424,4 @@ extern PolibFlicPlay po_libflicplay;
 #endif
 /* not POCO_H */ #endif
 
-#endif /* POCOLIB_H */
+#endif /* ANIMATOR_POCOLIB_COMPAT_H */

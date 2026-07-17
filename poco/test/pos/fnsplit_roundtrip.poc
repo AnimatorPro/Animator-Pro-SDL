@@ -49,5 +49,24 @@ main()
 		return;
 	}
 
+	/* Windows drive path with slash separators must roundtrip on every host. */
+	strcpy(path, "C:/Animator/scripts/run.poc");
+	if (fnsplit(path, device, dir, file, suffix) != 0)
+	{
+		printf("fnsplit Windows path failed");
+		return;
+	}
+	if (strcmp(device, "C:") != 0 || strcmp(dir, "/Animator/scripts/") != 0
+		|| strcmp(file, "run") != 0 || strcmp(suffix, ".poc") != 0)
+	{
+		printf("Windows path components mismatch");
+		return;
+	}
+	if (fnmerge(merged, device, dir, file, suffix) != 0 || strcmp(path, merged) != 0)
+	{
+		printf("Windows path roundtrip mismatch");
+		return;
+	}
+
 	printf("Success");
 }

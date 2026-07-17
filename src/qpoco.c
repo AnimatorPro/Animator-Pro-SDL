@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include "errcodes.h"
 #include "filepath.h"
 #include "jfile.h"
@@ -17,15 +18,15 @@
 #include "softmenu.h"
 #include "xfile.h"
 
-#include "poco/poco.h"
-#include "pocoface.h"
+#include <poco/poco.h>
+
+#include "ani_poco_adapter.h"
 #include "qpoco.h"
 #include "poco_turtle.h"
 #include "poco_tween.h"
 
 
-/***********  stuff concerned with running poco, not the poco library ***/
-extern Poco_lib *get_poco_libs();
+/* Animator-specific runner policy lives in this adapter-owned source. */
 extern void po_init_abort_control(int abortable, void *handler);
 extern bool po_check_abort(void *data);
 
@@ -82,15 +83,15 @@ else
  *	 also note that poco expects each pathname (other than the null path)
  *	 to include the trailing backslash.
  ****************************************************************************/
-static Names *get_poco_include_pathlist(void)
+static const char *const *get_poco_include_paths(void)
 {
 static char  nullpath[] = "";
 static char  rbuf[PATH_SIZE] = "";              /* resource dir path buffer */
 
-static Names pathlist[] = { 					/* list of include paths... */
-	{&pathlist[1], po_current_program_path},	/* program's dir first      */
-	{&pathlist[2], nullpath},					/* current/specified dir 1st*/
-	{NULL,		   rbuf},						/* then system resource dir */
+static const char *pathlist[] = { 					/* list of include paths... */
+	po_current_program_path,						/* program's dir first      */
+	nullpath,									/* current/specified dir    */
+	rbuf,										/* then system resource dir */
 	};
 
 if (rbuf[0] == 0)					/* only need to get the resource dir once */
@@ -98,7 +99,7 @@ if (rbuf[0] == 0)					/* only need to get the resource dir once */
 	strcpy(rbuf, resource_dir); 			/* get system resource dir	  */
 	}
 
-return(&pathlist);
+return pathlist;
 }
 
 /*****************************************************************************
@@ -172,6 +173,106 @@ static const char* resolved_poco_err_name(void)
 	return resolved;
 }
 
+typedef struct AniPocoDiagnosticState
+{
+	PocoStatus status;
+	char source_name[PATH_SIZE];
+	long line;
+	int column;
+	char message[512];
+	char error_file[PATH_SIZE];
+} AniPocoDiagnosticState;
+
+static void clear_adapter_error_file(const char *filename)
+{
+	FILE *file;
+
+	if (filename == NULL)
+		return;
+	file = fopen(filename, "w");
+	if (file != NULL)
+		fclose(file);
+}
+
+static void capture_adapter_diagnostic(void *user_data,
+	const PocoDiagnostic *diagnostic)
+{
+	AniPocoDiagnosticState *state = user_data;
+	FILE *file;
+
+	if (state == NULL || diagnostic == NULL)
+		return;
+	state->status = diagnostic->status;
+	state->line = diagnostic->line;
+	state->column = diagnostic->column;
+	if (diagnostic->source_name != NULL) {
+		strncpy(state->source_name, diagnostic->source_name,
+			sizeof(state->source_name) - 1);
+		state->source_name[sizeof(state->source_name) - 1] = '\0';
+	}
+	if (diagnostic->message != NULL) {
+		strncpy(state->message, diagnostic->message, sizeof(state->message) - 1);
+		state->message[sizeof(state->message) - 1] = '\0';
+	}
+	if (state->error_file[0] == '\0' || state->message[0] == '\0')
+		return;
+	file = fopen(state->error_file, "w");
+	if (file != NULL) {
+		fputs(state->message, file);
+		fclose(file);
+	}
+}
+
+static Errcode animator_status(PocoStatus status,
+	const AniPocoDiagnosticState *diagnostic)
+{
+	if (status == POCO_STATUS_REPORTED && diagnostic != NULL &&
+		diagnostic->message[0] != '\0')
+		return Err_in_err_file;
+	return (Errcode)status;
+}
+
+static Errcode compile_animator_program(const char *source_name,
+	PocoVm **out_vm, PocoProgram **out_program,
+	AniPocoDiagnosticState *diagnostic)
+{
+	PocoVmOptions options = {0};
+	PocoStatus status;
+
+	if (out_vm == NULL || out_program == NULL || diagnostic == NULL)
+		return Err_null_ref;
+	*out_vm = NULL;
+	*out_program = NULL;
+	memset(diagnostic, 0, sizeof(*diagnostic));
+	strncpy(diagnostic->error_file, resolved_poco_err_name(),
+		sizeof(diagnostic->error_file) - 1);
+	diagnostic->error_file[sizeof(diagnostic->error_file) - 1] = '\0';
+	clear_adapter_error_file(diagnostic->error_file);
+
+	options.include_paths = get_poco_include_paths();
+	options.include_path_count = 3;
+	options.diagnostic_callback = capture_adapter_diagnostic;
+	options.diagnostic_user_data = diagnostic;
+	ani_poco_configure_legacy_poe(&options);
+	status = poco_vm_create(&options, out_vm);
+	if (status == POCO_STATUS_OK)
+		status = ani_poco_register_libraries(*out_vm);
+	if (status == POCO_STATUS_OK)
+		status = poco_vm_compile_file(*out_vm, source_name, out_program);
+	if (status != POCO_STATUS_OK) {
+		poco_program_destroy(*out_program);
+		*out_program = NULL;
+		poco_vm_destroy(*out_vm);
+		*out_vm = NULL;
+	}
+	return animator_status(status, diagnostic);
+}
+
+static int check_adapter_abort(void *user_data)
+{
+	return po_check_abort(user_data) ? 1 : 0;
+}
+
 static bool poco_text_changed;
 
 /*****************************************************************************
@@ -187,9 +288,11 @@ if (qedit_poco(line, cpos))
 /*****************************************************************************
  *
  ****************************************************************************/
-static Errcode execute_poco(void **ppev,long *err_line)
+static Errcode execute_poco(PocoVm *vm, PocoProgram *program,
+	AniPocoDiagnosticState *diagnostic)
 {
-	Errcode err;
+	PocoRunOptions options = {0};
+	PocoStatus status;
 	void *ocurs;
 
 	po_tur_home();
@@ -198,33 +301,44 @@ static Errcode execute_poco(void **ppev,long *err_line)
 	builtin_err = Success;
 	po_init_abort_control(true, NULL);
 	ocurs = set_pen_cursor(&plain_ptool_cursor);
-	err = run_poco(ppev, resolved_poco_err_name(), po_check_abort, NULL, err_line);
+	options.cancel_callback = check_adapter_abort;
+	options.trace_file = resolved_poco_err_name();
+	status = poco_vm_run(vm, program, &options, NULL);
 	cleanup_toptext();
 	cleanup_poco_tween();
 	free_render_cashes();
 	set_pen_cursor(ocurs); /* restore old cursor */
 	show_mouse();	/* make cursor visible for sure */
-	return err;
+	return animator_status(status, diagnostic);
+}
+
+static Errcode execute_stripped_poco(PocoVm *vm, PocoProgram *program,
+	AniPocoDiagnosticState *diagnostic)
+{
+	PocoRunOptions options = {0};
+	PocoStatus status;
+
+	options.cancel_callback = check_adapter_abort;
+	options.trace_file = resolved_poco_err_name();
+	status = poco_vm_run(vm, program, &options, NULL);
+	return animator_status(status, diagnostic);
 }
 
 /* Run a poco program that doesn't need much in the way of the
  * poco run time environment (that won't do many ink calls etc. */
 Errcode run_poco_stripped_environment(char *source_name)
 {
-void	*pev;
-char	err_file[PATH_SIZE];
-long	err_line;
-int 	err_char;
-Errcode err;
+	PocoVm *vm;
+	PocoProgram *program;
+	AniPocoDiagnosticState diagnostic;
+	Errcode err;
 
-if ((err = compile_poco(&pev, source_name, resolved_poco_err_name()
-, NULL/*"H:dump"*/, get_poco_libs()
-, err_file, &err_line, &err_char, get_poco_include_pathlist(), false)) >= Success)
-	{
-	err = run_poco(&pev, resolved_poco_err_name(), po_check_abort, NULL, &err_line);
-	free_poco(&pev);
-	}
-return err;
+	err = compile_animator_program(source_name, &vm, &program, &diagnostic);
+	if (err >= Success)
+		err = execute_stripped_poco(vm, program, &diagnostic);
+	poco_program_destroy(program);
+	poco_vm_destroy(vm);
+	return err;
 }
 
 
@@ -234,54 +348,40 @@ return err;
 Errcode qrun_poco(char *sourcename, bool edit_err)
 {
 	Errcode err;
-	char	err_file[PATH_SIZE];
 	char	chainbuf[PATH_SIZE];
 	char	*phase;
-	long	err_line;
-	int 	err_char;
-	void	*pev;
+	PocoVm *vm;
+	PocoProgram *program;
+	AniPocoDiagnosticState diagnostic;
 
 CHAIN_ANOTHER_PROGRAM:					// loop point for chaining programs
 	po_chainto_program_path[0] = '\0';  // start with no chainto program
 
 	phase = "poco_compile";
-	err = compile_poco(&pev, sourcename, resolved_poco_err_name(),
-				NULL/*"H:dump"*/, get_poco_libs(),
-				err_file, &err_line, &err_char,
-				get_poco_include_pathlist(), false);
+	err = compile_animator_program(sourcename, &vm, &program, &diagnostic);
 	if (err >= Success)
 	{
 		save_undo();
-		err_char = 0;
 		phase = "poco_run";
-		err = execute_poco(&pev,&err_line);
+		err = execute_poco(vm, program, &diagnostic);
 	}
 
 	if (err < Success)
 	{
 		po_chainto_program_path[0] = '\0';  // don't allow chaining after error
-		if (err == POCO_ERR_IN_ERR_FILE) {
-			const char* poco_msg = poco_get_error();
-			if (poco_msg != NULL && poco_msg[0] != '\0') {
-				continu_box(poco_msg);
-			} else {
-				report_err_in_file(resolved_poco_err_name());
-			}
+		if (err == Err_in_err_file) {
+			report_err_in_file(resolved_poco_err_name());
 			if (edit_err)
-				qedit_note_changes(err_line, err_char);
+				qedit_note_changes(diagnostic.line, diagnostic.column);
 		}
 		else {
-			const char* poco_msg = poco_get_error();
-			if (poco_msg != NULL && poco_msg[0] != '\0') {
-				continu_box(poco_msg);
-			} else {
-				poco_report_err(phase, err);
-			}
+			poco_report_err(phase, err);
 		}
 		err = Err_reported;
 	}
 
-	free_poco(&pev);
+	poco_program_destroy(program);
+	poco_vm_destroy(vm);
 
 	if (po_chainto_program_path[0] != '\0')
 	{
@@ -294,22 +394,21 @@ CHAIN_ANOTHER_PROGRAM:					// loop point for chaining programs
 	return err;
 }
 
-static void *cl_pev;
+static PocoVm *cl_vm;
+static PocoProgram *cl_program;
+static AniPocoDiagnosticState cl_diagnostic;
 
 /*****************************************************************************
  * invoke poco (compile only) from the command line
  ****************************************************************************/
 Errcode compile_cl_poco(char *name)
 {
-char err_file[PATH_SIZE];
-long err_line;
-int err_char;
-
-set_current_program_path(name); 	/* used by compiler for #include, etc */
-
-return compile_poco(&cl_pev, name, resolved_poco_err_name(),
-		NULL, get_poco_libs(),
-		err_file, &err_line, &err_char, get_poco_include_pathlist(), false);
+	set_current_program_path(name); 	/* used by compiler for #include, etc */
+	poco_program_destroy(cl_program);
+	poco_vm_destroy(cl_vm);
+	cl_program = NULL;
+	cl_vm = NULL;
+	return compile_animator_program(name, &cl_vm, &cl_program, &cl_diagnostic);
 }
 
 
@@ -319,30 +418,32 @@ return compile_poco(&cl_pev, name, resolved_poco_err_name(),
 Errcode do_cl_poco(char *name)
 {
 Errcode err = Success;
-long	err_line;
 char	chainbuf[PATH_SIZE];
+
+(void)name;
 
 CHAIN_ANOTHER_PROGRAM:
 
 	po_chainto_program_path[0] = '\0';
 
-	if (cl_pev != NULL)
+	if (cl_program != NULL && cl_vm != NULL)
 		{
-		err = execute_poco(&cl_pev,&err_line);
+		err = execute_poco(cl_vm, cl_program, &cl_diagnostic);
 		if (err < Success)
 			{
 			po_chainto_program_path[0] = '\0';  // blast chain prog on error
-			if (err != POCO_ERR_IN_ERR_FILE && err != Err_early_exit)
+			if (err != Err_in_err_file && err != Err_early_exit)
 				poco_report_err("poco_run", err);
 			}
-		free_poco(&cl_pev);
+		poco_program_destroy(cl_program);
+		poco_vm_destroy(cl_vm);
+		cl_program = NULL;
+		cl_vm = NULL;
 		if (po_chainto_program_path[0] != '\0')
 			{
 			strcpy(chainbuf, po_chainto_program_path);
 			if ((err = compile_cl_poco(chainbuf)) >= Success)
 				goto CHAIN_ANOTHER_PROGRAM;
-			else
-				free_poco(&cl_pev);
 			}
 		}
 	return err;
@@ -451,7 +552,7 @@ void go_pgmn(void)
 				vset_set_path(POCO_PATH,pbuf);
 				break;
 			case 6:
-				print_pocolib("pocolib.txt", get_poco_libs());
+				ani_poco_write_library_list("pocolib.txt");
 				break;
 
 			default:
@@ -564,5 +665,3 @@ Errcode quse_poco()
 #undef QLS_LOAD
 #undef QLS_SAVE
 #undef QLS_USE
-
-

@@ -216,6 +216,7 @@ bool po_check_type_names(Poco_cb* pcb)
 					base_type_names[i].val,
 					base_type_names[i].name);
 			po_say_internal(pcb, "base_type_names doesn't check");
+   PO_CHECK_ABORT(pcb, false);
 			return (false);
 		}
 	}
@@ -368,6 +369,7 @@ bool po_append_type(Poco_cb* pcb, Type_info* ti, TypeComp tc, long dim, void* si
 {
 	if (ti->comp_count >= ti->comp_alloc) {
 		po_say_fatal(pcb, "variable type too complex");
+  PO_CHECK_ABORT(pcb, false);
 		return (false);
 	}
 	ti->comp[ti->comp_count] = tc;
@@ -396,7 +398,8 @@ bool po_copy_type(Poco_cb* pcb, Type_info* s, Type_info* d)
 {
 #ifdef DEVELOPMENT
 	if (s->comp_count > d->comp_alloc) {
-		po_say_internal(pcb, "variable type too complex in po_copy_type"); /* should never happen */
+		po_say_internal(pcb, "variable type too complex in po_copy_type");
+  PO_CHECK_ABORT(pcb, false);
 		return (false);
 	}
 #endif
@@ -415,6 +418,7 @@ bool po_cat_type(Poco_cb* pcb, Type_info* d, Type_info* s)
 {
 	if (d->comp_count + s->comp_count > d->comp_alloc) {
 		po_say_fatal(pcb, "variable type too complex");
+  PO_CHECK_ABORT(pcb, false);
 		return (false);
 	}
 	poco_copy_bytes(s->comp, d->comp + d->comp_count, s->comp_count * sizeof(*(s->comp)));
@@ -601,6 +605,7 @@ long po_get_subtype_size(Poco_cb* pcb, Type_info* ti)
  ****************************************************************************/
 bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 {
+	PO_CHECK_ABORT(pcb, false);
 	static char signed_and_unsigned[] = "cannot specify both signed and unsigned.";
 	static char long_and_short[]	  = "cannot specify both long and short";
 	SHORT type_token;
@@ -612,6 +617,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 	comp		   = TYPE_BAD;
 
 	for (;;) {
+		PO_CHECK_ABORT(pcb, false);
 		if (pcb->t.toktype == PTOK_USER_TYPE) {
 			po_copy_type(pcb, pcb->curtoken->val.symbol->ti, ti);
 			comp = ti->comp[ti->comp_count - 1];
@@ -636,24 +642,28 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 				case TYPE_SIGNED: /* set signed flag if not unsigned */
 					if (flags & TFL_UNSIGNED)
 						po_say_fatal(pcb, signed_and_unsigned);
+      PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_SIGNED;
 					break;
 
 				case TYPE_UNSIGNED: /* set unsigned flag if not signed */
 					if (flags & TFL_SIGNED)
 						po_say_fatal(pcb, signed_and_unsigned);
+      PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_UNSIGNED;
 					break;
 
 				case TYPE_LONG: /* set long flag if not short	*/
 					if (flags & TFL_SHORT)
 						po_say_fatal(pcb, long_and_short);
+      PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_LONG;
 					break;
 
 				case TYPE_SHORT: /* set short flag if not long	*/
 					if (flags & TFL_SHORT)
 						po_say_fatal(pcb, long_and_short);
+      PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_SHORT;
 					break;
 
@@ -694,6 +704,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 				break;
 			default:
 				po_say_fatal(pcb, "long cannot be specified for this type");
+    PO_CHECK_ABORT(pcb, false);
 				break;
 		}
 	} else {
@@ -710,6 +721,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 					break;
 				default:
 					po_say_fatal(pcb, "short cannot be specified for this type");
+     PO_CHECK_ABORT(pcb, false);
 					break;
 			}
 		}
@@ -734,6 +746,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 				break;
 			default:
 				po_say_fatal(pcb, "signed/unsigned cannot be specified for this type");
+    PO_CHECK_ABORT(pcb, false);
 				break;
 		}
 	}

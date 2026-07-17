@@ -8,8 +8,5 @@ typedef struct Jfile_tag { int dummy; } Jfile;
 #ifndef POCO_JFILE_H
 #define POCO_JFILE_H
 
-int pj_delete(const char *name);
-
 #endif /* POCO_JFILE_H */
-
 

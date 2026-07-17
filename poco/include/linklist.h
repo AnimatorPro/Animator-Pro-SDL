@@ -1,4 +1,10 @@
-/* Simple intrusive doubly-linked list helpers for Poco */
+/*
+ * Simple intrusive doubly-linked list helpers for Poco.
+ *
+ * Dlheader is part of the legacy Poco_lib compatibility ABI.  Keep its
+ * three-pointer sentinel layout in sync with Animator while legacy callers
+ * still exchange Poco_lib values across the boundary.
+ */
 #ifndef LINKLIST_H
 #define LINKLIST_H
 
@@ -10,39 +16,39 @@ typedef struct Dlnode {
 typedef struct Dlheader {
     Dlnode *head;
     Dlnode *tail;
+    Dlnode *tails_prev;
 } Dlheader;
 
-#define RNODE_FIELDS Dlnode node; void *resource
+#define RNODE_FIELDS Dlnode node; void *resource;
 
 static inline void init_list(Dlheader *h)
 {
-    h->head = 0;
+    h->head = (Dlnode *)&h->tail;
     h->tail = 0;
+    h->tails_prev = (Dlnode *)&h->head;
 }
 
 static inline void add_head(Dlheader *h, Dlnode *n)
 {
     Dlnode *first = h->head;
-    n->prev = 0;
+
+    n->prev = (Dlnode *)&h->head;
     n->next = first;
+    first->prev = n;
     h->head = n;
-    if (first) first->prev = n; else h->tail = n;
 }
 
 static inline void rem_node(Dlnode *n)
 {
-    if (n->prev) n->prev->next = n->next;
-    if (n->next) n->next->prev = n->prev;
+    n->prev->next = n->next;
+    n->next->prev = n->prev;
     n->next = n->prev = 0;
 }
 
 static inline void rem_from_list(Dlheader *h, Dlnode *n)
 {
-    if (n->prev) n->prev->next = n->next; else h->head = n->next;
-    if (n->next) n->next->prev = n->prev; else h->tail = n->prev;
-    n->next = n->prev = 0;
+    (void)h;
+    rem_node(n);
 }
 
 #endif /* LINKLIST_H */
-
-

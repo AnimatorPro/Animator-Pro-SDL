@@ -1,68 +1,19 @@
+/*
+ * Compatibility-only Animator header.
+ *
+ * Deprecated for new Animator code: use <poco/poco.h>.  This shim preserves
+ * legacy compile_poco/run_poco/free_poco source compatibility while keeping
+ * their declarations owned by Poco's single compatibility header.
+ */
+#ifndef ANIMATOR_POCOFACE_COMPAT_H
+#define ANIMATOR_POCOFACE_COMPAT_H
 
-#ifndef POCOFACE_H
-#define POCOFACE_H
+/* Supply Animator's Names tag at the only legacy function parameter boundary. */
+#include "errcodes.h"
+#include "stdtypes.h"
+#include "linklist.h"
+#define POCO_LEGACY_NAMES_TYPE Names
+#include "../../poco/include/pocoface.h"
+#undef POCO_LEGACY_NAMES_TYPE
 
-#ifndef POCOLIB_H
-	#include "pocolib.h"
-#endif
-
-//!TODO: Determine if these sizes are enough for modern use
-#define POCO_STACKSIZE_MIN		(6*1024L)
-#define POCO_STACKSIZE_MAX		(64*1024L)
-#define POCO_STACKSIZE_DEFAULT	(10*1024L) /* default poco runtime stacksize */
-
-extern int	po_version_number;	/* added 10/30/90, poco's version number */
-
-Errcode compile_poco(void **ppev,	/* returns executable pexe on Success */
-	char *source_name,	/* name of source file */
-	char *errors,		/* error file or NULL for stderr */
-	char *dump_name,	/* disassembly file or NULL for none */
-	/* for built-in function library */
-	Poco_lib *lib,
-	/* stuff for location of 1'st error */
-	char *err_fname,	/* file where error detected */
-	long *err_line, 	/* line where error detected */
-	int *err_char,		/* character in line where err detected */
-	Names *include_dirs, /* include search path */
-	bool verbose		/* enable verbose debug output */
-	);
-/* Compile poco function.  Leave error messages in a file named errors.
-   Otherwise build up executable structure in *ppev */
-
-Errcode run_poco(void **ppev,  /* value from compile_poco */
-	char *trace_name,
-				 bool (*check_abort)(void *),
-	void *check_abort_data,
-	long *err_line);
-/* run_poco:  execute *ppev starting at main() */
-
-void free_poco(void **ppev);
-/* free_poco: free up ppev returned by compile_poco and set *pev to NULL */
-
-
-/**** These next functions are for when you want to run a function
-   (not necessarily main) inside a compiled poco program.
-   (DON'T USE THEM!  Running something other than main() is untested) */
-
-Errcode pev_alloc_data(void *p);
-/* allocate and initialize data areas */
-
-void pev_free_data(void *p);
-/* free data areas */
-
-
-/* Routines useful for calling a specific function in a Poco program
- * in C. */
-void *po_fuf_code(void *fuf);
-char *po_fuf_name(void *fuf);
-
-/* Boundary constant: poco's value for Err_in_err_file.
- * Use this at the poco/host boundary instead of Err_in_err_file,
- * whose numeric value differs between the two errcodes.h files. */
-#define POCO_ERR_IN_ERR_FILE (-11)
-
-/* Retrieve last error message from libpoco.
- * Returns pointer to static buffer; cleared at start of compile/run. */
-const char* poco_get_error(void);
-
-#endif /* POCOFACE_H */
+#endif /* ANIMATOR_POCOFACE_COMPAT_H */

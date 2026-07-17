@@ -1,0 +1,5 @@
+#pragma poco library "poco_generic_bad_version.poe"
+
+main()
+{
+}

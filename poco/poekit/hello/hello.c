@@ -1,31 +1,29 @@
-/*****************************************************************************
- * hello.c - A simple hello world POE module demonstrating the new library
- *           loading system.
- ****************************************************************************/
+#include <poco/poco.h>
 
-/*----------------------------------------------------------------------------
- * include the usual header files...
- *--------------------------------------------------------------------------*/
-
-#include "errcodes.h"   /* host error codes (must precede pocorex.h)     */
-#include "pocorex.h"    /* required header file, also includes pocolib.h */
-#include <stdio.h>      /* for printf */
-
-/*----------------------------------------------------------------------------
- * your data and code goes here...
- *--------------------------------------------------------------------------*/
+#include <stdio.h>
 
 static void hello_func(void)
 {
 	printf("Hello from POE!\n");
 }
 
-/*----------------------------------------------------------------------------
- * Setup pocorex interface structures...
- *--------------------------------------------------------------------------*/
-
-static Lib_proto poe_calls[] = {
-	{ hello_func, "void HelloFunc(void);" },
+static const PocoBinding hello_bindings[] = {
+	{"void HelloFunc(void);", (PocoNativeFunction)hello_func},
 };
 
-Setup_Pocorex(NOFUNC, NOFUNC, "Hello POE", poe_calls);
+static const PocoLibrary hello_library = {
+	.identity = "Hello POE",
+	.bindings = hello_bindings,
+	.binding_count = sizeof(hello_bindings) / sizeof(hello_bindings[0]),
+};
+
+static const PocoModuleDescriptor hello_module = {
+	.abi_version = POCO_MODULE_ABI_VERSION,
+	.identity = "Hello POE",
+	.library = &hello_library,
+};
+
+POCO_MODULE_EXPORT const PocoModuleDescriptor *poco_module_get(void)
+{
+	return &hello_module;
+}

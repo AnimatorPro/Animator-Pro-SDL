@@ -1,0 +1,6 @@
+main()
+{
+	char bytes[4];
+	char *alias = alias_span(bytes);
+	return write_span(alias, 5);
+}

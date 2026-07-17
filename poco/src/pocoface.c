@@ -70,22 +70,24 @@
  ****************************************************************************/
 
 #include "jfile.h"
+#include "filepath.h"
+#include <poco/poco.h>
 #include "pocoface.h"
 #include "pocoload.h"
 #include "poco_errcodes.h"
 #include "poco.h"
-#include <setjmp.h>
+#include "standard_library.h"
+
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*****************************************************************************
  * some global vars...
- *	 po_compile_errhandler has (by convention) a scope that is internal to
- *	 the poco compiler.  the other globals are shared with the host.
  ****************************************************************************/
 
-jmp_buf po_compile_errhandler;	  /* Global jump buffer for compile errors.	*/
+
 int po_version_number = VRSN_NUM; /* Global version number for PJ's use.    */
 extern Errcode builtin_err;		  /* External library/floating point error.	*/
 
@@ -95,16 +97,665 @@ static char poco_last_error[512] = "";
 
 void poco_set_error(const char* fmt, ...)
 {
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(poco_last_error, sizeof(poco_last_error), fmt, args);
-    va_end(args);
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(poco_last_error, sizeof(poco_last_error), fmt, args);
+	va_end(args);
 }
 
 const char* poco_get_error(void)
 {
-    return poco_last_error;
+	return poco_last_error;
 }
+
+Poco_lib* poco_active_library(const char* identity)
+{
+	Poco_lib* library;
+
+	if (porunenv == NULL || identity == NULL)
+		return NULL;
+	for (library = porunenv->lib; library != NULL; library = library->next) {
+		if (library->name != NULL && strcmp(library->name, identity) == 0)
+			return library;
+	}
+	return NULL;
+}
+
+PocoPointerRegistry* poco_active_pointer_registry(void)
+{
+	return porunenv != NULL ? porunenv->pointer_registry : NULL;
+}
+
+/*
+ * Public embedding API
+ *
+ * The original compiler interface consumes Poco_lib and Names control blocks.
+ * Keep those implementation details here: a host registers public descriptors
+ * and each compiled program receives an owned, immutable legacy-compatible
+ * snapshot.  This lets registrations remain deterministic while neither the
+ * host nor an already compiled program can observe internal control blocks.
+ */
+typedef enum Poco_registered_library_kind
+{
+	POCO_REGISTERED_PUBLIC_LIBRARY,
+	POCO_REGISTERED_LEGACY_LIBRARY
+} Poco_registered_library_kind;
+
+typedef struct Poco_registered_library
+{
+	struct Poco_registered_library* next;
+	Poco_registered_library_kind kind;
+	PocoLibrary library;
+	PocoBinding* bindings;
+	PocoBindingContract* contracts;
+	PocoBindingPointerContract** pointer_contracts;
+	Poco_lib* legacy_library;
+	PocoLibraryRuntimeCleanup runtime_cleanup;
+} Poco_registered_library;
+
+typedef struct Poco_program_library
+{
+	struct Poco_program_library* next;
+	Poco_lib library;
+	Lib_proto* prototypes;
+	PocoLibrary* public_library;
+	PocoLibraryRuntimeCleanup runtime_cleanup;
+	int initialized;
+} Poco_program_library;
+
+struct PocoVm
+{
+	Names* include_dirs;
+	Poco_registered_library* libraries;
+	Poco_registered_library* libraries_tail;
+	PocoDiagnosticCallback diagnostic_callback;
+	void* diagnostic_user_data;
+	int verbose;
+	PocoModuleHooks module_hooks;
+	PocoPointerRegistry* pointer_registry;
+	int standard_library_registered;
+	int program_count;
+	int destroy_requested;
+};
+
+struct PocoProgram
+{
+	PocoVm* vm;
+	void* executable;
+	Poco_program_library* libraries;
+};
+
+static char* poco_api_copy_string(const char* value)
+{
+	size_t length;
+	char* copy;
+
+	if (value == NULL)
+		return NULL;
+	length = strlen(value) + 1;
+	copy = malloc(length);
+	if (copy != NULL)
+		memcpy(copy, value, length);
+	return copy;
+}
+
+static void poco_api_free_names(Names* names)
+{
+	Names* next;
+
+	while (names != NULL) {
+		next = names->next;
+		free(names->name);
+		free(names);
+		names = next;
+	}
+}
+
+static void poco_api_free_registered_library(Poco_registered_library* registered)
+{
+	size_t index;
+
+	if (registered == NULL)
+		return;
+	if (registered->kind == POCO_REGISTERED_PUBLIC_LIBRARY) {
+		if (registered->bindings != NULL) {
+			for (index = 0; index < registered->library.binding_count; ++index) {
+				free((char*)registered->bindings[index].prototype);
+				free(registered->pointer_contracts != NULL ?
+					registered->pointer_contracts[index] : NULL);
+			}
+		}
+		free(registered->pointer_contracts);
+		free(registered->contracts);
+		free(registered->bindings);
+		free((char*)registered->library.identity);
+	}
+	free(registered);
+}
+
+static void poco_api_free_registered_libraries(Poco_registered_library* registered)
+{
+	Poco_registered_library* next;
+
+	while (registered != NULL) {
+		next = registered->next;
+		poco_api_free_registered_library(registered);
+		registered = next;
+	}
+}
+
+static void poco_api_free_vm(PocoVm* vm)
+{
+	if (vm == NULL)
+		return;
+	poco_api_free_names(vm->include_dirs);
+	poco_api_free_registered_libraries(vm->libraries);
+	poco_pointer_registry_destroy(vm->pointer_registry);
+	free(vm);
+}
+
+static void poco_api_report(PocoVm* vm, PocoStatus status, const char* source_name,
+	long line, int column, const char* message)
+{
+	PocoDiagnostic diagnostic;
+
+	if (vm == NULL || vm->diagnostic_callback == NULL)
+		return;
+	diagnostic.status = status;
+	diagnostic.source_name = source_name;
+	diagnostic.line = line;
+	diagnostic.column = column;
+	diagnostic.message = message;
+	vm->diagnostic_callback(vm->diagnostic_user_data, &diagnostic);
+}
+
+static Errcode poco_api_library_initialize(Poco_lib* library)
+{
+	Poco_program_library* program_library = library != NULL ? library->local_data : NULL;
+	PocoLibrary* public_library = program_library != NULL ? program_library->public_library : NULL;
+	PocoStatus status;
+
+	if (program_library == NULL)
+		return Err_poco_internal;
+	if (public_library == NULL || public_library->initialize == NULL)
+		status = POCO_STATUS_OK;
+	else
+		status = public_library->initialize(public_library);
+	if (status == POCO_STATUS_OK)
+		program_library->initialized = 1;
+	return (Errcode)status;
+}
+
+static void poco_api_library_cleanup(Poco_lib* library)
+{
+	Poco_program_library* program_library = library != NULL ? library->local_data : NULL;
+	PocoLibrary* public_library = program_library != NULL ? program_library->public_library : NULL;
+
+	if (program_library != NULL && program_library->initialized &&
+		program_library->runtime_cleanup != NULL)
+		program_library->runtime_cleanup(library);
+	if (program_library != NULL && program_library->initialized &&
+		public_library != NULL && public_library->cleanup != NULL)
+		public_library->cleanup(public_library);
+	if (program_library != NULL)
+		program_library->initialized = 0;
+}
+
+static PocoStatus poco_api_append_registered_library(PocoVm* vm,
+	Poco_registered_library* registered)
+{
+	if (vm == NULL || registered == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->libraries_tail != NULL)
+		vm->libraries_tail->next = registered;
+	else
+		vm->libraries = registered;
+	vm->libraries_tail = registered;
+	return POCO_STATUS_OK;
+}
+
+static PocoStatus poco_api_register_legacy_library(PocoVm* vm, Poco_lib* library)
+{
+	Poco_registered_library* registered;
+
+	if (library == NULL || library->name == NULL)
+		return POCO_STATUS_INTERNAL_ERROR;
+	registered = calloc(1, sizeof(*registered));
+	if (registered == NULL)
+		return POCO_STATUS_OUT_OF_MEMORY;
+	registered->kind = POCO_REGISTERED_LEGACY_LIBRARY;
+	registered->legacy_library = library;
+	return poco_api_append_registered_library(vm, registered);
+}
+
+static void poco_api_free_program_libraries(Poco_program_library* library)
+{
+	Poco_program_library* next;
+
+	while (library != NULL) {
+		next = library->next;
+		free(library->prototypes);
+		free(library);
+		library = next;
+	}
+}
+
+static PocoStatus poco_api_make_program_libraries(PocoVm* vm,
+	Poco_program_library** out_libraries, Poco_lib** out_first_library)
+{
+	Poco_registered_library* registered;
+	Poco_program_library* first = NULL;
+	Poco_program_library* tail = NULL;
+	Poco_program_library* program_library;
+	size_t index;
+
+	if (out_libraries == NULL || out_first_library == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	*out_libraries = NULL;
+	*out_first_library = NULL;
+
+	for (registered = vm->libraries; registered != NULL; registered = registered->next) {
+		program_library = calloc(1, sizeof(*program_library));
+		if (program_library == NULL)
+			goto OUT_OF_MEMORY;
+
+		if (registered->kind == POCO_REGISTERED_LEGACY_LIBRARY) {
+			program_library->library = *registered->legacy_library;
+			program_library->library.next = NULL;
+		} else {
+			if (registered->library.binding_count != 0) {
+				program_library->prototypes = calloc(registered->library.binding_count,
+					sizeof(*program_library->prototypes));
+				if (program_library->prototypes == NULL) {
+					free(program_library);
+					goto OUT_OF_MEMORY;
+				}
+				for (index = 0; index < registered->library.binding_count; ++index) {
+					program_library->prototypes[index].proto =
+						(char*)registered->library.bindings[index].prototype;
+					program_library->prototypes[index].func =
+						(void*)registered->library.bindings[index].function;
+					program_library->prototypes[index].contract =
+						registered->library.bindings[index].contract;
+				}
+			}
+			program_library->library.next = NULL;
+			program_library->library.name = (char*)registered->library.identity;
+			program_library->library.lib = program_library->prototypes;
+			program_library->library.count = (int)registered->library.binding_count;
+			program_library->library.init = poco_api_library_initialize;
+			program_library->library.cleanup = poco_api_library_cleanup;
+			program_library->public_library = &registered->library;
+			program_library->runtime_cleanup = registered->runtime_cleanup;
+			program_library->library.local_data = program_library;
+		}
+
+		if (tail != NULL) {
+			tail->next = program_library;
+			tail->library.next = &program_library->library;
+		} else {
+			first = program_library;
+		}
+		tail = program_library;
+	}
+
+	*out_libraries = first;
+	*out_first_library = first != NULL ? &first->library : NULL;
+	return POCO_STATUS_OK;
+
+OUT_OF_MEMORY:
+	poco_api_free_program_libraries(first);
+	return POCO_STATUS_OUT_OF_MEMORY;
+}
+
+PocoStatus poco_vm_create(const PocoVmOptions* options, PocoVm** out_vm)
+{
+	PocoVm* vm;
+	PocoStatus status;
+
+	if (out_vm == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	*out_vm = NULL;
+	vm = calloc(1, sizeof(*vm));
+	if (vm == NULL)
+		return POCO_STATUS_OUT_OF_MEMORY;
+	vm->pointer_registry = poco_pointer_registry_create();
+	if (vm->pointer_registry == NULL) {
+		free(vm);
+		return POCO_STATUS_OUT_OF_MEMORY;
+	}
+	if (options != NULL) {
+		vm->diagnostic_callback = options->diagnostic_callback;
+		vm->diagnostic_user_data = options->diagnostic_user_data;
+		vm->verbose = options->verbose;
+		if (options->module_hooks != NULL)
+			vm->module_hooks = *options->module_hooks;
+	}
+	status = poco_vm_set_include_paths(vm,
+		options != NULL ? options->include_paths : NULL,
+		options != NULL ? options->include_path_count : 0);
+	if (status != POCO_STATUS_OK) {
+		poco_api_free_vm(vm);
+		return status;
+	}
+	*out_vm = vm;
+	return POCO_STATUS_OK;
+}
+
+void poco_vm_destroy(PocoVm* vm)
+{
+	if (vm == NULL)
+		return;
+	vm->destroy_requested = 1;
+	if (vm->program_count == 0)
+		poco_api_free_vm(vm);
+}
+
+PocoStatus poco_vm_register_borrowed_span(PocoVm* vm, void* pointer,
+	size_t byte_count, uint32_t permissions)
+{
+	Errcode status;
+
+	if (vm == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->destroy_requested)
+		return POCO_STATUS_PARAMETER_RANGE;
+	status = poco_pointer_registry_register_borrowed(vm->pointer_registry,
+		pointer, byte_count, permissions);
+	return (PocoStatus)status;
+}
+
+PocoStatus poco_vm_unregister_borrowed_span(PocoVm* vm, const void* pointer)
+{
+	Errcode status;
+
+	if (vm == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->destroy_requested)
+		return POCO_STATUS_PARAMETER_RANGE;
+	status = poco_pointer_registry_unregister_borrowed(vm->pointer_registry, pointer);
+	return (PocoStatus)status;
+}
+
+PocoStatus poco_vm_set_include_paths(PocoVm* vm, const char* const* paths, size_t path_count)
+{
+	Names* first = NULL;
+	Names* tail = NULL;
+	Names* entry;
+	size_t index;
+
+	if (vm == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->destroy_requested || (path_count != 0 && paths == NULL))
+		return POCO_STATUS_PARAMETER_RANGE;
+	/* Poco's legacy preprocessor resolves even the root source through its
+	 * include search list.  Keep an empty entry first so an absolute or
+	 * caller-relative source name is always usable, then append host paths. */
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL)
+		goto OUT_OF_MEMORY;
+	entry->name = poco_api_copy_string("");
+	if (entry->name == NULL) {
+		free(entry);
+		goto OUT_OF_MEMORY;
+	}
+	first = tail = entry;
+	for (index = 0; index < path_count; ++index) {
+		if (paths[index] == NULL)
+			goto INVALID_PATH;
+		entry = calloc(1, sizeof(*entry));
+		if (entry == NULL)
+			goto OUT_OF_MEMORY;
+		entry->name = poco_api_copy_string(paths[index]);
+		if (entry->name == NULL) {
+			free(entry);
+			goto OUT_OF_MEMORY;
+		}
+		if (tail != NULL)
+			tail->next = entry;
+		else
+			first = entry;
+		tail = entry;
+	}
+	poco_api_free_names(vm->include_dirs);
+	vm->include_dirs = first;
+	return POCO_STATUS_OK;
+
+INVALID_PATH:
+	poco_api_free_names(first);
+	return POCO_STATUS_PARAMETER_RANGE;
+OUT_OF_MEMORY:
+	poco_api_free_names(first);
+	return POCO_STATUS_OUT_OF_MEMORY;
+}
+
+PocoStatus poco_vm_register_library_with_runtime_cleanup(PocoVm* vm,
+	const PocoLibrary* library, PocoLibraryRuntimeCleanup runtime_cleanup)
+{
+	Poco_registered_library* registered;
+	Poco_registered_library* existing;
+	size_t index;
+
+	if (vm == NULL || library == NULL || library->identity == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->destroy_requested ||
+		library->binding_count == 0 || library->bindings == NULL)
+		return POCO_STATUS_PARAMETER_RANGE;
+	for (existing = vm->libraries; existing != NULL; existing = existing->next) {
+		const char* existing_identity = existing->kind == POCO_REGISTERED_PUBLIC_LIBRARY
+			? existing->library.identity : existing->legacy_library->name;
+		if (strcmp(existing_identity, library->identity) == 0)
+			return POCO_STATUS_PARAMETER_RANGE;
+	}
+
+	registered = calloc(1, sizeof(*registered));
+	if (registered == NULL)
+		return POCO_STATUS_OUT_OF_MEMORY;
+	registered->kind = POCO_REGISTERED_PUBLIC_LIBRARY;
+	registered->runtime_cleanup = runtime_cleanup;
+	registered->library = *library;
+	registered->library.identity = poco_api_copy_string(library->identity);
+	if (registered->library.identity == NULL)
+		goto OUT_OF_MEMORY;
+	if (library->binding_count != 0) {
+		registered->bindings = calloc(library->binding_count, sizeof(*registered->bindings));
+		if (registered->bindings == NULL)
+			goto OUT_OF_MEMORY;
+		registered->contracts = calloc(library->binding_count,
+			sizeof(*registered->contracts));
+		registered->pointer_contracts = calloc(library->binding_count,
+			sizeof(*registered->pointer_contracts));
+		if (registered->contracts == NULL || registered->pointer_contracts == NULL)
+			goto OUT_OF_MEMORY;
+		for (index = 0; index < library->binding_count; ++index) {
+			if (library->bindings[index].prototype == NULL || library->bindings[index].function == NULL)
+				goto INVALID_BINDING;
+			registered->bindings[index] = library->bindings[index];
+			registered->bindings[index].prototype =
+				poco_api_copy_string(library->bindings[index].prototype);
+			if (registered->bindings[index].prototype == NULL)
+				goto OUT_OF_MEMORY;
+			if (library->bindings[index].contract != NULL) {
+				const PocoBindingContract* source = library->bindings[index].contract;
+				PocoBindingContract* destination = &registered->contracts[index];
+
+				if (source->pointer_contract_count != 0 &&
+					source->pointer_contracts == NULL)
+					goto INVALID_BINDING;
+				*destination = *source;
+				if (source->pointer_contract_count != 0) {
+					registered->pointer_contracts[index] = calloc(
+						source->pointer_contract_count,
+						sizeof(*registered->pointer_contracts[index]));
+					if (registered->pointer_contracts[index] == NULL)
+						goto OUT_OF_MEMORY;
+					memcpy(registered->pointer_contracts[index], source->pointer_contracts,
+						source->pointer_contract_count *
+						sizeof(*registered->pointer_contracts[index]));
+					destination->pointer_contracts = registered->pointer_contracts[index];
+				}
+				registered->bindings[index].contract = destination;
+			}
+		}
+		registered->library.bindings = registered->bindings;
+	}
+	return poco_api_append_registered_library(vm, registered);
+
+INVALID_BINDING:
+	poco_api_free_registered_library(registered);
+	return POCO_STATUS_PARAMETER_RANGE;
+OUT_OF_MEMORY:
+	poco_api_free_registered_library(registered);
+	return POCO_STATUS_OUT_OF_MEMORY;
+}
+
+PocoStatus poco_vm_register_library(PocoVm* vm, const PocoLibrary* library)
+{
+	return poco_vm_register_library_with_runtime_cleanup(vm, library, NULL);
+}
+
+PocoStatus poco_vm_register_standard_library(PocoVm* vm)
+{
+	Poco_registered_library* previous_tail;
+	PocoStatus status;
+
+	if (vm == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->destroy_requested)
+		return POCO_STATUS_PARAMETER_RANGE;
+	if (vm->standard_library_registered)
+		return POCO_STATUS_OK;
+
+	previous_tail = vm->libraries_tail;
+	status = poco_register_standard_library_catalog(vm);
+	if (status != POCO_STATUS_OK) {
+		Poco_registered_library* first_new = previous_tail != NULL ? previous_tail->next : vm->libraries;
+		if (previous_tail != NULL)
+			previous_tail->next = NULL;
+		else
+			vm->libraries = NULL;
+		vm->libraries_tail = previous_tail;
+		poco_api_free_registered_libraries(first_new);
+		return status;
+	}
+	vm->standard_library_registered = 1;
+	return POCO_STATUS_OK;
+}
+
+PocoStatus poco_vm_compile_file(PocoVm* vm, const char* source_name, PocoProgram** out_program)
+{
+	PocoProgram* program;
+	Poco_lib* libraries;
+	PocoStatus status;
+	Errcode compile_status;
+	PocoModuleHooks previous_module_hooks;
+	char error_source[PATH_SIZE];
+	long error_line = 0;
+	int error_column = 0;
+
+	if (vm == NULL || source_name == NULL || out_program == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->destroy_requested)
+		return POCO_STATUS_PARAMETER_RANGE;
+	*out_program = NULL;
+	error_source[0] = '\0';
+	program = calloc(1, sizeof(*program));
+	if (program == NULL)
+		return POCO_STATUS_OUT_OF_MEMORY;
+	status = poco_api_make_program_libraries(vm, &program->libraries, &libraries);
+	if (status != POCO_STATUS_OK) {
+		free(program);
+		return status;
+	}
+	poco_loader_swap_module_hooks(&vm->module_hooks, &previous_module_hooks);
+	compile_status = compile_poco(&program->executable, (char*)source_name, NULL, NULL,
+		libraries, error_source, &error_line, &error_column, vm->include_dirs, vm->verbose != 0);
+	poco_loader_swap_module_hooks(&previous_module_hooks, NULL);
+	if (compile_status != Success) {
+		PocoStatus public_status = compile_status == Err_in_err_file
+			? POCO_STATUS_REPORTED : (PocoStatus)compile_status;
+		poco_api_report(vm, public_status, error_source, error_line,
+			error_column, poco_get_error());
+		if (program->executable != NULL)
+			free_poco(&program->executable);
+		poco_api_free_program_libraries(program->libraries);
+		free(program);
+		return public_status;
+	}
+	program->vm = vm;
+	((Poco_run_env*)program->executable)->pointer_registry = vm->pointer_registry;
+	++vm->program_count;
+	*out_program = program;
+	return POCO_STATUS_OK;
+}
+
+typedef struct Poco_api_cancel_context
+{
+	PocoCancelCallback callback;
+	void* user_data;
+} Poco_api_cancel_context;
+
+static bool poco_api_cancel(void* context)
+{
+	Poco_api_cancel_context* cancel_context = context;
+
+	return cancel_context != NULL && cancel_context->callback != NULL &&
+		cancel_context->callback(cancel_context->user_data) != 0;
+}
+
+PocoStatus poco_vm_run(PocoVm* vm, PocoProgram* program,
+	const PocoRunOptions* options, int32_t* out_result)
+{
+	Errcode run_status;
+	long error_line = 0;
+	Poco_run_env* run_env;
+	Poco_api_cancel_context cancel_context;
+
+	if (vm == NULL || program == NULL)
+		return POCO_STATUS_NULL_REFERENCE;
+	if (vm->destroy_requested || program->vm != vm)
+		return POCO_STATUS_PARAMETER_RANGE;
+	cancel_context.callback = options != NULL ? options->cancel_callback : NULL;
+	cancel_context.user_data = options != NULL ? options->cancel_user_data : NULL;
+	run_status = run_poco(&program->executable,
+		options != NULL ? (char*)options->trace_file : NULL,
+		cancel_context.callback != NULL ? poco_api_cancel : NULL,
+		cancel_context.callback != NULL ? &cancel_context : NULL, &error_line);
+	/* The legacy interpreter formats library errors for its trace and returns
+	 * Err_in_err_file.  Preserve the precise new FFI boundary status at the
+	 * public VM API so a host can distinguish a rejected span from a generic
+	 * reported script failure. */
+	if (run_status == Err_in_err_file && builtin_err == Err_poco_ffi_bounds)
+		run_status = Err_poco_ffi_bounds;
+	if (run_status == Success && out_result != NULL) {
+		run_env = program->executable;
+		*out_result = run_env->result.i;
+	}
+	if (run_status != Success)
+		poco_api_report(vm, (PocoStatus)run_status, NULL, error_line, 0,
+			"Poco program execution failed");
+	return (PocoStatus)run_status;
+}
+
+void poco_program_destroy(PocoProgram* program)
+{
+	PocoVm* vm;
+
+	if (program == NULL)
+		return;
+	vm = program->vm;
+	if (program->executable != NULL)
+		free_poco(&program->executable);
+	poco_api_free_program_libraries(program->libraries);
+	free(program);
+	if (vm != NULL) {
+		--vm->program_count;
+		if (vm->destroy_requested && vm->program_count == 0)
+			poco_api_free_vm(vm);
+	}
+}
+
+
 
 #ifdef DEBUG
 void po_show_basic_sizes()
@@ -460,12 +1111,13 @@ char* po_get_libproto_line(Poco_cb* pcb)
 	}
 	pp			 = &pl->lib[fs->line_count++];
 	pcb->libfunc = pp->func;
+	pcb->libcontract = pp->contract;
 
 	if (pp->proto == NULL) {
 		pcb->global_err = Err_poco_internal;
 		po_say_fatal(pcb, "NULL prototype string pointer in library %s", pl->name);
+		PO_CHECK_ABORT(pcb, NULL);
 	}
-
 	return pp->proto;
 }
 
@@ -492,82 +1144,70 @@ Errcode compile_poco(void** ppexe,		 /* returns executable pexe on Success */
 	*ppexe = NULL;
 	poco_last_error[0] = '\0';
 
-	if (Success != (err = setjmp(po_compile_errhandler))) {
-		/* Got here via longjmp -- flush error output and read it back */
+	if (Success != (err = po_init_memory_management(&pcb)))
+		return Err_no_memory; /* MUST return immediately if init fails. */
+
+	pcb->compile_aborted = false;
+	pcb->compile_err = Success;
+
+	pcb->stack_bottom = ((char*)&ppexe) - MAX_STACK;
+
+	pcb->t.err_file		= stdout;
+	pcb->t.include_dirs = include_dirs;
+	pcb->t.verbose		= verbose;
+
+	pcb->libfunc	 = NULL;
+	pcb->libcontract = NULL;
+	pcb->builtin_lib = lib;
+
+	/* Use an anonymous temp file for error output so we don't need
+	 * a named temp file path that must be resolved for fopen(). */
+	{
+		FILE* etmp = tmpfile();
+		if (etmp != NULL) {
+			pcb->t.err_file = etmp;
+		}
+		/* else: falls back to stdout */
+	}
+
+	if (dump_name != NULL) {
+		pcb->po_dump_file = fopen(dump_name, "w");
+	}
+
+	err = po_compile_file(pcb, source_name);
+	if (err != Success || pcb->compile_aborted) {
+		/* Read error output from the tmpfile into poco_last_error */
 		if (pcb->t.err_file != NULL && pcb->t.err_file != stdout && pcb->t.err_file != stderr) {
 			fflush(pcb->t.err_file);
 			rewind(pcb->t.err_file);
 			size_t n = fread(poco_last_error, 1, sizeof(poco_last_error) - 1, pcb->t.err_file);
 			poco_last_error[n] = '\0';
 		}
-		err = Err_in_err_file;
-	} else {
-		if (Success != (err = po_init_memory_management(&pcb))) {
-			poco_set_error("Out of memory during compilation");
-			return Err_no_memory; /* MUST return immediately if init fails. */
-		}
-
-		pcb->stack_bottom = ((char*)&ppexe) - MAX_STACK;
-
-		pcb->t.err_file		= stdout;
-		pcb->t.include_dirs = include_dirs;
-		pcb->t.verbose		= verbose;
-
-		pcb->libfunc	 = NULL;
-		pcb->builtin_lib = lib;
-
-		/* Use an anonymous temp file for error output so we don't need
-		 * a named temp file path that must be resolved for fopen(). */
-		{
-			FILE* etmp = tmpfile();
-			if (etmp != NULL) {
-				pcb->t.err_file = etmp;
-			}
-			/* else: falls back to stdout */
-		}
-
-		if (dump_name != NULL) {
-			pcb->po_dump_file = fopen(dump_name, "w");
-		}
-
-		err = po_compile_file(pcb, source_name);
-		if (err != Success) {
-			#ifdef DEVELOPMENT /* all errs s/b via longjump, not return value...*/
-			fprintf(stdout, "\ncompile_poco: got a non-zero return from po_compile_file!!!\n");
-			#endif
-
-			/* Read error output from the tmpfile into poco_last_error */
-			if (pcb->t.err_file != NULL && pcb->t.err_file != stdout && pcb->t.err_file != stderr) {
-				fflush(pcb->t.err_file);
-				rewind(pcb->t.err_file);
-				size_t n = fread(poco_last_error, 1, sizeof(poco_last_error) - 1, pcb->t.err_file);
-				poco_last_error[n] = '\0';
-			}
-			err = Err_in_err_file; /* we reported it in error file */
-			goto OUT;
-		}
-
-		pev = pj_zalloc((long)sizeof(*pev));
-		if (pev == NULL) {
-			poco_set_error("Out of memory allocating runtime environment");
-			err = Err_no_memory;
-			goto OUT;
-		}
-
-		pcb->run.lib = lib;
-		*pev		 = pcb->run;
-		*ppexe		 = pev;
+		err = Err_in_err_file; /* we reported it in error file */
+		goto OUT;
 	}
+
+	pev = pj_zalloc((long)sizeof(*pev));
+	if (pev == NULL) {
+		err = Err_no_memory;
+		goto OUT;
+	}
+
+	pcb->run.lib = lib;
+	*pev		 = pcb->run;
+	pev->compile_pcb = pcb;
+	*ppexe		 = pev;
+
 
 OUT:
 	gentle_fclose(pcb->po_dump_file);
 	gentle_fclose(pcb->t.err_file);
 
-	if (err == Success) {
-		po_free_compile_memory();
-	} 
-	/* Post-error cleanup goes here... */
-	else {
+	/* A successfully compiled program retains pcb as its owner for the
+	 * compiler/runtime allocation arena.  free_poco() releases that arena after
+	 * execution; releasing it here leaves a dangling compile_pcb and causes a
+	 * second free during program destruction. */
+	if (err != Success) {
 		/*
 		 * let caller know where the error was
 		 *	 if no files are open (eg, error was unexpected EOF) we say that.
@@ -604,7 +1244,7 @@ OUT:
 		/*
 		 * free all memory allocated since the compile started...
 		 */
-		po_free_all_memory();
+		po_free_all_memory(pcb);
 
 		/*
 		 * free any libraries from #pragma poco library "xxx"
@@ -616,9 +1256,8 @@ OUT:
 	/* kiki addition: libffi integration */
 	if (err == Success) {
 		err = po_ffi_build_structures(pev);
-		if (err < Success && poco_last_error[0] == '\0') {
-			poco_set_error("FFI build structures failed");
-		}
+		if (err != Success)
+			free_poco(ppexe);
 	}
 
 	return err;
@@ -639,32 +1278,17 @@ Errcode run_poco(void** ppexe,
 	if ((porunenv = *ppexe) == NULL)
 		return (Err_not_found);
 
-	poco_last_error[0] = '\0';
-
 	porunenv->enable_debug_trace  = true;
 	porunenv->check_abort		  = check_abort;
 	porunenv->check_abort_data	  = check_abort_data;
 	porunenv->trace_file		  = trace_file;
 	porunenv->err_line			  = err_line;
 
-	porunenv->variadic_type_index = 0;
+	po_ffi_variadic_types_reset(&porunenv->variadic);
 
 	run_err = lib_run_file(porunenv, "main");
-	if (run_err == Err_in_err_file && trace_file != NULL) {
-		/* Runtime wrote a trace/error to the file — read it back */
-		FILE* tf = fopen(trace_file, "r");
-		if (tf != NULL) {
-			size_t n = fread(poco_last_error, 1, sizeof(poco_last_error) - 1, tf);
-			poco_last_error[n] = '\0';
-			fclose(tf);
-		}
-	} else if (run_err < Success && poco_last_error[0] == '\0') {
-		char buf[256];
-		get_errtext(run_err, buf);
-		if (buf[0] != '\0') {
-			poco_set_error("%s", buf);
-		}
-	}
+	porunenv = NULL;
+
 	return run_err;
 }
 
@@ -674,15 +1298,20 @@ Errcode run_poco(void** ppexe,
 void free_poco(void** ppexe)
 {
 	Poco_run_env* pp;
+	Poco_cb* compile_pcb = NULL;
 
 	if ((pp = *ppexe) != NULL) {
+		if (porunenv == pp)
+			porunenv = NULL;
+		compile_pcb = (Poco_cb*)pp->compile_pcb;
 		po_pev_free_data(pp);
 		po_free_run_env(pp);
 		pj_free_pocorexes(&pp->loaded_libs);
 		pj_free(pp); /* this is allocated from PJ, free back to PJ. */
 		*ppexe = NULL;
 	}
-	po_free_all_memory();
+	if (compile_pcb != NULL)
+		po_free_all_memory(compile_pcb);
 }
 
 /*****************************************************************************

@@ -65,7 +65,7 @@ extern Text_symbol *in_hash_list();
 extern void add_to_hash();
 
 /***** global data from tokeni.c *******/
-extern bool pp_fatal;
+
 extern bool pp_eof;
 extern struct file_place *file_stack;
 extern struct text_symbol *define_list[];

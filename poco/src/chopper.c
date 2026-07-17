@@ -88,15 +88,16 @@ char* po_get_csource_line(Poco_cb* pcb)
 		do {
 
 			if (NULL == fgets(buf + icount, buflen - icount, fstack->source.file)) {
-				if (mlcomment) /* EOF in multi-line comment	*/
+				if (mlcomment) /* EOF in multi-line comment */
 					po_say_fatal(pcb, "EOF in comment");
-				else if (splice) /* EOF instead of continuation	*/
+				else if (splice) /* EOF instead of continuation */
 					po_expecting_got_str(pcb, "EOF", "continuation line");
-				else /* Normal EOF					*/
+				else /* Normal EOF */
 				{
 					lbuf = NULL;
 					goto NORMAL_EXIT;
 				}
+				PO_CHECK_ABORT(pcb, NULL);
 			} else /* Not EOF, we got a line....	*/
 			{
 
@@ -111,6 +112,7 @@ char* po_get_csource_line(Poco_cb* pcb)
 					if (buflen == 2 + icount)				/* If there is no \n at */
 					{										/* EOL, check for buffer*/
 						po_say_fatal(pcb, "line too long"); /* overflow. If not  */
+					PO_CHECK_ABORT(pcb, NULL);
 					}										/* it means last line	*/
 					++icount;								/* has no CRLF; adjust	*/
 				}											/* the count to match.	*/
@@ -158,8 +160,10 @@ char* po_get_csource_line(Poco_cb* pcb)
 
 				while (found_end == false) {
 					++subbuf;
-					if (NULL == (subbuf = strchr(subbuf, c)))
+					if (NULL == (subbuf = strchr(subbuf, c))) {
 						po_say_fatal(pcb, "strings cannot span lines without continuation (\\)");
+						PO_CHECK_ABORT(pcb, NULL);
+					}
 					if (!('\\' == subbuf[-1] && '\\' != subbuf[-2])) {
 						++subbuf;
 						found_end = true;

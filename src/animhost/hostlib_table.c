@@ -33,8 +33,9 @@ ANIMHOST_EXPORT Hostlib _a_a_mathlib  = { NULL, AA_MATHLIB,   AA_MATHLIB_VERSION
  *
  * The stub below provides just enough of the Porexlib layout (Libhead
  * followed by an Errcode pointer) so that builtin_err resolves to valid
- * memory.  The POE loader calls animhost_ensure_pocolib() after dlopen,
- * which wires this up if nobody else has.
+ * memory.  Poco core never discovers or invokes this Animator function;
+ * the Ani adapter may explicitly select it through PocoModuleHooks when
+ * legacy POE compatibility is requested.
  *
  * Host-dependent functions (GetMenuColors, GetPicScreen, etc.) remain NULL
  * in the stub and will crash if called; only pure-computation POE functions
@@ -57,5 +58,4 @@ ANIMHOST_EXPORT void animhost_ensure_pocolib(void)
 		_a_a_pocolib.next = &_standalone_porexlib_stub;
 	}
 }
-
 

@@ -33,14 +33,14 @@ void main(void)
 		{
 		printf("error: chrconst array is wrong size! (%d, s/b %d)\n",
 					sizeof(chrconst), EXPECTED_SIZE);
-		exit(-1);
+		return;
 		}
 
 	if (sizeof(strconst) != EXPECTED_SIZE+1) /* +1 for string nullterm */
 		{
 		printf("error: strconst array is wrong size! (%d, s/b %d)\n",
 					sizeof(strconst), EXPECTED_SIZE+1);
-		exit(-1);
+		return;
 		}
 
     for (i = 0; i < Array_els(expected); ++i)
@@ -56,5 +56,5 @@ void main(void)
     if (error == 0)
 		printf("Success");
     else
-		exit(-1);
+		return;
 }

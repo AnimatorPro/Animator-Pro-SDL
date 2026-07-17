@@ -80,7 +80,7 @@ do	{
 			goto OUT;
 			}
 		}
-	swork->line_pos = tokenize_word(swork->line_pos, pt, NULL, &slen,
+	swork->line_pos = softmenu_tokenize_word(swork->line_pos, pt, &slen,
 		&smt->ttype, false);
 	} while (swork->line_pos == NULL);
 smt->tline = swork->fline;
@@ -94,7 +94,7 @@ switch (smt->ttype)
         smt->ttype = TOK_LONG;
 	case TOK_LONG:
 		if (pt[1] == 'X')
-           smt->longval = htol(pt+2);
+		   smt->longval = softmenu_htol(pt+2);
         else
            smt->longval = atol(pt);
 		break;

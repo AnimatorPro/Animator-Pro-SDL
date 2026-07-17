@@ -1,0 +1,8 @@
+#pragma poco library "poco_generic_module.poe"
+
+main()
+{
+	if (GenericAnswer() != 42)
+		return;
+	puts("generic module loaded");
+}
