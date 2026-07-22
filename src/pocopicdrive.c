@@ -35,14 +35,10 @@ static char cur_pdr_name[64];
 static const char* get_suffix(const char* path)
 {
 	const char* dot = NULL;
-	while (*path)
-	{
-		if (*path == '.')
-		{
+	while (*path) {
+		if (*path == '.') {
 			dot = path;
-		}
-		else if (*path == '/' || *path == '\\')
-		{
+		} else if (*path == '/' || *path == '\\') {
 			dot = NULL;
 		}
 		++path;
@@ -67,24 +63,20 @@ static Errcode po_pic_driver_set(char* pdrname)
 {
 	Errcode err;
 
-	if (pdrname == NULL)
-	{
+	if (pdrname == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 
 	/* already loaded? */
-	if (cur_pdr != NULL)
-	{
-		if (0 == strcmp(pdrname, cur_pdr_name))
-		{
+	if (cur_pdr != NULL) {
+		if (0 == strcmp(pdrname, cur_pdr_name)) {
 			return Success;
 		}
 		cur_pdr = NULL;
 	}
 
 	err = load_pdr(pdrname, &cur_pdr);
-	if (err < Success)
-	{
+	if (err < Success) {
 		return err;
 	}
 
@@ -98,25 +90,17 @@ static Errcode po_pic_driver_set(char* pdrname)
  * in main.c via add_local_pdr)
  *--------------------------------------------------------------------------*/
 
-typedef struct
-{
+typedef struct {
 	const char* suffix;
 	const char* pdr_name;
 } SuffixToPdr;
 
 static const SuffixToPdr suffix_table[] = {
-	{".gif", "GIF.PDR"},
-	{".bmp", "BMP.PDR"},
-	{".rle", "BMP.PDR"},
-	{".pcx", "PCX.PDR"},
-	{".jpg", "JPEG.PDR"},
-	{".jpeg", "JPEG.PDR"},
-	{".png", "PNG.PDR"},
-	{".tga", "TARGA.PDR"}, /* if you add targa later */
-	{".tif", "TIFF.PDR"},  /* if you add tiff later */
-	{".flc", "=FLC.PDR"},
-	{".fli", "=FLC.PDR"},
-	{".pic", "=PIC.PDR"},
+	{".gif", "GIF.PDR"},  {".bmp", "BMP.PDR"},   {".rle", "BMP.PDR"},
+	{".pcx", "PCX.PDR"},  {".jpg", "JPEG.PDR"},  {".jpeg", "JPEG.PDR"},
+	{".png", "PNG.PDR"},  {".tga", "TARGA.PDR"}, /* if you add targa later */
+	{".tif", "TIFF.PDR"},                        /* if you add tiff later */
+	{".flc", "=FLC.PDR"}, {".fli", "=FLC.PDR"},  {".pic", "=PIC.PDR"},
 	{NULL, NULL},
 };
 
@@ -128,21 +112,17 @@ static Errcode po_pic_driver_detect(char* picpath)
 	const char* suf;
 	const SuffixToPdr* p;
 
-	if (picpath == NULL)
-	{
+	if (picpath == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 
 	suf = get_suffix(picpath);
-	if (suf == NULL || *suf == '\0')
-	{
+	if (suf == NULL || *suf == '\0') {
 		return Err_pic_unknown;
 	}
 
-	for (p = suffix_table; p->suffix != NULL; ++p)
-	{
-		if (strcasecmp(suf, p->suffix) == 0)
-		{
+	for (p = suffix_table; p->suffix != NULL; ++p) {
+		if (strcasecmp(suf, p->suffix) == 0) {
 			return po_pic_driver_set((char*)p->pdr_name);
 		}
 	}
@@ -160,21 +140,18 @@ static Errcode po_pic_get_size(char* path, int* width, int* height, int* depth)
 	Image_file* ifile = NULL;
 	Anim_info ainfo;
 
-	if (path == NULL || width == NULL || height == NULL || depth == NULL)
-	{
+	if (path == NULL || width == NULL || height == NULL || depth == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 
 	err = po_pic_driver_detect(path);
-	if (err < Success)
-	{
+	if (err < Success) {
 		return err;
 	}
 
 	get_screen_ainfo(vb.pencel, &ainfo);
 	err = pdr_open_ifile(cur_pdr, path, &ifile, &ainfo);
-	if (err < Success)
-	{
+	if (err < Success) {
 		return err;
 	}
 
@@ -197,40 +174,33 @@ static Errcode po_pic_load(char* path, void* screen)
 	bool allow_retry = true;
 
 RETRY:
-	if (cur_pdr == NULL)
-	{
+	if (cur_pdr == NULL) {
 		err = po_pic_driver_detect(path);
-		if (err < Success)
-		{
+		if (err < Success) {
 			return err;
 		}
 		allow_retry = false;
 	}
 
-	if (path == NULL)
-	{
+	if (path == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 
-	if (screen == NULL)
-	{
+	if (screen == NULL) {
 		screen = vb.pencel;
 	}
 
 	get_screen_ainfo((Rcel*)screen, &ainfo);
 	err = pdr_open_ifile(cur_pdr, path, &ifile, &ainfo);
-	if (err < Success)
-	{
-		if (allow_retry)
-		{
+	if (err < Success) {
+		if (allow_retry) {
 			cur_pdr = NULL;
 			goto RETRY;
 		}
 		return err;
 	}
 
-	if (ainfo.width == 0 || ainfo.height == 0)
-	{
+	if (ainfo.width == 0 || ainfo.height == 0) {
 		pdr_close_ifile(&ifile);
 		return Err_format;
 	}
@@ -252,35 +222,29 @@ static Errcode po_pic_save(char* path, void* screen)
 	Image_file* ifile = NULL;
 	Anim_info ainfo;
 
-	if (cur_pdr == NULL)
-	{
+	if (cur_pdr == NULL) {
 		err = po_pic_driver_detect(path);
-		if (err < Success)
-		{
+		if (err < Success) {
 			return err;
 		}
 	}
 
-	if (path == NULL)
-	{
+	if (path == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 
-	if (screen == NULL)
-	{
+	if (screen == NULL) {
 		screen = vb.pencel;
 	}
 
 	get_screen_ainfo((Rcel*)screen, &ainfo);
 
-	if (cur_pdr->spec_best_fit != NULL)
-	{
+	if (cur_pdr->spec_best_fit != NULL) {
 		cur_pdr->spec_best_fit(&ainfo);
 	}
 
 	err = pdr_create_ifile(cur_pdr, path, &ifile, &ainfo);
-	if (err < Success)
-	{
+	if (err < Success) {
 		return err;
 	}
 
@@ -299,26 +263,22 @@ extern Errcode po_pack_colortable(int* source, int source_count, int* dest, int 
  *--------------------------------------------------------------------------*/
 
 static Lib_proto po_picdrive_protos[] = {
-	{po_pic_driver_clear,
-		"void    PicDriverUnload(void);"},
-	{po_pic_driver_set,
-		"Errcode PicDriverSet(char *pdrname);"},
-	{po_pic_driver_detect,
-		"Errcode PicDriverDetect(char *picpath);"},
-	{po_pic_load,
-		"Errcode PicLoad(char *path, Screen *screen);"},
-	{po_pic_save,
-		"Errcode PicSave(char *path, Screen *screen);"},
+	{po_pic_driver_clear, "void    PicDriverUnload(void);"},
+	{po_pic_driver_set, "Errcode PicDriverSet(char *pdrname);"},
+	{po_pic_driver_detect, "Errcode PicDriverDetect(char *picpath);"},
+	{po_pic_load, "Errcode PicLoad(char *path, Screen *screen);"},
+	{po_pic_save, "Errcode PicSave(char *path, Screen *screen);"},
 	{po_pic_get_size,
-		"Errcode PicGetSize(char *path,"
-		" int *width, int *height, int *depth);"},
+	 "Errcode PicGetSize(char *path,"
+	 " int *width, int *height, int *depth);"},
 	{po_pack_colortable,
-		"Errcode PackColorTable(int *source, int source_count,"
-		" int *dest, int dest_count);"},
+	 "Errcode PackColorTable(int *source, int source_count,"
+	 " int *dest, int dest_count);"},
 };
 
 Poco_lib po_picdrive_lib = {
-	NULL, "Picture Driver",
+	NULL,
+	"Picture Driver",
 	po_picdrive_protos,
 	Array_els(po_picdrive_protos),
 	NULL,                /* init */

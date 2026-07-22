@@ -1,0 +1,16 @@
+int helper(int value)
+{
+	struct LocalPair { int left; long right; };
+	struct LocalPair pair;
+	long widened = value;
+	double ratio = 2.0;
+	int doubled = value * 2;
+	pair.left = value;
+	pair.right = widened;
+	return doubled + widened - value + ratio - 2;
+}
+
+int main(void)
+{
+	return helper(21);
+}

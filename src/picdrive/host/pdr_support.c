@@ -11,8 +11,7 @@
 
 
 Errcode pdr_boxfmt(char* fmt, ...);
-char   *stristr(char *string, char *pattern);
-
+char* stristr(char* string, char* pattern);
 
 Errcode pdr_boxfmt(char* fmt, ...)
 {
@@ -25,41 +24,40 @@ Errcode pdr_boxfmt(char* fmt, ...)
 	return (err);
 }
 
-
-static void strlwr(char *str)
+static void strlwr(char* str)
 {
 	while (*str) {
-		if (*str >= 'a' && *str <= 'z')
+		if (*str >= 'a' && *str <= 'z') {
 			*str -= 32;
+		}
 		++str;
 	}
 }
 
-
-static bool substreq(char *str, char *substr)
+static bool substreq(char* str, char* substr)
 {
 	while (*substr) {
-		if (*substr++ != *str++)
+		if (*substr++ != *str++) {
 			return false;
+		}
 	}
 	return true;
 }
 
-
-char *stristr(char *string, char *pattern)
+char* stristr(char* string, char* pattern)
 {
 	char patc1 = *pattern;
-	char *pstr	= string;
+	char* pstr = string;
 
 	strlwr(string);
 	strlwr(pattern);
 
 	while (*pstr) {
-		if (*pstr == patc1
-		 && substreq(pstr, pattern))
+		if (*pstr == patc1 && substreq(pstr, pattern)) {
 			return pstr;
-		else
+		} else {
 			++pstr;
+		}
 	}
 
 	return NULL;

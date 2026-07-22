@@ -1,7 +1,7 @@
 #include "rastcall.ih"
 
-void pj_set_hline(Raster *v, Pixel color, Coor x, Coor y, Ucoor width)
-/************************************************************************* 
+void pj_set_hline(Raster* v, Pixel color, Coor x, Coor y, Ucoor width)
+/*************************************************************************
  * Draw a horizontal line in a solid color.  This is clipped, so it's
  * ok for the line to partially or entirely outside the raster.
  *
@@ -13,19 +13,22 @@ void pj_set_hline(Raster *v, Pixel color, Coor x, Coor y, Ucoor width)
  *		Ucoor	width;	Width of line in pixels.
  *************************************************************************/
 {
-	if(((Ucoor)y) >= v->height)
+	if (((Ucoor)y) >= v->height) {
 		return;
-	if(x >= (Coor)(v->width))
+	}
+	if (x >= (Coor)(v->width)) {
 		return;
-	if(x < 0)
-	{
+	}
+	if (x < 0) {
 		width += x;
 		x = 0;
 	}
-	if(((Coor)width) <= 0)
+	if (((Coor)width) <= 0) {
 		return;
+	}
 	width += x;
-	if (width > v->width)
+	if (width > v->width) {
 		width = v->width;
-	SET_HLINE(v,color,x,y,width - x);
+	}
+	SET_HLINE(v, color, x, y, width - x);
 }

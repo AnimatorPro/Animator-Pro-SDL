@@ -1,0 +1,6 @@
+#include "library.h"
+
+int main(void)
+{
+	return library_add(35);
+}

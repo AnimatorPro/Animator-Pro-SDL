@@ -3,7 +3,7 @@
 #include "jimk.h"
 #include "memory.h"
 
-void make_cfit_table(Rgb3 *scm, Rgb3 *dcm, Pixel *cnums, int clearc)
+void make_cfit_table(Rgb3* scm, Rgb3* dcm, Pixel* cnums, int clearc)
 {
 	int i;
 	UBYTE c;
@@ -24,7 +24,7 @@ void make_cfit_table(Rgb3 *scm, Rgb3 *dcm, Pixel *cnums, int clearc)
 	}
 }
 
-void fitting_ctable(Rgb3 *scm, Rgb3 *dcm, UBYTE *cnums)
+void fitting_ctable(Rgb3* scm, Rgb3* dcm, UBYTE* cnums)
 {
 	int clearc;
 
@@ -33,20 +33,20 @@ void fitting_ctable(Rgb3 *scm, Rgb3 *dcm, UBYTE *cnums)
 	} else {
 		clearc = -1;
 	}
-	make_cfit_table(scm, dcm, (Pixel *)cnums, clearc);
+	make_cfit_table(scm, dcm, (Pixel*)cnums, clearc);
 }
 
-void nz_fitting_ctable(Rgb3 *scm, Rgb3 *dcm, UBYTE *cnums)
+void nz_fitting_ctable(Rgb3* scm, Rgb3* dcm, UBYTE* cnums)
 {
-	make_cfit_table(scm, dcm, (Pixel *)cnums, -1);
+	make_cfit_table(scm, dcm, (Pixel*)cnums, -1);
 }
 
-bool need_render_cfit(Cmap *scmap)
+bool need_render_cfit(Cmap* scmap)
 {
 	return vs.render_one_color || (vs.fit_colors && !cmaps_same(scmap, vb.pencel->cmap));
 }
 
-void init_celcfit(Celcfit *cfit)
+void init_celcfit(Celcfit* cfit)
 {
 	cfit->ccolor = -1;
 	cfit->tcolor = -1;
@@ -57,7 +57,7 @@ void init_celcfit(Celcfit *cfit)
 }
 
 /* clearc of -1 will ignore clearc */
-bool make_simple_cfit(Cmap *scmap, Cmap *dcmap, Celcfit *cfit, int clearc)
+bool make_simple_cfit(Cmap* scmap, Cmap* dcmap, Celcfit* cfit, int clearc)
 {
 	ULONG cmap_cksum;
 	ULONG dcmap_cksum;
@@ -80,7 +80,7 @@ bool make_simple_cfit(Cmap *scmap, Cmap *dcmap, Celcfit *cfit, int clearc)
 	return true;
 }
 
-void make_one_color_ctable(Pixel *ctable, SHORT tcolor)
+void make_one_color_ctable(Pixel* ctable, SHORT tcolor)
 {
 	pj_stuff_bytes(vs.ccolor, ctable, COLORS);
 	ctable[tcolor] = tcolor;
@@ -89,7 +89,7 @@ void make_one_color_ctable(Pixel *ctable, SHORT tcolor)
 	}
 }
 
-bool make_render_cfit(Cmap *scmap, Celcfit *cfit, SHORT tcolor)
+bool make_render_cfit(Cmap* scmap, Celcfit* cfit, SHORT tcolor)
 {
 	ULONG cmap_cksum;
 	ULONG dcmap_cksum;
@@ -149,7 +149,7 @@ done:
 	return true;
 }
 
-void get_cmap_blend(int bscale, Cmap *cmapa, Cmap *cmapb, Cmap *dcmap)
+void get_cmap_blend(int bscale, Cmap* cmapa, Cmap* cmapb, Cmap* dcmap)
 {
 	int count;
 	int as;

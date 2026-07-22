@@ -1,0 +1,4 @@
+int collision(void)
+{
+	return 1;
+}

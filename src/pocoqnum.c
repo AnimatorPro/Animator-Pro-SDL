@@ -5,13 +5,12 @@
 #include "pocoface.h"
 #include "pocolib.h"
 
-typedef struct upddata
-{
-	void *code;
+typedef struct upddata {
+	void* code;
 	Popot data;
 } Upddat;
 
-static Errcode ppupdate(Upddat *udd, SHORT value)
+static Errcode ppupdate(Upddat* udd, SHORT value)
 {
 	Pt_num ret;
 	int int_value;
@@ -39,8 +38,7 @@ static Errcode ppupdate(Upddat *udd, SHORT value)
  *                    void *data, char *fmt, ...)
  * Will abort requestor if update returns < Success.
  ****************************************************************************/
-int po_UdSlider(int* inum, int min, int max, void* update,
-	void* data, char* fmt, ...)
+int po_UdSlider(int* inum, int min, int max, void* update, void* data, char* fmt, ...)
 {
 	short num;
 	bool cancel;
@@ -58,9 +56,8 @@ int po_UdSlider(int* inum, int min, int max, void* update,
 	}
 	num = *inum;
 
-	if ((num < SHRT_MIN) || (min < SHRT_MIN) || (max < SHRT_MIN) ||
-		(num > SHRT_MAX) || (min > SHRT_MAX) || (max > SHRT_MAX) ||
-		(min > max)) {
+	if ((num < SHRT_MIN) || (min < SHRT_MIN) || (max < SHRT_MIN) || (num > SHRT_MAX) ||
+		(min > SHRT_MAX) || (max > SHRT_MAX) || (min > max)) {
 		return builtin_err = Err_parameter_range;
 	}
 

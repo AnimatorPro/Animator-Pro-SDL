@@ -18,9 +18,9 @@
 #include "util.h"
 #include "zoom.h"
 
-static Errcode default_tsettings(Vset_flidef *fdef);
+static Errcode default_tsettings(Vset_flidef* fdef);
 
-static Errcode load_file_settings(char *path, Vset_flidef *fdef, bool default_reset);
+static Errcode load_file_settings(char* path, Vset_flidef* fdef, bool default_reset);
 
 void rethink_settings(void)
 {
@@ -38,7 +38,7 @@ void rethink_settings(void)
 }
 
 /*** called by open_default_flx() ***************/
-Errcode load_default_settings(Vset_flidef *fdef)
+Errcode load_default_settings(Vset_flidef* fdef)
 {
 	Errcode err;
 	char path[PATH_SIZE];
@@ -62,18 +62,18 @@ Errcode load_default_settings(Vset_flidef *fdef)
 }
 
 /***** io routines for vsettings chunk ******/
-static void load_vschunk(Vsettings *pvs)
+static void load_vschunk(Vsettings* pvs)
 {
 	*pvs = vs;
 }
 
 /**** io routines for tsettings file with a linear array for path storage ****/
-static void close_vsetfile(Vsetfile *vsf)
+static void close_vsetfile(Vsetfile* vsf)
 {
 	xffclose(&vsf->xf);
 }
 
-static Errcode open_vsetfile(char *path, enum XReadWriteMode mode, Vsetfile *vsf)
+static Errcode open_vsetfile(char* path, enum XReadWriteMode mode, Vsetfile* vsf)
 {
 	Errcode err;
 
@@ -122,9 +122,9 @@ typedef struct tsettings_file {
 } Tsettings_file;
 
 /* initialize and set internal default paths in a patharray chunk */
-static void load_default_paths(Vset_paths *vp_chunk)
+static void load_default_paths(Vset_paths* vp_chunk)
 {
-	Vset_path *vsp;
+	Vset_path* vsp;
 
 	vp_chunk->id.size = sizeof(Vset_paths);
 	vp_chunk->id.type = VSET_PATHARRAY_ID;
@@ -136,7 +136,7 @@ static void load_default_paths(Vset_paths *vp_chunk)
 }
 
 /* loads a flidef chunk from the tempflx header */
-static void load_flidef(Vset_flidef *fdef, Fli_head *fh)
+static void load_flidef(Vset_flidef* fdef, Fli_head* fh)
 {
 	fdef->id.size = sizeof(Vset_flidef);
 	fdef->id.type = VSET_FLIDEF_ID;
@@ -155,7 +155,7 @@ static void load_flidef(Vset_flidef *fdef, Fli_head *fh)
 	}
 }
 
-static void load_vslow(Slow_vsettings *svs, bool defaults)
+static void load_vslow(Slow_vsettings* svs, bool defaults)
 {
 	svs->id.size = sizeof(*svs);
 	svs->id.type = VSET_SLOWVS_ID;
@@ -168,7 +168,7 @@ static void load_vslow(Slow_vsettings *svs, bool defaults)
 	}
 }
 
-static void load_init_tsettings(Tsettings_file *buf)
+static void load_init_tsettings(Tsettings_file* buf)
 {
 	buf->id.size = sizeof(*buf);
 	buf->id.type = VSETFILE_MAGIC;
@@ -181,10 +181,10 @@ static void load_init_tsettings(Tsettings_file *buf)
 }
 
 /*** used to create a default empty settings file ***/
-static Errcode default_tsettings(Vset_flidef *fdef)
+static Errcode default_tsettings(Vset_flidef* fdef)
 {
 	Errcode err;
-	Tsettings_file *buf;
+	Tsettings_file* buf;
 
 	buf = pj_zalloc(sizeof(*buf));
 	if (buf == NULL) {
@@ -197,7 +197,7 @@ static Errcode default_tsettings(Vset_flidef *fdef)
 	return err;
 }
 
-static Errcode reopen_tsettings(Vsetfile *vsf)
+static Errcode reopen_tsettings(Vsetfile* vsf)
 {
 	Errcode err;
 
@@ -219,10 +219,10 @@ error:
 }
 
 /* called whenever a tempflx is opened to reload ram settings state */
-Errcode reload_tsettings(Vsettings *pvs, Vset_flidef *fdef)
+Errcode reload_tsettings(Vsettings* pvs, Vset_flidef* fdef)
 {
 	Errcode err;
-	Tsettings_file *buf;
+	Tsettings_file* buf;
 
 	buf = pj_malloc(sizeof(*buf));
 	if (buf == NULL) {
@@ -255,12 +255,12 @@ error:
 
 /* full flush will flush all the slow stuff too, inkstrengths and menu
  * colors */
-static Errcode tset_flush(Vsetfile *vsf, bool full_flush)
+static Errcode tset_flush(Vsetfile* vsf, bool full_flush)
 {
 	Errcode err;
 	Tsettings_file buf;
 
-	load_flidef(&buf.fdef, (Fli_head *)&flix.hdr);
+	load_flidef(&buf.fdef, (Fli_head*)&flix.hdr);
 	load_vschunk(&buf.vs);
 
 	err = xffwriteoset(vsf->xf, &buf.fdef, FAST_FLUSHOFFSET, SLOW_FLUSHOFFSET - FAST_FLUSHOFFSET);
@@ -290,13 +290,13 @@ Errcode flush_tsettings(bool full_flush)
 }
 
 /* given path type (index) this returns offset of path record in file */
-static long path_type_offset(Vsetfile *vsf, int ptype)
+static long path_type_offset(Vsetfile* vsf, int ptype)
 {
 	(void)vsf;
 	return sizeof(Fat_chunk) + sizeof(Fat_chunk) + (ptype * sizeof(Vset_path));
 }
 
-Errcode vset_get_pathinfo(int ptype, Vset_path *pathinfo)
+Errcode vset_get_pathinfo(int ptype, Vset_path* pathinfo)
 {
 	Errcode err = Success;
 	Vsetfile vsf;
@@ -328,7 +328,7 @@ done:
 	return err;
 }
 
-Errcode vset_get_path(int ptype, char *path)
+Errcode vset_get_path(int ptype, char* path)
 {
 	Errcode err;
 	Vset_path vsp;
@@ -339,11 +339,11 @@ Errcode vset_get_path(int ptype, char *path)
 }
 
 /* this may be slow but it does the job */
-Errcode vset_set_pathinfo(int ptype, Vset_path *pathinfo)
+Errcode vset_set_pathinfo(int ptype, Vset_path* pathinfo)
 {
 	Errcode err;
 	Vsetfile vsf;
-	char *name;
+	char* name;
 	char save_name[PATH_SIZE];
 
 	if (((unsigned int)ptype) >= VSET_NUM_PATHS) {
@@ -370,7 +370,7 @@ Errcode vset_set_pathinfo(int ptype, Vset_path *pathinfo)
 	return err;
 }
 
-Errcode vset_set_path(int ptype, char *path)
+Errcode vset_set_path(int ptype, char* path)
 {
 	Vset_path vsp;
 	vsp.scroller_top = 0;
@@ -383,7 +383,7 @@ Errcode vset_set_path(int ptype, char *path)
  *
  *  Writes out a settings chunk.  Leaves file at start of chunk.
  */
-static Errcode write_settings_chunk(XFILE *newxf, SHORT id_type, LONG offset, Cmap *cmap,
+static Errcode write_settings_chunk(XFILE* newxf, SHORT id_type, LONG offset, Cmap* cmap,
 									bool for_fli_prefix)
 {
 	Errcode err;
@@ -441,10 +441,10 @@ error:
 	return err;
 }
 
-static Errcode save_settings_file(char *path, bool full_defaults)
+static Errcode save_settings_file(char* path, bool full_defaults)
 {
 	Errcode err;
-	XFILE *newxf;
+	XFILE* newxf;
 
 	err = xffopen(path, &newxf, XREADWRITE_CLOBBER);
 	if (err < Success) {
@@ -470,7 +470,7 @@ void save_default_settings(void)
 }
 
 /* called by fli saver to load prefix settings in new fli file */
-Errcode write_fli_settings(XFILE *xf, SHORT chunk_id)
+Errcode write_fli_settings(XFILE* xf, SHORT chunk_id)
 {
 	Errcode err;
 	long offset;
@@ -489,11 +489,11 @@ Errcode write_fli_settings(XFILE *xf, SHORT chunk_id)
 }
 
 /* used by flisize menu to load the flidef fields in the buttons */
-Errcode load_default_flidef(Vset_flidef *fdef)
+Errcode load_default_flidef(Vset_flidef* fdef)
 {
 	Errcode err;
 	Chunkparse_data pd;
-	XFILE *xf;
+	XFILE* xf;
 	char path[PATH_SIZE];
 
 	make_file_path(vb.init_drawer, default_name, path);
@@ -526,10 +526,10 @@ done:
 }
 
 /* truncates names off of settings paths loaded as defaults */
-static void chop_default_paths(Vset_paths *vsp)
+static void chop_default_paths(Vset_paths* vsp)
 {
 	int i;
-	Vset_path *vp;
+	Vset_path* vp;
 
 	vp = &vsp->path_recs[0];
 	for (i = 0; i < VSET_NUM_PATHS; ++i, ++vp) {
@@ -547,13 +547,13 @@ static void chop_default_paths(Vset_paths *vsp)
  *  re-load the tsettings file with the input settings. It will load
  *  the colour map even in some error cases, as it will the flidef.
  */
-static Errcode load_settings_chunk(XFILE *xf, Fat_chunk *id, LONG offset, Vset_flidef *fdef,
-								   Cmap *cmap, bool load_mucolors, bool as_defaults)
+static Errcode load_settings_chunk(XFILE* xf, Fat_chunk* id, LONG offset, Vset_flidef* fdef,
+								   Cmap* cmap, bool load_mucolors, bool as_defaults)
 {
 	Errcode err;
 	Chunkparse_data pd;
-	Tsettings_file *tset;
-	Fat_chunk *buf;
+	Tsettings_file* tset;
+	Fat_chunk* buf;
 	LONG recsize;
 	bool load_inkstrengths;
 
@@ -663,7 +663,7 @@ done:
 	return err;
 }
 
-static Errcode load_fli_settings(char *path, Cmap *cmap)
+static Errcode load_fli_settings(char* path, Cmap* cmap)
 {
 	Errcode err;
 	Flifile flif;
@@ -701,10 +701,10 @@ static Errcode load_fli_settings(char *path, Cmap *cmap)
 
 /* note this will not corrupt data in *vset unless read and version verify
  * is successful does not re-load settings */
-static Errcode load_file_settings(char *path, Vset_flidef *fdef, bool default_reset)
+static Errcode load_file_settings(char* path, Vset_flidef* fdef, bool default_reset)
 {
 	Errcode err;
-	XFILE *xf;
+	XFILE* xf;
 	Fat_chunk id;
 
 	err = xffopen(path, &xf, XREADONLY);
@@ -747,7 +747,7 @@ error:
 	return err;
 }
 
-static Errcode load_vsettings(char *path)
+static Errcode load_vsettings(char* path)
 {
 	Errcode err;
 	SHORT oframe_ix;
@@ -786,7 +786,7 @@ void qsave_vsettings(void)
 {
 	//! TODO: file chooser
 	char sbuf[50];
-	char *title =
+	char* title =
 		vset_get_filename(stack_string("save_set", sbuf), ".SET", save_str, SETTINGS_PATH, NULL, 1);
 
 	if (title != NULL) {
@@ -800,7 +800,7 @@ void qload_vsettings(void)
 {
 	//! TODO: file chooser
 	char sbuf[50];
-	char *title = vset_get_filename(stack_string("load_set", sbuf), ".SET;.FLC", load_str,
+	char* title = vset_get_filename(stack_string("load_set", sbuf), ".SET;.FLC", load_str,
 									SETTINGS_PATH, NULL, 1);
 
 	if (title != NULL) {

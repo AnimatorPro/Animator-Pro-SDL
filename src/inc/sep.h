@@ -3,4 +3,4 @@
 
 extern Errcode csd_edge1(Pixel ecolor);
 
-#endif // __SEP_H
+#endif  // __SEP_H

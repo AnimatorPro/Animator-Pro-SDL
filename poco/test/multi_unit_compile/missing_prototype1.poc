@@ -1,0 +1,4 @@
+int late_definition(void)
+{
+	return 7;
+}

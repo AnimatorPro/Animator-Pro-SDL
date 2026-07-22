@@ -8,7 +8,7 @@
 
 /* initializes a pullwork struct prior to calling pull subroutines
  * pull menuhdr must be open !! */
-void init_pullwork(Pullwork *pw, Menuhdr *mh)
+void init_pullwork(Pullwork* pw, Menuhdr* mh)
 {
 	clear_mem(pw, sizeof(*pw));
 	pw->root = mh;
@@ -22,9 +22,9 @@ void init_pullwork(Pullwork *pw, Menuhdr *mh)
 }
 
 /* saves a rectangle of the screen for the location and size specified */
-static Bytemap *save_behind(Wscreen *ws, SHORT x, SHORT y, SHORT w, SHORT h)
+static Bytemap* save_behind(Wscreen* ws, SHORT x, SHORT y, SHORT w, SHORT h)
 {
-	Bytemap *saverast;
+	Bytemap* saverast;
 	Rasthdr spec;
 
 	copy_rasthdr(ws->viscel, &spec);
@@ -47,9 +47,9 @@ static Bytemap *save_behind(Wscreen *ws, SHORT x, SHORT y, SHORT w, SHORT h)
 
 /* restores a saverast to location it was grabbed from with save_behind
  * and frees it */
-static void rest_behind(Wscreen *ws, Raster **psaverast)
+static void rest_behind(Wscreen* ws, Raster** psaverast)
 {
-	Raster *saverast = *psaverast;
+	Raster* saverast = *psaverast;
 
 	if (saverast != NULL) {
 		pj_blitrect(saverast, 0, 0, ws->viscel, saverast->x, saverast->y, saverast->width,
@@ -61,9 +61,9 @@ static void rest_behind(Wscreen *ws, Raster **psaverast)
 }
 
 /* draws a pull and allocates a Bytemap and saves underneath pull in it */
-static Bytemap *savedraw_pull(int x, int y, Pull *p, Pullwork *pw)
+static Bytemap* savedraw_pull(int x, int y, Pull* p, Pullwork* pw)
 {
-	Bytemap *saverast;
+	Bytemap* saverast;
 
 	if ((saverast = save_behind(pw->screen, x, y, p->width, p->height)) != NULL) {
 		see_pull(x, y, p, pw);
@@ -73,9 +73,9 @@ static Bytemap *savedraw_pull(int x, int y, Pull *p, Pullwork *pw)
 	return (saverast);
 }
 
-static void unselect(Pullwork *pw)
+static void unselect(Pullwork* pw)
 {
-	Pull *lp = pw->leaf_parent;
+	Pull* lp = pw->leaf_parent;
 
 	if (pw->level < 0) {
 		return;
@@ -91,7 +91,7 @@ static void unselect(Pullwork *pw)
 
 /* given a list of pulls and an keyboard scan code returns pull in list
  * with matching key, or NULL if none match */
-static Pull *which_key_pull(Pull *p, SHORT key)
+static Pull* which_key_pull(Pull* p, SHORT key)
 {
 	SHORT askey;
 
@@ -116,7 +116,7 @@ static Pull *which_key_pull(Pull *p, SHORT key)
  * recursive to handle more levels if if gets a hit it calls the selit
  * function  returns 0 if no keys processed Err_not_found if some keys
  * processed but no hits 1 if we got a hit */
-static int do_pullkeys(Menuhdr *mh, SHORT *hitid)
+static int do_pullkeys(Menuhdr* mh, SHORT* hitid)
 {
 	int ret;
 	int was_hidden;
@@ -149,7 +149,7 @@ static int do_pullkeys(Menuhdr *mh, SHORT *hitid)
 	cchild = cchild->children;
 	ccx += cchild->x;
 	ccy += cchild->y;
-	if ((pw.behind[pw.level] = (Raster *)savedraw_pull(ccx, ccy, cchild, &pw)) == NULL) {
+	if ((pw.behind[pw.level] = (Raster*)savedraw_pull(ccx, ccy, cchild, &pw)) == NULL) {
 		goto nohit;
 	}
 
@@ -179,7 +179,7 @@ cleanup:
 	return (ret);
 }
 
-static bool in_pblock(SHORT x, SHORT y, register Pull *p)
+static bool in_pblock(SHORT x, SHORT y, register Pull* p)
 {
 	if ((icb.sx < x) || (icb.sy < y) || (icb.sx >= (x + p->width)) || (icb.sy >= (y + p->height))) {
 		return (0);
@@ -189,7 +189,7 @@ static bool in_pblock(SHORT x, SHORT y, register Pull *p)
 
 /* returns 1 or Err_disabled if we got a hit Err_not_found if no hit */
 /* This routine is pretty creaky, but who want's to rewrite it? */
-static int do_pullmouse(Menuhdr *mh, SHORT *hitid)
+static int do_pullmouse(Menuhdr* mh, SHORT* hitid)
 {
 	SHORT x, y; /* root offset */
 	Pullwork pw;
@@ -249,7 +249,7 @@ static int do_pullmouse(Menuhdr *mh, SHORT *hitid)
 						ccx = cx + cchild->x;
 						ccy = cy + cchild->y;
 						if (NULL ==
-							(pw.behind[0] = (Raster *)savedraw_pull(ccx, ccy, cchild, &pw))) {
+							(pw.behind[0] = (Raster*)savedraw_pull(ccx, ccy, cchild, &pw))) {
 							ret = Err_no_memory;
 							goto cleanup;
 						}
@@ -297,13 +297,13 @@ static int do_pullmouse(Menuhdr *mh, SHORT *hitid)
 					if (p1 != child) {
 						unselect(&pw);
 						p1 = child;
-						if (NULL == (pw.behind[1] = (Raster *)save_behind(
+						if (NULL == (pw.behind[1] = (Raster*)save_behind(
 										 pw.screen, cx, cy, child->width, child->height))) {
 							ret = Err_no_memory;
 							goto cleanup;
 						}
 						if (!(child->flags & PULL_DISABLED)) {
-							draw_quad((Raster *)pw.screen->viscel, pw.screen->SRED, cx, cy,
+							draw_quad((Raster*)pw.screen->viscel, pw.screen->SRED, cx, cy,
 									  child->width, child->height);
 						}
 					}
@@ -344,7 +344,7 @@ cleanup:
 }
 
 /* "feels" a pull initiated as (*menuhdr->domenu) in input loop */
-int menu_dopull(Menuhdr *mh)
+int menu_dopull(Menuhdr* mh)
 {
 	SHORT selid = -1;
 	int ret;

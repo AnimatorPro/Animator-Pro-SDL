@@ -54,23 +54,23 @@
 #include <ctype.h>
 #include "token.h"
 
-#define SZTOKE			512 	/* max line length, token length */
-#define MAX_SYM_LEN 	40		/* max significant chars in sym name */
+#define SZTOKE 512     /* max line length, token length */
+#define MAX_SYM_LEN 40 /* max significant chars in sym name */
 
 /*----------------------------------------------------------------------------
  * Some useful macros missing from most ctype.h files...
  *--------------------------------------------------------------------------*/
 
 #ifndef isoctal
-  #define isoctal(a) ((a) >= '0' && (a) <= '7')
+#define isoctal(a) ((a) >= '0' && (a) <= '7')
 #endif
 
 #ifndef iscsymf
-  #define iscsymf(x) ( isalpha(x) || (x) == '_')
+#define iscsymf(x) (isalpha(x) || (x) == '_')
 #endif
 
 #ifndef iscsym
-  #define iscsym(x)  ( isalnum(x) || (x) == '_')
+#define iscsym(x) (isalnum(x) || (x) == '_')
 #endif
 
 /*****************************************************************************
@@ -83,83 +83,104 @@
  *
  ****************************************************************************/
 
-long htol(const char *s)
+long htol(const char* s)
 {
-long acc = 0;
-int  c;
+	long acc = 0;
+	int c;
 
-if (s[0] == '0' && s[1] == 'X')
-	s += 2;
-
-while (isxdigit(c = *s++))
-	{
-	acc <<= 4;
-	if (isdigit(c))
-		acc += c - '0';
-	else
-		acc += c - 'A' + 10;
+	if (s[0] == '0' && s[1] == 'X') {
+		s += 2;
 	}
-return(acc);
+
+	while (isxdigit(c = *s++)) {
+		acc <<= 4;
+		if (isdigit(c)) {
+			acc += c - '0';
+		} else {
+			acc += c - 'A' + 10;
+		}
+	}
+	return (acc);
 }
 
-static char translate_escape(char **s)
+static char translate_escape(char** s)
 /*****************************************************************************
  * translate the character(s) after a '\' into a single character.
  ****************************************************************************/
 {
-char	*in_str;
-short	counter;
-char	inchar;
-char	outchar;
+	char* in_str;
+	short counter;
+	char inchar;
+	char outchar;
 
 	in_str = *s;
-	switch (inchar = *in_str++)
-		{
-		case 'a':   outchar = '\a';  break;
-		case 'b':   outchar = '\b';  break;
-		case 'f':   outchar = '\f';  break;
-		case 'n':   outchar = '\n';  break;
-		case 'r':   outchar = '\r';  break;
-		case 't':   outchar = '\t';  break;
-		case 'v':   outchar = '\v';  break;
-		case '?':   outchar = '\?';  break;
-		case '\\':  outchar = '\\';  break;
-		case '\'':  outchar = '\'';  break;
-		case '\"':  outchar = '\"';  break;
+	switch (inchar = *in_str++) {
+		case 'a':
+			outchar = '\a';
+			break;
+		case 'b':
+			outchar = '\b';
+			break;
+		case 'f':
+			outchar = '\f';
+			break;
+		case 'n':
+			outchar = '\n';
+			break;
+		case 'r':
+			outchar = '\r';
+			break;
+		case 't':
+			outchar = '\t';
+			break;
+		case 'v':
+			outchar = '\v';
+			break;
+		case '?':
+			outchar = '\?';
+			break;
+		case '\\':
+			outchar = '\\';
+			break;
+		case '\'':
+			outchar = '\'';
+			break;
+		case '\"':
+			outchar = '\"';
+			break;
 		case 'x':
 			outchar = 0;
 			inchar = *in_str;
-			while (isxdigit(inchar))
-				{
-				if (inchar <= '9')
+			while (isxdigit(inchar)) {
+				if (inchar <= '9') {
 					inchar -= '0';
-				else if (inchar <= 'F')
+				} else if (inchar <= 'F') {
 					inchar -= 'A' - 10;
-				else
+				} else {
 					inchar -= 'a' - 10;
+				}
 				outchar = (outchar << 4) | inchar;
 				inchar = *++in_str;
-				}
+			}
 			break;
 		default:
-			if (isoctal(inchar))
-				{
+			if (isoctal(inchar)) {
 				counter = 4;
 				outchar = 0;
-				while (--counter)
-					{
+				while (--counter) {
 					outchar = (outchar << 3) | (inchar & 0x07);
 					inchar = *in_str;
-					if (isoctal(inchar))
+					if (isoctal(inchar)) {
 						++in_str;
-					else
+					} else {
 						break;
 					}
 				}
-			else
+			} else {
 				outchar = inchar;
+			}
 			break;
-		}
+	}
 
 	*s = in_str;
 	return outchar;
@@ -177,75 +198,78 @@ char	outchar;
  *	The number of digits placed into the word buffer is returned.
  ****************************************************************************/
 
-static int get_digits(char *line, char *word, SHORT *ttype)
+static int get_digits(char* line, char* word, SHORT* ttype)
 {
-enum {DECIMAL, HEX, FLOAT} numtype; 			/* String type				*/
-int count = 0;									/* Count of chars in word	*/
-register int c; 								/* Current char 			*/
+	enum { DECIMAL, HEX, FLOAT } numtype; /* String type				*/
 
-numtype = DECIMAL;								/* Assume decimal number	*/
-*ttype	= TOK_INT;								/* Assume short-int datatype*/
+	int count = 0;  /* Count of chars in word	*/
+	register int c; /* Current char 			*/
 
-if (*line == '0')                               /* Some special handling... */
-	{											/* If the sequence starts	*/
-	*word++ = *line++;							/* with 0x it's hex string. */
-	++count;
-	if ('X' == (c = toupper(*line)))
-		{
-		*word++ = c;
+	numtype = DECIMAL; /* Assume decimal number	*/
+	*ttype = TOK_INT;  /* Assume short-int datatype*/
+
+	if (*line == '0')      /* Some special handling... */
+	{                      /* If the sequence starts	*/
+		*word++ = *line++; /* with 0x it's hex string. */
 		++count;
-		++line;
-		numtype = HEX;
+		if ('X' == (c = toupper(*line))) {
+			*word++ = c;
+			++count;
+			++line;
+			numtype = HEX;
 		}
 	}
 
-for (;;)
-	{
-	c = toupper(*line++);
+	for (;;) {
+		c = toupper(*line++);
 
-	if (c == 'L')                               /* L allowed on all types of*/
-		{										/* numbers, be we ignore it */
-		if (numtype != FLOAT)					/* when specified with a	*/
-			*ttype = TOK_LONG;					/* float type number.		*/
-		}
-
-	else if (c == 'U' && numtype != FLOAT)      /* U allowed in non-floats, */
-		{}										/* is ignored, for now. 	*/
-
-	else if (c == 'F' && numtype != HEX)        /* F allowed in decimal or  */
-		{										/* float types, implies a	*/
-		numtype = FLOAT;						/* change from decimal to	*/
-		*ttype = TOK_DOUBLE;					/* float type.				*/
-		}
-
-	else if (c == '.' && numtype == DECIMAL)    /* Dot allowed in decimal,  */
-		{										/* when encountered, implies*/
-		numtype = FLOAT;						/* a change to a float type.*/
-		*ttype	= TOK_DOUBLE;
-		}
-
-	else if (c == 'E' && numtype == FLOAT)      /* E allowed in floats only.*/
-		{
-		if (*line == '-')       /* A minus sign is allowed after an E in a  */
-			{					/* floating point constant.  If a minus sign*/
-			*word++ = c;		/* is present, copy the E char, and let the */
-			++count;			/* minus sign get copied at the end of the	*/
-			c = *line++;		/* the for(;;) loop.						*/
+		if (c == 'L')               /* L allowed on all types of*/
+		{                           /* numbers, be we ignore it */
+			if (numtype != FLOAT) { /* when specified with a	*/
+				*ttype = TOK_LONG;  /* float type number.		*/
 			}
 		}
 
-	else if ((numtype != HEX && !isdigit(c)) || /* Terminate loop if char is */
-			 (numtype == HEX && !isxdigit(c)))	/* non of the above, & is not*/
-			break;								/* in charset for its type.  */
+		else if (c == 'U' && numtype != FLOAT) /* U allowed in non-floats, */
+		{
+		} /* is ignored, for now. 	*/
 
-	*word++ = c;								/* Copy char to word buffer.*/
-	++count;
+		else if (c == 'F' && numtype != HEX) /* F allowed in decimal or  */
+		{                                    /* float types, implies a	*/
+			numtype = FLOAT;                 /* change from decimal to	*/
+			*ttype = TOK_DOUBLE;             /* float type.				*/
+		}
 
-	if (count > MAX_SYM_LEN-2)
-		break;
+		else if (c == '.' && numtype == DECIMAL) /* Dot allowed in decimal,  */
+		{                                        /* when encountered, implies*/
+			numtype = FLOAT;                     /* a change to a float type.*/
+			*ttype = TOK_DOUBLE;
+		}
+
+		else if (c == 'E' && numtype == FLOAT) /* E allowed in floats only.*/
+		{
+			if (*line == '-') /* A minus sign is allowed after an E in a  */
+			{                 /* floating point constant.  If a minus sign*/
+				*word++ = c;  /* is present, copy the E char, and let the */
+				++count;      /* minus sign get copied at the end of the	*/
+				c = *line++;  /* the for(;;) loop.						*/
+			}
+		}
+
+		else if ((numtype != HEX && !isdigit(c)) ||  /* Terminate loop if char is */
+				 (numtype == HEX && !isxdigit(c))) { /* non of the above, & is not*/
+			break;                                   /* in charset for its type.  */
+		}
+
+		*word++ = c; /* Copy char to word buffer.*/
+		++count;
+
+		if (count > MAX_SYM_LEN - 2) {
+			break;
+		}
 	}
 
-return(count);
+	return (count);
 }
 
 /*****************************************************************************
@@ -283,95 +307,86 @@ return(count);
  *	word buffer (eg, you won't get a word and a NULL return on the same call).
  ****************************************************************************/
 
-char *tokenize_word(char *line,    /* (in) -> current line position */
-					 char *word,    /* (in) -> output token buffer */
-					 char *qstring, /* (in) -> quoted string o/p buffer */
-					 SHORT	*plen,		   /* (out) # of bytes put in word buf */
-					 SHORT	*ttype, 	   /* (out) token type				   */
-					bool quote		   /* (in)	preserve quotes on string? */
-				   )
+char* tokenize_word(char* line,    /* (in) -> current line position */
+					char* word,    /* (in) -> output token buffer */
+					char* qstring, /* (in) -> quoted string o/p buffer */
+					SHORT* plen,   /* (out) # of bytes put in word buf */
+					SHORT* ttype,  /* (out) token type				   */
+					bool quote     /* (in)	preserve quotes on string? */
+)
 {
-char	*wrkptr;
-char	*sword = word;
-int 	toklen;
-SHORT	toktype;
-register unsigned int c;
-UBYTE	c1;
-UBYTE	c2;
+	char* wrkptr;
+	char* sword = word;
+	int toklen;
+	SHORT toktype;
+	register unsigned int c;
+	UBYTE c1;
+	UBYTE c2;
 
-/*----------------------------------------------------------------------------
- * Skip leading whitespace, get the first character, return NULL if no char.
- *--------------------------------------------------------------------------*/
+	/*----------------------------------------------------------------------------
+	 * Skip leading whitespace, get the first character, return NULL if no char.
+	 *--------------------------------------------------------------------------*/
 
-	while (isspace(*line) )
+	while (isspace(*line)) {
 		++line;
+	}
 
-	if ('\0' == (c = *line))
-		{
+	if ('\0' == (c = *line)) {
 		toktype = TOK_EOF;
 		line = NULL;
 		goto OUT;
-		}
+	}
 
-/*----------------------------------------------------------------------------
- * Handle keywords, types, symbols
- *--------------------------------------------------------------------------*/
+	/*----------------------------------------------------------------------------
+	 * Handle keywords, types, symbols
+	 *--------------------------------------------------------------------------*/
 
-	if (iscsymf(c))
-		{
-		line = po_chop_csym(line, word, MAX_SYM_LEN-1, &wrkptr);
+	if (iscsymf(c)) {
+		line = po_chop_csym(line, word, MAX_SYM_LEN - 1, &wrkptr);
 		word = wrkptr;
 		toktype = TOK_UNDEF;
-		}
+	}
 #ifdef DEADWOOD
-	else if (iscsymf(c))
-		{
+	else if (iscsymf(c)) {
 		toktype = TOK_UNDEF;
 		*word++ = c;
 		++line;
 		toklen = MAX_SYM_LEN;
-		for (;;)
-			{
+		for (;;) {
 			c = *line;
-			if (iscsym(c))
-				{
+			if (iscsym(c)) {
 				++line;
-				if (toklen)
-					{
+				if (toklen) {
 					*word++ = c;
 					--toklen;
-					}
-				 }
-			else
+				}
+			} else {
 				break;
 			}
 		}
-
+	}
 #endif /* DEADWOOD */
 
-/*----------------------------------------------------------------------------
- * Handle numeric constants
- *--------------------------------------------------------------------------*/
+	/*----------------------------------------------------------------------------
+	 * Handle numeric constants
+	 *--------------------------------------------------------------------------*/
 
-	else if (isdigit(c))
-		{
-		toklen = get_digits(line,word,&toktype);
-		line  += toklen;
-		word  += toklen;
-		}
+	else if (isdigit(c)) {
+		toklen = get_digits(line, word, &toktype);
+		line += toklen;
+		word += toklen;
+	}
 
-/*----------------------------------------------------------------------------
- * Handle C operators and string/char constants...
- * This processes non-alphanumeric characters.	Most will be passed through
- * as single character tokens.	Some, like ==, !=, >= and <= are easier to
- * handle here than in parser (which only has a one-token look-ahead).
- * Also, quoted strings and chars are now handled in this switch statement.
- *--------------------------------------------------------------------------*/
+	/*----------------------------------------------------------------------------
+	 * Handle C operators and string/char constants...
+	 * This processes non-alphanumeric characters.	Most will be passed through
+	 * as single character tokens.	Some, like ==, !=, >= and <= are easier to
+	 * handle here than in parser (which only has a one-token look-ahead).
+	 * Also, quoted strings and chars are now handled in this switch statement.
+	 *--------------------------------------------------------------------------*/
 
-	else
-		{
-
-		c1 = line[1];		/* lookahead characters */
+	else {
+		c1 = line[1]; /* lookahead characters */
 		/*
 		 * A one-character token at the end of a line has only its trailing
 		 * NUL available for lookahead.  Do not read past that terminator while
@@ -379,282 +394,245 @@ UBYTE	c2;
 		 */
 		c2 = (c1 == '\0') ? '\0' : line[2];
 
-		switch (c)
-			{
-
+		switch (c) {
 			case '"':                       /* note: a shortcut in this loop */
 											/* assumes that a quoted string  */
-				if (qstring != NULL)		/* could never be longer than	 */
+				if (qstring != NULL) {      /* could never be longer than	 */
 					sword = word = qstring; /* SZTOKE-3 chars.				 */
+				}
 				toktype = TOK_QUO;
-				if (quote)
+				if (quote) {
 					*word++ = '"';
+				}
 				++line;
-				toklen = SZTOKE-3; /* room for nullterm and two quotes */
-				while(--toklen)
-					{
+				toklen = SZTOKE - 3; /* room for nullterm and two quotes */
+				while (--toklen) {
 					c = *line++;
-					if (c == 0)
+					if (c == 0) {
 						break;
-					else if (c == '\\')
-						{
-						if (quote)
-							{
-							*word++  = c;
+					} else if (c == '\\') {
+						if (quote) {
+							*word++ = c;
 							*word++ = *line++;
-							}
-						else
-							{
+						} else {
 							wrkptr = line;
 							*word++ = translate_escape(&wrkptr);
 							line = wrkptr;
-							}
 						}
-					else if (c == '\"')
-						{
+					} else if (c == '\"') {
 						break;
-						}
-					else
-						{
+					} else {
 						*word++ = c;
-						}
 					}
-				if (quote)
+				}
+				if (quote) {
 					*word++ = '"';
+				}
 				break;
 
 			case '\'':
 
-				if (quote)
+				if (quote) {
 					*word++ = '\'';
+				}
 				toktype = TOK_SQUO;
 				++line;
-				for (;;)
-					{
+				for (;;) {
 					c = *line++;
-					if (c == 0)
+					if (c == 0) {
 						break;
-					else if (c == '\\')
-						{
-						if (quote)
-							{
-							*word++  = c;
+					} else if (c == '\\') {
+						if (quote) {
+							*word++ = c;
 							*word++ = *line++;
-							}
-						else
-							{
+						} else {
 							wrkptr = line;
 							*word++ = translate_escape(&wrkptr);
 							line = wrkptr;
-							}
 						}
-					else if (c == '\'')
-						{
+					} else if (c == '\'') {
 						break;
-						}
-					else
-						{
+					} else {
 						*word++ = c;
-						}
 					}
-				if (quote)
+				}
+				if (quote) {
 					*word++ = '\'';
+				}
 				break;
 
 			case '.':
 
-				if (c1 == '.' && c2 == '.')
-					{
+				if (c1 == '.' && c2 == '.') {
 					toktype = TOK_UNDEF;
 					goto THREECHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '%':
 
 				if (c1 == '=') /* mod-equals */
-					{
+				{
 					toktype = TOK_MOD_EQUALS;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '/':
 
 				if (c1 == '=') /* div-equals */
-					{
+				{
 					toktype = TOK_DIV_EQUALS;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '*':
 
-				if (c1 == '=')
-					{
+				if (c1 == '=') {
 					toktype = TOK_MUL_EQUALS;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '+':
 
-				if (c1 == '+')
-					{
+				if (c1 == '+') {
 					toktype = TOK_PLUS_PLUS;
 					goto TWOCHAR;
-					}
-				else if (c1 == '=')
-					{
+				} else if (c1 == '=') {
 					toktype = TOK_PLUS_EQUALS;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '-':
 
-				if (c1 == '-')
-					{
+				if (c1 == '-') {
 					toktype = TOK_MINUS_MINUS;
 					goto TWOCHAR;
-					}
-				else if (c1 == '=')
-					{
+				} else if (c1 == '=') {
 					toktype = TOK_MINUS_EQUALS;
 					goto TWOCHAR;
-					}
-				else if (c1 == '>')
-					{
+				} else if (c1 == '>') {
 					toktype = TOK_ARROW;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '=':
 
 				if (c1 == '=') /* double equals */
-					{
+				{
 					toktype = TOK_EQ;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '!':
 
 				if (c1 == '=') /* != */
-					{
+				{
 					toktype = TOK_NE;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '<':
 
 				if (c1 == '=') /* <= */
-					{
+				{
 					toktype = TOK_LE;
 					goto TWOCHAR;
-					}
-				else if (c1 == '<')    /* << */
-					{
-					if (c2 == '=')
-						{
+				} else if (c1 == '<') /* << */
+				{
+					if (c2 == '=') {
 						toktype = TOK_LSHIFT_EQUALS;
 						goto THREECHAR;
-						}
-					else
-						{
+					} else {
 						toktype = TOK_LSHIFT;
 						goto TWOCHAR;
-						}
 					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '>':
 
 				if (c1 == '=') /* >= */
-					{
+				{
 					toktype = TOK_GE;
 					goto TWOCHAR;
-					}
-				else if (c1 == '>')    /* >> */
-					{
-					if (c2 == '=')
-						{
+				} else if (c1 == '>') /* >> */
+				{
+					if (c2 == '=') {
 						toktype = TOK_RSHIFT_EQUALS;
 						goto THREECHAR;
-						}
-					else
-						{
+					} else {
 						toktype = TOK_RSHIFT;
 						goto TWOCHAR;
-						}
 					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '&':
 
 				if (c1 == '&') /* logical and - && */
-					{
+				{
 					toktype = TOK_LAND;
 					goto TWOCHAR;
-					}
-				else if (c1 == '=')
-					{
+				} else if (c1 == '=') {
 					toktype = TOK_AND_EQUALS;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '|':
 
 				if (c1 == '|') /* logical or - || */
-					{
+				{
 					toktype = TOK_LOR;
 					goto TWOCHAR;
-					}
-				else if (c1 == '=')
-					{
+				} else if (c1 == '=') {
 					toktype = TOK_OR_EQUALS;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 
 			case '^':
 
-				if (c1 == '=')
-					{
+				if (c1 == '=') {
 					toktype = TOK_XOR_EQUALS;
 					goto TWOCHAR;
-					}
-				else
+				} else {
 					goto SIMPLE;
+				}
 			default:
-	SIMPLE:
+SIMPLE:
 				toktype = *word++ = c;
 				++line;
 				break;
-			}
 		}
+	}
 
 OUT:
 
 	*ttype = toktype;
 	*word = 0;
-	if (plen != NULL)
+	if (plen != NULL) {
 		*plen = word - sword;
+	}
 	return line;
 
 
@@ -672,5 +650,4 @@ THREECHAR:
 	*word++ = c2;
 	line += 3;
 	goto OUT;
-
 }

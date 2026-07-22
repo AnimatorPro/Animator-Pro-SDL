@@ -1,4 +1,7 @@
 add_library(poco_legacy_poe_fixture MODULE legacy_poe_fixture.c)
+target_include_directories(poco_legacy_poe_fixture PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src"
+)
 target_link_libraries(poco_legacy_poe_fixture PRIVATE Poco::poco)
 set_target_properties(poco_legacy_poe_fixture PROPERTIES
     PREFIX ""

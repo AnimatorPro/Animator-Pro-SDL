@@ -11,7 +11,7 @@
 #include "zoom.h"
 
 static void load_overlay(int how);
-static int load_fli_overlay(char *title, int how);
+static int load_fli_overlay(char* title, int how);
 
 void qload_overlay(void)
 {
@@ -30,7 +30,7 @@ void qload_overlay(void)
 	}
 }
 
-static char *overl_msgs[3] = {
+static char* overl_msgs[3] = {
 	"load_comp_over",
 	"load_comp_under",
 	"load_comp_cross",
@@ -38,7 +38,7 @@ static char *overl_msgs[3] = {
 
 static void load_overlay(int how)
 {
-	char *title;
+	char* title;
 	SHORT ounder;
 	char sbuf[50];
 	Vset_path cpath;
@@ -63,7 +63,7 @@ static void load_overlay(int how)
 	}
 }
 
-static int may_cfit_blit_cel(Rcel *cel, int fit)
+static int may_cfit_blit_cel(Rcel* cel, int fit)
 {
 	Tcolxldat txd;
 	Pixel fitab[256];
@@ -80,22 +80,22 @@ static int may_cfit_blit_cel(Rcel *cel, int fit)
 }
 
 typedef struct abtdat {
-	int *frame;
-	USHORT *totframes;
+	int* frame;
+	USHORT* totframes;
 } Vabortdat;
 
-static bool olay_abort_verify(void *vabortdat)
+static bool olay_abort_verify(void* vabortdat)
 {
-	Vabortdat *vd = vabortdat;
+	Vabortdat* vd = vabortdat;
 	return (soft_yes_no_box("!%d%d", "olay_abort", *vd->frame + 1, *vd->totframes));
 }
 
 /* returns ecode if can't do. This reports errors.*/
-static int load_fli_overlay(char *title, int how)
+static int load_fli_overlay(char* title, int how)
 {
 	Errcode err;
-	Rcel *loadcel = NULL;
-	Cmap *cmap = NULL;
+	Rcel* loadcel = NULL;
+	Cmap* cmap = NULL;
 	int usr_fit = 0; /* start off not knowing how to fit colors */
 	Flifile flif;
 	int i = 0;

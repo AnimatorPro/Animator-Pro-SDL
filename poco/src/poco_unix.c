@@ -14,15 +14,14 @@ void initTermios(int echo);
 void resetTermios(void);
 char getch_(int echo);
 
-
 /* Initialize new terminal i/o settings */
 void initTermios(int echo)
 {
-	tcgetattr(0, &old); /* grab old terminal i/o settings */
-	new = old; /* make new settings same as old settings */
-	new.c_lflag &= ~ICANON; /* disable buffered i/o */
+	tcgetattr(0, &old);                 /* grab old terminal i/o settings */
+	new = old;                          /* make new settings same as old settings */
+	new.c_lflag &= ~ICANON;             /* disable buffered i/o */
 	new.c_lflag &= echo ? ECHO : ~ECHO; /* set echo mode */
-	tcsetattr(0, TCSANOW, &new); /* use these new terminal i/o settings now */
+	tcsetattr(0, TCSANOW, &new);        /* use these new terminal i/o settings now */
 }
 
 /* Restore old terminal i/o settings */

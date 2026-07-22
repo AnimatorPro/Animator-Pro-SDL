@@ -29,16 +29,16 @@
 #include "timemenu.h"
 
 
-static void pal_feel_qslider(Button *m);
-static void sliders_from_ccolor_with_menuwndo(Menuwndo *m);
+static void pal_feel_qslider(Button* m);
+static void sliders_from_ccolor_with_menuwndo(Menuwndo* m);
 static void see_color_sliders(void);
 static bool visible_cmap(void);
-static void ccolor_from_sliders(void *data, Button *b);
-static void change_hls_mode(Button *m);
-static void pal_menu_back(Button *m);
+static void ccolor_from_sliders(void* data, Button* b);
+static void change_hls_mode(Button* m);
+static void pal_menu_back(Button* m);
 
 static SHORT ccred, ccgreen, ccblue;
-static Cmap *new_cmap;
+static Cmap* new_cmap;
 
 static Qslider red_sl = QSL_INIT1(0, RGB_MAX - 1, &ccred, 0, ccolor_from_sliders, leftright_arrs);
 static Qslider green_sl =
@@ -131,7 +131,7 @@ static Smu_button_list pal_blist[] = {
 	{"undo", {&pal_res_sel}},  {"pen", {&pal_bru_sel}},
 };
 
-static void pmu_color_redraw(void *mh, USHORT why)
+static void pmu_color_redraw(void* mh, USHORT why)
 {
 	(void)mh;
 	(void)why;
@@ -149,7 +149,7 @@ static Redraw_node palette_rn = {{NULL, NULL}, /* node */
 								 NULL,
 								 NEW_CCOLOR | NEW_CMAP};
 
-static void pmu_on_showhide(Menuhdr *mh, bool showing)
+static void pmu_on_showhide(Menuhdr* mh, bool showing)
 {
 	(void)mh;
 
@@ -179,14 +179,14 @@ Menuhdr palette_menu = MENU_INIT0(320, 97, 0, 103,                   /* width, h
 /*
  * Called when a palette color slider has changed.
  */
-static void pal_feel_qslider(Button *m)
+static void pal_feel_qslider(Button* m)
 {
 	save_undo();
 	feel_qslider(m);
 	dirties();
 }
 
-static Errcode cmapcopy1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode cmapcopy1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)data;
 	(void)ix;
@@ -198,7 +198,7 @@ static Errcode cmapcopy1(void *data, int ix, int intween, int scale, Autoarg *aa
 	return Success;
 }
 
-static Errcode refit1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode refit1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	if (vs.pal_fit) {
 		refit_rcel(vb.pencel, new_cmap, vb.pencel->cmap);
@@ -207,7 +207,7 @@ static Errcode refit1(void *data, int ix, int intween, int scale, Autoarg *aa)
 }
 
 /* loads a palette from a palette file or a fli reports errors */
-Errcode load_palette(char *title, int fitting)
+Errcode load_palette(char* title, int fitting)
 {
 	Errcode err;
 	Errcode fliret;
@@ -263,7 +263,7 @@ void qload_palette(void)
 {
 	static char last_path[PATH_MAX] = "";
 
-	char *file_path = pj_dialog_file_open("Load Palette", "col;flc;cel", last_path);
+	char* file_path = pj_dialog_file_open("Load Palette", "col;flc;cel", last_path);
 
 	if (file_path != NULL) {
 		load_palette(file_path, PIC_IO_PAL_FIT);
@@ -274,7 +274,7 @@ void qsave_palette(void)
 {
 	static char last_path[PATH_MAX] = "";
 
-	char *file_path = pj_dialog_file_save("Save Palette", "col", last_path);
+	char* file_path = pj_dialog_file_save("Save Palette", "col", last_path);
 
 	if (file_path != NULL) {
 		soft_put_wait_box("!%s", "wait_save", file_path);
@@ -283,7 +283,7 @@ void qsave_palette(void)
 	}
 }
 
-static void refit_1c(int scale, Rgb3 *p, int ccolor, int ix)
+static void refit_1c(int scale, Rgb3* p, int ccolor, int ix)
 {
 	(void)scale;
 	(void)ix;
@@ -298,7 +298,7 @@ void refit_vf(void)
 	}
 }
 
-static Errcode cl_refit1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode cl_refit1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)data;
 	(void)ix;
@@ -328,7 +328,7 @@ static void cuse_cel(void)
 
 static void sliders_from_ccolor(void)
 {
-	Rgb3 *rgb;
+	Rgb3* rgb;
 	SHORT r, g, b;
 
 	rgb = vb.pencel->cmap->ctab + vs.ccolor;
@@ -346,7 +346,7 @@ static void sliders_from_ccolor(void)
 	}
 }
 
-static void sliders_from_ccolor_with_menuwndo(Menuwndo *m)
+static void sliders_from_ccolor_with_menuwndo(Menuwndo* m)
 {
 	(void)m;
 	sliders_from_ccolor();
@@ -356,7 +356,7 @@ static void see_color_sliders(void)
 {
 	Button **s, *f;
 	int i;
-	static Button *slides[3] = {&pal_rsl_sel, &pal_gsl_sel, &pal_bsl_sel};
+	static Button* slides[3] = {&pal_rsl_sel, &pal_gsl_sel, &pal_bsl_sel};
 
 	sliders_from_ccolor();
 	s = slides;
@@ -368,7 +368,7 @@ static void see_color_sliders(void)
 	}
 }
 
-void rampit(const Rgb3 *r1, const Rgb3 *r2, Rgb3 *dr, int ccount)
+void rampit(const Rgb3* r1, const Rgb3* r2, Rgb3* dr, int ccount)
 /* Make a color smooth RGB color ramp between r1 and r2 into dr. */
 {
 	int i;
@@ -380,7 +380,7 @@ void rampit(const Rgb3 *r1, const Rgb3 *r2, Rgb3 *dr, int ccount)
 	}
 }
 
-void hls_rampit(const Rgb3 *r1, const Rgb3 *r2, Rgb3 *dr, int ccount)
+void hls_rampit(const Rgb3* r1, const Rgb3* r2, Rgb3* dr, int ccount)
 /* Make a color smooth RGB color ramp between r1 and r2 into dr. */
 {
 	SHORT h1, l1, s1;
@@ -516,7 +516,7 @@ static void get_menu_colors(void)
 		return;
 	}
 	if (choice < IDC) {
-		set_new_mucolors((Rgb3 *)(cideals + choice), vb.screen);
+		set_new_mucolors((Rgb3*)(cideals + choice), vb.screen);
 	} else {
 		get_menu_5();
 	}
@@ -530,9 +530,9 @@ static void crestore(void)
 	show_mp();
 }
 
-static void ccolor_from_sliders(void *data, Button *button)
+static void ccolor_from_sliders(void* data, Button* button)
 {
-	Rgb3 *rgb;
+	Rgb3* rgb;
 	SHORT r, g, b;
 	(void)data;
 	(void)button;
@@ -549,20 +549,21 @@ static void ccolor_from_sliders(void *data, Button *button)
 	rgb->g = g;
 	rgb->b = b;
 	wait_sync();
-	pj_set_colors(vb.screen, vs.ccolor, 1, (UBYTE *)rgb);
+	pj_set_colors(vb.screen, vs.ccolor, 1, (UBYTE*)rgb);
 }
 
-static void change_hls_mode(Button *m)
+static void change_hls_mode(Button* m)
 {
 	change_mode(m);
 	sliders_from_ccolor();
 	see_color_sliders();
 }
 
-static void pal_menu_back(Button *m)
+static void pal_menu_back(Button* m)
 {
 	wbg_ncorner_back(m);
 }
+
 /* called when a tool has done it's thing */
 void cycle_ccolor(void)
 {
@@ -639,13 +640,13 @@ void toggle_ccycle(void)
 	set_ccycle(!vs.cycle_draw);
 }
 
-void mb_toggle_ccycle(Button *b)
+void mb_toggle_ccycle(Button* b)
 {
 	toggle_ccycle();
 	draw_buttontop(b); /* draws twice if ccolor changed oh well */
 }
 
-static int get_mousecolor(Wndo *w)
+static int get_mousecolor(Wndo* w)
 {
 	(void)w;
 
@@ -658,12 +659,12 @@ static int get_mousecolor(Wndo *w)
 	return 0; /* no need to reset mouse in do_reqloop() */
 }
 
-static void scale_palette_menu(Rscale *scale)
+static void scale_palette_menu(Rscale* scale)
 {
 	scale_powell_palette(scale);
 }
 
-static bool pal_dopull(Menuhdr *mh)
+static bool pal_dopull(Menuhdr* mh)
 {
 	bool cclip_isnt;
 
@@ -683,7 +684,7 @@ static void qone_palette(void)
 	}
 }
 
-static void palette_selit(Menuhdr *mh, SHORT hitid)
+static void palette_selit(Menuhdr* mh, SHORT hitid)
 {
 	(void)mh;
 
@@ -792,9 +793,9 @@ void enable_palette_menu(void)
 void palette(void)
 {
 	Menuhdr tpull;
-	Cursorhdr *och;
+	Cursorhdr* och;
 	void *oundo, *oredo;
-	void *ss;
+	void* ss;
 
 	if (MENU_ISOPEN(&palette_menu)) {
 		return;

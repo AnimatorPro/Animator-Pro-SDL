@@ -16,21 +16,19 @@
 
 
 /* This object allows us to decode a pcx file a line at a time. */
-typedef struct unpcx_obj
-{
-	UBYTE *buf;
-	UBYTE *over;
+typedef struct unpcx_obj {
+	UBYTE* buf;
+	UBYTE* over;
 	int over_count;
 	int bpl;
-	XFILE *file;
+	XFILE* file;
 } Unpcx_obj;
-
 
 /* Initialize object and allocate buffer big enough for bpl bytes plus
  * overflow.  */
-static Errcode unpcx_init(Unpcx_obj *upo, /* line unpacker object */
+static Errcode unpcx_init(Unpcx_obj* upo, /* line unpacker object */
 						  int bpl,        /* bytes-per-line */
-						  XFILE *file)    /* source file */
+						  XFILE* file)    /* source file */
 {
 	clear_struct(upo);
 	if ((upo->buf = pj_malloc(bpl + PCX_MAX_RUN + 1)) == NULL) {
@@ -42,21 +40,19 @@ static Errcode unpcx_init(Unpcx_obj *upo, /* line unpacker object */
 	return (Success);
 }
 
-
 /* Cleanup resources associated with upo object. */
-static void unpcx_cleanup(Unpcx_obj *upo)
+static void unpcx_cleanup(Unpcx_obj* upo)
 {
 	pj_freez(&upo->buf);
 }
 
-
-static Errcode unpack_pcx_line(Unpcx_obj *upo)
+static Errcode unpack_pcx_line(Unpcx_obj* upo)
 {
 	int bytes_left;
-	UBYTE *p;
+	UBYTE* p;
 	register int count;
 	UBYTE data;
-	XFILE *file = upo->file;
+	XFILE* file = upo->file;
 
 	/* first deal with any overflow from last line */
 	pj_copy_bytes(upo->over, upo->buf, upo->over_count);
@@ -85,10 +81,9 @@ static Errcode unpack_pcx_line(Unpcx_obj *upo)
 	return (Success);
 }
 
-
 /* Subroutine to help convert from bit-plane to byte-a-pixel representation */
 /* or the out_mask into out byte-plane wherever a bit in bit-plane is set */
-static void bits_to_bytes(UBYTE *in, UBYTE *out, int w, UBYTE out_mask)
+static void bits_to_bytes(UBYTE* in, UBYTE* out, int w, UBYTE out_mask)
 {
 	int k;
 	UBYTE imask;
@@ -112,9 +107,8 @@ static void bits_to_bytes(UBYTE *in, UBYTE *out, int w, UBYTE out_mask)
 	}
 }
 
-
 /* Convert from CGA 2-bit-a-pixel format to byte-a-pixel format */
-static void bits2_to_bytes(UBYTE *in, UBYTE *out, int w)
+static void bits2_to_bytes(UBYTE* in, UBYTE* out, int w)
 {
 	int k;
 	UBYTE imask;
@@ -144,15 +138,14 @@ static void bits2_to_bytes(UBYTE *in, UBYTE *out, int w)
 	}
 }
 
-
-static Errcode unpack_pcx(Rcel *screen, Pcx_header *hdr, XFILE *f)
+static Errcode unpack_pcx(Rcel* screen, Pcx_header* hdr, XFILE* f)
 {
 	Errcode err;
 	Unpcx_obj rupo;
 	int width, height;
 	int bpl;
 	int i;
-	UBYTE *uout_buf = NULL;
+	UBYTE* uout_buf = NULL;
 	int depth, depth1;
 	UBYTE out_mask;
 
@@ -214,11 +207,10 @@ OUT:
 	return (err);
 }
 
-
 /**** Compression code ****/
 
 /* Do PCX compression of buf into file out */
-static void pcx_comp_buf(XFILE *out, UBYTE *buf, int count)
+static void pcx_comp_buf(XFILE* out, UBYTE* buf, int count)
 {
 	int same_count, lcount;
 	int c;
@@ -246,13 +238,12 @@ static void pcx_comp_buf(XFILE *out, UBYTE *buf, int count)
 	}
 }
 
-
 /* Save out header, pixel, and color map corresponding to screen.  Assumes
  * file open and at start of  file. */
-static Errcode pcx_save_screen(XFILE *out, Rcel *screen)
+static Errcode pcx_save_screen(XFILE* out, Rcel* screen)
 {
 	Pcx_header rhdr;
-	UBYTE *buf = NULL;
+	UBYTE* buf = NULL;
 	Errcode err = Success;
 	int width = screen->width, height = screen->height, i;
 
@@ -300,24 +291,21 @@ OUT:
 	return (err);
 }
 
-
 /**** Routines having more to do with PJ than PCX ******/
 static int pcx_files_open = 0; /* lock data structures
 								* to prevent open without
 								* close */
 
-
-static bool suffix_in(char *string, char *suff)
+static bool suffix_in(char* string, char* suff)
 {
 	string += strlen(string) - strlen(suff);
 	return (txtcmp(string, suff) == 0);
 }
 
-
 /* Figure out whether a this version has a color map or not.  Also figure
  * out number number of planes in this version.  If version is unknown
  * return Errcode, else success. */
-static Errcode decode_version(Pcx_header *hdr, bool *with_cmap)
+static Errcode decode_version(Pcx_header* hdr, bool* with_cmap)
 {
 	switch (hdr->version) {
 		case 0:
@@ -339,14 +327,13 @@ static Errcode decode_version(Pcx_header *hdr, bool *with_cmap)
 	return (Success);
 }
 
-
 /* Read in PCX - header,  and verify it is a good header.
  *  Move appropriate fields from hdr to ainfo */
-static Errcode read_pcx_start(Pcx_file *gf, struct pcx_header *hdr, Anim_info *ainfo,
-							  bool *got_cmap)
+static Errcode read_pcx_start(Pcx_file* gf, struct pcx_header* hdr, Anim_info* ainfo,
+							  bool* got_cmap)
 {
 	Errcode err;
-	XFILE *f;
+	XFILE* f;
 
 	f = gf->file;
 
@@ -389,11 +376,10 @@ error:
 	return (err);
 }
 
-
 /* Tell host that we can only write 8 bit-a-pixel images,  and only one
  * frame.  No need to check width and height, since PCX format handles
  * any width/height. */
-static bool pcx_spec_best_fit(Anim_info *ainfo)
+static bool pcx_spec_best_fit(Anim_info* ainfo)
 {
 	bool nofit;
 
@@ -403,12 +389,11 @@ static bool pcx_spec_best_fit(Anim_info *ainfo)
 	return (nofit); /* return whether fit was exact */
 }
 
-
 /* Clean up resources used by PCX reader/writer */
-static void close_pcx_file(Image_file **pif)
+static void close_pcx_file(Image_file** pif)
 {
-	Pcx_file **pcxile = (Pcx_file **)pif;
-	Pcx_file *gf;
+	Pcx_file** pcxile = (Pcx_file**)pif;
+	Pcx_file* gf;
 
 	if (pcxile == NULL || (gf = *pcxile) == NULL) {
 		return;
@@ -421,15 +406,14 @@ static void close_pcx_file(Image_file **pif)
 	pcx_files_open = false;
 }
 
-
 /* Function: pcx_open_ifsub
  *
  *  Check path suffix.  Allocate Pcx_file.  Open up file.
  */
-static Errcode pcx_open_ifsub(Pcx_file **pcxile, char *path, enum XReadWriteMode mode)
+static Errcode pcx_open_ifsub(Pcx_file** pcxile, char* path, enum XReadWriteMode mode)
 {
 	Errcode err = Success;
-	Pcx_file *gf;
+	Pcx_file* gf;
 
 	*pcxile = NULL;
 
@@ -451,18 +435,17 @@ static Errcode pcx_open_ifsub(Pcx_file **pcxile, char *path, enum XReadWriteMode
 	return (err);
 }
 
-
 /* Check path for PCX suffix.  If there open it and read in header.
  * Return Errcode if header is bad or other failure. */
-static Errcode open_pcx_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ainfo)
+static Errcode open_pcx_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 {
 	Errcode err;
-	Pcx_file **ppcx;
+	Pcx_file** ppcx;
 	struct pcx_header hdr;
 	bool got_cmap;
 	(void)pd;
 
-	ppcx = (Pcx_file **)pif;
+	ppcx = (Pcx_file**)pif;
 
 	if ((err = pcx_open_ifsub(ppcx, path, XREADONLY)) < Success) {
 		goto error;
@@ -482,16 +465,15 @@ error:
 	return (err);
 }
 
-
 /* Make sure path  has .PCX suffix. Create PCX file (but don't write
  * anything to it yet).  Save ainfo where we can get to it later. */
-static Errcode create_pcx_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ainfo)
+static Errcode create_pcx_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 {
 	Errcode err;
-	Pcx_file **ppcx;
+	Pcx_file** ppcx;
 	(void)pd;
 
-	ppcx = (Pcx_file **)pif;
+	ppcx = (Pcx_file**)pif;
 
 	if ((err = pcx_open_ifsub(ppcx, path, XWRITEONLY)) < Success) {
 		goto error;
@@ -505,7 +487,6 @@ error:
 	return (err);
 }
 
-
 static UBYTE default_pcx_cmap[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0xaa, 0x00, 0xaa, 0x00, 0x00, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0xaa,
 	0x00, 0xaa, 0xaa, 0xaa, 0x00, 0xaa, 0xaa, 0xaa, 0x55, 0x55, 0x55, 0x55, 0x55, 0xff, 0x55, 0xff,
@@ -515,22 +496,21 @@ static UBYTE bwcmap[] = {
 	0, 0, 0, 0xff, 0xff, 0xff,
 };
 
-
 /* Seek to the beginning of an open  PCX file, and then read in the
  * first frame of image into screen.  (In our case read in the only
  * frame of image.) */
-static Errcode pcx_read_picframe(Image_file *ifile, Rcel *screen)
+static Errcode pcx_read_picframe(Image_file* ifile, Rcel* screen)
 {
 	Errcode err;
-	Pcx_file *gf;
-	XFILE *pcx_load_file;
+	Pcx_file* gf;
+	XFILE* pcx_load_file;
 	Anim_info info;
 	Pcx_header hdr;
 	bool got_cmap;
-	Cmap *cmap = screen->cmap;
-	Rgb3 *ctab = cmap->ctab;
+	Cmap* cmap = screen->cmap;
+	Rgb3* ctab = cmap->ctab;
 
-	gf = (Pcx_file *)ifile;   /* ifile has more data past the Image_file */
+	gf = (Pcx_file*)ifile;    /* ifile has more data past the Image_file */
 	pcx_load_file = gf->file; /* Grab the FILE handle */
 	xrewind(pcx_load_file);   /* Go back to beginning of file */
 
@@ -564,28 +544,26 @@ static Errcode pcx_read_picframe(Image_file *ifile, Rcel *screen)
 	return (err);
 }
 
-
 /* Read in subsequent frames of image.  Since we only have one  this
  * routine is pretty trivial. */
-static Errcode pcx_read_next(Image_file *ifile, Rcel *screen)
+static Errcode pcx_read_next(Image_file* ifile, Rcel* screen)
 {
 	(void)ifile;
 	(void)screen;
 	return (Success);
 }
 
-
-static Errcode pcx_save_frame(Image_file *ifile, Rcel *screen, ULONG num_frames,
-							  Errcode (*seek_frame)(int ix, void *seek_data), void *seek_data,
-							  Rcel *work_screen)
+static Errcode pcx_save_frame(Image_file* ifile, Rcel* screen, ULONG num_frames,
+							  Errcode (*seek_frame)(int ix, void* seek_data), void* seek_data,
+							  Rcel* work_screen)
 {
-	Pcx_file *gf;
+	Pcx_file* gf;
 	(void)num_frames;
 	(void)seek_frame;
 	(void)seek_data;
 	(void)work_screen;
 
-	gf = (Pcx_file *)ifile;
+	gf = (Pcx_file*)ifile;
 
 	if (gf->ainfo.width != screen->width || gf->ainfo.height != screen->height) {
 		return (Err_bad_input);
@@ -593,25 +571,24 @@ static Errcode pcx_save_frame(Image_file *ifile, Rcel *screen, ULONG num_frames,
 	return (pcx_save_screen(gf->file, screen));
 }
 
-
 /**** driver header declaration ******/
 static char pcx_pdr_name[] = "PCX.PDR";
 static char pcx_title_info[] = "PCX standard picture format.";
 
 static Pdr pcx_pdr_header = {
 	{REX_PICDRIVER, PDR_VERSION, NOFUNC, NOFUNC, NULL, NULL, NULL},
-	pcx_title_info,                    /* title_info */
-	"",                       /* long_info */
-	".PCX",                 /* default_suffi */
+	pcx_title_info, /* title_info */
+	"",             /* long_info */
+	".PCX",         /* default_suffi */
 	1,
-	1,                  /* max_write_frames, max_read_frames */
-	pcx_spec_best_fit,                 /* (*spec_best_fit)() */
-	create_pcx_file,                   /* (*create_image_file)() */
-	open_pcx_file,                     /* (*open_image_file)() */
-	close_pcx_file,                    /* (*close_image_file)() */
-	pcx_read_picframe,   /* (*read_first_frame)() */
-	pcx_read_next,                     /* (*read_delta_next)() */
-	pcx_save_frame,                    /* (*save_frames)() */
+	1,                 /* max_write_frames, max_read_frames */
+	pcx_spec_best_fit, /* (*spec_best_fit)() */
+	create_pcx_file,   /* (*create_image_file)() */
+	open_pcx_file,     /* (*open_image_file)() */
+	close_pcx_file,    /* (*close_image_file)() */
+	pcx_read_picframe, /* (*read_first_frame)() */
+	pcx_read_next,     /* (*read_delta_next)() */
+	pcx_save_frame,    /* (*save_frames)() */
 };
 
 Local_pdr pcx_local_pdr = {NULL, pcx_pdr_name, &pcx_pdr_header};

@@ -1,6 +1,6 @@
 #include "rectang.h"
 
-void crect_torect(register Cliprect *cr, register Rectangle *r)
+void crect_torect(register Cliprect* cr, register Rectangle* r)
 
 /* copys and or converts a cliprect to a rectangle */
 {

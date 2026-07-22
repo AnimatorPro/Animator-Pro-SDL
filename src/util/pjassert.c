@@ -14,13 +14,11 @@
  *
  *  Verbose error logger, used in debug mode where possible.
  */
-int
-pj_assert_fail(int success, const char *file, unsigned int line,
-		const char *func, const char *str)
+int pj_assert_fail(int success, const char* file, unsigned int line, const char* func,
+				   const char* str)
 {
 	if (!success) {
-		fprintf(stderr, "%s:%u: %s: pj_assert( %s ) failed.\n",
-				file, line, func, str);
+		fprintf(stderr, "%s:%u: %s: pj_assert( %s ) failed.\n", file, line, func, str);
 	}
 
 	return success;
@@ -30,12 +28,10 @@ pj_assert_fail(int success, const char *file, unsigned int line,
  *
  *  Simple error logger, used in release mode.
  */
-int
-pj_assert_fail(int success, const char *file, unsigned int line)
+int pj_assert_fail(int success, const char* file, unsigned int line)
 {
 	if (!success) {
-		fprintf(stderr, "%s:%u: pj_assert failed.\n",
-				file, line);
+		fprintf(stderr, "%s:%u: pj_assert failed.\n", file, line);
 	}
 
 	return success;

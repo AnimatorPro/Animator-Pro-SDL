@@ -11,4 +11,3 @@ void some_random_function(void)
 {
 	printf("This function exists but no entry point!\n");
 }
-

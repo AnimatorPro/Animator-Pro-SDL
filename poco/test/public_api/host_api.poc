@@ -2,5 +2,6 @@
 
 main()
 {
-	return twice(20) + EXTRA;
+	return twice(20) + with_run_context(EXTRA) +
+		with_variadic_run_context(0, 5, 6);
 }

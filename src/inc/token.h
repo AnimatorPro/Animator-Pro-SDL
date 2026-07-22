@@ -1,6 +1,6 @@
 /* token.h - C-tokenizer definitions used by Animator's Softmenu parser.
  *
- * Poco has its own private tokenizer under poco/include.  This header retains
+ * Poco has its own private tokenizer under poco/src.  This header retains
  * the token values Softmenu needs without importing Poco into Animator. */
 
 #ifndef ANIMATOR_TOKEN_H

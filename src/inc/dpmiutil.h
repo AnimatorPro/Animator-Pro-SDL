@@ -23,14 +23,10 @@ typedef struct dpmi_memory_info {
 	unsigned char dpmi_major_version;
 } DPMIMemoryInfo;
 
-enum {
-	DPMIFLAG_386	 = 0x0001,
-	DPMIFLAG_REALINT = 0x0002,
-	DPMIFLAG_VMM	 = 0x0004
-};
+enum { DPMIFLAG_386 = 0x0001, DPMIFLAG_REALINT = 0x0002, DPMIFLAG_VMM = 0x0004 };
 
 extern bool pj_dpmi_present(void);
 extern unsigned long pj_dpmi_inquire_version(void);
-extern int			 pj_dpmi_inquire_memory(DPMIMemoryInfo *pinfo);
+extern int pj_dpmi_inquire_memory(DPMIMemoryInfo* pinfo);
 
 #endif

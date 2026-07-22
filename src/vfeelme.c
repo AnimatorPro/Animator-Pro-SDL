@@ -4,7 +4,7 @@
 #include "menus.h"
 #include "pentools.h"
 
-void toggle_pen(Button *m)
+void toggle_pen(Button* m)
 {
 	vs.use_brush = !vs.use_brush;
 	draw_buttontop(m);

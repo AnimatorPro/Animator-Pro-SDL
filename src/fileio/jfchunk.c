@@ -30,32 +30,31 @@
  *              (head_size <= sizeof(Fat_chunk) means no head data).
  *  root_size - The root chunk size provided if root_type is -1.
  */
-void
-init_chunkparse(Chunkparse_data *pd, XFILE *xf,
-		LONG root_type, LONG root_oset, ULONG head_size, LONG root_size)
+void init_chunkparse(Chunkparse_data* pd, XFILE* xf, LONG root_type, LONG root_oset,
+					 ULONG head_size, LONG root_size)
 {
 	pd->error = Success; /* good until fail */
 	pd->xf = xf;
 
-	if (head_size < sizeof(Chunk_id)) /* at least enough for size and id */
+	if (head_size < sizeof(Chunk_id)) { /* at least enough for size and id */
 		head_size = sizeof(Chunk_id);
+	}
 
 	if (root_type == DONT_READ_ROOT) {
 		pd->chunk_left = root_size - head_size;
 		pd->nextoset = head_size; /* start at end of header */
-	}
-	else {
-		pd->nextoset = 0; /* start at head chunk */
-		pd->chunk_left = -1; /* we read root chunk */
+	} else {
+		pd->nextoset = 0;             /* start at head chunk */
+		pd->chunk_left = -1;          /* we read root chunk */
 		pd->chunk_offset = head_size; /* passed to get_next_chunk in here */
 	}
 
 	if (root_oset < 0) {
 		pd->nextoset = xfftell(xf);
-		if (pd->nextoset < 0)
+		if (pd->nextoset < 0) {
 			pd->error = pd->nextoset;
-	}
-	else {
+		}
+	} else {
 		pd->nextoset += root_oset;
 	}
 
@@ -82,15 +81,16 @@ init_chunkparse(Chunkparse_data *pd, XFILE *xf,
  *  Fat_chunk in the file copy_next_chunk() read_parsed_chunk() will
  *  only copy or read the head data.
  */
-bool get_next_chunk(Chunkparse_data *pd)
+bool get_next_chunk(Chunkparse_data* pd)
 {
-	if (pd->chunk_left == 0 || pd->error < Success)
+	if (pd->chunk_left == 0 || pd->error < Success) {
 		return false; /* done or error */
+	}
 
-	pd->error
-		= xffreadoset(pd->xf, &pd->fchunk, pd->nextoset, sizeof(Fat_chunk));
-	if (pd->error < Success)
+	pd->error = xffreadoset(pd->xf, &pd->fchunk, pd->nextoset, sizeof(Fat_chunk));
+	if (pd->error < Success) {
 		return false;
+	}
 
 	/* First time through if reading root chunk */
 	if (pd->chunk_left < 0) {
@@ -103,7 +103,7 @@ bool get_next_chunk(Chunkparse_data *pd)
 			return false;
 		}
 
-		if(pd->fchunk.type != pd->type) {
+		if (pd->fchunk.type != pd->type) {
 			pd->error = Err_no_chunk;
 			return false;
 		}
@@ -113,8 +113,7 @@ bool get_next_chunk(Chunkparse_data *pd)
 
 		pd->data_size = pd->chunk_offset;
 		pd->type = ROOT_CHUNK_TYPE; /* special type for root (-1) */
-	}
-	else {
+	} else {
 		pd->data_size = pd->fchunk.size;
 		pd->type = pd->fchunk.type;
 	}
@@ -126,7 +125,7 @@ bool get_next_chunk(Chunkparse_data *pd)
 	}
 
 	pd->chunk_offset = pd->nextoset; /* current chunk offset */
-	pd->nextoset += pd->data_size; /* on to next by size of current */
+	pd->nextoset += pd->data_size;   /* on to next by size of current */
 	pd->data_size -= sizeof(Fat_chunk);
 
 	/* Set pd->data_size to actual data size (may be negative)
@@ -143,14 +142,15 @@ bool get_next_chunk(Chunkparse_data *pd)
  *
  *  Note: you will always get at least a Fat_chunk worth of data.
  */
-Errcode
-read_parsed_chunk(Chunkparse_data *pd, void *buf, LONG maxsize)
+Errcode read_parsed_chunk(Chunkparse_data* pd, void* buf, LONG maxsize)
 {
-	if (maxsize < 0 || (maxsize -= sizeof(Fat_chunk)) > pd->data_size)
+	if (maxsize < 0 || (maxsize -= sizeof(Fat_chunk)) > pd->data_size) {
 		maxsize = pd->data_size;
-	*(Fat_chunk *)buf = pd->fchunk;
-	if (maxsize > 0)
-		return xffread(pd->xf, OPTR(buf,sizeof(Fat_chunk)), maxsize);
+	}
+	*(Fat_chunk*)buf = pd->fchunk;
+	if (maxsize > 0) {
+		return xffread(pd->xf, OPTR(buf, sizeof(Fat_chunk)), maxsize);
+	}
 	return Success;
 }
 
@@ -163,8 +163,7 @@ read_parsed_chunk(Chunkparse_data *pd, void *buf, LONG maxsize)
  *  size - size of chunk data not including chunk header.
  *  type - chunk_id type.
  */
-Errcode
-jwrite_chunk(XFILE *xf, void *data, LONG size, SHORT type)
+Errcode jwrite_chunk(XFILE* xf, void* data, LONG size, SHORT type)
 {
 	Errcode err;
 	Chunk_id chunk;
@@ -173,12 +172,14 @@ jwrite_chunk(XFILE *xf, void *data, LONG size, SHORT type)
 	chunk.type = type;
 
 	err = xffwrite(xf, &chunk, sizeof(chunk));
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	err = xffwrite(xf, data, size);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	return Success;
 }
@@ -188,19 +189,18 @@ jwrite_chunk(XFILE *xf, void *data, LONG size, SHORT type)
  *  Copys to dest the parsed chunk including it's leading Chunk_id
  *  this prefers to seek. It might be better to do two writes.
  */
-Errcode
-copy_parsed_chunk(Chunkparse_data *pd, XFILE *dst)
+Errcode copy_parsed_chunk(Chunkparse_data* pd, XFILE* dst)
 {
 	Errcode err;
 	const size_t size = sizeof(Fat_chunk) + pd->data_size;
 
 	if (pd->data_size <= 0) {
 		return xffwrite(dst, &pd->fchunk, size);
-	}
-	else {
+	} else {
 		err = xffseek(pd->xf, pd->chunk_offset, XSEEK_SET);
-		if (err < Success)
+		if (err < Success) {
 			return err;
+		}
 
 		return pj_copydata(pd->xf, dst, size);
 	}
@@ -212,15 +212,14 @@ copy_parsed_chunk(Chunkparse_data *pd, XFILE *dst)
  *  type and size fields.  This depends on the version field following
  *  the size and type fields in the Fat_chunk.
  */
-Errcode
-update_parsed_chunk(Chunkparse_data *pd, void *buf)
+Errcode update_parsed_chunk(Chunkparse_data* pd, void* buf)
 {
-	if (((Fat_chunk *)buf)->size != pd->fchunk.size
-		|| ((Fat_chunk *)buf)->type != pd->fchunk.type) {
+	if (((Fat_chunk*)buf)->size != pd->fchunk.size || ((Fat_chunk*)buf)->type != pd->fchunk.type) {
 		return Err_bad_input;
 	}
 
-	if (pd->data_size <= 0)
+	if (pd->data_size <= 0) {
 		return Success;
-	return xffwrite(pd->xf, OPTR(buf,sizeof(Chunk_id)), pd->data_size);
+	}
+	return xffwrite(pd->xf, OPTR(buf, sizeof(Chunk_id)), pd->data_size);
 }

@@ -1,0 +1,6 @@
+#include "file_value.h"
+
+main()
+{
+	return FILE_INCLUDE_VALUE;
+}

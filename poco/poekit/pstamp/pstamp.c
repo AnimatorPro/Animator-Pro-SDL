@@ -57,22 +57,22 @@ extern int snprintf(char*, unsigned long, const char*, ...);
  * local data and constants...
  *--------------------------------------------------------------------------*/
 
-#define BORDER_COLOR_IDX	255 		// we draw borders using color 255,
-Rgb3	border_color_rgb =	{0,0,200};	// which we set to a nice medium blue.
+#define BORDER_COLOR_IDX 255          // we draw borders using color 255,
+Rgb3 border_color_rgb = {0, 0, 200};  // which we set to a nice medium blue.
 
-#define MIN_PSWIDTH  10 		// these are pretty much arbitrary lower
-#define MIN_PSHEIGHT 10 		// limits on the size of a postage stamp.
+#define MIN_PSWIDTH 10   // these are pretty much arbitrary lower
+#define MIN_PSHEIGHT 10  // limits on the size of a postage stamp.
 
-#define MAX_PSWIDTH  1024		// stack-alloc'd buffer size, MUST be <= 1536.
+#define MAX_PSWIDTH 1024  // stack-alloc'd buffer size, MUST be <= 1536.
 
-UBYTE	rtab[256];				// tables to hold the red, green, and blue
-UBYTE	gtab[256];				// components of the input screen's color
-UBYTE	btab[256];				// map; splitting them gives faster access.
+UBYTE rtab[256];  // tables to hold the red, green, and blue
+UBYTE gtab[256];  // components of the input screen's color
+UBYTE btab[256];  // map; splitting them gives faster access.
 
-int 	srcblkwi;				// integer width of a source averaging block.
-int 	srcblkhi;				// integer height of a source averaging block.
+int srcblkwi;  // integer width of a source averaging block.
+int srcblkhi;  // integer height of a source averaging block.
 
-int 	deltabpr;				// distance from end of block to start of next.
+int deltabpr;  // distance from end of block to start of next.
 
 /*----------------------------------------------------------------------------
  * code...
@@ -81,7 +81,7 @@ int 	deltabpr;				// distance from end of block to start of next.
 /*****************************************************************************
  * unload screen's rgbrgb... cmap to our separate red, green, blue arrays.
  ****************************************************************************/
-static void unload_ctab(Rgb3 *ptab, int tabcount)
+static void unload_ctab(Rgb3* ptab, int tabcount)
 {
 	int i;
 	for (i = 0; i < tabcount; ++i) {
@@ -95,12 +95,12 @@ static void unload_ctab(Rgb3 *ptab, int tabcount)
 /*****************************************************************************
  * draw a hollow box.
  ****************************************************************************/
-static void draw_box(Rcel *drast, Pixel color, int x, int y, int w, int h)
+static void draw_box(Rcel* drast, Pixel color, int x, int y, int w, int h)
 {
-	pj_set_hline(drast, color, x,	  y,	 w);
-	pj_set_hline(drast, color, x,	  y+h-1, w);
-	pj_set_vline(drast, color, x,	  y,	 h);
-	pj_set_vline(drast, color, x+w-1, y,	 h);
+	pj_set_hline(drast, color, x, y, w);
+	pj_set_hline(drast, color, x, y + h - 1, w);
+	pj_set_vline(drast, color, x, y, h);
+	pj_set_vline(drast, color, x + w - 1, y, h);
 }
 
 /*****************************************************************************
@@ -112,16 +112,16 @@ static void draw_box(Rcel *drast, Pixel color, int x, int y, int w, int h)
  * things like a single-pixel-wide line to show up in the postage stamp
  * image; straight averaging would make the line disappear.
  ****************************************************************************/
-static unsigned int average_pixel_block(Pixel *inbuf)
+static unsigned int average_pixel_block(Pixel* inbuf)
 {
-	int  w;
-	int  h;
-	unsigned int  pix;
-	unsigned int  totpix;
-	unsigned int  rsum		= 0;
-	unsigned int  gsum		= 0;
-	unsigned int  bsum		= 0;
-	unsigned int  numblack	= 0;
+	int w;
+	int h;
+	unsigned int pix;
+	unsigned int totpix;
+	unsigned int rsum = 0;
+	unsigned int gsum = 0;
+	unsigned int bsum = 0;
+	unsigned int numblack = 0;
 
 	/*------------------------------------------------------------------------
 	 * sum up the pixels in the averaging block...
@@ -139,7 +139,7 @@ static unsigned int average_pixel_block(Pixel *inbuf)
 				bsum += btab[pix];
 			}
 		}
-		inbuf += deltabpr; // skip to start of averaging block on next line.
+		inbuf += deltabpr;  // skip to start of averaging block on next line.
 	}
 
 	/*------------------------------------------------------------------------
@@ -153,36 +153,35 @@ static unsigned int average_pixel_block(Pixel *inbuf)
 		rsum /= totpix;
 		gsum /= totpix;
 		bsum /= totpix;
-		return (6*rsum/RGB_MAX*36)+(6*gsum/RGB_MAX*6)+(6*bsum/RGB_MAX);
+		return (6 * rsum / RGB_MAX * 36) + (6 * gsum / RGB_MAX * 6) + (6 * bsum / RGB_MAX);
 	}
 }
 
 /*****************************************************************************
  * process the full-sized input image down to a postage stamp.
  ****************************************************************************/
-static void build_output_image(Rcel *vrast, Pixel *srastbuf,
-							  int swidth, int sheight, int bpr,
-							  double srcblkw, double srcblkh)
+static void build_output_image(Rcel* vrast, Pixel* srastbuf, int swidth, int sheight, int bpr,
+							   double srcblkw, double srcblkh)
 {
-	double srcx;					/* source x */
-	double srcy;					/* source y */
-	double srcw;					/* source width */
-	double srch;					/* source height */
-	int    dy;						/* output raster current line */
-	int    dwidth;					/* output raster line width */
-	Pixel  *psline; 				/* pointer to current source line */
-	Pixel  *pdline; 				/* pointer to current location in linebuf */
-	Pixel  linebuf[MAX_PSWIDTH];	/* output line buffer */
+	double srcx;                /* source x */
+	double srcy;                /* source y */
+	double srcw;                /* source width */
+	double srch;                /* source height */
+	int dy;                     /* output raster current line */
+	int dwidth;                 /* output raster line width */
+	Pixel* psline;              /* pointer to current source line */
+	Pixel* pdline;              /* pointer to current location in linebuf */
+	Pixel linebuf[MAX_PSWIDTH]; /* output line buffer */
 
 	/*------------------------------------------------------------------------
 	 * initialize local vars...
 	 *----------------------------------------------------------------------*/
 
-	dy		 = 0;
-	dwidth	 = vrast->width;
+	dy = 0;
+	dwidth = vrast->width;
 
-	srcw	 = swidth;
-	srch	 = sheight;
+	srcw = swidth;
+	srch = sheight;
 
 	/*------------------------------------------------------------------------
 	 * initialize global vars we share with averaging routine...
@@ -215,48 +214,44 @@ static void build_output_image(Rcel *vrast, Pixel *srastbuf,
 	}
 }
 
-
 /*****************************************************************************
  * convert a screen to postage stamp image rendered onto another screen.
  ****************************************************************************/
-Errcode make_pstamp(void* sscreen, void* dscreen,
-					int dxstart, int dystart,
-				int dwidth, int dheight,
-				bool draw_border)
+Errcode make_pstamp(void* sscreen, void* dscreen, int dxstart, int dystart, int dwidth, int dheight,
+					bool draw_border)
 {
-	Rcel   *vrast;			 /* virtual destination raster */
-	Rcel   workcel; 		 /* work raster for creating a virtual raster */
-	int    swidth;			 /* integer width of source raster */
-	int    sheight; 		 /* integer height of source raster */
-	double srcblkw; 		 /* real width	of source averaging block */
-	double srcblkh; 		 /* real height of source averaging block */
-	int    vwidth;			 /* virtual dest width	*/
-	int    vheight; 		 /* virtual dest height */
-	int    bpr; 			 /* bytes per row in source raster */
-	Pixel  *srastbuf;		 /* pointer to source raster in memory */
-	Pixel  *allocbuf = NULL; /* pointer to allocated raster, if allocated */
+	Rcel* vrast;            /* virtual destination raster */
+	Rcel workcel;           /* work raster for creating a virtual raster */
+	int swidth;             /* integer width of source raster */
+	int sheight;            /* integer height of source raster */
+	double srcblkw;         /* real width	of source averaging block */
+	double srcblkh;         /* real height of source averaging block */
+	int vwidth;             /* virtual dest width	*/
+	int vheight;            /* virtual dest height */
+	int bpr;                /* bytes per row in source raster */
+	Pixel* srastbuf;        /* pointer to source raster in memory */
+	Pixel* allocbuf = NULL; /* pointer to allocated raster, if allocated */
 
 	/*------------------------------------------------------------------------
 	 * validate parms
 	 *----------------------------------------------------------------------*/
 
-	if (NULL == sscreen || NULL == dscreen)
+	if (NULL == sscreen || NULL == dscreen) {
 		return builtin_err = Err_null_ref;
+	}
 
 	if (dwidth < MIN_PSWIDTH || dheight < MIN_PSHEIGHT) {
-		return builtin_err = poeQerror(
-			Err_parameter_range,
-			"Cannot make a %d x %d postage stamp image.  "
-			"The smallest allowable image size is %d x %d.",
-			dwidth, dheight, MIN_PSWIDTH, MIN_PSHEIGHT);
+		return builtin_err = poeQerror(Err_parameter_range,
+									   "Cannot make a %d x %d postage stamp image.  "
+									   "The smallest allowable image size is %d x %d.",
+									   dwidth, dheight, MIN_PSWIDTH, MIN_PSHEIGHT);
 	}
 
 	if (dwidth > MAX_PSWIDTH) {
-		return builtin_err = poeQerror(
-			Err_too_big,
-			"Cannot make a %d x %d postage stamp image.  "
-			"The largest allowable image width is %d.",
-			dwidth, dheight, MAX_PSWIDTH);
+		return builtin_err = poeQerror(Err_too_big,
+									   "Cannot make a %d x %d postage stamp image.  "
+									   "The largest allowable image width is %d.",
+									   dwidth, dheight, MAX_PSWIDTH);
 	}
 
 	/*------------------------------------------------------------------------
@@ -269,21 +264,20 @@ Errcode make_pstamp(void* sscreen, void* dscreen,
 	 *----------------------------------------------------------------------*/
 
 	{
-		register Rcel *srast = sscreen;
+		register Rcel* srast = sscreen;
 
-		swidth	= srast->width;
+		swidth = srast->width;
 		sheight = srast->height;
 
 		if (srast->cmap->num_colors > Array_els(rtab)) {
 			return builtin_err = Err_too_big;
-		}
-		else {
+		} else {
 			unload_ctab(srast->cmap->ctab, srast->cmap->num_colors);
 		}
 
 		if (srast->type == RT_BYTEMAP) {
 			srastbuf = srast->u.hw.bm.bp[0];
-			bpr 	= srast->u.hw.bm.bpr;
+			bpr = srast->u.hw.bm.bpr;
 		} else {
 			allocbuf = malloc(srast->width * srast->height);
 			if (allocbuf == NULL) {
@@ -291,7 +285,7 @@ Errcode make_pstamp(void* sscreen, void* dscreen,
 				goto ERROR_EXIT;
 			}
 			srastbuf = allocbuf;
-			bpr 	= srast->width;
+			bpr = srast->width;
 			pj_get_rectpix(srast, srastbuf, 0, 0, srast->width, srast->height);
 		}
 	}
@@ -304,16 +298,16 @@ Errcode make_pstamp(void* sscreen, void* dscreen,
 	 *----------------------------------------------------------------------*/
 
 	if (swidth <= dwidth) {
-		srcblkw  = 1.0;
-		vwidth	 = swidth;
+		srcblkw = 1.0;
+		vwidth = swidth;
 	} else {
 		srcblkw = swidth / (double)dwidth;
-		vwidth	= dwidth;
+		vwidth = dwidth;
 	}
 
 	if (sheight <= dheight) {
-		srcblkh  = 1.0;
-		vheight  = sheight;
+		srcblkh = 1.0;
+		vheight = sheight;
 	} else {
 		srcblkh = sheight / (double)dheight;
 		vheight = dheight;
@@ -329,13 +323,14 @@ Errcode make_pstamp(void* sscreen, void* dscreen,
 	{
 		Rectangle workrect;
 
-		workrect.x		= dxstart + ((dwidth-vwidth) >> 1);
-		workrect.y		= dystart + ((dheight-vheight) >> 1);
-		workrect.width	= vwidth;
+		workrect.x = dxstart + ((dwidth - vwidth) >> 1);
+		workrect.y = dystart + ((dheight - vheight) >> 1);
+		workrect.width = vwidth;
 		workrect.height = vheight;
 
-		if (!pj_rcel_make_virtual(&workcel, (Rcel *)dscreen, &workrect))
+		if (!pj_rcel_make_virtual(&workcel, (Rcel*)dscreen, &workrect)) {
 			goto ERROR_EXIT;
+		}
 		vrast = &workcel;
 	}
 
@@ -359,7 +354,7 @@ Errcode make_pstamp(void* sscreen, void* dscreen,
 	 *----------------------------------------------------------------------*/
 
 	if (draw_border) {
-		draw_box((Rcel *)dscreen, BORDER_COLOR_IDX, dxstart, dystart, dwidth, dheight);
+		draw_box((Rcel*)dscreen, BORDER_COLOR_IDX, dxstart, dystart, dwidth, dheight);
 	}
 
 ERROR_EXIT:
@@ -379,12 +374,11 @@ ERROR_EXIT:
  *
  * interesting idea, sounds real slow; maybe it'll get done someday.
  ****************************************************************************/
-int pstamp_difference(void* screen1, int srcx, int srcy,
-					  void* screen2, int dx, int vy, int dw, int dh)
+int pstamp_difference(void* screen1, int srcx, int srcy, void* screen2, int dx, int vy, int dw,
+					  int dh)
 {
 	return 1;
 }
-
 
 /*****************************************************************************
  * initialize the screen/raster upon which the postage stamps will be drawn.
@@ -394,9 +388,9 @@ int pstamp_difference(void* screen1, int srcx, int srcy,
  ****************************************************************************/
 void init_pstamp_screen(void* screen)
 {
-	Rgb3 *ptab;
-	Rcel *rast;
-	int   r, g, b;
+	Rgb3* ptab;
+	Rcel* rast;
+	int r, g, b;
 
 	if (NULL == (rast = screen)) {
 		builtin_err = Err_null_ref;
@@ -406,12 +400,12 @@ void init_pstamp_screen(void* screen)
 	ptab = rast->cmap->ctab;
 	ptab[BORDER_COLOR_IDX] = border_color_rgb;
 
-	for (r=0; r<6; ++r) {
-		for (g=0; g<6; ++g) {
-			for (b=0; b<6; ++b) {
-				ptab->r = RGB_MAX*r/6;
-				ptab->g = RGB_MAX*g/6;
-				ptab->b = RGB_MAX*b/6;
+	for (r = 0; r < 6; ++r) {
+		for (g = 0; g < 6; ++g) {
+			for (b = 0; b < 6; ++b) {
+				ptab->r = RGB_MAX * r / 6;
+				ptab->g = RGB_MAX * g / 6;
+				ptab->b = RGB_MAX * b / 6;
 				++ptab;
 			}
 		}
@@ -420,14 +414,27 @@ void init_pstamp_screen(void* screen)
 	pj_cmap_load(rast, rast->cmap);
 	pj_set_rast(rast, 0);
 
-// #region agent log
-{int _fd=open("/Users/kiki/dev/animatorpro/.cursor/debug.log",O_WRONLY|O_CREAT|O_APPEND,0644);if(_fd>=0){char _b[256];int _n=snprintf(_b,sizeof(_b),"{\"hypothesisId\":\"H20\",\"runId\":\"post-fix\",\"location\":\"pstamp.c:init_pstamp_screen\",\"message\":\"pre-GetPicScreen\",\"data\":{\"rast\":\"%p\",\"_plptr\":\"%p\",\"fn\":\"%p\"}}\n",(void*)rast,(void*)_plptr,(void*)(_plptr?_plptr->pl_getpicscreen:0));write(_fd,_b,_n);close(_fd);}}
-// #endregion
+	// #region agent log
+	{
+		int _fd = open("/Users/kiki/dev/animatorpro/.cursor/debug.log",
+					   O_WRONLY | O_CREAT | O_APPEND, 0644);
+		if (_fd >= 0) {
+			char _b[256];
+			int _n =
+				snprintf(_b, sizeof(_b),
+						 "{\"hypothesisId\":\"H20\",\"runId\":\"post-fix\",\"location\":\"pstamp.c:"
+						 "init_pstamp_screen\",\"message\":\"pre-GetPicScreen\",\"data\":{\"rast\":"
+						 "\"%p\",\"_plptr\":\"%p\",\"fn\":\"%p\"}}\n",
+						 (void*)rast, (void*)_plptr, (void*)(_plptr ? _plptr->pl_getpicscreen : 0));
+			write(_fd, _b, _n);
+			close(_fd);
+		}
+	}
+	// #endregion
 	if (rast == GetPicScreen()) {
 		poePicDirtied();
 	}
 }
-
 
 /*****************************************************************************
  * if the screen the pstamps were being drawn onto is the main picscreen,
@@ -435,27 +442,41 @@ void init_pstamp_screen(void* screen)
  ****************************************************************************/
 void cleanup_pstamp_screen(void* screen)
 {
-// #region agent log
-{int _fd=open("/Users/kiki/dev/animatorpro/.cursor/debug.log",O_WRONLY|O_CREAT|O_APPEND,0644);if(_fd>=0){char _b[256];int _n=snprintf(_b,sizeof(_b),"{\"hypothesisId\":\"H20\",\"runId\":\"post-fix\",\"location\":\"pstamp.c:cleanup\",\"message\":\"pre-GetPicScreen\",\"data\":{\"screen\":\"%p\",\"_plptr\":\"%p\"}}\n",(void*)screen,(void*)_plptr);write(_fd,_b,_n);close(_fd);}}
-// #endregion
-	if (screen == GetPicScreen())
+	// #region agent log
+	{
+		int _fd = open("/Users/kiki/dev/animatorpro/.cursor/debug.log",
+					   O_WRONLY | O_CREAT | O_APPEND, 0644);
+		if (_fd >= 0) {
+			char _b[256];
+			int _n = snprintf(_b, sizeof(_b),
+							  "{\"hypothesisId\":\"H20\",\"runId\":\"post-fix\",\"location\":"
+							  "\"pstamp.c:cleanup\",\"message\":\"pre-GetPicScreen\",\"data\":{"
+							  "\"screen\":\"%p\",\"_plptr\":\"%p\"}}\n",
+							  (void*)screen, (void*)_plptr);
+			write(_fd, _b, _n);
+			close(_fd);
+		}
+	}
+	// #endregion
+	if (screen == GetPicScreen()) {
 		poePicDirtied();
+	}
 }
-
 
 /*----------------------------------------------------------------------------
  * Setup rexlib/pocorex interface structures...
  *--------------------------------------------------------------------------*/
 static Lib_proto calls[] = {
-	{ init_pstamp_screen,	"void    InitPstampScreen(Screen *s);"},
+	{init_pstamp_screen, "void    InitPstampScreen(Screen *s);"},
 
-	{ cleanup_pstamp_screen,"void    CleanupPstampScreen(Screen *s);"},
+	{cleanup_pstamp_screen, "void    CleanupPstampScreen(Screen *s);"},
 
-	{ make_pstamp,			"void    MakePstamp(Screen *source, Screen *dest,"
-							" int dx, int dy, int dw, int dh, Boolean draw_border);"},
+	{make_pstamp,
+	 "void    MakePstamp(Screen *source, Screen *dest,"
+	 " int dx, int dy, int dw, int dh, Boolean draw_border);"},
 
-//	{ pstamp_difference,	"int     PstampDifference(Screen *s1, int srcx, int srcy,"
-//							" Screen *s2, int dx, int vy, int dw, int dh);"},
+	//	{ pstamp_difference,	"int     PstampDifference(Screen *s1, int srcx, int srcy,"
+	//							" Screen *s2, int dx, int vy, int dw, int dh);"},
 
 };
 

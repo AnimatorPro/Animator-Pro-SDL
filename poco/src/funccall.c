@@ -44,8 +44,7 @@
 
 #include "poco.h"
 
-typedef struct ffi_vararg_type
-{
+typedef struct ffi_vararg_type {
 	struct ffi_vararg_type* next;
 	IdoType ido_type;
 } Ffi_vararg_type;
@@ -54,20 +53,26 @@ static int po_ffi_variadic_push_op(IdoType ido_type)
 {
 	switch (ido_type) {
 		case IDO_INT:
-			if (sizeof(int) == sizeof(int16_t))
+			if (sizeof(int) == sizeof(int16_t)) {
 				return OP_FFI_PUSH_SINT16;
-			if (sizeof(int) == sizeof(int32_t))
+			}
+			if (sizeof(int) == sizeof(int32_t)) {
 				return OP_FFI_PUSH_SINT32;
-			if (sizeof(int) == sizeof(int64_t))
+			}
+			if (sizeof(int) == sizeof(int64_t)) {
 				return OP_FFI_PUSH_SINT64;
+			}
 			break;
 		case IDO_LONG:
-			if (sizeof(long) == sizeof(int16_t))
+			if (sizeof(long) == sizeof(int16_t)) {
 				return OP_FFI_PUSH_SINT16;
-			if (sizeof(long) == sizeof(int32_t))
+			}
+			if (sizeof(long) == sizeof(int32_t)) {
 				return OP_FFI_PUSH_SINT32;
-			if (sizeof(long) == sizeof(int64_t))
+			}
+			if (sizeof(long) == sizeof(int64_t)) {
 				return OP_FFI_PUSH_SINT64;
+			}
 			break;
 		case IDO_DOUBLE:
 			return OP_FFI_PUSH_DOUBLE;
@@ -82,7 +87,7 @@ static int po_ffi_variadic_push_op(IdoType ido_type)
 /*****************************************************************************
  * return the size in bytes of a parameter to a function.
  ****************************************************************************/
-int po_get_param_size(Poco_cb* pcb, SHORT ido_type)
+int po_get_param_size(Poco_cb* pcb, SHORT ido_type, bool allow_struct)
 {
 	int psize;
 
@@ -102,6 +107,15 @@ int po_get_param_size(Poco_cb* pcb, SHORT ido_type)
 		case IDO_CPT:
 			psize = sizeof(void*);
 			break;
+		case IDO_STRUCT:
+			if (!allow_struct) {
+				po_say_fatal(pcb, "cannot pass structure by value to a Poco function");
+				PO_CHECK_ABORT(pcb, 0);
+				return 0;
+			}
+			/* The VM transports the bounded address; libffi receives a per-call copy. */
+			psize = sizeof(Popot);
+			break;
 #ifdef STRING_EXPERIMENT
 		case IDO_STRING:
 			psize = sizeof(PoString);
@@ -109,11 +123,11 @@ int po_get_param_size(Poco_cb* pcb, SHORT ido_type)
 #endif /* STRING_EXPERIMENT */
 		case IDO_VPT:
 			po_say_fatal(pcb, "missing '*' in parameter to function??");
-   PO_CHECK_ABORT(pcb, 0);
+			PO_CHECK_ABORT(pcb, 0);
 			break;
 		default:
 			po_say_fatal(pcb, "cannot pass structure by value (perhaps missing '*'?)");
-   PO_CHECK_ABORT(pcb, 0);
+			PO_CHECK_ABORT(pcb, 0);
 			break;
 	}
 	return (psize);
@@ -129,8 +143,8 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 	Symbol* param;
 	SHORT expected_count;
 	SHORT idot;
-	SHORT param_count	   = 0;
-	int param_size		   = 0;
+	SHORT param_count = 0;
+	int param_size = 0;
 	int this_param_size;
 	bool is_cvarg_call = false;
 	Exp_frame* param_exps = NULL;
@@ -140,7 +154,7 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 	Code_buf callcode;
 
 	po_init_code_buf(pcb, &callcode);
-	param		   = fff->parameters;
+	param = fff->parameters;
 	expected_count = fff->pcount;
 
 	for (;;) {
@@ -151,8 +165,8 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 			break;
 		}
 
-		exp        = po_new_expframe(pcb);
-		exp->next  = param_exps;
+		exp = po_new_expframe(pcb);
+		exp->next = param_exps;
 		param_exps = exp;
 		po_get_expression(pcb, exp);
 
@@ -162,18 +176,18 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 				if (po_is_pointer(&exp->ctc) || po_is_array(&exp->ctc)) {
 					po_code_op(pcb, &exp->ecd, OP_PPT_TO_CPT);
 					exp->ctc.comp[exp->ctc.comp_count - 1] = TYPE_CPT;
-					exp->ctc.ido_type					   = IDO_CPT;
+					exp->ctc.ido_type = IDO_CPT;
 				}
 #ifdef STRING_EXPERIMENT
 				else if (po_is_string(&exp->ctc)) {
 					po_code_op(pcb, &exp->ecd, OP_STRING_TO_CPT);
-					exp->ctc.comp[0]  = TYPE_CHAR;
-					exp->ctc.comp[1]  = TYPE_CPT;
+					exp->ctc.comp[0] = TYPE_CHAR;
+					exp->ctc.comp[1] = TYPE_CPT;
 					exp->ctc.ido_type = IDO_CPT;
 				}
 #endif /* STRING_EXPERIMENT */
 
-				this_param_size = po_get_param_size(pcb, exp->ctc.ido_type);
+				this_param_size = po_get_param_size(pcb, exp->ctc.ido_type, false);
 				Ffi_vararg_type* variadic_type = po_memalloc(pcb, sizeof(*variadic_type));
 				if (variadic_type == NULL) {
 					PO_CHECK_ABORT_VOID(pcb);
@@ -181,16 +195,33 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 				}
 				variadic_type->next = NULL;
 				variadic_type->ido_type = exp->ctc.ido_type;
-				if (variadic_tail == NULL)
+				if (variadic_tail == NULL) {
 					variadic_types = variadic_type;
-				else
+				} else {
 					variadic_tail->next = variadic_type;
+				}
 				variadic_tail = variadic_type;
 			}
 		} else {
-			// regular parameter
-			po_coerce_expression(pcb, exp, param->ti, false);
-			this_param_size					 = po_get_param_size(pcb, exp->ctc.ido_type);
+			/* A C aggregate is represented on the VM stack by its bounded lvalue
+			 * address.  po_ffi_call() copies the bytes into call-owned storage
+			 * before handing the argument to libffi. */
+			if (param->ti->ido_type == IDO_STRUCT) {
+				if (fff->type != CFF_C || exp->ctc.ido_type != IDO_STRUCT ||
+					!po_types_same(param->ti, &exp->ctc, 0) || param->ti->sdims == NULL ||
+					exp->ctc.sdims == NULL || param->ti->sdims[0].pt != exp->ctc.sdims[0].pt ||
+					!any_code(pcb, &exp->left)) {
+					po_say_fatal(pcb, "structure argument type mismatch in call to '%s'",
+								 fff->name);
+					PO_CHECK_ABORT_VOID(pcb);
+					return;
+				}
+				clear_code_buf(pcb, &exp->ecd);
+				po_copy_code(pcb, &exp->left, &exp->ecd);
+			} else {
+				po_coerce_expression(pcb, exp, param->ti, false);
+			}
+			this_param_size = po_get_param_size(pcb, exp->ctc.ido_type, fff->type == CFF_C);
 		}
 
 		++param_count;
@@ -233,14 +264,14 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 	}
 
 	if (param_count < expected_count) {
-	NOT_ENOUGH_PARMS:
+NOT_ENOUGH_PARMS:
 		po_say_fatal(pcb, "not enough parameters in call to function '%s'", fff->name);
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	if (pcb->t.toktype == ',') {
 		po_say_fatal(pcb, "too many parameters in call to function '%s'", fff->name);
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	po_eat_rparen(pcb);
@@ -269,9 +300,8 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 			const int op = po_ffi_variadic_push_op(variadic_types->ido_type);
 
 			if (op == OP_BAD) {
-				po_say_fatal(pcb,
-					"unsupported C variadic argument promotion in call to '%s'",
-					fff->name);
+				po_say_fatal(pcb, "unsupported C variadic argument promotion in call to '%s'",
+							 fff->name);
 				PO_CHECK_ABORT_VOID(pcb);
 				return;
 			}
@@ -325,7 +355,7 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 void po_get_function(Poco_cb* pcb, Exp_frame* e)
 {
 	Type_info* ti = &e->ctc;
-	int end_type  = ti->comp[ti->comp_count - 1];
+	int end_type = ti->comp[ti->comp_count - 1];
 	Func_frame* fuf;
 
 	if (end_type == TYPE_POINTER && ti->comp_count > 2 &&
@@ -338,7 +368,7 @@ void po_get_function(Poco_cb* pcb, Exp_frame* e)
 
 	if (end_type != TYPE_FUNCTION) {
 		po_say_fatal(pcb, "trying to call something that's not a function");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 
@@ -351,10 +381,10 @@ void po_get_function(Poco_cb* pcb, Exp_frame* e)
 	mk_function_call(pcb, e, fuf, end_type);
 
 	clear_code_buf(pcb, &e->left); /* if we had code in the left side, nuke  */
-	e->left_complex = false;	   /* it, we've now processed it into a call.*/
+	e->left_complex = false;       /* it, we've now processed it into a call.*/
 
-	if (end_type == TYPE_POINTER)		   /* if function returns a pointer  */
-	{									   /* put a NOP into the left buffer,*/
+	if (end_type == TYPE_POINTER)          /* if function returns a pointer  */
+	{                                      /* put a NOP into the left buffer,*/
 		po_code_op(pcb, &e->left, OP_NOP); /* to signal we do have an lval.  */
-	}									   /* if it gets deref'd the NOP gets*/
+	} /* if it gets deref'd the NOP gets*/
 } /* replaced by the call code later*/

@@ -3,12 +3,13 @@
 #include "fli.h"
 #include "animinfo.h"
 
-Errcode pj_fli_info(char *path, Anim_info *ainfo)
+Errcode pj_fli_info(char* path, Anim_info* ainfo)
 {
-Errcode err;
-Flifile flif;
+	Errcode err;
+	Flifile flif;
 
-	if((err = pj_fli_info_open(&flif, path, ainfo)) >= Success)
+	if ((err = pj_fli_info_open(&flif, path, ainfo)) >= Success) {
 		pj_fli_close(&flif);
-	return(err);
+	}
+	return (err);
 }

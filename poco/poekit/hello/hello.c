@@ -23,7 +23,7 @@ static const PocoModuleDescriptor hello_module = {
 	.library = &hello_library,
 };
 
-POCO_MODULE_EXPORT const PocoModuleDescriptor *poco_module_get(void)
+POCO_MODULE_EXPORT const PocoModuleDescriptor* poco_module_get(void)
 {
 	return &hello_module;
 }

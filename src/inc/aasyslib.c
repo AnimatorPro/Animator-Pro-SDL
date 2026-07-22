@@ -5,11 +5,11 @@
 
 char fmt1[] = "sysl_%s equ +0%xH\n";
 
-#define sloset(f) sfoset(fmt1,Syslib,f,f)
+#define sloset(f) sfoset(fmt1, Syslib, f, f)
 
-main(int argc,char **argv)
+main(int argc, char** argv)
 {
-	openit(argc,argv);
+	openit(argc, argv);
 
 	sloset(malloc);
 	sloset(zalloc);
@@ -20,12 +20,12 @@ main(int argc,char **argv)
 	sloset(strcpy);
 	sloset(strlen);
 	sloset(strcmp);
-	sloset(pj_get_path_suffix); 
+	sloset(pj_get_path_suffix);
 	sloset(pj_get_path_name);
 
 	sloset(pj_rex_load);
 	sloset(pj_rex_free);
- 	sloset(pj_rexlib_load);
+	sloset(pj_rexlib_load);
 	sloset(pj_rexlib_init);
 	sloset(pj_rexlib_free);
 

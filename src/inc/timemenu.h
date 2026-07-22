@@ -35,11 +35,11 @@ extern void kill_a_frame(void);
 extern void set_total_frames(void);
 extern void redraw_range_buttons(void);
 extern void do_time_menu(void);
-extern void go_time_menu(void *data);
+extern void go_time_menu(void* data);
 
 /* tseg.c */
-extern void redraw_tseg(struct button *b);
-extern void change_time_mode(struct button *m);
+extern void redraw_tseg(struct button* b);
+extern void change_time_mode(struct button* m);
 
 /* vpsubs.c */
 extern void init_seq(void);

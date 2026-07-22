@@ -1,25 +1,22 @@
 #include "memory.h"
 #include "linklist.h"
 
-void *
-sort_slist(register Slnode *list,
-		int (*cmp)(void *a, void *b, void *cmpdat), void *cmpdat)
+void* sort_slist(register Slnode* list, int (*cmp)(void* a, void* b, void* cmpdat), void* cmpdat)
 {
-register void **array, **array_pt;
-register Slnode *pt;
-register int elements, i;
+	register void **array, **array_pt;
+	register Slnode* pt;
+	register int elements, i;
 
 	elements = slist_len(list);
-	if (elements <= 1)
-		return(list);	/* length 0 or 1 lists already sorted */
+	if (elements <= 1) {
+		return (list); /* length 0 or 1 lists already sorted */
+	}
 
-	array = pj_malloc( elements * sizeof(void *));
-	if (array)
-	{
+	array = pj_malloc(elements * sizeof(void*));
+	if (array) {
 		pt = list;
 		array_pt = array;
-		while ( pt )
-		{
+		while (pt) {
 			*array_pt++ = pt;
 			pt = pt->next;
 		}
@@ -27,13 +24,12 @@ register int elements, i;
 		array_pt = array;
 		list = NULL;
 		i = elements;
-		while (--i >= 0)
-		{
+		while (--i >= 0) {
 			pt = *array_pt++;
 			pt->next = list;
 			list = pt;
 		}
-		pj_free( array );
+		pj_free(array);
 	}
-	return(list);
+	return (list);
 }

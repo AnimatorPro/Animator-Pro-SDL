@@ -37,9 +37,11 @@
 static Struct_info* in_sif_list(register Struct_info* l, char* name)
 {
 	while (l != NULL) {
-		if (l->name[0] == *name) /* quick-check 1st char before strcmp call */
-			if (po_eqstrcmp(l->name, name) == 0)
+		if (l->name[0] == *name) { /* quick-check 1st char before strcmp call */
+			if (po_eqstrcmp(l->name, name) == 0) {
 				return (l);
+			}
+		}
 		l = l->next;
 	}
 	return (NULL);
@@ -54,8 +56,9 @@ static Struct_info* find_sif(Poco_cb* pcb, Poco_frame* pf, char* name)
 	(void)pcb;
 
 	while (pf != NULL) {
-		if ((sif = in_sif_list(pf->fsif, name)) != NULL)
+		if ((sif = in_sif_list(pf->fsif, name)) != NULL) {
 			return (sif);
+		}
 		pf = pf->next;
 	}
 	return (NULL);
@@ -68,11 +71,11 @@ static Struct_info* new_sif(Poco_cb* pcb, Poco_frame* pf, char* name)
 {
 	Struct_info* new;
 
-	new		  = po_memzalloc(pcb, sizeof(*new) + strlen(name) + 1);
+	new = po_memzalloc(pcb, sizeof(*new) + strlen(name) + 1);
 	new->name = (char*)(new + 1);
 	strcpy(new->name, name);
 	new->next = pf->fsif;
-	pf->fsif  = new;
+	pf->fsif = new;
 	return (new);
 }
 
@@ -115,28 +118,29 @@ static void pf_to_sif(Poco_cb* pcb, Poco_frame* pf, Struct_info* sif, SHORT ttyp
 		link = s->link;
 		if (s->tok_type == PTOK_VAR) {
 			s->next = s->link = sif->elements;
-			sif->elements	  = s;
+			sif->elements = s;
 		} else {
 			po_free_symbol(s);
 		}
 		s = link;
 	}
 	pf->symbols = NULL;
-	s			= sif->elements;
+	s = sif->elements;
 	while (s != NULL) {
 		sif->el_count += 1;
 		size = po_get_type_size(s->ti);
 		if (size == 0) {
 			po_say_fatal(pcb, "element %s in structure/union is of unknown size/type", s->name);
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 		}
 		if (ttype == TYPE_STRUCT) {
 			s->symval.doff = sif->size;
 			sif->size += size;
 		} else {
 			s->symval.doff = 0;
-			if (sif->size < size)
+			if (sif->size < size) {
 				sif->size = size;
+			}
 		}
 		s = s->next;
 	}
@@ -151,19 +155,21 @@ static void pf_to_sif(Poco_cb* pcb, Poco_frame* pf, Struct_info* sif, SHORT ttyp
 void po_move_sifs_to_parent(Poco_cb* pcb)
 {
 	Struct_info* sifs; /* -> last sif in chain tied to current frame */
-	Poco_frame* pf;	   /* -> current frame */
-	Poco_frame* rf;	   /* -> parent frame */
+	Poco_frame* pf;    /* -> current frame */
+	Poco_frame* rf;    /* -> parent frame */
 
 	rf = pf = pcb->rframe;
-	while (rf->frame_type == FTY_STRUCT) /* find parent func/global frame */
+	while (rf->frame_type == FTY_STRUCT) { /* find parent func/global frame */
 		rf = rf->next;
+	}
 
 	sifs = pf->fsif;
-	while (sifs->next != NULL) /* find end of sif chain */
+	while (sifs->next != NULL) { /* find end of sif chain */
 		sifs = sifs->next;
+	}
 
 	sifs->next = rf->fsif; /* concatenate sif chain of current 	*/
-	rf->fsif   = pf->fsif; /* frame ahead of chain on parent frame 	*/
+	rf->fsif = pf->fsif;   /* frame ahead of chain on parent frame 	*/
 
 	pf->fsif = NULL; /* prevent chain from being free'd      */
 }
@@ -185,7 +191,7 @@ static void get_enum_block(Poco_cb* pcb, Poco_frame* pf)
 		ttype = pcb->t.toktype;
 		switch (ttype) {
 			case PTOK_UNDEF:
-				s			= pcb->curtoken->val.symbol;
+				s = pcb->curtoken->val.symbol;
 				s->tok_type = PTOK_ENUMCONST;
 				po_need_token(pcb);
 				if (pcb->t.toktype != '=') {
@@ -197,13 +203,13 @@ static void get_enum_block(Poco_cb* pcb, Poco_frame* pf)
 					po_trash_expframe(pcb, &ef);
 				}
 				s->symval.i = curval++;
-				ttype		= po_need_comma_or_brace(pcb);
+				ttype = po_need_comma_or_brace(pcb);
 				break;
 			case TOK_RBRACE:
 				break;
 			case PTOK_VAR:
 				po_say_fatal(pcb, "enum constant name redefined");
-    PO_CHECK_ABORT_VOID(pcb);
+				PO_CHECK_ABORT_VOID(pcb);
 				break;
 			default:
 				po_expecting_got(pcb, "name of enum constant or }");
@@ -236,23 +242,24 @@ Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf, SHORT struct_union_ttyp
 		case PTOK_LABEL:
 
 			name = pcb->curtoken->val.symbol->name;
-			sif	 = find_sif(pcb, pf, name);
-			if (sif != NULL)						   /* Handle strange ANSI	*/
-			{										   /* rule:  if struct tag */
-				lookup_token(pcb);					   /* exists at another	*/
-				if (pcb->t.toktype == ';')			   /* scope, and this def  */
-				{									   /* is 'struct name;',   */
+			sif = find_sif(pcb, pf, name);
+			if (sif != NULL)                           /* Handle strange ANSI	*/
+			{                                          /* rule:  if struct tag */
+				lookup_token(pcb);                     /* exists at another	*/
+				if (pcb->t.toktype == ';')             /* scope, and this def  */
+				{                                      /* is 'struct name;',   */
 					sif = in_sif_list(pf->fsif, name); /* then we build a new	*/
-				}									   /* incomplete definition*/
-				pushback_token(&pcb->t);			   /* at the current scope.*/
+				} /* incomplete definition*/
+				pushback_token(&pcb->t); /* at the current scope.*/
 			}
-			if (sif == NULL)
+			if (sif == NULL) {
 				sif = new_sif(pcb, pf, name);
+			}
 			break;
 
 		default:
 			po_say_fatal(pcb, "malformed name for struct/union/enum...");
-   PO_CHECK_ABORT(pcb, NULL);
+			PO_CHECK_ABORT(pcb, NULL);
 			goto ERROR;
 	}
 
@@ -261,7 +268,7 @@ Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf, SHORT struct_union_ttyp
 	if (pcb->t.toktype == TOK_LBRACE) {
 		if (sif->size != 0) {
 			po_say_fatal(pcb, "struct/union/enum tag redefined");
-   PO_CHECK_ABORT(pcb, NULL);
+			PO_CHECK_ABORT(pcb, NULL);
 			goto ERROR;
 		}
 		if (struct_union_ttype == TYPE_ENUM) {
@@ -271,13 +278,15 @@ Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf, SHORT struct_union_ttyp
 			po_new_frame(pcb, pf->scope + 1, sif->name, FTY_STRUCT);
 			po_get_block(pcb, pcb->rframe);
 			pf_to_sif(pcb, pcb->rframe, sif, struct_union_ttype);
-			if (pcb->rframe->fsif != NULL)
+			if (pcb->rframe->fsif != NULL) {
 				po_move_sifs_to_parent(pcb);
+			}
 			po_old_frame(pcb);
 		}
 		sif->type = struct_union_ttype;
-	} else
+	} else {
 		pushback_token(&pcb->t);
+	}
 
 	return (sif);
 

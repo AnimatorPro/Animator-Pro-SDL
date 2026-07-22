@@ -27,22 +27,22 @@ static Sgroup1_data qmu_sh1dat = {
 Button qmu_clus_sel = MB_INIT1(NONEXT, NOCHILD, 78, 9, 128, 44, /* w,h,x,y */
 							   NOTEXT, see_crb, feel_crb, ppalette, NULL, 0, NOKEY, 0);
 
-void see_undo(Button *b)
+void see_undo(Button* b)
 {
 	set_button_disable(b, (vl.undoit == NULL));
 	ccorner_text(b);
 }
 
-void see_redo(Button *b)
+void see_redo(Button* b)
 {
 	set_button_disable(b, (vl.redoit == NULL));
 	ccorner_text(b);
 }
 
-void see_clusid(Button *b)
+void see_clusid(Button* b)
 {
 	char clusid[2];
-	char *dat;
+	char* dat;
 
 	dat = b->datme;
 	clusid[0] = dat[vs.use_bun]; /* 1 or 0 */
@@ -52,7 +52,7 @@ void see_clusid(Button *b)
 	b->datme = dat;
 }
 
-void toggle_clusid(Button *b)
+void toggle_clusid(Button* b)
 {
 	set_use_bun(!vs.use_bun);
 	draw_buttontop(b);
@@ -192,7 +192,7 @@ static Button qmu_grid_sel =
 			 ncorner_text, toggle_bgroup, qgrid, &vs.use_grid, 1, NOKEY, MB_B_GHILITE /* flags */
 	);
 
-void see_mask_button(Button *b)
+void see_mask_button(Button* b)
 {
 	set_button_disable(b, (mask_rast == NULL));
 	ncorner_text(b);
@@ -242,7 +242,7 @@ static Button qmu_title_sel =
 	MB_INIT1(&qmu_undo_sel, NOCHILD, 53, 9, 3, 3, NODATA, see_titlebar, mb_move_quickmenu,
 			 mb_quickmenu_to_bottom, NOGROUP, 0, NOKEY, 0);
 
-static void qmu_color_redraw(void *dat, USHORT why)
+static void qmu_color_redraw(void* dat, USHORT why)
 {
 	(void)dat;
 	(void)why;
@@ -258,7 +258,7 @@ static Redraw_node quick_rn = {{NULL, NULL}, /* node */
 							   NULL,
 							   NEW_CCOLOR};
 
-static void qmu_on_showhide(Menuhdr *mh, bool showing)
+static void qmu_on_showhide(Menuhdr* mh, bool showing)
 {
 	(void)mh;
 
@@ -294,7 +294,7 @@ Errcode go_quick_menu(void)
 {
 	Errcode err;
 	Menuhdr tpull;
-	void *ss;
+	void* ss;
 
 	err = soft_buttons("home_panel", home_smblist, Array_els(home_smblist), &ss);
 	if (err < Success) {
@@ -310,7 +310,7 @@ Errcode go_quick_menu(void)
 	const char* menu_name = "home_with_poco";
 #else
 	const char* menu_name = "home";
-#endif // WITH_POCO
+#endif  // WITH_POCO
 
 	err = load_soft_pull(&tpull, 0, menu_name, MAINP_MUID, main_selit, do_mainpull);
 	if (err < Success) {
@@ -320,9 +320,9 @@ Errcode go_quick_menu(void)
 #ifdef WITH_POCO
 	err = init_poco_pull(&tpull, POC_DOT_PUL, POC_PUL);
 	if (err < Success) {
-        xfprintf(xstderr, "init_poco_pull failed\n");
+		xfprintf(xstderr, "init_poco_pull failed\n");
 	}
-#endif // WITH_POCO
+#endif  // WITH_POCO
 
 	scale_pull(&tpull, 0); /* scale poco stuff too... */
 	err = do_menuloop(vb.screen, &quick_menu, NULL, &tpull, home_dokeys);
@@ -334,13 +334,13 @@ error:
 	return err;
 }
 
-void see_crb(Button *m)
+void see_crb(Button* m)
 {
 	m->identity = (SHORT)vs.use_bun;
 	see_cluster(m);
 }
 
-void feel_crb(Button *m)
+void feel_crb(Button* m)
 {
 	m->identity = (SHORT)vs.use_bun;
 	feel_cluster(m);

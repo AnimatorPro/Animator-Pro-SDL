@@ -1,0 +1,6 @@
+#pragma poco use "dedup_library.poc"
+
+int main(void)
+{
+	return dedup_value();
+}

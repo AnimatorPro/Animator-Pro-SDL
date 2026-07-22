@@ -2,7 +2,7 @@
 #include "errcodes.h"
 #include "memory.h"
 
-Errcode pj_alloc_bitmap(Rasthdr *spec, Bitmap **prr)
+Errcode pj_alloc_bitmap(Rasthdr* spec, Bitmap** prr)
 
 /* this will allocate and initialize an entire Bitmap using the input Bitmap
  * as a specification for what size etc to open up. It must be supplied with
@@ -18,20 +18,20 @@ Errcode pj_alloc_bitmap(Rasthdr *spec, Bitmap **prr)
  *
  */
 {
-register Bitmap *rr;
-Errcode err;
+	register Bitmap* rr;
+	Errcode err;
 
-	if((rr = pj_malloc((LONG)sizeof(Bitmap))) == NULL)
-	{
+	if ((rr = pj_malloc((LONG)sizeof(Bitmap))) == NULL) {
 		err = Err_no_memory;
 		goto error;
 	}
-	if((err = pj_open_bitmap(spec,rr)) < 0)
+	if ((err = pj_open_bitmap(spec, rr)) < 0) {
 		goto error;
+	}
 
 	*prr = rr;
-	return(0);
+	return (0);
 error:
 	pj_gentle_free(rr);
-	return(err);
+	return (err);
 }

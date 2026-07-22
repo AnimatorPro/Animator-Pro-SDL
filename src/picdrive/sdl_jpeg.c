@@ -1,5 +1,5 @@
 /*****************************************************************************
-* sdl_jpeg.c - picdriver for loading JPEG files through SDL_Image
+ * sdl_jpeg.c - picdriver for loading JPEG files through SDL_Image
  ****************************************************************************/
 
 /*----------------------------------------------------------------------------
@@ -18,16 +18,15 @@
 #include "jimk.h"
 #include "sdl_pdr.h"
 
-
 // ---------------------------------------------------------------------------
 /*
  * Wrapper for SDL_Image's IMG_SaveJPG function that passes in
  * the quality parameter from the vs.pic_save_quality variable.
  */
-static bool sdlpdr_save_jpeg(SDL_Surface *surface, char *path) {
+static bool sdlpdr_save_jpeg(SDL_Surface* surface, char* path)
+{
 	return IMG_SaveJPG(surface, path, vs.pic_save_quality);
 }
-
 
 /*----------------------------------------------------------------------------
  * Setup rex & pdr interface structures...
@@ -39,10 +38,4 @@ static char long_description[] =
 	"at load time.";
 
 
-SDL_PDR_CREATE(JPEG,
-			   "JPEG Format (SDL)",
-			   long_description,
-			   "jpg;jpeg",
-			   IMG_Load,
-			   sdlpdr_save_jpeg);
-
+SDL_PDR_CREATE(JPEG, "JPEG Format (SDL)", long_description, "jpg;jpeg", IMG_Load, sdlpdr_save_jpeg);

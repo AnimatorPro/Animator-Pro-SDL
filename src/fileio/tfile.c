@@ -35,4 +35,3 @@ Errcode set_temp_path(const char* new_path)
 	(void)new_path;
 	return Success;
 }
-

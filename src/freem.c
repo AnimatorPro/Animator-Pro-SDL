@@ -40,8 +40,9 @@ static Errcode push_alt_id(LONG id)
 
 	if (pushed_alt == 0) {
 		if (vl.alt_cel) {
-			if ((err = save_pic(alt_name, vl.alt_cel, id, true)) < 0)
+			if ((err = save_pic(alt_name, vl.alt_cel, id, true)) < 0) {
 				return (err);
+			}
 			pj_rcel_free(vl.alt_cel);
 			vl.alt_cel = NULL;
 		}
@@ -57,8 +58,9 @@ static Errcode push_screen_id(LONG timeid)
 	Errcode err;
 
 	if (pushed_screen == 0) {
-		if ((err = save_pic(screen_name, vb.pencel, timeid, true)) < 0)
+		if ((err = save_pic(screen_name, vb.pencel, timeid, true)) < 0) {
 			return (err);
+		}
 	}
 	pushed_screen++;
 	return 0;
@@ -71,8 +73,9 @@ Errcode pop_screen_id(LONG check_id)
 	if (--pushed_screen == 0) {
 		if (pj_exists(screen_name)) {
 			err = load_pic(screen_name, vb.pencel, check_id, true);
-			if (err < 0)
+			if (err < 0) {
 				return (err);
+			}
 			pj_delete(screen_name);
 			return Success;
 		}
@@ -97,8 +100,9 @@ Errcode push_cel(void)
 	Errcode err;
 
 	if (pushed_cel == 0) {
-		if (thecel != NULL && (err = save_fcel_temp(thecel)) < 0)
+		if (thecel != NULL && (err = save_fcel_temp(thecel)) < 0) {
 			return (err);
+		}
 		free_fcel(&thecel);
 	}
 	++pushed_cel;
@@ -128,8 +132,9 @@ static int push_mask(void)
 	if (pushed_mask == 0) {
 		if (mask_rast) {
 			err = save_the_mask(mask_name);
-			if (err < Success)
+			if (err < Success) {
 				return (err);
+			}
 			free_the_mask();
 		}
 	}
@@ -223,8 +228,8 @@ Errcode push_pics_id(LONG time_id)
 	return push_screen_id(time_id);
 }
 
-void set_trd_maxmem(void) {
-
+void set_trd_maxmem(void)
+{
 }
 
 /*** checker "task" called from within input loop installed by doauto() ***/
@@ -234,8 +239,9 @@ void pop_most(void)
 	pop_alt_id(0);
 	pop_cel();
 	pop_mask();
-	if (pushed_mask == 0 || pushed_alt == 0 || pushed_cel == 0)
+	if (pushed_mask == 0 || pushed_alt == 0 || pushed_cel == 0) {
 		set_trd_maxmem();
+	}
 }
 
 static char pshd, dps;

@@ -20,10 +20,10 @@
    The last item in the 'choices' list is always numbered zero,
    Err_abort is returned if this is selected or the space bar or right click
    outside menu area. do reqmenu may return an error and fail (no ram) */
-static int makedo_qchoice(char *header, char **choices, int ccount, VFUNC *feelers,
-						  bool hide_on_hit, USHORT *qc_flags)
+static int makedo_qchoice(char* header, char** choices, int ccount, VFUNC* feelers,
+						  bool hide_on_hit, USHORT* qc_flags)
 {
-	Menuhdr *qc;
+	Menuhdr* qc;
 	int ret = build_qchoice(icb.input_screen, &qc, header, choices, ccount, feelers, hide_on_hit,
 							qc_flags);
 	if (ret < 0) {
@@ -37,18 +37,19 @@ static int makedo_qchoice(char *header, char **choices, int ccount, VFUNC *feele
 
 /* Does not format and takes an array of strings returns 0 to 8 for choices
  * Err_abort if canceled other error code if error */
-int qchoice(USHORT *qc_flags, char *header, char **choices, int ccount)
+int qchoice(USHORT* qc_flags, char* header, char** choices, int ccount)
 {
 	return makedo_qchoice(header, choices, ccount, NULL, true, qc_flags);
 }
 
-int qchoice_feel(USHORT *qc_flags, char *header, char **choices, int ccount, bool hide_on_hit, VFUNC* feelers)
+int qchoice_feel(USHORT* qc_flags, char* header, char** choices, int ccount, bool hide_on_hit,
+				 VFUNC* feelers)
 {
 	return makedo_qchoice(header, choices, ccount, feelers, hide_on_hit, qc_flags);
 }
 
 
-static Errcode va_qchoicef(USHORT *qc_flags, char *formats, char *text, va_list args)
+static Errcode va_qchoicef(USHORT* qc_flags, char* formats, char* text, va_list args)
 
 /** takes input as one string with formatting info first line is header, each
  * subsequent line is a choice, returns Err_abort if Aborted or errcode on
@@ -56,8 +57,8 @@ static Errcode va_qchoicef(USHORT *qc_flags, char *formats, char *text, va_list 
 {
 	Errcode err;
 	unsigned int count;
-	char *choices[11];
-	char *tbuf;
+	char* choices[11];
+	char* tbuf;
 
 	tbuf = NULL;
 	if ((err = get_formatted_ftext(&tbuf, 0, formats, text, args, true)) <= 0) {
@@ -89,10 +90,10 @@ done:
 	return (softerr(err, "smu_choice"));
 }
 
-int qchoicef(USHORT *qc_flags, char *fmt, ...)
+int qchoicef(USHORT* qc_flags, char* fmt, ...)
 {
 	va_list args;
-	char *formats;
+	char* formats;
 	int ret;
 
 	va_start(args, fmt);
@@ -102,14 +103,14 @@ int qchoicef(USHORT *qc_flags, char *fmt, ...)
 	return (ret);
 }
 
-int soft_qchoice(USHORT *qc_flags, char *key, ...)
+int soft_qchoice(USHORT* qc_flags, char* key, ...)
 /* bring up formatted qchoice loaded from resource if key is the formats
  * string, ie: "!%..." the next item is the key followed by the args */
 {
 	Errcode err;
-	char *text;
+	char* text;
 	va_list args;
-	char *formats;
+	char* formats;
 
 	va_start(args, key);
 	if (NULL == (formats = ftext_format_type(&key, &args))) {

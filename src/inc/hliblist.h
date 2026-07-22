@@ -16,13 +16,13 @@
  *				this header file will #include <uselib.h> to do the actual
  *				work of building the list.
  *
- *				For rex-loadable modules which do not need host-provided 
+ *				For rex-loadable modules which do not need host-provided
  *				libraries, there is no need to include this header file, but
  *				there is no harm in doing so; it will not choke when there
  *				are no HLIB_TYPE_n macros defined.
  *
  * EXAMPLE:
- *				#include <rexlib.h> 
+ *				#include <rexlib.h>
  *				#define HLIB_TYPE_1 AA_STDIOLIB
  *				#define HLIB_TYPE_2 AA_POCOLIB
  *				#define HLIB_TYPE_3 AA_GFXLIB
@@ -34,9 +34,9 @@
  *				if none of the macros are defined; no host libraries will
  *				be set up in this case.
  * EXIT:
- *				C macro HLIB_LIST contains the name of the Hostlib 
+ *				C macro HLIB_LIST contains the name of the Hostlib
  *				structure which heads the list of structures built.  The
- *				value in this macro is suitable for initializing the 
+ *				value in this macro is suitable for initializing the
  *				hostlib list field in the Rexlib header structure (it already
  *				includes the '&' to take the address of the structure, for
  *				initializing a pointer field.)  If no libraries were set up,
@@ -50,46 +50,46 @@
  ****************************************************************************/
 
 #ifdef HLIB_TYPE_1
-  #define HLIB_TYPE HLIB_TYPE_1
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_1
+#include <usehlib.h>
 #endif
 
 #ifdef HLIB_TYPE_2
-  #define HLIB_TYPE HLIB_TYPE_2
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_2
+#include <usehlib.h>
 #endif
 
 #ifdef HLIB_TYPE_3
-  #define HLIB_TYPE HLIB_TYPE_3
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_3
+#include <usehlib.h>
 #endif
 
 #ifdef HLIB_TYPE_4
-  #define HLIB_TYPE HLIB_TYPE_4
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_4
+#include <usehlib.h>
 #endif
 
 #ifdef HLIB_TYPE_5
-  #define HLIB_TYPE HLIB_TYPE_5
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_5
+#include <usehlib.h>
 #endif
 
 #ifdef HLIB_TYPE_6
-  #define HLIB_TYPE HLIB_TYPE_6
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_6
+#include <usehlib.h>
 #endif
 
 #ifdef HLIB_TYPE_7
-  #define HLIB_TYPE HLIB_TYPE_7
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_7
+#include <usehlib.h>
 #endif
 
 #ifdef HLIB_TYPE_8
-  #define HLIB_TYPE HLIB_TYPE_8
-  #include <usehlib.h>
+#define HLIB_TYPE HLIB_TYPE_8
+#include <usehlib.h>
 #endif
 
-#ifdef HLIB_TYPE_9 
-  #define HLIB_TYPE HLIB_TYPE_9 
-  #include <usehlib.h>
+#ifdef HLIB_TYPE_9
+#define HLIB_TYPE HLIB_TYPE_9
+#include <usehlib.h>
 #endif

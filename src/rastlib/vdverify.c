@@ -2,10 +2,11 @@
 #include "errcodes.h"
 #include "vdevcall.h"
 
-Errcode pj_vd_verify_hardware(Vdevice *vd)
+Errcode pj_vd_verify_hardware(Vdevice* vd)
 /* verifys driver hardware exists */
 {
-	if (vd->lib->detect == NULL)
-		return(Err_driver_protocol);
-	return((*vd->lib->detect)(vd));
+	if (vd->lib->detect == NULL) {
+		return (Err_driver_protocol);
+	}
+	return ((*vd->lib->detect)(vd));
 }

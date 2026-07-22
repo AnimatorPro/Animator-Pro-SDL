@@ -34,11 +34,10 @@
 
 #include "fli.h"
 
-extern Errcode errline(Errcode err, char *fmt, ...);
+extern Errcode errline(Errcode err, char* fmt, ...);
 
-Errcode pj_fli_error_report(Errcode err, char *msg, char *filename)
+Errcode pj_fli_error_report(Errcode err, char* msg, char* filename)
 {
-
 #ifndef FLILIB_CODE
 
 	errline(err, msg, filename);

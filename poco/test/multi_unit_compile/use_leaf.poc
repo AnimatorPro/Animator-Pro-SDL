@@ -1,0 +1,11 @@
+int used_global = 7;
+
+int used_add(int value)
+{
+	return value + used_global;
+}
+
+static int hidden_used_function(void)
+{
+	return 99;
+}

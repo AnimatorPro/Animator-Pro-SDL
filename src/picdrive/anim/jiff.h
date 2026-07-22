@@ -1,7 +1,6 @@
 
 /* EA handy make a long from 4 chars macros redone to work with Aztec*/
-#define MAKE_ID(a, b, c, d)\
-	( ((long)(a)<<24) + ((long)(b)<<16) + ((long)(c)<<8) + (long)(d) )
+#define MAKE_ID(a, b, c, d) (((long)(a) << 24) + ((long)(b) << 16) + ((long)(c) << 8) + (long)(d))
 
 /* these are the IFF types I deal with */
 #define FORM MAKE_ID('F', 'O', 'R', 'M')
@@ -12,27 +11,23 @@
 #define RIFF MAKE_ID('R', 'I', 'F', 'F')
 #define VRUN MAKE_ID('V', 'R', 'U', 'N')
 
-union bytes4
-	{
+union bytes4 {
 	char b4_name[4];
 	long b4_type;
-	};
+};
 
-struct iff_chunk
-	{
+struct iff_chunk {
 	union bytes4 iff_type;
 	long iff_length;
-	};
+};
 
-struct form_chunk
-	{
+struct form_chunk {
 	union bytes4 fc_type; /* == FORM */
 	long fc_length;
 	union bytes4 fc_subtype;
-	};
+};
 
-struct BitMapHeader
-	{
+struct BitMapHeader {
 	USHORT w, h;
 	USHORT x, y;
 	UBYTE nPlanes;
@@ -42,4 +37,4 @@ struct BitMapHeader
 	USHORT transparentColor;
 	UBYTE xAspect, yAspect;
 	SHORT pageWidth, pageHeight;
-	};
+};

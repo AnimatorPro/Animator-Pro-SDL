@@ -22,7 +22,7 @@ int main(void)
 	int32_t result = 0;
 	PocoStatus status;
 
-	if (POCO_API_VERSION_MAJOR != 1) {
+	if (POCO_API_VERSION_MAJOR != 2) {
 		return 10;
 	}
 	status = poco_vm_create(NULL, &vm);

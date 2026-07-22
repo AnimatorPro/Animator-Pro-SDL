@@ -26,7 +26,7 @@ static const PocoModuleDescriptor generic_module = {
 	NULL,
 };
 
-POCO_MODULE_EXPORT const PocoModuleDescriptor *poco_module_get(void)
+POCO_MODULE_EXPORT const PocoModuleDescriptor* poco_module_get(void)
 {
 	return &generic_module;
 }

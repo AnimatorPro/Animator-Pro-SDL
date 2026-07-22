@@ -1,0 +1,6 @@
+#pragma poco use "use_leaf.poc"
+
+int main(void)
+{
+	return hidden_used_function();
+}

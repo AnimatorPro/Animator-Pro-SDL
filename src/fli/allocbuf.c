@@ -4,10 +4,9 @@
 #include "memory.h"
 #include "rcel.h"
 
-Errcode pj_fli_alloc_cbuf(Fli_frame **pcbuf, USHORT width,USHORT height, 
-				   LONG num_colors)
-/************************************************************************* 
- * Calculates compression buffer size needed and allocates memory 
+Errcode pj_fli_alloc_cbuf(Fli_frame** pcbuf, USHORT width, USHORT height, LONG num_colors)
+/*************************************************************************
+ * Calculates compression buffer size needed and allocates memory
  * for it in *pcbuf.  This should have a matching pj_freez(pcbuf)
  * somewhere.
  *
@@ -21,13 +20,14 @@ Errcode pj_fli_alloc_cbuf(Fli_frame **pcbuf, USHORT width,USHORT height,
  *		there's trouble.
  *************************************************************************/
 {
-	if(NULL == (*pcbuf = pj_zalloc(pj_fli_cbuf_size(width,height,num_colors))))
-		return(Err_no_memory);
-	return(Success);
+	if (NULL == (*pcbuf = pj_zalloc(pj_fli_cbuf_size(width, height, num_colors)))) {
+		return (Err_no_memory);
+	}
+	return (Success);
 }
 
-Errcode pj_fli_cel_alloc_cbuf(Fli_frame **pcbuf, Rcel *cel)
+Errcode pj_fli_cel_alloc_cbuf(Fli_frame** pcbuf, Rcel* cel)
 /* same as fli_alloc_cbuf() but allocs a cbuf sized for an rcel screen */
 {
-	return(pj_fli_alloc_cbuf(pcbuf,cel->width,cel->height,cel->cmap->num_colors));
+	return (pj_fli_alloc_cbuf(pcbuf, cel->width, cel->height, cel->cmap->num_colors));
 }

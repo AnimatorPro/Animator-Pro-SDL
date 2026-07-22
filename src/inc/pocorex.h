@@ -12,7 +12,6 @@
 #include "errcodes.h"
 #include "stdtypes.h"
 #include "pocolib.h"
-#include "../../poco/include/pocorex.h"
+#include "../../poco/src/pocorex.h"
 
 #endif /* ANIMATOR_POCOREX_COMPAT_H */
-

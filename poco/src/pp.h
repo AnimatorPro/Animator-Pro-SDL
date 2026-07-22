@@ -16,30 +16,26 @@
 #include "pplists.h"
 #endif /* PPLISTS_H */
 
-struct text_symbol
-{
-struct text_symbol *next;
-char *name;
-bool is_macro;
-char *value;
-struct name_list *parameters;
+struct text_symbol {
+	struct text_symbol* next;
+	char* name;
+	bool is_macro;
+	char* value;
+	struct name_list* parameters;
 };
 typedef struct text_symbol Text_symbol;
 
-struct file_place
-{
-FILE *file;
-struct file_place *pred;
-char *name;
-int line_count;
+struct file_place {
+	FILE* file;
+	struct file_place* pred;
+	char* name;
+	int line_count;
 };
 typedef struct file_place File_place;
 
-
-struct conditional
-{
-struct conditional *next;
-bool state;/*true or false*/
+struct conditional {
+	struct conditional* next;
+	bool state; /*true or false*/
 };
 typedef struct conditional Conditional;
 
@@ -52,25 +48,25 @@ extern void po_expecting_got();
 extern void zero_divide();
 extern bool po_eat_token();
 extern bool skip_through();
-extern char *po_skip_space();
-extern char *po_chop_to();
-extern char *chop_cword();
+extern char* po_skip_space();
+extern char* po_chop_to();
+extern char* chop_cword();
 extern void po_init_pp();
 extern void po_free_pp();
-extern char *next_line();
-extern char *next_ctoken();
+extern char* next_line();
+extern char* next_ctoken();
 extern po_get_csource_line();
 extern int hash_function();
-extern Text_symbol *in_hash_list();
+extern Text_symbol* in_hash_list();
 extern void add_to_hash();
 
 /***** global data from tokeni.c *******/
 
 extern bool pp_eof;
-extern struct file_place *file_stack;
-extern struct text_symbol *define_list[];
-extern struct conditional *ifdef_stack;
-extern char line_b1[];/*this one gets unexpanded line*/
+extern struct file_place* file_stack;
+extern struct text_symbol* define_list[];
+extern struct conditional* ifdef_stack;
+extern char line_b1[]; /*this one gets unexpanded line*/
 extern char line_b2[];
 
 
@@ -82,8 +78,8 @@ extern char line_b2[];
 #define RBRACE '}'
 #define LPAREN '('
 #define RPAREN ')'
-extern Names *includes;	/*where to get include files from */
-extern Names *cl_defines;
+extern Names* includes; /*where to get include files from */
+extern Names* cl_defines;
 
 
 #ifndef iscsymf

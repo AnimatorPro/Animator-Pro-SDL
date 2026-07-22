@@ -1,0 +1,9 @@
+static int same_name(void)
+{
+	return 32;
+}
+
+int static_library_value(void)
+{
+	return same_name();
+}

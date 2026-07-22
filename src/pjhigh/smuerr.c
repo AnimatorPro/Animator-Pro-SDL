@@ -3,11 +3,11 @@
 #include "jimk.h"
 #include "softmenu.h"
 
-static Errcode soft_errline(Errcode err, char *errsym, char *key, va_list *pargs)
+static Errcode soft_errline(Errcode err, char* errsym, char* key, va_list* pargs)
 {
 	/* note, will not report if Successful or Err_aborted or Err_reported */
 	char etext[ERRTEXT_SIZE];
-	char *formats;
+	char* formats;
 	char text[256]; /* buffer for specific text, only used if key != NULL */
 
 	if (!get_errtext(err, etext)) {
@@ -26,7 +26,7 @@ static Errcode soft_errline(Errcode err, char *errsym, char *key, va_list *pargs
 	return Err_reported;
 }
 
-Errcode softerr(Errcode err, char *key, ...)
+Errcode softerr(Errcode err, char* key, ...)
 {
 	va_list args;
 

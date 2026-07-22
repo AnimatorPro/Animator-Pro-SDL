@@ -22,52 +22,43 @@
  *	with the 0xAA is an innocuous TEST instruction.
  *--------------------------------------------------------------------------*/
 
-char *strcpy(char *dst, const char *src);
+char* strcpy(char* dst, const char* src);
 
-#pragma aux strcpy =												\
-	  0x8B 0xD7 	 /* 			mov 	edx,edi 		   */	\
-	  0x66 0xAD 	 /* loop:		lodsw					   */	\
-	  0x84 0xC0 	 /* 			test	al,al			   */	\
-	  0x74 0x07 	 /* 			jz		short done		   */	\
-	  0x66 0xAB 	 /* 			stosw					   */	\
-	  0x84 0xE4 	 /* 			test	ah,ah			   */	\
-	  0x75 0xF4 	 /* 			jne 	short loop		   */	\
-	  0xA8 0xAA 	 /* done:		test al,0AAh | stosb	   */	\
-	parm caller [edi] [esi] 										\
-	value [edx] 													\
-	modify exact [eax edx esi edi];
+#pragma aux strcpy = 0x8B 0xD7 /* 			mov 	edx,edi 		   */           \
+	0x66 0xAD                  /* loop:		lodsw					   */            \
+	0x84 0xC0                  /* 			test	al,al			   */             \
+	0x74 0x07                  /* 			jz		short done		   */          \
+	0x66 0xAB                  /* 			stosw					   */                \
+	0x84 0xE4                  /* 			test	ah,ah			   */             \
+	0x75 0xF4                  /* 			jne 	short loop		   */         \
+	0xA8 0xAA                  /* done:		test al,0AAh | stosb	   */ \
+	parm caller[edi][esi] value[edx] modify exact[eax edx esi edi];
 
 /*----------------------------------------------------------------------------
  * memcpy
  *--------------------------------------------------------------------------*/
 
-void *memcpy(void *dst, const void *src, unsigned count);
+void* memcpy(void* dst, const void* src, unsigned count);
 
-#pragma aux memcpy =												\
-	  0x8B 0xD7 	 /* 			mov 	edx,edi 		   */	\
-	  0xD1 0xE9 	 /* 			shr 	ecx,1			   */	\
-	  0xF3 0x66 0xA5 /* 			rep movsw				   */	\
-	  0x13 0xC9 	 /* 			adc 	ecx,ecx 		   */	\
-	  0xF3 0xA4 	 /* 			rep movsb				   */	\
-	parm caller [edi] [esi] [ecx]									\
-	value [edx] 													\
-	modify exact [ecx edx esi edi];
+#pragma aux memcpy = 0x8B 0xD7 /* 			mov 	edx,edi 		   */ \
+	0xD1 0xE9                  /* 			shr 	ecx,1			   */   \
+	0xF3 0x66 0xA5             /* 			rep movsw				   */   \
+	0x13 0xC9                  /* 			adc 	ecx,ecx 		   */ \
+	0xF3 0xA4                  /* 			rep movsb				   */   \
+	parm caller[edi][esi][ecx] value[edx] modify exact[ecx edx esi edi];
 
 /*----------------------------------------------------------------------------
  * memset
  *--------------------------------------------------------------------------*/
 
-void *memset(void *dst, int value, unsigned count);
+void* memset(void* dst, int value, unsigned count);
 
-#pragma aux memset =												\
-	  0x8B 0xD7 	 /* 			mov 	edx,edi 		   */	\
-	  0x8A 0xE0 	 /* 			mov 	ah,al			   */	\
-	  0xD1 0xE9 	 /* 			shr 	ecx,1			   */	\
-	  0xF3 0x66 0xAB /* 			rep stosw				   */	\
-	  0x13 0xC9 	 /* 			adc 	ecx,ecx 		   */	\
-	  0xF3 0xAA 	 /* 			rep stosb				   */	\
-	parm caller [edi] [eax] [ecx]									\
-	value [edx] 													\
-	modify exact [eax ecx edx edi];
+#pragma aux memset = 0x8B 0xD7 /* 			mov 	edx,edi 		   */ \
+	0x8A 0xE0                  /* 			mov 	ah,al			   */   \
+	0xD1 0xE9                  /* 			shr 	ecx,1			   */   \
+	0xF3 0x66 0xAB             /* 			rep stosw				   */   \
+	0x13 0xC9                  /* 			adc 	ecx,ecx 		   */ \
+	0xF3 0xAA                  /* 			rep stosb				   */   \
+	parm caller[edi][eax][ecx] value[edx] modify exact[eax ecx edx edi];
 
 #endif /* PJINLINE_H */

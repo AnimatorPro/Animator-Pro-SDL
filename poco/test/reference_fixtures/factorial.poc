@@ -1,0 +1,12 @@
+main()
+{
+	int value = 6;
+	int result = 1;
+
+	while (value > 1) {
+		result *= value;
+		--value;
+	}
+	result = reference_identity(result);
+	return result;
+}

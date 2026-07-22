@@ -26,6 +26,14 @@ endif()
 option(WITH_ANI  "Build Animator Pro." ON)
 option(WITH_POCO "Build with the Poco scripting language." OFF)
 option(USE_ASAN  "Use Clang Memory Address Sanitizer"      OFF)
+option(USE_TSAN  "Use Clang Thread Sanitizer"              OFF)
+
+# The address and thread sanitizers instrument memory in incompatible ways and
+# cannot share a build.  Reject the combination up front so a misconfigured
+# build fails at configure time rather than link time.
+if (USE_ASAN AND USE_TSAN)
+	message(FATAL_ERROR "USE_ASAN and USE_TSAN are mutually exclusive; enable at most one.")
+endif()
 
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -37,6 +45,12 @@ if (UNIX)
 	if (USE_ASAN)
 		set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fsanitize=address -g")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -g")
+	elseif (USE_TSAN)
+		set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fsanitize=thread -g")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -g")
+		set(CMAKE_EXE_LINKER_FLAGS    "${CMAKE_EXE_LINKER_FLAGS}    -fsanitize=thread")
+		set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=thread")
+		set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fsanitize=thread")
 	endif()
 
 	add_compile_options(
@@ -85,7 +99,17 @@ if (WITH_POCO)
 
 	# Build animhost first (needed by POE modules)
 	add_subdirectory(src/animhost)
-	
+
+	# poco_core defaults to a static archive, but the Animator host still ships
+	# its own copy of the .poe loader entry points in src/pocorex.c
+	# (pj_load_pocorex, pj_free_pocorexes, format_poco_lib_error).  A static
+	# poco_core exposes the same symbols from poco/src/pocoload.c and the two
+	# collide at link time, so link Poco as a shared library for the host build.
+	# Downstream embedders keep the static default.
+	if (WITH_ANI)
+		set(POCO_BUILD_SHARED ON)
+	endif()
+
 	# Add new standalone poco subproject
 	add_subdirectory(poco)
 

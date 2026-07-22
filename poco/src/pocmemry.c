@@ -23,7 +23,7 @@
 
 #define NUM_SBLK 16 /* Number of small blocks in cache. 		*/
 #define NUM_EXPF 32 /* Number of expression frames in cache.	*/
-#define NUM_POCF 4	/* Number of poco frames in cache.			*/
+#define NUM_POCF 4  /* Number of poco frames in cache.			*/
 
 /*----------------------------------------------------------------------------
  * defines and data used by memory management routines...
@@ -33,21 +33,19 @@
  *--------------------------------------------------------------------------*/
 
 typedef struct cache_cookie /* When we hand out a block from a struct	*/
-{							/* cache it gets prefixed with one of these.*/
-	Cache_ctl* pctl;		/* When po_freemem() sees the MBLK_CACHED  */
-	SHORT cache_slot;		/* cookie_val, it uses the rest of the info */
-	USHORT cookie_val;		/* in this structure to free the block back */
-} Cache_cookie;				/* to the cache it came from.				*/
+{                           /* cache it gets prefixed with one of these.*/
+	Cache_ctl* pctl;        /* When po_freemem() sees the MBLK_CACHED  */
+	SHORT cache_slot;       /* cookie_val, it uses the rest of the info */
+	USHORT cookie_val;      /* in this structure to free the block back */
+} Cache_cookie;             /* to the cache it came from.				*/
 
-typedef struct mblk_ctl	  /* This structure is used to track blocks of*/
-{						  /* memory we have aquired from our parent.	*/
-	struct mblk_ctl		  /* Each block starts with one of these, to	*/
-	  * next;			  /* link it to the next aquired block. This	*/
-	unsigned long used;	  /* allows us to easily free all aquired mem */
+typedef struct mblk_ctl   /* This structure is used to track blocks of*/
+{                         /* memory we have aquired from our parent.	*/
+	struct mblk_ctl       /* Each block starts with one of these, to	*/
+		* next;           /* link it to the next aquired block. This	*/
+	unsigned long used;   /* allows us to easily free all aquired mem */
 	unsigned long unused; /* during error handling.  Used/unused space*/
-} Mblk_ctl;				  /* has meaning only for the current block.	*/
-
-static Mblk_ctl* mblk_cur; /* This outlives PCB, must live in BSS mem. */
+} Mblk_ctl;               /* has meaning only for the current block.	*/
 
 #define MBLK_CACHED 0x0402 /* Magic #: Block came from struct cache.	*/
 #define MBLK_ALLOCD 0x1126 /* Magic #: Block came from regular memory. */
@@ -76,19 +74,16 @@ static Errcode new_mblk(Poco_cb* pcb)
 
 	if (NULL == (new = pj_malloc(MBLK_SIZE))) /* get memory	 */
 	{
-		if (pcb != NULL) /* If pcb is NULL, we are doing initial setup, we	*/
-		{				 /* don't have a pcb yet, so we just return err code.*/
-			pcb->global_err = Err_no_memory;
-			pcb->compile_aborted = true;
-			pcb->compile_err = Err_no_memory;
-		}
+		pcb->global_err = Err_no_memory;
+		pcb->compile_aborted = true;
+		pcb->compile_err = Err_no_memory;
 		return Err_no_memory;
 	}
 
 	poco_zero_bytes(new, MBLK_SIZE);
-	new->next	= mblk_cur;
-	mblk_cur	= new;
-	new->used	= sizeof(Mblk_ctl);
+	new->next = pcb->mblk_cur;
+	pcb->mblk_cur = new;
+	new->used = sizeof(Mblk_ctl);
 	new->unused = MBLK_SIZE - sizeof(Mblk_ctl);
 
 	return Success;
@@ -99,11 +94,11 @@ static Errcode new_mblk(Poco_cb* pcb)
  ****************************************************************************/
 static void init_cache_ctl(Cache_ctl* pctl, char* pmem, SHORT numslots, SHORT slotsize)
 {
-	pctl->inuse		= (UBYTE*)pmem;					   /* inuse table at start */
-	pctl->pbase		= ((UBYTE*)(pmem + numslots));	   /* of block, data area	*/
+	pctl->inuse = (UBYTE*)pmem;                        /* inuse table at start */
+	pctl->pbase = ((UBYTE*)(pmem + numslots));         /* of block, data area	*/
 	pctl->slot_size = slotsize + sizeof(Cache_cookie); /* follows inuse table. */
 	pctl->num_slots = numslots;
-	pctl->nxt_slot	= 0;
+	pctl->nxt_slot = 0;
 }
 
 /*****************************************************************************
@@ -120,10 +115,11 @@ Errcode po_init_memory_management(Poco_cb** pcb)
 	char* pmem;
 
 	if (NULL == (pmem = pj_zalloc(sizeof(Poco_cb) + /* if new caches are added  */
-								  TOT_SBLK +		/* add their TOT_xxxx names */
-								  TOT_EXPF +		/* to this list.			*/
-								  TOT_POCF)))
+								  TOT_SBLK +        /* add their TOT_xxxx names */
+								  TOT_EXPF +        /* to this list.			*/
+								  TOT_POCF))) {
 		return Err_no_memory;
+	}
 
 	/*
 	 * set up the poco_cb area, remember its location so we can free it later...
@@ -146,7 +142,13 @@ Errcode po_init_memory_management(Poco_cb** pcb)
 	init_cache_ctl(&(*pcb)->pocf_cache, pmem, NUM_POCF, SIZ_POCF);
 	pmem += TOT_POCF;
 
-	return new_mblk(NULL);
+	if (new_mblk(*pcb) != Success) {
+		po_free_compile_memory(*pcb);
+		*pcb = NULL;
+		return Err_no_memory;
+	}
+
+	return Success;
 }
 
 /*****************************************************************************
@@ -170,13 +172,13 @@ void po_free_all_memory(Poco_cb* pcb)
 {
 	Mblk_ctl *cur, *next;
 
-	cur = mblk_cur;
+	cur = pcb->mblk_cur;
 	while (cur != NULL) {
 		next = cur->next;
 		pj_free(cur);
 		cur = next;
 	}
-	mblk_cur = NULL;
+	pcb->mblk_cur = NULL;
 
 	po_free_compile_memory(pcb);
 }
@@ -204,10 +206,11 @@ void po_freemem(void* pt)
 
 	switch (pc->cookie_val) {
 		case MBLK_CACHED:
-			pctl						= pc->pctl;
+			pctl = pc->pctl;
 			pctl->inuse[pc->cache_slot] = 0;
-			if (pc->cache_slot < pctl->nxt_slot)
+			if (pc->cache_slot < pctl->nxt_slot) {
 				pctl->nxt_slot = pc->cache_slot;
+			}
 			break;
 		case MBLK_ALLOCD:
 			pc->cookie_val = MBLK_FREED;
@@ -237,14 +240,15 @@ void* po_memalloc(Poco_cb* pcb, register unsigned long size)
 
 	size += sizeof(*pt);
 
-	if (size > mblk_cur->unused) {
-		if (new_mblk(pcb) != Success)
+	if (size > pcb->mblk_cur->unused) {
+		if (new_mblk(pcb) != Success) {
 			return NULL;
+		}
 	}
 
-	pt = (USHORT*)(((char*)mblk_cur) + mblk_cur->used);
-	mblk_cur->used += size;
-	mblk_cur->unused -= size;
+	pt = (USHORT*)(((char*)pcb->mblk_cur) + pcb->mblk_cur->used);
+	pcb->mblk_cur->used += size;
+	pcb->mblk_cur->unused -= size;
 
 	*pt++ = MBLK_ALLOCD;
 
@@ -267,14 +271,15 @@ void* po_memzalloc(Poco_cb* pcb, register size_t size)
 
 	size += sizeof(*pt);
 
-	if (size > mblk_cur->unused) {
-		if (new_mblk(pcb) != Success)
+	if (size > pcb->mblk_cur->unused) {
+		if (new_mblk(pcb) != Success) {
 			return NULL;
+		}
 	}
 
-	pt = (USHORT*)(((char*)mblk_cur) + mblk_cur->used);
-	mblk_cur->used += size;
-	mblk_cur->unused -= size;
+	pt = (USHORT*)(((char*)pcb->mblk_cur) + pcb->mblk_cur->used);
+	pcb->mblk_cur->used += size;
+	pcb->mblk_cur->unused -= size;
 
 	*pt++ = MBLK_ALLOCD;
 
@@ -302,11 +307,11 @@ void* po_cache_malloc(Poco_cb* pcb, register Cache_ctl* pctl)
 	for (cache_slot = pctl->nxt_slot; cache_slot < pctl->num_slots; ++cache_slot) {
 		if (pctl->inuse[cache_slot] == 0) {
 			pctl->inuse[cache_slot] = 1;
-			pctl->nxt_slot			= cache_slot + 1;
-			pmem					= (Cache_cookie*)(pctl->pbase + cache_slot * pctl->slot_size);
-			pmem->pctl				= pctl;
-			pmem->cache_slot		= cache_slot;
-			pmem->cookie_val		= MBLK_CACHED;
+			pctl->nxt_slot = cache_slot + 1;
+			pmem = (Cache_cookie*)(pctl->pbase + cache_slot * pctl->slot_size);
+			pmem->pctl = pctl;
+			pmem->cache_slot = cache_slot;
+			pmem->cookie_val = MBLK_CACHED;
 			++pmem;
 			goto OUT;
 		}
@@ -315,8 +320,9 @@ void* po_cache_malloc(Poco_cb* pcb, register Cache_ctl* pctl)
 	pctl->nxt_slot = pctl->num_slots;
 
 	pmem = po_memalloc(pcb, pctl->slot_size);
-	if (pmem == NULL)
+	if (pmem == NULL) {
 		return NULL;
+	}
 
 OUT:
 
@@ -337,7 +343,7 @@ char* po_clone_string(Poco_cb* pcb, char* s)
 	char* d;
 
 	size = strlen(s) + 1;
-	d	 = po_memalloc(pcb, size);
+	d = po_memalloc(pcb, size);
 	poco_copy_bytes(s, d, size);
 	return (d);
 }

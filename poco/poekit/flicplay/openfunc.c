@@ -4,15 +4,16 @@
 
 #include "flicplay.h"
 
-static Flic *fliclist = NULL;
+static Flic* fliclist = NULL;
 
-static void free_playback_raster(Flic *pflic)
+static void free_playback_raster(Flic* pflic)
 /*****************************************************************************
  *
  ****************************************************************************/
 {
-	if (NULL == pflic || NULL == pflic->playback_raster)
+	if (NULL == pflic || NULL == pflic->playback_raster) {
 		return;
+	}
 
 	if (pflic->playback_raster != pflic->root_raster) {
 		free(pflic->playback_raster);
@@ -20,44 +21,45 @@ static void free_playback_raster(Flic *pflic)
 	}
 }
 
-static Errcode build_playback_raster(Flic *pflic, Rcel *root, int x, int y)
+static Errcode build_playback_raster(Flic* pflic, Rcel* root, int x, int y)
 /*****************************************************************************
  *
  ****************************************************************************/
 {
-	Flifile 	*flifile;
-	Rectangle	therect;
+	Flifile* flifile;
+	Rectangle therect;
 
-	if (NULL == pflic)
+	if (NULL == pflic) {
 		return Err_null_ref;
+	}
 
-	if (NULL == (flifile = pflic->flifile))
+	if (NULL == (flifile = pflic->flifile)) {
 		return Err_file_not_open;
+	}
 
 	free_playback_raster(pflic);
 
 	if (NULL == root) {
-		if (NULL == pflic->root_raster)
+		if (NULL == pflic->root_raster) {
 			pflic->root_raster = GetPicScreen();
+		}
 		root = pflic->root_raster;
 	} else {
 		pflic->root_raster = root;
 	}
 
-	if (root->width == flifile->hdr.width
-	 && root->height == flifile->hdr.height
-	 && x == 0
-	 && y == 0) {
+	if (root->width == flifile->hdr.width && root->height == flifile->hdr.height && x == 0 &&
+		y == 0) {
 		pflic->playback_raster = root;
 	} else {
 		if (x == 0 && y == 0) {
-			therect.x = (root->width  - flifile->hdr.width)  / 2;
+			therect.x = (root->width - flifile->hdr.width) / 2;
 			therect.y = (root->height - flifile->hdr.height) / 2;
 		} else {
 			therect.x = x;
 			therect.y = y;
 		}
-		therect.width  = flifile->hdr.width;
+		therect.width = flifile->hdr.width;
 		therect.height = flifile->hdr.height;
 		if (NULL == (pflic->playback_raster = malloc(sizeof(Rcel)))) {
 			return Err_no_memory;
@@ -68,7 +70,7 @@ static Errcode build_playback_raster(Flic *pflic, Rcel *root, int x, int y)
 	return Success;
 }
 
-void do_flic_close(Flic *pflic)
+void do_flic_close(Flic* pflic)
 /*****************************************************************************
  * close flic file, free all associated resources, remove from resource list.
  ****************************************************************************/
@@ -98,7 +100,7 @@ void do_flic_close(Flic *pflic)
 		prev = &cur->next;
 	}
 
-	pflic->magic = 0xDEADDEAD;	/* prevent re-use */
+	pflic->magic = 0xDEADDEAD; /* prevent re-use */
 
 	free(pflic);
 }
@@ -108,7 +110,7 @@ void do_flic_close_all(void)
  *
  ****************************************************************************/
 {
-	Flic	*cur, *next;
+	Flic *cur, *next;
 
 	for (cur = fliclist; cur != NULL; cur = next) {
 		next = cur->next;
@@ -116,14 +118,14 @@ void do_flic_close_all(void)
 	}
 }
 
-Errcode do_flic_open(char *path, Flic **ppflic)
+Errcode do_flic_open(char* path, Flic** ppflic)
 /*****************************************************************************
  * alloc flic control structures, open flic file, return status.
  ****************************************************************************/
 {
 	Errcode err;
-	Flic	*pflic;
-	Flifile *flifile;
+	Flic* pflic;
+	Flifile* flifile;
 
 	if ('\0' == *path) {
 		return Err_parameter_range;
@@ -143,18 +145,19 @@ Errcode do_flic_open(char *path, Flic **ppflic)
 		goto ERROR_EXIT;
 	}
 
-	if (Success > (err = pj_fli_alloc_cbuf(&pflic->framebuf,
-							flifile->hdr.width, flifile->hdr.height, COLORS))) {
+	if (Success > (err = pj_fli_alloc_cbuf(&pflic->framebuf, flifile->hdr.width,
+										   flifile->hdr.height, COLORS))) {
 		goto ERROR_EXIT;
 	}
 
-	if (Success > (err = build_playback_raster(pflic, NULL, 0, 0)))
+	if (Success > (err = build_playback_raster(pflic, NULL, 0, 0))) {
 		goto ERROR_EXIT;
+	}
 
-	pflic->magic	  = IANS_FLIC_MAGIC;
-	pflic->cur_frame  = BEFORE_FIRST_FRAME;
+	pflic->magic = IANS_FLIC_MAGIC;
+	pflic->cur_frame = BEFORE_FIRST_FRAME;
 	pflic->num_frames = flifile->hdr.frame_count;
-	pflic->speed	  = flifile->hdr.speed;
+	pflic->speed = flifile->hdr.speed;
 
 	pflic->next = fliclist;
 	fliclist = pflic;
@@ -167,29 +170,27 @@ ERROR_EXIT:
 	do_flic_close(pflic);
 	*ppflic = NULL;
 	return err;
-
 }
 
-Errcode do_flic_options(Flic	  *pflic,
-						int 	  speed,
-						int 	  keyhit_stops_playback,
-						Rcel	  *new_raster,
-						int 	  x,
-						int 	  y)
+Errcode do_flic_options(Flic* pflic, int speed, int keyhit_stops_playback, Rcel* new_raster, int x,
+						int y)
 /*****************************************************************************
  *
  ****************************************************************************/
 {
 	Errcode err;
 
-	if (NULL == pflic)
+	if (NULL == pflic) {
 		return Err_null_ref;
+	}
 
-	if (speed >= 0)
+	if (speed >= 0) {
 		pflic->speed = speed;
+	}
 
-	if (keyhit_stops_playback >= 0)
+	if (keyhit_stops_playback >= 0) {
 		pflic->keyhit_stops_playback = keyhit_stops_playback;
+	}
 
 	if (NULL != new_raster || x != 0 || y != 0) {
 		if (Success > (err = build_playback_raster(pflic, new_raster, x, y))) {
@@ -197,5 +198,4 @@ Errcode do_flic_options(Flic	  *pflic,
 		}
 		do_rewind(pflic); /* force rewind if the raster moved/changed */
 	}
-
 }

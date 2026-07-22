@@ -282,13 +282,16 @@ verify_consumer_contract("package-config consumer" "${CMAKE_CURRENT_LIST_DIR}/pa
     poco_package_consumer FALSE)
 
 # First configure/build Poco by itself.  This must never use the parent build
-# directory; only the copied poco/ tree is available to it.
+# directory; only the copied poco/ tree is available to it.  The installed
+# package deliverable is the self-contained shared library, so build it shared
+# here; the add_subdirectory consumer below exercises the default static embed.
 configure_and_build(
     "copied Poco tree"
     "${_copied_poco_source}"
     "${_sandbox}/poco-build"
     "-DCMAKE_INSTALL_PREFIX=${_install_prefix}"
     "-DCMAKE_BUILD_TYPE=Release"
+    "-DPOCO_BUILD_SHARED=ON"
 )
 
 # Then configure/build a minimal third-party project.  Its source contains

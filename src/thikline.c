@@ -71,7 +71,7 @@ typedef LONG fpoint;
 #define MINFP (~MAXFP)
 
 /* renders a line using the current brush */
-static Errcode brush_line(Rbrush *rb, Short_xy *ends)
+static Errcode brush_line(Rbrush* rb, Short_xy* ends)
 {
 #define x0 ends[0].x
 #define y0 ends[0].y
@@ -129,8 +129,8 @@ static Errcode brush_line(Rbrush *rb, Short_xy *ends)
 		fpoint fpx, fpy;
 		fpoint m, m_inv;
 		fpoint dcur, dmin, dmax;
-#define bmap ((Bytemap *)rb->rast)
-		Pixel *line;
+#define bmap ((Bytemap*)rb->rast)
+		Pixel* line;
 
 		/* slope and inverse slope (inverse so no division in loop and
 		 * no worrys about it's being 0) */

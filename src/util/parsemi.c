@@ -1,23 +1,21 @@
 #include "filepath.h"
 
-int parse_to_semi(char **input, char *outstart,int maxlen)
+int parse_to_semi(char** input, char* outstart, int maxlen)
 
 /* put input up to (but not including) a semicolon into output.
    Skips leading white space and semicolons returns length of token
    gotten */
 {
-char *in = *input;
-char *output = outstart;
-char c;
+	char* in = *input;
+	char* output = outstart;
+	char c;
 
 
-	for (;;)
-	{
+	for (;;) {
 		c = *in;
-		switch(c)
-		{
+		switch (c) {
 			case 0:
-				return(0);
+				return (0);
 			case ' ':
 			case '\t':
 			case '\r':
@@ -31,16 +29,17 @@ char c;
 	}
 
 FIRSTC:
-	for (;;)
-	{
+	for (;;) {
 		c = *in;
-		if(c == 0 || c == ';')
+		if (c == 0 || c == ';') {
 			break;
-		if(--maxlen > 0)
+		}
+		if (--maxlen > 0) {
 			*output++ = c;
+		}
 		++in;
 	}
 	*output = 0;
 	*input = in;
-	return(output - outstart);
+	return (output - outstart);
 }

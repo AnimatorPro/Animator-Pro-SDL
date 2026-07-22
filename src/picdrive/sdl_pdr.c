@@ -19,7 +19,6 @@
 #include "rcel.h"
 #include "sdl_pdr.h"
 
-
 /*----------------------------------------------------------------------------
  * PDR_SdlFile structure, our extension to host's Image_file.
  * Since all the file IO is handled through SDL_image, I'm trying
@@ -29,22 +28,21 @@
  *--------------------------------------------------------------------------*/
 typedef struct pdr_sdlfile {
 	Image_file hdr; /* PJ Image_file, must be first in struct! */
-	SDL_Surface *surface;
+	SDL_Surface* surface;
 	int width;
 	int height;
 	int depth;
-	char *path[PATH_MAX];
-	SDL_Surface*  (*sdl_load_image)(char* path);
+	char* path[PATH_MAX];
+	SDL_Surface* (*sdl_load_image)(char* path);
 	bool (*sdl_save_image)(SDL_Surface* surface, char* path);
 } PDR_SdlFile;
-
 
 /*****************************************************************************
  * as long as it's one frame of 8 bits-per-pixel, we can do it as requested.
  * if the host has asked for anything else, force the data in the Anim_info
  * to match what we can do, and return FALSE to indicate we tweaked it.
  ****************************************************************************/
-bool sdlpdr_spec_best_fit(Anim_info *ainfo)
+bool sdlpdr_spec_best_fit(Anim_info* ainfo)
 {
 	(void)ainfo;
 	return true;
@@ -53,14 +51,14 @@ bool sdlpdr_spec_best_fit(Anim_info *ainfo)
 /*****************************************************************************
  * Clean up resources used by picture driver.
  ****************************************************************************/
-void sdlpdr_close_file(Image_file **psf)
+void sdlpdr_close_file(Image_file** psf)
 {
-	PDR_SdlFile *sf;
+	PDR_SdlFile* sf;
 
 	if (psf == NULL || *psf == NULL) { /* these could be NULL if we get   */
 		return;                        /* called by our own error cleanup.*/
 	} else {
-		sf = (PDR_SdlFile *)*psf; /* retrieve and recast to our type */
+		sf = (PDR_SdlFile*)*psf; /* retrieve and recast to our type */
 	}
 
 	if (sf->surface != NULL) { /* if file is open, 			   */
@@ -75,13 +73,13 @@ void sdlpdr_close_file(Image_file **psf)
 /*****************************************************************************
  * allocate main data structure, open file.
  ****************************************************************************/
-Errcode sdlpdr_alloc_and_open(PDR_SdlFile **psf, char *path, char *openmode)
+Errcode sdlpdr_alloc_and_open(PDR_SdlFile** psf, char* path, char* openmode)
 {
 	(void)path;
 	(void)openmode;
 
 	// Alloc storage, punt on error.
-	PDR_SdlFile *sf = (PDR_SdlFile *)calloc(1, sizeof(PDR_SdlFile));
+	PDR_SdlFile* sf = (PDR_SdlFile*)calloc(1, sizeof(PDR_SdlFile));
 
 	if (sf == NULL) {
 		return Err_no_memory;
@@ -103,10 +101,10 @@ Errcode sdlpdr_alloc_and_open(PDR_SdlFile **psf, char *path, char *openmode)
 /*****************************************************************************
  * Open up the file, verify file header.
  ****************************************************************************/
-Errcode sdlpdr_open_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ainfo)
+Errcode sdlpdr_open_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 {
 	Errcode err;
-	PDR_SdlFile *sf;
+	PDR_SdlFile* sf;
 
 	assert(pd->sdl_load_image);
 
@@ -119,7 +117,7 @@ Errcode sdlpdr_open_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ainfo
 
 	err = sdlpdr_alloc_and_open(&sf, path, "rb");
 	if (err != Success) {
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		return err;
 	}
 
@@ -142,7 +140,7 @@ Errcode sdlpdr_open_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ainfo
 	sf->surface = pd->sdl_load_image(path);
 
 	if (!sf->surface) {
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		return Err_pic_unknown;
 	}
 
@@ -162,27 +160,26 @@ Errcode sdlpdr_open_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ainfo
 	ainfo->num_frames = 1;
 	ainfo->millisec_per_frame = DEFAULT_AINFO_SPEED;
 
-	*pif = (Image_file *)sf;
+	*pif = (Image_file*)sf;
 	return Success;
 }
-
 
 /*****************************************************************************
  * read in 1st (er, only) image.
  ****************************************************************************/
-Errcode sdlpdr_read_first(Image_file *ifile, Rcel *screen)
+Errcode sdlpdr_read_first(Image_file* ifile, Rcel* screen)
 {
-	PDR_SdlFile *sf = (PDR_SdlFile *)ifile;
+	PDR_SdlFile* sf = (PDR_SdlFile*)ifile;
 	SDL_Palette* screen_palette = NULL;
 	assert(sf);
 	assert(sf->surface);
 
-	//!TODO: handle color remapping
+	//! TODO: handle color remapping
 	if (sf->surface->format != SDL_PIXELFORMAT_INDEX8) {
 		SDL_Palette* screen_palette = SDL_CreatePalette(screen->cmap->num_colors);
 		if (!screen_palette) {
 			fprintf(stderr, "[sdlpdr_read_first] unable to create palette: %s\n", SDL_GetError());
-			sdlpdr_close_file((Image_file **)&sf);
+			sdlpdr_close_file((Image_file**)&sf);
 			return Err_no_memory;
 		}
 
@@ -193,17 +190,17 @@ Errcode sdlpdr_read_first(Image_file *ifile, Rcel *screen)
 			if (!temp) {
 				fprintf(stderr, "[sdlpdr_open_file] unable to fit to palette.\n");
 				SDL_DestroyPalette(screen_palette);
-				sdlpdr_close_file((Image_file **)&sf);
+				sdlpdr_close_file((Image_file**)&sf);
 				return Err_no_memory;
 			}
 			SDL_DestroySurface(sf->surface);
 			sf->surface = temp;
-		}
-		else { // PIC_IO_PAL_OVERWRITE
+		} else {  // PIC_IO_PAL_OVERWRITE
 			SDL_Surface* temp = sdlpdr_convert_colors(sf->surface, 256);
 			if (!temp) {
-				fprintf(stderr, "[sdlpdr_open_file] unable to convert high color to indexed: %s\n", SDL_GetError());
-				sdlpdr_close_file((Image_file **)&sf);
+				fprintf(stderr, "[sdlpdr_open_file] unable to convert high color to indexed: %s\n",
+						SDL_GetError());
+				sdlpdr_close_file((Image_file**)&sf);
 				return Err_no_memory;
 			}
 
@@ -218,7 +215,7 @@ Errcode sdlpdr_read_first(Image_file *ifile, Rcel *screen)
 		return Err_no_lock;
 	}
 
-	uint8_t *surface_buf = (uint8_t *)sf->surface->pixels;
+	uint8_t* surface_buf = (uint8_t*)sf->surface->pixels;
 	uint8_t buf[sf->width];
 
 	for (int y = 0; y < sf->height; y += 1) {
@@ -242,14 +239,13 @@ Errcode sdlpdr_read_first(Image_file *ifile, Rcel *screen)
 	return Success;
 }
 
-
 /*****************************************************************************
  * create an output file (alloc, open, and write file header).
  ****************************************************************************/
-Errcode sdlpdr_create_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ainfo)
+Errcode sdlpdr_create_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 {
 	Errcode err;
-	PDR_SdlFile *sf;
+	PDR_SdlFile* sf;
 
 	assert(pd->sdl_save_image);
 
@@ -263,7 +259,7 @@ Errcode sdlpdr_create_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ain
 
 	err = sdlpdr_alloc_and_open(&sf, path, "wb");
 	if (err != Success) {
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		return err;
 	}
 
@@ -275,23 +271,23 @@ Errcode sdlpdr_create_file(Pdr *pd, char *path, Image_file **pif, Anim_info *ain
 	sf->width = ainfo->width;
 	sf->height = ainfo->height;
 
-	*pif = (Image_file *)sf;
+	*pif = (Image_file*)sf;
 	return Success;
 }
 
 /*****************************************************************************
  * save screen image.
  ****************************************************************************/
-Errcode sdlpdr_save_frames(Image_file *ifile, Rcel *screen, int num_frames,
-						   Errcode (*seek_frame)(int ix, void *seek_data), void *seek_data,
-						   Rcel *work_screen)
+Errcode sdlpdr_save_frames(Image_file* ifile, Rcel* screen, int num_frames,
+						   Errcode (*seek_frame)(int ix, void* seek_data), void* seek_data,
+						   Rcel* work_screen)
 {
 	(void)num_frames;
 	(void)seek_frame;
 	(void)seek_data;
 	(void)work_screen;
 
-	PDR_SdlFile *sf = (PDR_SdlFile *)ifile;
+	PDR_SdlFile* sf = (PDR_SdlFile*)ifile;
 
 	/*------------------------------------------------------------------------
 	 * write the picture file from the input screen, using output options.
@@ -303,7 +299,7 @@ Errcode sdlpdr_save_frames(Image_file *ifile, Rcel *screen, int num_frames,
 
 	sf->surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_INDEX8);
 	if (!sf->surface) {
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		return Err_no_surface;
 	}
 
@@ -311,10 +307,10 @@ Errcode sdlpdr_save_frames(Image_file *ifile, Rcel *screen, int num_frames,
 	 * Copy over palette
 	 */
 
-	SDL_Palette *palette = SDL_CreatePalette(screen->cmap->num_colors);
+	SDL_Palette* palette = SDL_CreatePalette(screen->cmap->num_colors);
 	if (!palette) {
 		SDL_DestroySurface(sf->surface);
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		return Err_no_palette;
 	}
 
@@ -326,20 +322,20 @@ Errcode sdlpdr_save_frames(Image_file *ifile, Rcel *screen, int num_frames,
 	SDL_DestroyPalette(palette);
 	palette = NULL;
 
-	Pixel *buf = malloc(w + 2);
+	Pixel* buf = malloc(w + 2);
 	if (!buf) {
 		SDL_DestroySurface(sf->surface);
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		return Err_no_memory;
 	}
 
 	if (!SDL_LockSurface(sf->surface)) {
 		SDL_DestroySurface(sf->surface);
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		return Err_no_lock;
 	}
 
-	uint8_t *surface_buf = (uint8_t *)sf->surface->pixels;
+	uint8_t* surface_buf = (uint8_t*)sf->surface->pixels;
 
 	for (y = 0; y < h; y += 1) {
 		pj_get_hseg(screen, buf, 0, y, w);
@@ -356,11 +352,10 @@ Errcode sdlpdr_save_frames(Image_file *ifile, Rcel *screen, int num_frames,
 	 * the rest of the code to be more generic.
 	 */
 	if (!sf->sdl_save_image(sf->surface, sf->path)) {
-		sdlpdr_close_file((Image_file **)&sf);
+		sdlpdr_close_file((Image_file**)&sf);
 		soft_continu_box("!%s", "sdl_cant_write", sf->path);
 		return Err_file_access;
 	}
 
 	return Success;
 }
-

@@ -27,8 +27,9 @@ static void close_flx(Flxfile* flx)
 	pj_gentle_free(flx->idx);
 	free_flx_overlays(flx);
 
-	if (flx->xf != NULL)
+	if (flx->xf != NULL) {
 		xffclose(&flx->xf);
+	}
 
 	clear_mem(flx, sizeof(*flx));
 	flx->comp_type = pj_fli_comp_ani;
@@ -36,8 +37,9 @@ static void close_flx(Flxfile* flx)
 
 static Errcode alloc_flx_index(Flx** flx, int num_entries)
 {
-	if (NULL == (*flx = pj_zalloc(num_entries * sizeof(Flx))))
+	if (NULL == (*flx = pj_zalloc(num_entries * sizeof(Flx)))) {
 		return (Err_no_memory);
+	}
 	return (0);
 }
 
@@ -50,12 +52,14 @@ static Errcode open_flx(char* path, Flxfile* flx, enum XReadWriteMode mode)
 	clear_struct(flx);
 
 	err = xffopen(path, &flx->xf, mode);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	err = xffread(flx->xf, &flx->hdr, sizeof(Flx_head));
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	if (flx->hdr.type != FLIX_MAGIC) {
 		err = Err_bad_magic;
@@ -63,22 +67,25 @@ static Errcode open_flx(char* path, Flxfile* flx, enum XReadWriteMode mode)
 	}
 
 	acc = flx->hdr.frames_in_table;
-	if ((err = alloc_flx_index(&flx->idx, acc)) < Success)
+	if ((err = alloc_flx_index(&flx->idx, acc)) < Success) {
 		goto error;
+	}
 	acc *= sizeof(Flx);
 
 	err = xffreadoset(flx->xf, flx->idx, flx->hdr.index_oset, acc);
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	flx->comp_type = pj_fli_comp_ani;
 	return (Success);
 
 error:
-	if (err == Err_eof)
+	if (err == Err_eof) {
 		truncated(path);
-	else
+	} else {
 		softerr(err, "!%s", "tflx_open", path);
+	}
 	close_flx(flx);
 	return (err);
 }
@@ -86,8 +93,8 @@ error:
 /* flushes or writes index of flx file leaves file position at end of index */
 static Errcode flush_flx_index(Flxfile* flx)
 {
-	return xffwriteoset(
-	  flx->xf, flx->idx, flx->hdr.index_oset, flx->hdr.frames_in_table * sizeof(Flx));
+	return xffwriteoset(flx->xf, flx->idx, flx->hdr.index_oset,
+						flx->hdr.frames_in_table * sizeof(Flx));
 }
 
 /* (re-)writes the header, settings chunk, and index of a flx file */
@@ -107,8 +114,9 @@ Errcode flush_flx_hidx(Flxfile* flx)
 
 void flush_tflx(void)
 {
-	if (flix.xf == NULL)
+	if (flix.xf == NULL) {
 		return;
+	}
 
 	flush_tsettings(false);
 	flush_flx_hidx(&flix);
@@ -131,12 +139,14 @@ static Errcode new_flx_prefix(Flxfile* flx, Fli_id* flid, char* fliname)
 	fchunk.size = sizeof(fchunk) + sizeof(Flipath);
 
 	err = xffwriteoset(flx->xf, &fchunk, sizeof(Flx_head), sizeof(fchunk));
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	flx->hdr.path_oset = sizeof(Flx_head) + sizeof(fchunk);
-	if ((err = update_flx_path(flx, flid, fliname)) < 0)
+	if ((err = update_flx_path(flx, flid, fliname)) < 0) {
 		return (err);
+	}
 	return (Success);
 }
 
@@ -152,38 +162,45 @@ static Errcode empty_flx_start(char* path, Flxfile* flx, int iframes)
 		goto error;
 	}
 
-	if (!iframes)
+	if (!iframes) {
 		iframes = 1;
+	}
 	itable = iframes + 100;
-	if (itable > MAXFRAMES + 1)
+	if (itable > MAXFRAMES + 1) {
 		itable = MAXFRAMES + 1;
-	else if (itable < 255)
+	} else if (itable < 255) {
 		itable = 255;
+	}
 
 	close_temp_flx();
-	if ((err = create_flxfile(path, flx)) < 0)
+	if ((err = create_flxfile(path, flx)) < 0) {
 		goto error;
-	flx->hdr.frame_count	 = iframes;
-	flx->hdr.width			 = vb.pencel->width;
-	flx->hdr.height			 = vb.pencel->height;
-	flx->hdr.bits_a_pixel	 = 8;	   /* vb.pencel->pdepth */
+	}
+	flx->hdr.frame_count = iframes;
+	flx->hdr.width = vb.pencel->width;
+	flx->hdr.height = vb.pencel->height;
+	flx->hdr.bits_a_pixel = 8;         /* vb.pencel->pdepth */
 	flx->hdr.frames_in_table = itable; /* make a blank index... */
-	flx->hdr.speed			 = FLX_DEFAULT_SPEED;
+	flx->hdr.speed = FLX_DEFAULT_SPEED;
 
-	if ((err = alloc_flx_index(&flx->idx, itable)) < Success)
+	if ((err = alloc_flx_index(&flx->idx, itable)) < Success) {
 		goto error;
+	}
 
 	/* write new default prefix chunk */
 
-	if ((err = new_flx_prefix(flx, NULL, NULL)) < 0)
+	if ((err = new_flx_prefix(flx, NULL, NULL)) < 0) {
 		goto error;
+	}
 
 	flx->hdr.index_oset = xfftell(flx->xf);
-	if ((err = flush_flx_index(flx)) < 0) /* flush (write) new index */
+	if ((err = flush_flx_index(flx)) < 0) { /* flush (write) new index */
 		goto error;
+	}
 
-	if ((err = flush_flx_index(flx)) < 0) /* flush (write) new index */
+	if ((err = flush_flx_index(flx)) < 0) { /* flush (write) new index */
 		goto error;
+	}
 	return (Success);
 error:
 	close_flx(flx);
@@ -196,21 +213,25 @@ Errcode empty_tempflx(int iframes)
 {
 	Errcode err;
 
-	if ((err = empty_flx_start(tflxname, &flix, iframes)) < Success)
+	if ((err = empty_flx_start(tflxname, &flix, iframes)) < Success) {
 		goto error;
+	}
 
 	/* write out first black frame (note this clears the index) */
 
-	if ((err = write_first_flxblack(NULL, &flix, vb.pencel)) < Success)
+	if ((err = write_first_flxblack(NULL, &flix, vb.pencel)) < Success) {
 		goto error;
+	}
 
 	if (--iframes > 0) /* create subsequent blank frames */
 	{
-		if ((err = write_next_flxempty(NULL, &flix, iframes)) < Success)
+		if ((err = write_next_flxempty(NULL, &flix, iframes)) < Success) {
 			goto error;
+		}
 	}
-	if ((err = write_ring_flxempty(NULL, &flix)) < Success)
+	if ((err = write_ring_flxempty(NULL, &flix)) < Success) {
 		goto error;
+	}
 
 	cleans();
 	return (Success);
@@ -227,8 +248,9 @@ Errcode otempflx(void)
 	err = open_flx(tflxname, &flix, XREADWRITE_OPEN);
 	if (err >= Success) {
 		err = reload_tsettings(&vs, NULL);
-		if (err < Success)
+		if (err < Success) {
 			close_temp_flx();
+		}
 	}
 
 	return err;
@@ -240,12 +262,12 @@ Errcode open_tempflx(bool reload_settings)
 	(void)reload_settings;
 
 	vs.bframe_ix = 0; /* back frame buffer no good now */
-	if ((err = otempflx()) < Success)
+	if ((err = otempflx()) < Success) {
 		return (err);
+	}
 	rethink_settings();
 	return (Success);
 }
-
 
 /* makes header, prefix chunks, and index for a tflx from another fli
  * file and an index size. It will leave the file position at the start of the
@@ -285,7 +307,7 @@ static Errcode create_tflx_start(Flifile* flif, char* fliname, long extra_frames
 				}
 
 				flix.hdr.path_oset = xfftell(flix.xf);
-				err				   = update_flx_path(&flix, &flif->hdr.id, fliname);
+				err = update_flx_path(&flix, &flif->hdr.id, fliname);
 				if (err < Success) {
 					goto error;
 				}
@@ -311,20 +333,24 @@ static Errcode create_tflx_start(Flifile* flif, char* fliname, long extra_frames
 
 		pd.fchunk.type = FCID_PREFIX;
 		pd.fchunk.size = flix.hdr.index_oset - sizeof(Flx_head);
-		err			   = xffwriteoset(flix.xf, &pd.fchunk, sizeof(Flx_head), sizeof(Chunk_id));
-		if (err < Success)
+		err = xffwriteoset(flix.xf, &pd.fchunk, sizeof(Flx_head), sizeof(Chunk_id));
+		if (err < Success) {
 			goto error;
+		}
 	} else if (err == Err_no_chunk) {
-		if ((err = new_flx_prefix(&flix, &flif->hdr.id, fliname)) < 0)
+		if ((err = new_flx_prefix(&flix, &flif->hdr.id, fliname)) < 0) {
 			goto error;
+		}
 		flix.hdr.index_oset = xfftell(flix.xf);
-	} else
+	} else {
 		goto error;
+	}
 
 	/* set magic flush header, settings, and write index */
 
-	if ((err = flush_flx_hidx(&flix)) < Success)
+	if ((err = flush_flx_hidx(&flix)) < Success) {
 		goto error;
+	}
 
 	return (Success);
 
@@ -346,8 +372,9 @@ Errcode ring_tflx(Fli_frame* cbuf)
 	gb_fli_abs_tseek(vb.pencel, 0, cbuf);
 	see_cmap();
 	size = pj_fli_comp_cel(cbuf, undof, vb.pencel, COMP_DELTA_FRAME, flix.comp_type);
-	if (pj_i_is_empty_rec(cbuf))
+	if (pj_i_is_empty_rec(cbuf)) {
 		size = 0;
+	}
 	if ((err = make_flx_record(&flix, ix, cbuf, size, 1)) < 0) {
 		return (err);
 	}
@@ -373,8 +400,9 @@ static Errcode ring_loaded_anim(char* name, Errcode reason, int frame_count)
 	Errcode err;
 	Fli_frame* frame;
 
-	if ((err = pj_fli_cel_alloc_cbuf(&frame, vb.pencel)) < Success)
+	if ((err = pj_fli_cel_alloc_cbuf(&frame, vb.pencel)) < Success) {
 		return (err);
+	}
 
 	while (flix.hdr.frame_count > 0) {
 		soft_put_wait_box("wait_ringing");
@@ -408,50 +436,60 @@ static Errcode fli_to_tempflx(char* name, int extra_frames, bool allow_abort)
 	cleans();
 
 	err = squawk_open_flifile(name, &flif, XREADONLY);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	if (flif.hdr.width != vb.pencel->width || flif.hdr.height != vb.pencel->height) {
 		err = Err_wrong_res;
 		goto error;
 	}
 
-	if ((err = create_tflx_start(&flif, name, extra_frames)) < Success)
+	if ((err = create_tflx_start(&flif, name, extra_frames)) < Success) {
 		goto error;
+	}
 
-	if ((err = pj_fli_cel_alloc_cbuf(&frame, vb.pencel)) < 0)
+	if ((err = pj_fli_cel_alloc_cbuf(&frame, vb.pencel)) < 0) {
 		goto error;
+	}
 
-	if ((err = pj_i_read_uncomp1(NULL, &flif, NULL, frame, 0)) < Success)
+	if ((err = pj_i_read_uncomp1(NULL, &flif, NULL, frame, 0)) < Success) {
 		goto error;
+	}
 
 	dirty_frame = !pj_frame_has_pstamp(frame);
 
-	if ((err = write_first_flxchunk(NULL, &flix, frame)) < Success)
+	if ((err = write_first_flxchunk(NULL, &flix, frame)) < Success) {
 		goto error;
+	}
 
 	for (;;) {
-		if ((err = pj_fli_read_uncomp(NULL, &flif, NULL, frame, 0)) < Success)
+		if ((err = pj_fli_read_uncomp(NULL, &flif, NULL, frame, 0)) < Success) {
 			goto error;
+		}
 
 		if (allow_abort && (poll_abort() < Success)) {
-			if ((err = abort_anim_load(name, flif.hdr.frame_count)) < Success)
+			if ((err = abort_anim_load(name, flif.hdr.frame_count)) < Success) {
 				break;
+			}
 		}
 
 		if (flix.hdr.frame_count < flif.hdr.frame_count) {
-			if ((err = write_next_flxchunk(NULL, &flix, frame)) >= Success)
+			if ((err = write_next_flxchunk(NULL, &flix, frame)) >= Success) {
 				continue;
+			}
 		} else {
-			if ((err = write_ring_flxchunk(NULL, &flix, frame)) >= Success)
+			if ((err = write_ring_flxchunk(NULL, &flix, frame)) >= Success) {
 				goto done;
+			}
 		}
 		break;
 	}
 
 	pj_freez(&frame);
-	if ((err = ring_loaded_anim(name, err, flif.hdr.frame_count)) >= Success)
+	if ((err = ring_loaded_anim(name, err, flif.hdr.frame_count)) >= Success) {
 		goto done;
+	}
 
 error:
 	close_temp_flx();
@@ -460,7 +498,6 @@ done:
 	pj_fli_close(&flif);
 	return (err);
 }
-
 
 Errcode make_pdr_tempflx(char* pdr_name, char* flicname, Anim_info* ainfo)
 {
@@ -471,10 +508,12 @@ Errcode make_pdr_tempflx(char* pdr_name, char* flicname, Anim_info* ainfo)
 	int frame_count, frames_left;
 
 	close_temp_flx();
-	if ((err = load_pdr(pdr_name, &pd)) < Success)
+	if ((err = load_pdr(pdr_name, &pd)) < Success) {
 		return (cant_use_module(err, pdr_name));
-	if ((err = pdr_open_ifile(pd, flicname, &ifile, ainfo)) < Success)
+	}
+	if ((err = pdr_open_ifile(pd, flicname, &ifile, ainfo)) < Success) {
 		goto error;
+	}
 
 	if ((frame_count = ainfo->num_frames) > MAXFRAMES) {
 		if (!soft_yes_no_box("!%s%d%d", "max_frames", flicname, frame_count, MAXFRAMES)) {
@@ -484,8 +523,9 @@ Errcode make_pdr_tempflx(char* pdr_name, char* flicname, Anim_info* ainfo)
 		frame_count = MAXFRAMES;
 	}
 
-	if ((err = empty_flx_start(tflxname, &flix, frame_count)) < Success)
+	if ((err = empty_flx_start(tflxname, &flix, frame_count)) < Success) {
 		goto error;
+	}
 
 	flix.hdr.speed = ainfo->millisec_per_frame;
 	if (ainfo->aspect_dy) {
@@ -493,45 +533,55 @@ Errcode make_pdr_tempflx(char* pdr_name, char* flicname, Anim_info* ainfo)
 		flix.hdr.aspect_dy = ainfo->aspect_dy;
 	}
 
-	if ((err = pdr_read_first(ifile, vb.pencel)) < Success)
+	if ((err = pdr_read_first(ifile, vb.pencel)) < Success) {
 		goto error;
+	}
 
-	if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < Success)
+	if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < Success) {
 		goto error;
+	}
 	err = write_first_flxframe(NULL, &flix, cbuf, vb.pencel);
 	pj_freez(&cbuf);
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	frames_left = frame_count;
 	while (--frames_left) {
 		if (poll_abort() < Success) {
-			if ((err = abort_anim_load(flicname, frame_count)) < Success)
+			if ((err = abort_anim_load(flicname, frame_count)) < Success) {
 				break;
+			}
 		}
 		save_undo();
-		if ((err = pdr_read_next(ifile, vb.pencel)) < Success)
+		if ((err = pdr_read_next(ifile, vb.pencel)) < Success) {
 			goto ring_error;
-		if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < 0)
+		}
+		if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < 0) {
 			goto ring_error;
+		}
 		err = write_next_flxframe(NULL, &flix, cbuf, undof, vb.pencel);
 		pj_freez(&cbuf);
-		if (err < Success)
+		if (err < Success) {
 			goto ring_error;
+		}
 	}
 
-	if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < 0)
+	if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < 0) {
 		goto ring_error;
+	}
 	fli_abs_tseek(undof, 0);
 	err = write_ring_flxframe(NULL, &flix, cbuf, vb.pencel, undof);
 	pj_freez(&cbuf);
-	if (err >= Success)
+	if (err >= Success) {
 		goto done;
+	}
 
 ring_error: /* call backoff and ring routine */
 
-	if ((err = ring_loaded_anim(flicname, err, frame_count)) >= Success)
+	if ((err = ring_loaded_anim(flicname, err, frame_count)) >= Success) {
 		goto done;
+	}
 error:
 	close_temp_flx();
 done:
@@ -541,19 +591,18 @@ done:
 	return (err);
 }
 
-
 Errcode make_tempflx(char* name, bool allow_abort)
 {
 	Errcode err;
 
 	pj_delete(tflxname);
 	maybe_push_most();
-	if ((err = fli_to_tempflx(name, 0, allow_abort)) < 0)
+	if ((err = fli_to_tempflx(name, 0, allow_abort)) < 0) {
 		empty_tempflx(1);
+	}
 	maybe_pop_most();
 	return (err);
 }
-
 
 static Errcode set_first_frame(int ix)
 {
@@ -563,8 +612,9 @@ static Errcode set_first_frame(int ix)
 	LONG sz, tsz;
 	int i;
 
-	if (ix >= flix.hdr.frame_count || ix == 0)
+	if (ix >= flix.hdr.frame_count || ix == 0) {
 		return (Success);
+	}
 
 	hide_mp();
 	unzoom();
@@ -573,7 +623,7 @@ static Errcode set_first_frame(int ix)
 	soft_put_wait_box("wait_reorder");
 	save_undo();
 
-	sz	= pj_fli_cel_cbuf_size(vb.pencel);
+	sz = pj_fli_cel_cbuf_size(vb.pencel);
 	tsz = flix.hdr.frames_in_table * sizeof(Flx);
 
 	if ((cbuf = pj_zalloc(Max(sz, tsz))) == NULL) {
@@ -581,23 +631,26 @@ static Errcode set_first_frame(int ix)
 		goto error;
 	}
 
-	if ((err = gb_fli_tseek(undof, vs.frame_ix, ix, cbuf)) < 0)
+	if ((err = gb_fli_tseek(undof, vs.frame_ix, ix, cbuf)) < 0) {
 		goto error;
+	}
 	zoom_unundo();
 
 	oftab = (Flx*)cbuf;
 	copy_mem(flix.idx, oftab, sz);
 
 	for (i = 1; i <= flix.hdr.frame_count; ++i) {
-		if (++ix > flix.hdr.frame_count)
+		if (++ix > flix.hdr.frame_count) {
 			ix = 1;
+		}
 		flix.idx[i] = oftab[ix];
 	}
 	vs.bframe_ix = 0;
-	vs.frame_ix	 = 0;
+	vs.frame_ix = 0;
 	pj_fli_comp_frame1(cbuf, vb.pencel, flix.comp_type);
-	if ((err = write_flx_frame(&flix, 0, cbuf)) < 0)
+	if ((err = write_flx_frame(&flix, 0, cbuf)) < 0) {
 		goto error;
+	}
 	flush_tflx();
 
 error:
@@ -610,18 +663,17 @@ error:
 	return (err);
 }
 
-
 void qset_first_frame(void* data)
 {
 	SHORT ix;
 	(void)data;
 
 	ix = vs.frame_ix + 1;
-	if (!soft_qreq_number(&ix, 1, flix.hdr.frame_count, "set_frame0"))
+	if (!soft_qreq_number(&ix, 1, flix.hdr.frame_count, "set_frame0")) {
 		return;
+	}
 	set_first_frame(ix - 1);
 }
-
 
 /* called from auto if desired to clear whole flx in clear pic do auto */
 void empty_cleared_flx(Pixel color)
@@ -636,7 +688,7 @@ void empty_cleared_flx(Pixel color)
 	push_most();
 
 	/* start with empty tempflx with table large enough for current flx */
-	oix	   = vs.frame_ix;
+	oix = vs.frame_ix;
 	ospeed = flix.hdr.speed;
 	empty_tempflx(flix.hdr.frame_count);
 	flix.hdr.speed = ospeed; /* preserve this */
@@ -645,16 +697,18 @@ void empty_cleared_flx(Pixel color)
 
 	if (color != 0) /* empty already set to color 0 */
 	{
-		if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < Success)
+		if ((err = pj_fli_cel_alloc_cbuf(&cbuf, vb.pencel)) < Success) {
 			goto error;
+		}
 
 		/* make a new first frame if not color zero
 		 * and re-write first frame.  All others remain blank,
 		 * including ring. */
 
 		pj_fli_comp_frame1(cbuf, vb.pencel, flix.comp_type);
-		if ((err = write_flx_frame(&flix, 0, cbuf)) < Success)
+		if ((err = write_flx_frame(&flix, 0, cbuf)) < Success) {
 			goto error;
+		}
 		flush_tflx();
 		pj_free(cbuf);
 	}

@@ -18,20 +18,19 @@ extern void cleanup_resources(void);
 /* pjhigh/resource.c */
 extern Errcode no_resource(Errcode err);
 
-extern Errcode init_menu_resource(char *menu_file);
+extern Errcode init_menu_resource(char* menu_file);
 extern void cleanup_menu_resource(void);
-extern Errcode init_resource_path(char *path);
+extern Errcode init_resource_path(char* path);
 
-extern char *make_resource_path(char *dir, char *name, char *path_buf);
-extern char *make_resource_name(char *name, char *path_buf);
+extern char* make_resource_path(char* dir, char* name, char* path_buf);
+extern char* make_resource_name(char* name, char* path_buf);
 
-extern bool resource_exists(char *name);
-extern bool req_resource_name(char *result, char *pat, char *hailing);
+extern bool resource_exists(char* name);
+extern bool req_resource_name(char* result, char* pat, char* hailing);
 
 /* Platform specific. */
-extern Errcode
-init_pj_startup(Argparse_list *more_args, Do_aparse do_others,
-		int argc, char **argv, char *help_key, char *menufile_name);
+extern Errcode init_pj_startup(Argparse_list* more_args, Do_aparse do_others, int argc, char** argv,
+							   char* help_key, char* menufile_name);
 
 extern void cleanup_startup(void);
 

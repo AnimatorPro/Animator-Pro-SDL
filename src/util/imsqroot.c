@@ -10,28 +10,27 @@
 
 int sqr_root(long i)
 {
-unsigned long	mask;
-long t;
-unsigned short	result;
-unsigned long	lolly;
-assert(i >= 0);
+	unsigned long mask;
+	long t;
+	unsigned short result;
+	unsigned long lolly;
+	assert(i >= 0);
 
-/*
-** Approximate starting mask value
-*/
+	/*
+	** Approximate starting mask value
+	*/
 
-for (mask = 1, lolly = i; mask < lolly; mask <<= 1, lolly >>= 1)
-;
+	for (mask = 1, lolly = i; mask < lolly; mask <<= 1, lolly >>= 1);
 
-result = 0;
+	result = 0;
 
-while (mask)
-{
-t = result | mask;
-if ((t * t) <= i)
-    result = t;
-mask >>= 1;
-}
+	while (mask) {
+		t = result | mask;
+		if ((t * t) <= i) {
+			result = t;
+		}
+		mask >>= 1;
+	}
 
-return ((int)result);
+	return ((int)result);
 }

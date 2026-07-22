@@ -27,8 +27,8 @@
 
 
 /* Animator-specific runner policy lives in this adapter-owned source. */
-extern void po_init_abort_control(int abortable, void *handler);
-extern bool po_check_abort(void *data);
+extern void po_init_abort_control(int abortable, void* handler);
+extern bool po_check_abort(void* data);
 
 
 /* the path from which the currently-running poco program was loaded...
@@ -50,23 +50,21 @@ char po_current_program_path[PATH_SIZE] = "";
 char po_chainto_program_path[PATH_SIZE];
 
 // forward declarations for new compilers
-static Errcode qls_poco(char *pbuf,char *prompt, char *button, int qls_mode, int path_type);
-static Errcode qload_poco(char *pbuf);
-static Errcode qsave_poco(char *pbuf);
+static Errcode qls_poco(char* pbuf, char* prompt, char* button, int qls_mode, int path_type);
+static Errcode qload_poco(char* pbuf);
+static Errcode qsave_poco(char* pbuf);
 Errcode quse_poco();
-
 
 /*****************************************************************************
  * store the path of the current poco program into the global path var.
  ****************************************************************************/
-static void set_current_program_path(char *progpath)
+static void set_current_program_path(char* progpath)
 {
-if (Success <= get_full_path(progpath, po_current_program_path))
-	{
-	remove_path_name(po_current_program_path);	/* nuke last name on path str */
+	if (Success <= get_full_path(progpath, po_current_program_path)) {
+		remove_path_name(po_current_program_path); /* nuke last name on path str */
+	} else {
+		po_current_program_path[0] = '\0'; /* oh well */
 	}
-else
-	po_current_program_path[0] = '\0'; /* oh well */
 }
 
 /*****************************************************************************
@@ -83,72 +81,71 @@ else
  *	 also note that poco expects each pathname (other than the null path)
  *	 to include the trailing backslash.
  ****************************************************************************/
-static const char *const *get_poco_include_paths(void)
+static const char* const* get_poco_include_paths(void)
 {
-static char  nullpath[] = "";
-static char  rbuf[PATH_SIZE] = "";              /* resource dir path buffer */
+	static char nullpath[] = "";
+	static char rbuf[PATH_SIZE] = ""; /* resource dir path buffer */
 
-static const char *pathlist[] = { 					/* list of include paths... */
-	po_current_program_path,						/* program's dir first      */
-	nullpath,									/* current/specified dir    */
-	rbuf,										/* then system resource dir */
+	static const char* pathlist[] = {
+		/* list of include paths... */
+		po_current_program_path, /* program's dir first      */
+		nullpath,                /* current/specified dir    */
+		rbuf,                    /* then system resource dir */
 	};
 
-if (rbuf[0] == 0)					/* only need to get the resource dir once */
+	if (rbuf[0] == 0) /* only need to get the resource dir once */
 	{
-	strcpy(rbuf, resource_dir); 			/* get system resource dir	  */
+		strcpy(rbuf, resource_dir); /* get system resource dir	  */
 	}
 
-return pathlist;
+	return pathlist;
 }
 
 /*****************************************************************************
  * Remove <cr>'s and truncate string after 5 lines.
  ****************************************************************************/
-static void trunc_to_5_lines(char *source)
+static void trunc_to_5_lines(char* source)
 {
-char *dest;
-char c;
-int count = 0;
+	char* dest;
+	char c;
+	int count = 0;
 
-dest = source;
-while ((c = *source++) != 0)
-	{
-	switch (c)
-		{
-		case '\r':
-			break;
-		case '\n':
-			*dest++ = c;
-			if (++count >= 5)
-				goto OUT;
-			break;
-		default:
-			*dest++ = c;
-			break;
+	dest = source;
+	while ((c = *source++) != 0) {
+		switch (c) {
+			case '\r':
+				break;
+			case '\n':
+				*dest++ = c;
+				if (++count >= 5) {
+					goto OUT;
+				}
+				break;
+			default:
+				*dest++ = c;
+				break;
 		}
 	}
 OUT:
-*dest++ = 0;
+	*dest++ = 0;
 }
 
 /*****************************************************************************
  * Put first five lines of a file into a dialog box.
  ****************************************************************************/
-void report_err_in_file(char *filename)
+void report_err_in_file(char* filename)
 {
 	char err_buf[512];
 	XFILE* f;
 	size_t size;
 
 	f = xfopen(filename, XREADONLY);
-	if (f == NULL)
-	{
+	if (f == NULL) {
 		soft_continu_box("no_err_file");
 		return;
 	}
 
-	size = xfread(err_buf, sizeof(err_buf)-1, 1, f);
+	size = xfread(err_buf, sizeof(err_buf) - 1, 1, f);
 	err_buf[size] = 0;
 	xfclose(f);
 	trunc_to_5_lines(err_buf);
@@ -158,10 +155,11 @@ void report_err_in_file(char *filename)
 /*****************************************************************************
  *
  ****************************************************************************/
-static void poco_report_err(char *phase, Errcode err)
+static void poco_report_err(char* phase, Errcode err)
 {
-if (err != Err_early_exit)
-	softerr(err, phase);
+	if (err != Err_early_exit) {
+		softerr(err, phase);
+	}
 }
 
 /* Resolve poco_err_name (e.g. "=:AATEMP.ERR") to a real filesystem path
@@ -173,8 +171,7 @@ static const char* resolved_poco_err_name(void)
 	return resolved;
 }
 
-typedef struct AniPocoDiagnosticState
-{
+typedef struct AniPocoDiagnosticState {
 	PocoStatus status;
 	char source_name[PATH_SIZE];
 	long line;
@@ -183,39 +180,41 @@ typedef struct AniPocoDiagnosticState
 	char error_file[PATH_SIZE];
 } AniPocoDiagnosticState;
 
-static void clear_adapter_error_file(const char *filename)
+static void clear_adapter_error_file(const char* filename)
 {
-	FILE *file;
+	FILE* file;
 
-	if (filename == NULL)
+	if (filename == NULL) {
 		return;
+	}
 	file = fopen(filename, "w");
-	if (file != NULL)
+	if (file != NULL) {
 		fclose(file);
+	}
 }
 
-static void capture_adapter_diagnostic(void *user_data,
-	const PocoDiagnostic *diagnostic)
+static void capture_adapter_diagnostic(void* user_data, const PocoDiagnostic* diagnostic)
 {
-	AniPocoDiagnosticState *state = user_data;
-	FILE *file;
+	AniPocoDiagnosticState* state = user_data;
+	FILE* file;
 
-	if (state == NULL || diagnostic == NULL)
+	if (state == NULL || diagnostic == NULL) {
 		return;
+	}
 	state->status = diagnostic->status;
 	state->line = diagnostic->line;
 	state->column = diagnostic->column;
 	if (diagnostic->source_name != NULL) {
-		strncpy(state->source_name, diagnostic->source_name,
-			sizeof(state->source_name) - 1);
+		strncpy(state->source_name, diagnostic->source_name, sizeof(state->source_name) - 1);
 		state->source_name[sizeof(state->source_name) - 1] = '\0';
 	}
 	if (diagnostic->message != NULL) {
 		strncpy(state->message, diagnostic->message, sizeof(state->message) - 1);
 		state->message[sizeof(state->message) - 1] = '\0';
 	}
-	if (state->error_file[0] == '\0' || state->message[0] == '\0')
+	if (state->error_file[0] == '\0' || state->message[0] == '\0') {
 		return;
+	}
 	file = fopen(state->error_file, "w");
 	if (file != NULL) {
 		fputs(state->message, file);
@@ -223,29 +222,28 @@ static void capture_adapter_diagnostic(void *user_data,
 	}
 }
 
-static Errcode animator_status(PocoStatus status,
-	const AniPocoDiagnosticState *diagnostic)
+static Errcode animator_status(PocoStatus status, const AniPocoDiagnosticState* diagnostic)
 {
-	if (status == POCO_STATUS_REPORTED && diagnostic != NULL &&
-		diagnostic->message[0] != '\0')
+	if (status == POCO_STATUS_REPORTED && diagnostic != NULL && diagnostic->message[0] != '\0') {
 		return Err_in_err_file;
+	}
 	return (Errcode)status;
 }
 
-static Errcode compile_animator_program(const char *source_name,
-	PocoVm **out_vm, PocoProgram **out_program,
-	AniPocoDiagnosticState *diagnostic)
+static Errcode compile_animator_program(const char* source_name, PocoVm** out_vm,
+										PocoProgram** out_program,
+										AniPocoDiagnosticState* diagnostic)
 {
 	PocoVmOptions options = {0};
 	PocoStatus status;
 
-	if (out_vm == NULL || out_program == NULL || diagnostic == NULL)
+	if (out_vm == NULL || out_program == NULL || diagnostic == NULL) {
 		return Err_null_ref;
+	}
 	*out_vm = NULL;
 	*out_program = NULL;
 	memset(diagnostic, 0, sizeof(*diagnostic));
-	strncpy(diagnostic->error_file, resolved_poco_err_name(),
-		sizeof(diagnostic->error_file) - 1);
+	strncpy(diagnostic->error_file, resolved_poco_err_name(), sizeof(diagnostic->error_file) - 1);
 	diagnostic->error_file[sizeof(diagnostic->error_file) - 1] = '\0';
 	clear_adapter_error_file(diagnostic->error_file);
 
@@ -255,10 +253,12 @@ static Errcode compile_animator_program(const char *source_name,
 	options.diagnostic_user_data = diagnostic;
 	ani_poco_configure_legacy_poe(&options);
 	status = poco_vm_create(&options, out_vm);
-	if (status == POCO_STATUS_OK)
+	if (status == POCO_STATUS_OK) {
 		status = ani_poco_register_libraries(*out_vm);
-	if (status == POCO_STATUS_OK)
+	}
+	if (status == POCO_STATUS_OK) {
 		status = poco_vm_compile_file(*out_vm, source_name, out_program);
+	}
 	if (status != POCO_STATUS_OK) {
 		poco_program_destroy(*out_program);
 		*out_program = NULL;
@@ -268,7 +268,7 @@ static Errcode compile_animator_program(const char *source_name,
 	return animator_status(status, diagnostic);
 }
 
-static int check_adapter_abort(void *user_data)
+static int check_adapter_abort(void* user_data)
 {
 	return po_check_abort(user_data) ? 1 : 0;
 }
@@ -280,20 +280,19 @@ static bool poco_text_changed;
  ****************************************************************************/
 static void qedit_note_changes(long line, int cpos)
 {
-if (qedit_poco(line, cpos))
-	poco_text_changed = true;
+	if (qedit_poco(line, cpos)) {
+		poco_text_changed = true;
+	}
 }
-
 
 /*****************************************************************************
  *
  ****************************************************************************/
-static Errcode execute_poco(PocoVm *vm, PocoProgram *program,
-	AniPocoDiagnosticState *diagnostic)
+static Errcode execute_poco(PocoVm* vm, PocoProgram* program, AniPocoDiagnosticState* diagnostic)
 {
 	PocoRunOptions options = {0};
 	PocoStatus status;
-	void *ocurs;
+	void* ocurs;
 
 	po_tur_home();
 	make_render_cashes();
@@ -308,12 +307,12 @@ static Errcode execute_poco(PocoVm *vm, PocoProgram *program,
 	cleanup_poco_tween();
 	free_render_cashes();
 	set_pen_cursor(ocurs); /* restore old cursor */
-	show_mouse();	/* make cursor visible for sure */
+	show_mouse();          /* make cursor visible for sure */
 	return animator_status(status, diagnostic);
 }
 
-static Errcode execute_stripped_poco(PocoVm *vm, PocoProgram *program,
-	AniPocoDiagnosticState *diagnostic)
+static Errcode execute_stripped_poco(PocoVm* vm, PocoProgram* program,
+									 AniPocoDiagnosticState* diagnostic)
 {
 	PocoRunOptions options = {0};
 	PocoStatus status;
@@ -326,55 +325,53 @@ static Errcode execute_stripped_poco(PocoVm *vm, PocoProgram *program,
 
 /* Run a poco program that doesn't need much in the way of the
  * poco run time environment (that won't do many ink calls etc. */
-Errcode run_poco_stripped_environment(char *source_name)
+Errcode run_poco_stripped_environment(char* source_name)
 {
-	PocoVm *vm;
-	PocoProgram *program;
+	PocoVm* vm;
+	PocoProgram* program;
 	AniPocoDiagnosticState diagnostic;
 	Errcode err;
 
 	err = compile_animator_program(source_name, &vm, &program, &diagnostic);
-	if (err >= Success)
+	if (err >= Success) {
 		err = execute_stripped_poco(vm, program, &diagnostic);
+	}
 	poco_program_destroy(program);
 	poco_vm_destroy(vm);
 	return err;
 }
 
-
 /*****************************************************************************
  * compile, (and if successfull) run a poco program.
  ****************************************************************************/
-Errcode qrun_poco(char *sourcename, bool edit_err)
+Errcode qrun_poco(char* sourcename, bool edit_err)
 {
 	Errcode err;
-	char	chainbuf[PATH_SIZE];
-	char	*phase;
-	PocoVm *vm;
-	PocoProgram *program;
+	char chainbuf[PATH_SIZE];
+	char* phase;
+	PocoVm* vm;
+	PocoProgram* program;
 	AniPocoDiagnosticState diagnostic;
 
-CHAIN_ANOTHER_PROGRAM:					// loop point for chaining programs
+CHAIN_ANOTHER_PROGRAM:                  // loop point for chaining programs
 	po_chainto_program_path[0] = '\0';  // start with no chainto program
 
 	phase = "poco_compile";
 	err = compile_animator_program(sourcename, &vm, &program, &diagnostic);
-	if (err >= Success)
-	{
+	if (err >= Success) {
 		save_undo();
 		phase = "poco_run";
 		err = execute_poco(vm, program, &diagnostic);
 	}
 
-	if (err < Success)
-	{
+	if (err < Success) {
 		po_chainto_program_path[0] = '\0';  // don't allow chaining after error
 		if (err == Err_in_err_file) {
 			report_err_in_file(resolved_poco_err_name());
-			if (edit_err)
+			if (edit_err) {
 				qedit_note_changes(diagnostic.line, diagnostic.column);
-		}
-		else {
+			}
+		} else {
 			poco_report_err(phase, err);
 		}
 		err = Err_reported;
@@ -383,8 +380,7 @@ CHAIN_ANOTHER_PROGRAM:					// loop point for chaining programs
 	poco_program_destroy(program);
 	poco_vm_destroy(vm);
 
-	if (po_chainto_program_path[0] != '\0')
-	{
+	if (po_chainto_program_path[0] != '\0') {
 		strcpy(chainbuf, po_chainto_program_path);
 		sourcename = chainbuf;
 		set_current_program_path(chainbuf);
@@ -394,16 +390,16 @@ CHAIN_ANOTHER_PROGRAM:					// loop point for chaining programs
 	return err;
 }
 
-static PocoVm *cl_vm;
-static PocoProgram *cl_program;
+static PocoVm* cl_vm;
+static PocoProgram* cl_program;
 static AniPocoDiagnosticState cl_diagnostic;
 
 /*****************************************************************************
  * invoke poco (compile only) from the command line
  ****************************************************************************/
-Errcode compile_cl_poco(char *name)
+Errcode compile_cl_poco(char* name)
 {
-	set_current_program_path(name); 	/* used by compiler for #include, etc */
+	set_current_program_path(name); /* used by compiler for #include, etc */
 	poco_program_destroy(cl_program);
 	poco_vm_destroy(cl_vm);
 	cl_program = NULL;
@@ -411,41 +407,39 @@ Errcode compile_cl_poco(char *name)
 	return compile_animator_program(name, &cl_vm, &cl_program, &cl_diagnostic);
 }
 
-
 /*****************************************************************************
  *
  ****************************************************************************/
-Errcode do_cl_poco(char *name)
+Errcode do_cl_poco(char* name)
 {
-Errcode err = Success;
-char	chainbuf[PATH_SIZE];
+	Errcode err = Success;
+	char chainbuf[PATH_SIZE];
 
-(void)name;
+	(void)name;
 
 CHAIN_ANOTHER_PROGRAM:
 
 	po_chainto_program_path[0] = '\0';
 
-	if (cl_program != NULL && cl_vm != NULL)
-		{
+	if (cl_program != NULL && cl_vm != NULL) {
 		err = execute_poco(cl_vm, cl_program, &cl_diagnostic);
-		if (err < Success)
-			{
+		if (err < Success) {
 			po_chainto_program_path[0] = '\0';  // blast chain prog on error
-			if (err != Err_in_err_file && err != Err_early_exit)
+			if (err != Err_in_err_file && err != Err_early_exit) {
 				poco_report_err("poco_run", err);
 			}
+		}
 		poco_program_destroy(cl_program);
 		poco_vm_destroy(cl_vm);
 		cl_program = NULL;
 		cl_vm = NULL;
-		if (po_chainto_program_path[0] != '\0')
-			{
+		if (po_chainto_program_path[0] != '\0') {
 			strcpy(chainbuf, po_chainto_program_path);
-			if ((err = compile_cl_poco(chainbuf)) >= Success)
+			if ((err = compile_cl_poco(chainbuf)) >= Success) {
 				goto CHAIN_ANOTHER_PROGRAM;
 			}
 		}
+	}
 	return err;
 }
 
@@ -457,15 +451,15 @@ CHAIN_ANOTHER_PROGRAM:
  *	program in the editor (if any) is preserved across the run.
  *	(hey -- kludge is my middle name.)
  ****************************************************************************/
-Errcode qrun_pocofile(char *poco_path, bool editable)
+Errcode qrun_pocofile(char* poco_path, bool editable)
 {
 	Errcode err;
 	char save_path[PATH_SIZE];
 
 	strcpy(save_path, po_current_program_path);
 	set_current_program_path(poco_path);
-	err = qrun_poco(poco_path,editable);
-	strcpy(po_current_program_path,save_path);
+	err = qrun_poco(poco_path, editable);
+	strcpy(po_current_program_path, save_path);
 
 	return err;
 }
@@ -474,22 +468,18 @@ Errcode qrun_pocofile(char *poco_path, bool editable)
  * Make sure user has a chance to save his changes to the program before
  * he loads in a new program or starts a fresh one.
  ****************************************************************************/
-static void insure_changes(char *poco_file, char *poco_path)
+static void insure_changes(char* poco_file, char* poco_path)
 {
-if (!poco_text_changed)
-	return;
-if (poco_file[0] == 0)
-	{
-	if (soft_yes_no_box("save_changes_first"))
-		{
-		qsave_poco(poco_path);
-		}
+	if (!poco_text_changed) {
+		return;
 	}
-else
-	{
-	if (soft_yes_no_box("!%s", "save_changes_to_first", poco_file))
-		{
-		pj_copyfile(poco_source_name, poco_path);
+	if (poco_file[0] == 0) {
+		if (soft_yes_no_box("save_changes_first")) {
+			qsave_poco(poco_path);
+		}
+	} else {
+		if (soft_yes_no_box("!%s", "save_changes_to_first", poco_file)) {
+			pj_copyfile(poco_source_name, poco_path);
 		}
 	}
 }
@@ -501,12 +491,11 @@ void go_pgmn(void)
 {
 	int choice;
 	char pbuf[PATH_SIZE];
-	char *poco_file;
+	char* poco_file;
 	USHORT mdis[9];
 
 
-	for (;;)
-	{
+	for (;;) {
 		/* set up asterisks and disables */
 		clear_mem(mdis, sizeof(mdis));
 
@@ -518,21 +507,20 @@ void go_pgmn(void)
 
 		poco_file = pj_get_path_name(pbuf);
 
-		choice = soft_qchoice(mdis, "!%.18s", "poco_program", poco_file );
+		choice = soft_qchoice(mdis, "!%.18s", "poco_program", poco_file);
 
-		switch (choice)
-		{
+		switch (choice) {
 			case 0:
-				qedit_note_changes(-1L,-1);
+				qedit_note_changes(-1L, -1);
 				break;
 			case 1:
-				qrun_poco(poco_source_name,true);
+				qrun_poco(poco_source_name, true);
 				break;
 			case 2:
 				insure_changes(poco_file, pbuf);
 				qload_poco(pbuf);
 				break;
-			case 3: 	/* save */
+			case 3: /* save */
 				if (poco_file[0] == 0) {
 					// perform save as
 					qsave_poco(pbuf);
@@ -541,15 +529,15 @@ void go_pgmn(void)
 				pj_copyfile(poco_source_name, pbuf);
 				poco_text_changed = false;
 				break;
-			case 4: 	/* save as */
+			case 4: /* save as */
 				qsave_poco(pbuf);
 				break;
-			case 5: 	/* new	*/
+			case 5: /* new	*/
 				insure_changes(poco_file, pbuf);
 				pj_delete(poco_source_name);
 				poco_text_changed = false;
 				poco_file[0] = 0;
-				vset_set_path(POCO_PATH,pbuf);
+				vset_set_path(POCO_PATH, pbuf);
 				break;
 			case 6:
 				ani_poco_write_library_list("pocolib.txt");
@@ -569,59 +557,47 @@ void go_pgmn(void)
  * Put up a file requestor to load, save, or use a poco program (depending
  * on qls_mode variable).	Then take appropriate load/save/use action.
  ****************************************************************************/
-static Errcode qls_poco(char *pbuf,char *prompt, char *button, int qls_mode, int path_type)
+static Errcode qls_poco(char* pbuf, char* prompt, char* button, int qls_mode, int path_type)
 {
 	bool got_it = false;
 	Errcode err = Success;
 	char poco_path[PATH_SIZE];
 
-	if(vset_get_filename(prompt,".POC;.H",button,path_type, poco_path,1) != NULL)
-	{
-		switch (qls_mode)
-		{
-			case QLS_LOAD:
-			{
-				if (!pj_exists(poco_path))
-				{
+	if (vset_get_filename(prompt, ".POC;.H", button, path_type, poco_path, 1) != NULL) {
+		switch (qls_mode) {
+			case QLS_LOAD: {
+				if (!pj_exists(poco_path)) {
 					cant_find(poco_path);
 					err = Err_no_file;
-				}
-				else
-				{
+				} else {
 					vs.ped_cursor_p = vs.ped_yoff = 0;
 					set_current_program_path(poco_path);
-					if ((err = pj_copyfile(poco_path,poco_source_name)) >= Success)
-						poco_text_changed = false;
-				}
-			}
-			break;
-
-			case QLS_USE:
-				qrun_pocofile(poco_path,false);
-				break;
-			case QLS_SAVE:
-				{
-				if (overwrite_old(poco_path))
-					{
-					if ((err = pj_copyfile(poco_source_name,poco_path)) >= Success)
+					if ((err = pj_copyfile(poco_path, poco_source_name)) >= Success) {
 						poco_text_changed = false;
 					}
-				else
+				}
+			} break;
+
+			case QLS_USE:
+				qrun_pocofile(poco_path, false);
+				break;
+			case QLS_SAVE: {
+				if (overwrite_old(poco_path)) {
+					if ((err = pj_copyfile(poco_source_name, poco_path)) >= Success) {
+						poco_text_changed = false;
+					}
+				} else {
 					err = Err_extant;
 				}
-				break;
+			} break;
 		}
-	}
-	else {
+	} else {
 		err = Err_abort;
 	}
 
-	if(err >= Success)
-	{
-		strcpy(pbuf,poco_path);
-	}
-	else
-	{
+	if (err >= Success) {
+		strcpy(pbuf, poco_path);
+	} else {
 		pj_get_path_name(pbuf)[0] = 0;
 	}
 	return err;
@@ -630,23 +606,21 @@ static Errcode qls_poco(char *pbuf,char *prompt, char *button, int qls_mode, int
 /*****************************************************************************
  *
  ****************************************************************************/
-static Errcode qload_poco(char *pbuf)
+static Errcode qload_poco(char* pbuf)
 {
-char sbuf[50];
+	char sbuf[50];
 
-return(qls_poco(pbuf,stack_string("load_poco",sbuf),
-	load_str, QLS_LOAD, POCO_PATH));
+	return (qls_poco(pbuf, stack_string("load_poco", sbuf), load_str, QLS_LOAD, POCO_PATH));
 }
 
 /*****************************************************************************
  *
  ****************************************************************************/
-static Errcode qsave_poco(char *pbuf)
+static Errcode qsave_poco(char* pbuf)
 {
-char sbuf[50];
+	char sbuf[50];
 
-return(qls_poco(pbuf,stack_string("save_poco",sbuf),
-	save_str, QLS_SAVE, POCO_PATH));
+	return (qls_poco(pbuf, stack_string("save_poco", sbuf), save_str, QLS_SAVE, POCO_PATH));
 }
 
 /*****************************************************************************
@@ -658,8 +632,8 @@ Errcode quse_poco()
 	char sbuf[50];
 	char ubuf[16];
 
-	return qls_poco(pbuf,stack_string("use_poco",sbuf),
-	stack_string("use_str",ubuf), QLS_USE, POCO_USE_PATH);
+	return qls_poco(pbuf, stack_string("use_poco", sbuf), stack_string("use_str", ubuf), QLS_USE,
+					POCO_USE_PATH);
 }
 
 #undef QLS_LOAD

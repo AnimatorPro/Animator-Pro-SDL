@@ -24,7 +24,7 @@ endif()
 
 string(REGEX MATCHALL "#[ \t]*include[ \t]*[^\n]+" CANONICAL_INCLUDES "${CANONICAL_HEADER_CONTENTS}")
 foreach(CANONICAL_INCLUDE IN LISTS CANONICAL_INCLUDES)
-    if(NOT CANONICAL_INCLUDE MATCHES "^[ \t]*#[ \t]*include[ \t]*<(stddef|stdint|stdbool)\\.h>[ \t]*(/\\*.*\\*/)?$")
+    if(NOT CANONICAL_INCLUDE MATCHES "^[ \t]*#[ \t]*include[ \t]*<(stddef|stdint|stdbool|stdio)\\.h>[ \t]*(/\\*.*\\*/)?$")
         message(FATAL_ERROR
             "The canonical public header may include only standard C headers; found: ${CANONICAL_INCLUDE}")
     endif()

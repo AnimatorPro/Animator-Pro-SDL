@@ -250,14 +250,52 @@
 
 #include "poco.h"
 #include <limits.h> /* so we can properly determine max int value */
+#include <locale.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <xlocale.h>
+#endif
 
 
 /* internal predeclarations */
 
 static void get_prec1(Poco_cb* pcb, Exp_frame* e);
 static void assign_after_value(Poco_cb* pcb, Exp_frame* e, Symbol* var);
+
+/*
+ * Source text always spells floating constants with the C decimal point.
+ * atof() instead follows the process-global numeric locale, which made the
+ * same graph source compile to a different constant after a host selected a
+ * comma-decimal locale.  Use an explicit C locale without mutating ambient
+ * process state.  Locale creation is kept per conversion so the compiler does
+ * not add another shared mutable singleton.
+ */
+static double poco_parse_source_double(const char* text)
+{
+#ifdef _WIN32
+	_locale_t c_locale = _create_locale(LC_NUMERIC, "C");
+	double value;
+
+	if (c_locale == NULL) {
+		return 0.0;
+	}
+	value = _strtod_l(text, NULL, c_locale);
+	_free_locale(c_locale);
+	return value;
+#else
+	locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+	double value;
+
+	if (c_locale == (locale_t)0) {
+		return 0.0;
+	}
+	value = strtod_l(text, NULL, c_locale);
+	freelocale(c_locale);
+	return value;
+#endif
+}
 
 /****** MODULE ERROR error handling messages ********/
 
@@ -266,7 +304,7 @@ static void assign_after_value(Poco_cb* pcb, Exp_frame* e, Symbol* var);
  ****************************************************************************/
 static void po_say_err(Poco_cb* pcb, char* s)
 {
-	Token* t	   = &pcb->t;
+	Token* t = &pcb->t;
 	File_stack* fs = t->file_stack;
 	char errtxtbuf[128];
 	long line_num = 0;
@@ -284,15 +322,17 @@ static void po_say_err(Poco_cb* pcb, char* s)
 		pcb->error_char_number = char_num;
 	}
 
-	if (pcb->global_err == Err_syntax)
+	if (pcb->global_err == Err_syntax) {
 		strcpy(errtxtbuf, "Error");
-	else
+	} else {
 		get_errtext(pcb->global_err, errtxtbuf);
+	}
 
-	if (fs == NULL)
+	if (fs == NULL) {
 		fprintf(t->err_file, "%s\n%s\n", errtxtbuf, s);
-	else
+	} else {
 		fprintf(t->err_file, "%s in %s near line %ld:\n%s\n", errtxtbuf, fs->name, line_num, s);
+	}
 }
 
 /*****************************************************************************
@@ -307,11 +347,12 @@ void po_say_warning(Poco_cb* pcb, char* fmt, ...)
 	vsprintf(sbuf, fmt, args);
 	va_end(args);
 
-	if (pcb->global_err >= 0)
+	if (pcb->global_err >= 0) {
 		pcb->global_err = Err_syntax;
+	}
 
 	po_say_err(pcb, sbuf);
-	pcb->error_line_number = 0; // forget error line #, just a warning
+	pcb->error_line_number = 0;  // forget error line #, just a warning
 }
 
 /*****************************************************************************
@@ -326,16 +367,18 @@ void po_say_fatal(Poco_cb* pcb, char* fmt, ...)
 	vsprintf(sbuf, fmt, args);
 	va_end(args);
 
-	if (pcb->global_err >= 0)
+	if (pcb->global_err >= 0) {
 		pcb->global_err = Err_syntax;
+	}
 
 	po_say_err(pcb, sbuf);
 
 	pcb->compile_aborted = true;
-	if (pcb->global_err >= 0)
+	if (pcb->global_err >= 0) {
 		pcb->compile_err = Err_syntax;
-	else
+	} else {
 		pcb->compile_err = pcb->global_err;
+	}
 }
 
 /*****************************************************************************
@@ -352,7 +395,7 @@ void po_say_internal(Poco_cb* pcb, char* fmt, ...)
 
 	pcb->global_err = Err_poco_internal;
 	po_say_fatal(pcb, "poco internal error: %s", sbuf);
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -369,7 +412,7 @@ void po_expecting_got(Poco_cb* pcb, char* expecting)
 void po_expecting_got_str(Poco_cb* pcb, char* expecting, char* got)
 {
 	po_say_fatal(pcb, "expecting %s got '%s'", expecting, got);
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -391,7 +434,7 @@ bool po_need_token(Poco_cb* pcb)
 void po_redefined(Poco_cb* pcb, char* s)
 {
 	po_say_fatal(pcb, "%s redefined", s);
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -400,7 +443,7 @@ void po_redefined(Poco_cb* pcb, char* s)
 void po_undefined(Poco_cb* pcb, char* s)
 {
 	po_say_fatal(pcb, "%s undefined", s);
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -409,7 +452,7 @@ void po_undefined(Poco_cb* pcb, char* s)
 void po_unmatched_paren(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "unmatched parenthesis");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -453,7 +496,6 @@ void po_freelist(void* l)
  ****************************************************************************/
 int po_hashfunc(UBYTE* s)
 {
-
 	int acc;
 	int c;
 
@@ -463,7 +505,6 @@ int po_hashfunc(UBYTE* s)
 	}
 	return (acc & (HASH_SIZE - 1));
 }
-
 
 /*****************************************************************************
  * unlink an element from a singly-linked list.
@@ -490,7 +531,7 @@ void po_unhash_symbol(Poco_cb* pcb, Symbol* s)
 {
 	Symbol** hash_slot;
 
-	hash_slot  = pcb->rframe->hash_table + po_hashfunc((UBYTE*)s->name);
+	hash_slot = pcb->rframe->hash_table + po_hashfunc((UBYTE*)s->name);
 	*hash_slot = po_unlink_el(*hash_slot, s);
 }
 
@@ -503,12 +544,14 @@ static Symbol* new_symbol(Poco_cb* pcb, char* s, SHORT tok_type)
 	Symbol** hash_slot;
 
 	hash_slot = pcb->rframe->hash_table + po_hashfunc((UBYTE*)s);
-	new		  = po_memzalloc(pcb, sizeof(*new) + strlen(s) + 1);
+	new = po_memzalloc(pcb, sizeof(*new) + strlen(s) + 1);
 	new->name = (char*)(new + 1);
 	strcpy(new->name, s);
+	new->unit_name = pcb->current_unit_name;
+	new->unit_index = pcb->current_unit_index;
 	new->tok_type = tok_type;
-	new->next	  = *hash_slot;
-	*hash_slot	  = new;
+	new->next = *hash_slot;
+	*hash_slot = new;
 	return (new);
 }
 
@@ -529,12 +572,13 @@ int po_rehash(Poco_cb* pcb, Symbol* s)
 
 	while (s != NULL) {
 		++counter;
-		if (s->name[0] == '\0')
+		if (s->name[0] == '\0') {
 			return counter;
-		hash_slot  = pcb->rframe->hash_table + po_hashfunc((UBYTE*)s->name);
-		s->next	   = *hash_slot;
+		}
+		hash_slot = pcb->rframe->hash_table + po_hashfunc((UBYTE*)s->name);
+		s->next = *hash_slot;
 		*hash_slot = s;
-		s		   = s->link;
+		s = s->link;
 	}
 	return 0;
 }
@@ -578,8 +622,8 @@ Symbol* po_new_symbol(Poco_cb* pcb, char* name)
 		return NULL;
 	}
 
-	s->link		= rf->symbols;
-	s->scope	= rf->scope;
+	s->link = rf->symbols;
+	s->scope = rf->scope;
 	rf->symbols = s;
 
 	return s;
@@ -593,9 +637,11 @@ static Symbol* in_symbol_list(register Symbol* l, char* name)
 	register char c1 = *name;
 
 	while (l != NULL) {
-		if (l->name[0] == c1) /* quick-check first chars before making call */
-			if (po_eqstrcmp(l->name, name) == 0)
+		if (l->name[0] == c1) { /* quick-check first chars before making call */
+			if (po_eqstrcmp(l->name, name) == 0) {
 				return (l);
+			}
+		}
 		l = l->next;
 	}
 	return (NULL);
@@ -610,7 +656,7 @@ static Symbol* find_symbol(Poco_cb* pcb, char* name)
 	Symbol* s;
 	int hashval;
 
-	p		= pcb->rframe;
+	p = pcb->rframe;
 	hashval = po_hashfunc((UBYTE*)name);
 	while (p != NULL) {
 		if ((s = in_symbol_list(p->hash_table[hashval], name)) != NULL) {
@@ -644,10 +690,10 @@ void* po_reverse_links(Symbol* el)
 
 	list = NULL;
 	while (el != NULL) {
-		link	 = el->link;
+		link = el->link;
 		el->link = list;
-		list	 = el;
-		el		 = link;
+		list = el;
+		el = link;
 	}
 	return (list);
 }
@@ -661,10 +707,11 @@ static Tstack* new_token(Poco_cb* pcb)
 {
 	Tstack* t;
 
-	if (NULL == (t = pcb->free_tokens))
+	if (NULL == (t = pcb->free_tokens)) {
 		t = po_memalloc(pcb, sizeof(*t));
-	else
+	} else {
 		pcb->free_tokens = t->next;
+	}
 	return t;
 }
 
@@ -673,7 +720,7 @@ static Tstack* new_token(Poco_cb* pcb)
  ****************************************************************************/
 static void free_token(Poco_cb* pcb, Tstack* t)
 {
-	t->next			 = pcb->free_tokens;
+	t->next = pcb->free_tokens;
 	pcb->free_tokens = t;
 }
 
@@ -733,11 +780,11 @@ static Tstack* build_token_list(Poco_cb* pcb)
 
 	ts = new_token(pcb);
 
-	first_ts	  = ts;
-	strbase		  = pcb->strlit_work;
-	strwrk		  = strbase;
-	strlit_len	  = 0;
-	prev_ts		  = &dummy_ts;
+	first_ts = ts;
+	strbase = pcb->strlit_work;
+	strwrk = strbase;
+	strlit_len = 0;
+	prev_ts = &dummy_ts;
 	prev_ts->type = PTOK_MAX + 1;
 
 NEED_MORE:
@@ -746,16 +793,16 @@ NEED_MORE:
 
 	if (line_pos == NULL) /* handle EOF */
 	{
-		ts->type	 = TOK_EOF;
+		ts->type = TOK_EOF;
 		ts->line_num = 0;
 		ts->char_num = 0;
 		ts->ctoke[0] = '\0';
-		prev_ts		 = ts;
+		prev_ts = ts;
 		ts = ts->next = new_token(pcb);
-		ts->type	  = TOK_EOF;
-		ts->line_num  = 0;
-		ts->char_num  = 0;
-		ts->ctoke[0]  = '\0';
+		ts->type = TOK_EOF;
+		ts->line_num = 0;
+		ts->char_num = 0;
+		ts->ctoke[0] = '\0';
 		goto ENDFILE;
 	}
 
@@ -763,12 +810,13 @@ NEED_MORE:
 
 	for (;;) {
 		ts->is_symbol = false;
-		ts->line_num  = line_count;
+		ts->line_num = line_count;
 
-		line_pos = (char*)tokenize_word(
-		  (UBYTE*)line_pos, (UBYTE*)ts->ctoke, (UBYTE*)strwrk, &ctoke_size, &token_type, false);
-		if (line_pos == NULL)
+		line_pos = (char*)tokenize_word((UBYTE*)line_pos, (UBYTE*)ts->ctoke, (UBYTE*)strwrk,
+										&ctoke_size, &token_type, false);
+		if (line_pos == NULL) {
 			goto ENDLINE;
+		}
 		ts->type = (PToken_t)token_type;
 
 		ts->char_num = 1 + ((line_pos - ctoke_size) - line_start);
@@ -776,17 +824,17 @@ NEED_MORE:
 		if (prev_ts->type == TOK_QUO && ts->type != TOK_QUO) {
 			register Names* n;
 
-			n		= po_memzalloc(pcb, sizeof(*n) + strlit_len + 1);
+			n = po_memzalloc(pcb, sizeof(*n) + strlit_len + 1);
 			n->name = (char*)(n + 1);
 			poco_copy_bytes(strbase, n->name, strlit_len + 1);
-			n->next				= pcb->run.literals;
-			pcb->run.literals	= n;
+			n->next = pcb->run.literals;
+			pcb->run.literals = n;
 			prev_ts->val.string = n->name;
-			prev_ts->type		= PTOK_QUO;
+			prev_ts->type = PTOK_QUO;
 			prev_ts->ctoke_size = strlit_len;
 			strncpy(prev_ts->ctoke, prev_ts->val.string, MAX_SYM_LEN - 1);
 			strlit_len = 0;
-			strwrk	   = strbase;
+			strwrk = strbase;
 		}
 
 		ts->ctoke_size = ctoke_size;
@@ -795,38 +843,42 @@ NEED_MORE:
 			case TOK_INT:
 			case TOK_LONG:
 
-				if (ts->ctoke[1] == 'X')
+				if (ts->ctoke[1] == 'X') {
 					ts->val.num = htol(ts->ctoke);
-				else
+				} else {
 					ts->val.num = atol(ts->ctoke);
+				}
 
-				if (ts->val.num > INT_MAX)
+				if (ts->val.num > INT_MAX) {
 					ts->type = TOK_LONG;
+				}
 
 				break;
 
 			case TOK_DOUBLE:
 
-				ts->val.dnum = atof(ts->ctoke);
+				ts->val.dnum = poco_parse_source_double(ts->ctoke);
 				break;
 
 			case TOK_SQUO:
 
-				if (ctoke_size > 1)
+				if (ctoke_size > 1) {
 					if (ctoke_size > 1) {
 						po_say_fatal(pcb, "invalid character constant '%s'", ts->ctoke);
 						PO_CHECK_ABORT(pcb, NULL);
 					}
-					ts->val.num = (unsigned char)(ts->ctoke[0]);
-					ts->type	= TOK_INT;
-					break;
+				}
+				ts->val.num = (unsigned char)(ts->ctoke[0]);
+				ts->type = TOK_INT;
+				break;
 
 			case TOK_QUO:
 
 				strwrk = strbase + (strlit_len += ctoke_size);
-				if (strlit_len > MAX_STRLIT_LEN)
-					po_say_fatal(
-					  pcb, "string literal exceeds length limit of %d characters", MAX_STRLIT_LEN);
+				if (strlit_len > MAX_STRLIT_LEN) {
+					po_say_fatal(pcb, "string literal exceeds length limit of %d characters",
+								 MAX_STRLIT_LEN);
+				}
 				break;
 
 		} /* END switch (type) */
@@ -840,17 +892,19 @@ NEED_MORE:
 
 ENDLINE:
 
-	if (prev_ts == &dummy_ts || prev_ts->type == TOK_QUO)
+	if (prev_ts == &dummy_ts || prev_ts->type == TOK_QUO) {
 		goto NEED_MORE;
+	}
 
 ENDFILE:
 
 	prev_ts->next = NULL;
 	free_token(pcb, ts);
 
-#ifdef DEBUG
-	for (ts = first_ts; ts; ts = ts->next)
+#ifdef POCO_DEBUG_DUMP
+	for (ts = first_ts; ts; ts = ts->next) {
 		printf("%s ", ts->ctoke);
+	}
 	printf("\n");
 #endif
 
@@ -863,18 +917,20 @@ ENDFILE:
 static SHORT lookahead_type(Poco_cb* pcb)
 {
 	Symbol* s;
-	Tstack* ts	= pcb->curtoken->next;
+	Tstack* ts = pcb->curtoken->next;
 	SHORT ttype = ts->type;
 
-	if (ttype != TOK_UNDEF)
+	if (ttype != TOK_UNDEF) {
 		return ttype;
+	}
 
 	if (NULL != (s = find_symbol(pcb, ts->ctoke))) {
 		ttype = s->tok_type;
-		if (ttype == PTOK_ENUMCONST)
+		if (ttype == PTOK_ENUMCONST) {
 			return TOK_INT;
-		else
+		} else {
 			return ttype;
+		}
 	}
 	return TOK_UNDEF;
 }
@@ -895,32 +951,35 @@ void po_lookup_freshtoken(Poco_cb* pcb)
 
 	PO_CHECK_ABORT_VOID(pcb);
 
-	if (((char*)&pcb) < pcb->stack_bottom)
+	if (((char*)&pcb) < pcb->stack_bottom) {
 		po_say_fatal(pcb, "stack overflow (statements too deeply nested)");
-  PO_CHECK_ABORT_VOID(pcb);
+	}
+	PO_CHECK_ABORT_VOID(pcb);
 
 	ts = pcb->curtoken->next;
 	free_token(pcb, pcb->curtoken);
 	pcb->curtoken = ts;
-	if (ts->next == NULL)
+	if (ts->next == NULL) {
 		ts->next = build_token_list(pcb);
+	}
 
 	if (ts->type == TOK_UNDEF) {
 		if (NULL != (s = find_symbol(pcb, ts->ctoke))) {
 			ts->type = s->tok_type;
 			if (ts->type == PTOK_ENUMCONST) {
 				ts->val.num = s->symval.i;
-				ts->type	= TOK_INT;
+				ts->type = TOK_INT;
 			} else {
 				ts->val.symbol = s;
-				if (ts->type == PTOK_VAR || ts->type == PTOK_LABEL || ts->type == PTOK_UNDEF)
+				if (ts->type == PTOK_VAR || ts->type == PTOK_LABEL || ts->type == PTOK_UNDEF) {
 					ts->is_symbol = true;
+				}
 			}
 		} else {
-			s			   = po_new_symbol(pcb, ts->ctoke);
-			ts->type	   = PTOK_UNDEF;
+			s = po_new_symbol(pcb, ts->ctoke);
+			ts->type = PTOK_UNDEF;
 			ts->val.symbol = s;
-			ts->is_symbol  = true;
+			ts->is_symbol = true;
 		}
 	}
 	pcb->t.toktype = ts->type;
@@ -937,8 +996,9 @@ bool po_is_next_token(Poco_cb* pcb, SHORT ttype)
 	bool ret = false;
 
 	lookup_token(pcb);
-	if (pcb->t.toktype == ttype || pcb->t.toktype == TOK_EOF)
+	if (pcb->t.toktype == ttype || pcb->t.toktype == TOK_EOF) {
 		ret = true;
+	}
 	pushback_token(&pcb->t);
 	return (ret);
 }
@@ -951,9 +1011,9 @@ bool po_eat_token(Poco_cb* pcb, SHORT ttype)
 	char buf[2];
 
 	if (po_need_token(pcb)) {
-		if (pcb->t.toktype == ttype)
+		if (pcb->t.toktype == ttype) {
 			return (true);
-		else {
+		} else {
 			buf[0] = ttype;
 			buf[1] = 0;
 			po_expecting_got(pcb, buf);
@@ -1015,7 +1075,7 @@ static SHORT inv_ido[] = {
 static void no_assign_void(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "can't assign to void variable");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1024,7 +1084,7 @@ static void no_assign_void(Poco_cb* pcb)
 static void unknown_assignment(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "unknown type in assignment");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1033,7 +1093,7 @@ static void unknown_assignment(Poco_cb* pcb)
 static void no_struct_assign(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "poco can't do struct assignments");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1082,8 +1142,9 @@ SHORT po_find_local_assign(Poco_cb* pcb, Type_info* ti)
 		if (po_is_array(ti)) {
 			po_say_fatal(pcb, "lvalue required");
 			PO_CHECK_ABORT(pcb, 0);
-		} else
+		} else {
 			aop = OP_LOC_PASS;
+		}
 	}
 	return aop;
 }
@@ -1134,8 +1195,9 @@ static SHORT find_global_assign(Poco_cb* pcb, Type_info* ti)
 		if (po_is_array(ti)) {
 			po_say_fatal(pcb, "lvalue required");
 			PO_CHECK_ABORT(pcb, 0);
-		} else
+		} else {
 			aop = OP_GLO_PASS;
+		}
 	}
 	return (aop);
 }
@@ -1155,7 +1217,7 @@ SHORT po_find_assign_op(Poco_cb* pcb, Symbol* var, Type_info* ti)
 static void no_use_void(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "can't use void value");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -1164,57 +1226,62 @@ static void no_use_void(Poco_cb* pcb)
 void po_var_too_complex(Poco_cb* pcb)
 {
 	po_say_fatal(pcb, "variable too complicated to use...");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 Ido_table po_ido_table[] =
-  /* Table that lets us quickly determine what operations are legal on
-   * a certain IDO_TYPE */
-  {
-	  /**  is_num can_add ido_type	**/
-	  {
-		true,
-		true,
-		IDO_INT,
-	  },
-	  {
-		true,
-		true,
-		IDO_LONG,
-	  },
-	  {
-		true,
-		true,
-		IDO_DOUBLE,
-	  },
-	  {
-		false,
-		true,
-		IDO_POINTER,
-	  },
-	  {
-		false,
-		true,
-		IDO_CPT,
-	  },
-	  {
-		false,
-		false,
-		IDO_VOID,
-	  },
-	  {
-		false,
-		false,
-		IDO_VPT,
-	  },
+	/* Table that lets us quickly determine what operations are legal on
+	 * a certain IDO_TYPE */
+	{
+		/**  is_num can_add ido_type	**/
+		{
+			true,
+			true,
+			IDO_INT,
+		},
+		{
+			true,
+			true,
+			IDO_LONG,
+		},
+		{
+			true,
+			true,
+			IDO_DOUBLE,
+		},
+		{
+			false,
+			true,
+			IDO_POINTER,
+		},
+		{
+			false,
+			true,
+			IDO_CPT,
+		},
+		{
+			false,
+			false,
+			IDO_VOID,
+		},
+		{
+			false,
+			false,
+			IDO_VPT,
+		},
 #ifdef STRING_EXPERIMENT
-	  {
-		FALSE,
-		FALSE,
-		IDO_STRING,
-	  },
+		{
+			FALSE,
+			FALSE,
+			IDO_STRING,
+		},
 #endif /* STRING_EXPERIMENT */
-  };
+		{
+			false,
+			false,
+			IDO_STRUCT,
+		},
+};
 
 /*****************************************************************************
  * Run a sanity check on table to correlate IDO-types with instructions
@@ -1229,7 +1296,7 @@ static bool po_check_ido_table(Poco_cb* pcb)
 		if (i != (size_t)po_ido_table[i].ido_type) {
 			fprintf(pcb->t.err_file, "%d != %d\n", i, po_ido_table[i].ido_type);
 			po_say_internal(pcb, "po_ido_table doesn't check");
-   PO_CHECK_ABORT(pcb, false);
+			PO_CHECK_ABORT(pcb, false);
 			return (false);
 		}
 	}
@@ -1281,7 +1348,7 @@ static SHORT find_global_use(Poco_cb* pcb, Type_info* ti)
 				goto ERR;
 		}
 	} else {
-	ERR:
+ERR:
 		po_var_too_complex(pcb);
 	}
 	return (op);
@@ -1331,7 +1398,7 @@ SHORT po_find_local_use(Poco_cb* pcb, Type_info* ti)
 				goto ERR;
 		}
 	} else {
-	ERR:
+ERR:
 		po_var_too_complex(pcb);
 	}
 	return (op);
@@ -1353,12 +1420,12 @@ static SHORT ref_op(Poco_cb* pcb, Type_info* ti)
 {
 	(void)pcb;
 
-	if (po_is_pointer(ti))
+	if (po_is_pointer(ti)) {
 		return (OP_PI_VAR);
-	else {
-		if (ti->comp_count != 1)
+	} else {
+		if (ti->comp_count != 1) {
 			return (-1);
-		else {
+		} else {
 			switch (ti->comp[0]) {
 				case TYPE_CHAR:
 					return (OP_CI_VAR);
@@ -1392,12 +1459,12 @@ static SHORT ind_op(Poco_cb* pcb, Type_info* ti)
 {
 	(void)pcb;
 
-	if (po_is_pointer(ti))
+	if (po_is_pointer(ti)) {
 		return (OP_PI_ASS);
-	else {
-		if (ti->comp_count != 1)
+	} else {
+		if (ti->comp_count != 1) {
 			return (-1);
-		else {
+		} else {
 			switch (ti->comp[0]) {
 				case TYPE_CHAR:
 					return (OP_CI_ASS);
@@ -1432,19 +1499,21 @@ void po_code_elsize(Poco_cb* pcb, Exp_frame* e, int el_size)
 	int bipower;
 	int i;
 
-	if (el_size == 0)
+	if (el_size == 0) {
 		po_say_fatal(pcb, "size of type is zero (eg, pointer to void)");
-  PO_CHECK_ABORT_VOID(pcb);
+	}
+	PO_CHECK_ABORT_VOID(pcb);
 
 	if (el_size != 1) {
 		bipower = 2;
 		for (i = 1; i < 15; i++) /* try to do it as a shift... */
 		{
 			if (el_size == bipower) {
-				if (e->ctc.ido_type == IDO_INT)
+				if (e->ctc.ido_type == IDO_INT) {
 					po_code_int(pcb, &e->ecd, OP_ICON, i);
-				else
+				} else {
 					po_code_long(pcb, &e->ecd, OP_LCON, (long)i);
+				}
 				po_code_op(pcb, &e->ecd, po_lshift_ops[e->ctc.ido_type]);
 				goto GOT_SCALING;
 			}
@@ -1454,7 +1523,7 @@ void po_code_elsize(Poco_cb* pcb, Exp_frame* e, int el_size)
 		po_coerce_numeric_exp(pcb, e, IDO_LONG);
 		po_code_long(pcb, &e->ecd, OP_LCON, el_size);
 		po_code_op(pcb, &e->ecd, OP_LMUL);
-	GOT_SCALING:
+GOT_SCALING:
 		po_fold_const(pcb, e);
 	}
 }
@@ -1472,7 +1541,7 @@ static void get_array(Poco_cb* pcb, Exp_frame* e)
 
 	if (!any_code(pcb, &e->left)) {
 		po_say_fatal(pcb, "bizarre circumstances for array.");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 	if (end_type == TYPE_POINTER) {
@@ -1482,7 +1551,7 @@ static void get_array(Poco_cb* pcb, Exp_frame* e)
 		/* do nothing */
 	} else {
 		po_say_fatal(pcb, "indexing non-pointer");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 		return;
 	}
 	ti = &e->ctc;
@@ -1491,20 +1560,23 @@ static void get_array(Poco_cb* pcb, Exp_frame* e)
 	el_size = po_get_type_size(ti);
 	po_init_expframe(pcb, &iex);
 	po_get_expression(pcb, &iex);
-	if (po_force_num_exp(pcb, &iex.ctc) < 0)
+	if (po_force_num_exp(pcb, &iex.ctc) < 0) {
 		goto TRASHIT;
+	}
 	if (iex.ctc.ido_type != IDO_INT) {
 		po_coerce_numeric_exp(pcb, &iex, IDO_LONG);
 	}
-	if (!po_eat_rbracket(pcb))
+	if (!po_eat_rbracket(pcb)) {
 		goto TRASHIT;
+	}
 	po_code_elsize(pcb, &iex, el_size);
 	po_code_op(pcb, &iex.ecd, po_add_offset_ops[iex.ctc.ido_type]);
 	/* have computed parts of array expression common to left and right side... */
 	po_concatenate_code(pcb, &e->left, &iex.ecd); /* this is all for left side */
 	po_concatenate_code(pcb, &e->ecd, &iex.ecd);  /* Right side still needs a OP_XREF */
-	if ((op = ref_op(pcb, ti)) < 0)
+	if ((op = ref_op(pcb, ti)) < 0) {
 		goto TRASHIT;
+	}
 	po_code_op(pcb, &e->ecd, op);
 	e->left_complex = true;
 TRASHIT:
@@ -1580,12 +1652,12 @@ static void get_pmember(Poco_cb* pcb, Exp_frame* e)
 
 	if (e->ctc.comp[0] != TYPE_STRUCT || e->ctc.comp_count > 2) {
 		po_say_fatal(pcb, "using -> on something that isn't a struct");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	if (e->ctc.comp_count == 1) {
 		po_say_fatal(pcb, "-> where there should be a . perhaps?");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	si = e->ctc.sdims[0].pt;
@@ -1627,14 +1699,15 @@ static void get_member(Poco_cb* pcb, Exp_frame* e)
 	if (e->ctc.comp_count != 1) {
 		if (po_is_pointer(&e->ctc)) {
 			po_say_fatal(pcb, ". where there should be a -> perhaps?");
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 			goto OUT;
 		} else if (po_is_array(&e->ctc)) {
 			po_say_fatal(pcb, "need [] before .");
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 			goto OUT;
-		} else
+		} else {
 			goto NOTSTRUCT;
+		}
 	}
 	si = e->ctc.sdims[0].pt;
 	lookup_token(pcb);
@@ -1647,19 +1720,19 @@ static void get_member(Poco_cb* pcb, Exp_frame* e)
 	e->doff += doff;
 	if (!e->left_complex) {
 		elsize = po_get_type_size(msym->ti) - 1;
-		patch  = OPTR(e->left.code_pt, -(sizeof(int) + sizeof(long)));
+		patch = OPTR(e->left.code_pt, -(sizeof(int) + sizeof(long)));
 		*patch += doff; /* add var offset to OP_XXX_ADDRESS */
-		patch		  = OPTR(e->left.code_pt, -(sizeof(long)));
+		patch = OPTR(e->left.code_pt, -(sizeof(long)));
 		*(long*)patch = elsize;
 
 		if (po_is_array(msym->ti)) /* move left side (OP_XXX_ADDRESS) */
-		{						   /* to right side.				   */
+		{                          /* to right side.				   */
 			e->ecd.code_pt = OPTR(e->ecd.code_pt, -(OPY_SIZE + sizeof(int)));
 			po_concatenate_code(pcb, &e->ecd, &e->left);
 		} else {
-			patch  = OPTR(e->ecd.code_pt, -(OPY_SIZE + sizeof(int)));
+			patch = OPTR(e->ecd.code_pt, -(OPY_SIZE + sizeof(int)));
 			*patch = find_use_op(pcb, vsym, &e->ctc); /* update OP_XXX_XVAR */
-			patch  = OPTR(e->ecd.code_pt, -sizeof(int));
+			patch = OPTR(e->ecd.code_pt, -sizeof(int));
 			*patch += doff; /* update var offset in OP_XXX_XVAR */
 		}
 	} else {
@@ -1670,19 +1743,20 @@ static void get_member(Poco_cb* pcb, Exp_frame* e)
 			po_code_int(pcb, &e->ecd, OP_ICON, doff);
 			po_code_op(pcb, &e->ecd, OP_ADD_IOFFSET);
 		}
-		if ((op = ref_op(pcb, &e->ctc)) < 0)
+		if ((op = ref_op(pcb, &e->ctc)) < 0) {
 			goto OUT;
+		}
 		po_code_op(pcb, &e->ecd, op);
 	}
 OUT:
 	return;
 NOTSTRUCT:
 	po_say_fatal(pcb, "using . on something that isn't a struct");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 	return;
 }
 
-int po_scoped_address_op[2] = { OP_GLO_ADDRESS, OP_LOC_ADDRESS };
+int po_scoped_address_op[2] = {OP_GLO_ADDRESS, OP_LOC_ADDRESS};
 
 /*****************************************************************************
  * generate code to use a variable.
@@ -1698,7 +1772,7 @@ static void use_var(Poco_cb* pcb, Exp_frame* e, Symbol* var)
 
 	var->flags |= SFL_USED;
 
-	op	 = po_scoped_address_op[var->storage_scope];
+	op = po_scoped_address_op[var->storage_scope];
 	size = po_get_type_size(ti) - 1;
 
 	switch (ti->comp[ti->comp_count - 1]) {
@@ -1733,11 +1807,12 @@ static void use_var(Poco_cb* pcb, Exp_frame* e, Symbol* var)
 void po_new_var_space(Poco_cb* pcb, Symbol* var)
 {
 	Poco_frame* rf = pcb->rframe;
-	long size	   = po_get_type_size(var->ti);
+	long size = po_get_type_size(var->ti);
 
 	if (var->ti->flags & TFL_STATIC) {
-		while (rf->frame_type != FTY_GLOBAL)
+		while (rf->frame_type != FTY_GLOBAL) {
 			rf = rf->next;
+		}
 		var->storage_scope = SCOPE_GLOBAL;
 	} else {
 		var->storage_scope = (var->scope == SCOPE_GLOBAL) ? SCOPE_GLOBAL : SCOPE_LOCAL;
@@ -1765,10 +1840,10 @@ void po_init_expframe(Poco_cb* pcb, Exp_frame* e)
 {
 	poco_zero_bytes(e, sizeof(*e));
 	e->pure_const = true;
-	po_init_code_buf(pcb, &e->ecd);	 /* The right value of expression */
+	po_init_code_buf(pcb, &e->ecd);  /* The right value of expression */
 	po_init_code_buf(pcb, &e->left); /* The left value of expression */
-	e->ctc.comp		  = e->ctc_comp; /* e->ctc - the expression type */
-	e->ctc.sdims	  = e->ctc_dims;
+	e->ctc.comp = e->ctc_comp;       /* e->ctc - the expression type */
+	e->ctc.sdims = e->ctc_dims;
 	e->ctc.comp_alloc = MAX_TYPE_COMPS;
 }
 
@@ -1840,8 +1915,9 @@ SHORT po_force_ptr_or_num_exp(Poco_cb* pcb, Type_info* ti)
 	SHORT nt;
 
 	nt = ti->ido_type;
-	if (!po_ido_table[nt].can_add)
+	if (!po_ido_table[nt].can_add) {
 		po_expecting_got(pcb, "numeric expression or data pointer");
+	}
 	return (nt);
 }
 
@@ -1863,7 +1939,7 @@ static void upgrade_numerical_expression(Poco_cb* pcb, Exp_frame* e, SHORT ido_t
 						break;
 					default:
 						po_say_fatal(pcb, "cannot do pointer<->number conversion");
-      PO_CHECK_ABORT_VOID(pcb);
+						PO_CHECK_ABORT_VOID(pcb);
 						break;
 				}
 			} break;
@@ -1901,7 +1977,7 @@ static void upgrade_numerical_expression(Poco_cb* pcb, Exp_frame* e, SHORT ido_t
 	}
 	return;
 upgrade_type:
-	e->ctc.comp[0]	= inv_ido[ido_type];
+	e->ctc.comp[0] = inv_ido[ido_type];
 	e->ctc.ido_type = ido_type;
 	po_fold_const(pcb, e);
 }
@@ -1927,12 +2003,12 @@ void po_coerce_to_boolean(Poco_cb* pcb, Exp_frame* e)
 				break;
 			default:
 				po_say_fatal(pcb, "expecting boolean expression");
-    PO_CHECK_ABORT_VOID(pcb);
+				PO_CHECK_ABORT_VOID(pcb);
 				return;
 		}
-		e->ctc.comp[0]	  = TYPE_INT;
+		e->ctc.comp[0] = TYPE_INT;
 		e->ctc.comp_count = 1;
-		e->ctc.ido_type	  = IDO_INT;
+		e->ctc.ido_type = IDO_INT;
 	}
 }
 
@@ -1942,8 +2018,8 @@ void po_coerce_to_string(Poco_cb* pcb, Exp_frame* e)
  * make a cast to promote an expression to a String type.
  ****************************************************************************/
 {
-	static TypeComp st				  = TYPE_STRING;
-	static Type_info string_type_info = { &st, NULL, 1, 1, IDO_STRING, 0 };
+	static TypeComp st = TYPE_STRING;
+	static Type_info string_type_info = {&st, NULL, 1, 1, IDO_STRING, 0};
 	po_coerce_expression(pcb, e, &string_type_info, TRUE);
 }
 #endif /* STRING_EXPERIMENT */
@@ -1968,7 +2044,7 @@ static void cant_convert_to_String(Poco_cb* pcb)
  ****************************************************************************/
 {
 	po_say_fatal(pcb, "expression can't be converted to String type");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 #endif /* STRING_EXPERIMENT */
 
@@ -1981,12 +2057,21 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 	TypeComp end_type, *pend_type;
 	int start_count, end_count;
 
-	end_count	= ti->comp_count;
-	pend_type	= ti->comp + end_count - 1;
-	end_type	= *pend_type;
+	end_count = ti->comp_count;
+	pend_type = ti->comp + end_count - 1;
+	end_type = *pend_type;
 	start_count = e->ctc.comp_count;
 	pstart_type = e->ctc.comp + start_count - 1;
-	start_type	= *pstart_type;
+	start_type = *pstart_type;
+	if (end_type == TYPE_STRUCT) {
+		if (recast || start_count != 1 || start_type != TYPE_STRUCT || ti->sdims == NULL ||
+			e->ctc.sdims == NULL || ti->sdims[0].pt != e->ctc.sdims[0].pt ||
+			!po_types_same(ti, &e->ctc, 0)) {
+			po_say_fatal(pcb, "structure type mismatch in assignment");
+			PO_CHECK_ABORT_VOID(pcb);
+		}
+		return;
+	}
 
 	if (end_count == 1) {
 #ifdef STRING_EXPERIMENT
@@ -1995,8 +2080,9 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 		 * a char *, or a char [] */
 		{
 			if (start_count == 1) {
-				if (start_type != TYPE_STRING)
+				if (start_type != TYPE_STRING) {
 					cant_convert_to_String(pcb);
+				}
 				/* else will end up returning happily - both are strings! */
 			} else if (start_count == 2) {
 				if (e->ctc.comp[0] == TYPE_CHAR) {
@@ -2004,31 +2090,34 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 						case TYPE_POINTER:
 						case TYPE_ARRAY:
 							po_code_op(pcb, &e->ecd, OP_PPT_TO_STRING);
-							e->ctc.comp[0]	  = TYPE_STRING;
+							e->ctc.comp[0] = TYPE_STRING;
 							e->ctc.comp_count = 1;
-							e->ctc.ido_type	  = IDO_STRING;
+							e->ctc.ido_type = IDO_STRING;
 							break;
 						case TYPE_CPT:
 							po_code_op(pcb, &e->ecd, OP_CPT_TO_STRING);
-							e->ctc.comp[0]	  = TYPE_STRING;
+							e->ctc.comp[0] = TYPE_STRING;
 							e->ctc.comp_count = 1;
-							e->ctc.ido_type	  = IDO_STRING;
+							e->ctc.ido_type = IDO_STRING;
 							break;
 						default:
 							cant_convert_to_String(pcb);
 							break;
 					}
-				} else
+				} else {
 					cant_convert_to_String(pcb);
-			} else
+				}
+			} else {
 				cant_convert_to_String(pcb);
+			}
 		} else
-#endif	/* STRING_EXPERIMENT */
+#endif /* STRING_EXPERIMENT */
 		/* Then (hopefully) it's a numerical type of some sort */
 		{
-			if (recast && start_count != 1)
+			if (recast && start_count != 1) {
 				po_say_fatal(pcb, "cannot recast pointer expression to numeric type");
-    PO_CHECK_ABORT_VOID(pcb);
+			}
+			PO_CHECK_ABORT_VOID(pcb);
 			po_coerce_numeric_exp(pcb, e, ti->ido_type);
 		}
 	} else {
@@ -2040,11 +2129,11 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 						break;
 					case TYPE_CPT:
 						po_code_op(pcb, &e->ecd, OP_CPT_TO_PPT);
-						start_type		= TYPE_POINTER;
+						start_type = TYPE_POINTER;
 						e->ctc.ido_type = IDO_POINTER;
 						break;
 					case TYPE_ARRAY:
-						start_type		= TYPE_POINTER;
+						start_type = TYPE_POINTER;
 						e->ctc.ido_type = IDO_POINTER;
 						break;
 					case TYPE_FUNCTION:
@@ -2058,7 +2147,7 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 						po_code_op(pcb, &e->ecd, OP_STRING_TO_PPT);
 						*pstart_type++ = TYPE_CHAR; /* Convert type to (char *) */
 						e->ctc.comp_count += 1;
-						start_type		= TYPE_POINTER;
+						start_type = TYPE_POINTER;
 						e->ctc.ido_type = IDO_POINTER;
 						break;
 #endif /* STRING_EXPERIMENT */
@@ -2073,7 +2162,7 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 					case TYPE_POINTER:
 					case TYPE_ARRAY:
 						po_code_op(pcb, &e->ecd, OP_PPT_TO_CPT);
-						start_type		= TYPE_CPT; /* update expression type */
+						start_type = TYPE_CPT; /* update expression type */
 						e->ctc.ido_type = IDO_CPT;
 						break;
 					case TYPE_FUNCTION:
@@ -2090,7 +2179,7 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 						po_code_op(pcb, &e->ecd, OP_STRING_TO_CPT);
 						*pstart_type++ = TYPE_CHAR; /* Convert type to (char *) */
 						e->ctc.comp_count += 1;
-						start_type		= TYPE_CPT;
+						start_type = TYPE_CPT;
 						e->ctc.ido_type = IDO_CPT;
 						break;
 #endif /* STRING_EXPERIMENT */
@@ -2106,7 +2195,7 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 			po_copy_type(pcb, ti, &e->ctc);
 		} else if (!(ti->comp[0] == TYPE_VOID || e->ctc.comp[0] == TYPE_VOID)) {
 			if (!po_types_same(ti, &e->ctc, 0)) {
-#ifdef DEBUG
+#ifdef POCO_DEBUG_DUMP
 				fprintf(pcb->t.err_file, "s is ");
 				po_print_type(pcb, pcb->t.err_file, &e->ctc);
 				fprintf(pcb->t.err_file, "\nd is ");
@@ -2114,17 +2203,18 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 				fprintf(pcb->t.err_file, "\n");
 #endif
 				po_say_fatal(pcb, "type mismatch in pointer evaluation");
-    PO_CHECK_ABORT_VOID(pcb);
+				PO_CHECK_ABORT_VOID(pcb);
 			}
 		}
 	}
 	return;
-WANT_POINTER : {
+WANT_POINTER: {
 	if (recast) {
 		po_say_fatal(pcb, "cannot recast numeric expression to pointer type");
 		PO_CHECK_ABORT_VOID(pcb);
-	} else
+	} else {
 		po_expecting_got(pcb, "pointer expression");
+	}
 }
 }
 
@@ -2140,7 +2230,7 @@ void po_get_prim(Poco_cb* pcb, Exp_frame* e)
 			lookup_token(pcb);
 			if (pcb->t.toktype != TOK_RPAREN) {
 				po_say_fatal(pcb, "missing right parenthesis");
-    PO_CHECK_ABORT_VOID(pcb);
+				PO_CHECK_ABORT_VOID(pcb);
 			}
 			break;
 		}
@@ -2163,10 +2253,7 @@ void po_get_prim(Poco_cb* pcb, Exp_frame* e)
 			break;
 		}
 		case PTOK_QUO: {
-			po_code_popot(pcb,
-						  &e->ecd,
-						  OP_PCON,
-						  pcb->curtoken->val.string,
+			po_code_popot(pcb, &e->ecd, OP_PCON, pcb->curtoken->val.string,
 						  pcb->curtoken->val.string + strlen(pcb->curtoken->val.string),
 						  pcb->curtoken->val.string);
 			po_set_base_type(pcb, &e->ctc, TYPE_CHAR, 0, NULL);
@@ -2337,7 +2424,7 @@ static void get_post_increment(Poco_cb* pcb, Exp_frame* e, Op_type op_group[NUM_
 		}
 	} else {
 		po_say_fatal(pcb, "trying to increment a non-variable");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 	}
 }
 
@@ -2359,7 +2446,7 @@ static void get_pre_increment(Poco_cb* pcb, Exp_frame* e, Op_type op_group[NUM_I
 		}
 	} else {
 		po_say_fatal(pcb, "trying to increment a non-variable");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 	}
 }
 
@@ -2378,7 +2465,7 @@ static void get_dereference(Poco_cb* pcb, Exp_frame* e)
 	}
 
 	po_say_fatal(pcb, " '*' on non-pointer expression");
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 }
 
 /*****************************************************************************
@@ -2392,7 +2479,7 @@ static void get_address(Poco_cb* pcb, Exp_frame* e)
 	po_get_unop_expression(pcb, &ex);
 	if (!any_code(pcb, &ex.left)) {
 		po_say_fatal(pcb, "trying to take address of non-variable");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	po_copy_type(pcb, &ex.ctc, &e->ctc);
@@ -2417,8 +2504,9 @@ void po_get_unop_expression(Poco_cb* pcb, Exp_frame* e)
 	register SHORT ttype;
 	SHORT ntype;
 
-	if (!po_need_token(pcb))
+	if (!po_need_token(pcb)) {
 		return;
+	}
 
 	ttype = pcb->t.toktype;
 	ntype = lookahead_type(pcb);
@@ -2426,7 +2514,7 @@ void po_get_unop_expression(Poco_cb* pcb, Exp_frame* e)
 	if (ttype == '-') {
 		po_get_unop_expression(pcb, e);
 		op_group = po_neg_ops;
-		fok		 = true;
+		fok = true;
 	} else if (ttype == '!') {
 		po_get_unop_expression(pcb, e);
 		op_group = po_not_ops;
@@ -2455,23 +2543,25 @@ void po_get_unop_expression(Poco_cb* pcb, Exp_frame* e)
 	} else {
 		get_sizeof(pcb, e);
 		if (po_need_token(pcb)) {
-			if (pcb->t.toktype == TOK_PLUS_PLUS)
+			if (pcb->t.toktype == TOK_PLUS_PLUS) {
 				get_post_increment(pcb, e, po_add_ops);
-			else if (pcb->t.toktype == TOK_MINUS_MINUS)
+			} else if (pcb->t.toktype == TOK_MINUS_MINUS) {
 				get_post_increment(pcb, e, po_sub_ops);
-			else
+			} else {
 				pushback_token(&pcb->t);
+			}
 		}
 		return;
 	}
 
 	t1 = temp = po_force_num_exp(pcb, &e->ctc);
-	if (temp < 0)
+	if (temp < 0) {
 		return;
+	}
 	if (op_group != NULL) {
 		if ((t1 == IDO_DOUBLE) && !fok) {
 			po_say_fatal(pcb, "~ and ! operators can't be used with floats or doubles");
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 			return;
 		}
 		po_code_op(pcb, &e->ecd, op_group[t1]);
@@ -2500,8 +2590,34 @@ static void assign_after_value(Poco_cb* pcb, Exp_frame* e, Symbol* var)
 static void make_assign(Poco_cb* pcb, Exp_frame* e, Exp_frame* val_exp, Symbol* var)
 {
 	TypeComp obase = e->ctc.comp[0];
+	long struct_size;
 
 	po_coerce_expression(pcb, val_exp, &e->ctc, false);
+	if (e->ctc.ido_type == IDO_STRUCT) {
+		struct_size = po_get_type_size(&e->ctc);
+		if (struct_size <= 0 || !any_code(pcb, &e->left)) {
+			po_say_fatal(pcb, "invalid structure assignment target");
+			PO_CHECK_ABORT_VOID(pcb);
+			return;
+		}
+		/* Ordinary struct lvalues and native struct-return temps both travel as
+		 * bounded addresses.  Retain one source address so the assignment still
+		 * has the usual expression value after OP_COPY consumes its operands. */
+		if (any_code(pcb, &val_exp->left)) {
+			clear_code_buf(pcb, &val_exp->ecd);
+			po_copy_code(pcb, &val_exp->left, &val_exp->ecd);
+		}
+		po_concatenate_code(pcb, &e->ecd, &val_exp->ecd);
+		po_code_op(pcb, &e->ecd, OP_PDUPE);
+		po_concatenate_code(pcb, &e->ecd, &e->left);
+		po_code_long(pcb, &e->ecd, OP_COPY, struct_size);
+		clear_code_buf(pcb, &e->left);
+		e->includes_assignment++;
+		e->includes_assignment += val_exp->includes_assignment;
+		e->includes_function += val_exp->includes_function;
+		e->pure_const &= val_exp->pure_const;
+		return;
+	}
 	po_concatenate_code(pcb, &e->ecd, &val_exp->ecd);
 	e->ctc.comp[0] = obase;
 	assign_after_value(pcb, e, var);
@@ -2525,10 +2641,7 @@ static void make_assign(Poco_cb* pcb, Exp_frame* e, Exp_frame* val_exp, Symbol* 
  *	routine (in fold.c) for checking a !pure_const expression to see if it
  *	qualifies as constant for an init expression.
  ****************************************************************************/
-bool po_assign_after_equals(Poco_cb* pcb,
-							   Exp_frame* e,
-							   Symbol* var,
-									 bool must_be_init_constant)
+bool po_assign_after_equals(Poco_cb* pcb, Exp_frame* e, Symbol* var, bool must_be_init_constant)
 {
 	Exp_frame val_eee;
 
@@ -2539,7 +2652,7 @@ bool po_assign_after_equals(Poco_cb* pcb,
 		if (!val_eee.pure_const) {
 			if (!po_is_static_init_const(pcb, &val_eee.ecd)) {
 				po_say_fatal(pcb, "constant expression required for static initializer");
-    PO_CHECK_ABORT(pcb, false);
+				PO_CHECK_ABORT(pcb, false);
 			}
 		}
 	}
@@ -2552,10 +2665,7 @@ bool po_assign_after_equals(Poco_cb* pcb,
 /*****************************************************************************
  * code a '+=' type op (eg, *= <<=, etc).
  ****************************************************************************/
-static void plus_equals(Poco_cb* pcb,
-						Exp_frame* e,
-						Symbol* var,
-						Op_type op_group[NUM_IDOS],
+static void plus_equals(Poco_cb* pcb, Exp_frame* e, Symbol* var, Op_type op_group[NUM_IDOS],
 						SHORT (*enforcer)(Poco_cb* pcb, Type_info* ti))
 {
 	Exp_frame val_eee;
@@ -2563,8 +2673,9 @@ static void plus_equals(Poco_cb* pcb,
 
 	po_init_expframe(pcb, &val_eee);
 	po_get_expression(pcb, &val_eee);
-	if ((*enforcer)(pcb, &e->ctc) < 0)
+	if ((*enforcer)(pcb, &e->ctc) < 0) {
 		goto TRASH;
+	}
 	if (is_pt) {
 		po_coerce_numeric_exp(pcb, &val_eee, IDO_INT);
 		po_code_elsize(pcb, &val_eee, po_get_subtype_size(pcb, &e->ctc));
@@ -2669,11 +2780,14 @@ bool po_new_frame(Poco_cb* pcb, int scope, char* name, int type)
 	}
 
 	pf->hash_table = (Symbol**)(pf + 1);
-	pf->name	   = name;
-	pf->next	   = pcb->rframe;
-	pcb->rframe	   = pf;
-	pf->scope	   = scope;
+	pf->name = name;
+	pf->next = pcb->rframe;
+	pcb->rframe = pf;
+	pf->scope = scope;
 	pf->frame_type = type;
+	if (type == FTY_GLOBAL) {
+		pf->doff = -pcb->run.data_size;
+	}
 
 	return true;
 }
@@ -2688,10 +2802,12 @@ void po_old_frame(Poco_cb* pcb)
 	if ((rf = pcb->rframe) != NULL) {
 		pcb->rframe = rf->next;
 
-		if (rf->symbols)
+		if (rf->symbols) {
 			po_free_symbol_list(&rf->symbols);
-		if (rf->fsif)
+		}
+		if (rf->fsif) {
 			po_free_sif_list(&rf->fsif);
+		}
 
 		if (rf->frame_type != FTY_STRUCT) {
 			po_trash_code_buf(pcb, &rf->fcd);
@@ -2710,89 +2826,89 @@ static bool init_reserved_words(Poco_cb* pcb)
 	Symbol* n;
 	Poco_frame* rf = pcb->rframe;
 
-	static struct rwinit
-	{
+	static struct rwinit {
 		char* string;
 		SHORT type;
 		SHORT val;
 	} rwi[] = {
 		{
-		  "void",
-		  PTOK_TYPE,
-		  TYPE_VOID,
+			"void",
+			PTOK_TYPE,
+			TYPE_VOID,
 		},
 		{
-		  "char",
-		  PTOK_TYPE,
-		  TYPE_CHAR,
+			"char",
+			PTOK_TYPE,
+			TYPE_CHAR,
 		},
 		{
-		  "short",
-		  PTOK_TYPE,
-		  TYPE_SHORT,
+			"short",
+			PTOK_TYPE,
+			TYPE_SHORT,
 		},
 		{
-		  "int",
-		  PTOK_TYPE,
-		  TYPE_INT,
+			"int",
+			PTOK_TYPE,
+			TYPE_INT,
 		},
 		{
-		  "long",
-		  PTOK_TYPE,
-		  TYPE_LONG,
+			"long",
+			PTOK_TYPE,
+			TYPE_LONG,
 		},
 		{
-		  "float",
-		  PTOK_TYPE,
-		  TYPE_FLOAT,
+			"float",
+			PTOK_TYPE,
+			TYPE_FLOAT,
 		},
-		{ "double", PTOK_TYPE, TYPE_DOUBLE },
-		{ "signed", PTOK_TYPE, TYPE_SIGNED },
-		{ "unsigned", PTOK_TYPE, TYPE_UNSIGNED },
-		{ "Screen", PTOK_TYPE, TYPE_SCREEN },
+		{"double", PTOK_TYPE, TYPE_DOUBLE},
+		{"signed", PTOK_TYPE, TYPE_SIGNED},
+		{"unsigned", PTOK_TYPE, TYPE_UNSIGNED},
+		{"Screen", PTOK_TYPE, TYPE_SCREEN},
 #ifdef STRING_EXPERIMENT
-		{ "String", PTOK_TYPE, TYPE_STRING },
+		{"String", PTOK_TYPE, TYPE_STRING},
 #endif /* STRING_EXPERIMENT */
-		{ "ErrCode", PTOK_TYPE, TYPE_INT },
-		{ "Errcode", PTOK_TYPE, TYPE_INT },
-		{ "Boolean", PTOK_TYPE, TYPE_CHAR },
-		{ "FILE", PTOK_TYPE, TYPE_FILE },
-		{ "struct", PTOK_TYPE, TYPE_STRUCT },
-		{ "union", PTOK_TYPE, TYPE_UNION },
-		{ "enum", PTOK_TYPE, TYPE_ENUM },
-		{ "const", PTOK_TYPE, TYPE_CONST },
-		{ "volatile", PTOK_TYPE, TYPE_VOLATILE },
-		{ "extern", PTOK_TYPE, TYPE_EXTERN },
-		{ "static", PTOK_TYPE, TYPE_STATIC },
-		{ "auto", PTOK_TYPE, TYPE_AUTO },
-		{ "register", PTOK_TYPE, TYPE_REGISTER },
-		{ "typedef", PTOK_TYPEDEF, 0 },
+		{"ErrCode", PTOK_TYPE, TYPE_INT},
+		{"Errcode", PTOK_TYPE, TYPE_INT},
+		{"Boolean", PTOK_TYPE, TYPE_CHAR},
+		{"FILE", PTOK_TYPE, TYPE_FILE},
+		{"struct", PTOK_TYPE, TYPE_STRUCT},
+		{"union", PTOK_TYPE, TYPE_UNION},
+		{"enum", PTOK_TYPE, TYPE_ENUM},
+		{"const", PTOK_TYPE, TYPE_CONST},
+		{"volatile", PTOK_TYPE, TYPE_VOLATILE},
+		{"extern", PTOK_TYPE, TYPE_EXTERN},
+		{"static", PTOK_TYPE, TYPE_STATIC},
+		{"auto", PTOK_TYPE, TYPE_AUTO},
+		{"register", PTOK_TYPE, TYPE_REGISTER},
+		{"typedef", PTOK_TYPEDEF, 0},
 		{
-		  "...",
-		  PTOK_ELLIPSIS,
-		  TYPE_ELLIPSIS,
+			"...",
+			PTOK_ELLIPSIS,
+			TYPE_ELLIPSIS,
 		},
-		{ "for", PTOK_FOR, 0 },
-		{ "if", PTOK_IF, 0 },
-		{ "while", PTOK_WHILE, 0 },
-		{ "return", PTOK_RETURN, 0 },
-		{ "switch", PTOK_SWITCH, 0 },
-		{ "goto", PTOK_GOTO, 0 },
-		{ "do", PTOK_DO, 0 },
-		{ "else", PTOK_ELSE, 0 },
-		{ "break", PTOK_BREAK, 0 },
-		{ "continue", PTOK_CONTINUE, 0 },
-		{ "sizeof", PTOK_SIZEOF, 0 },
-		{ "NULL", PTOK_NULL, 0 },
-		{ "case", PTOK_CASE, 0 },
-		{ "default", PTOK_DEFAULT, 0 },
+		{"for", PTOK_FOR, 0},
+		{"if", PTOK_IF, 0},
+		{"while", PTOK_WHILE, 0},
+		{"return", PTOK_RETURN, 0},
+		{"switch", PTOK_SWITCH, 0},
+		{"goto", PTOK_GOTO, 0},
+		{"do", PTOK_DO, 0},
+		{"else", PTOK_ELSE, 0},
+		{"break", PTOK_BREAK, 0},
+		{"continue", PTOK_CONTINUE, 0},
+		{"sizeof", PTOK_SIZEOF, 0},
+		{"NULL", PTOK_NULL, 0},
+		{"case", PTOK_CASE, 0},
+		{"default", PTOK_DEFAULT, 0},
 	};
 
 	for (i = 0; i < Array_els(rwi); i++) {
-		if ((n = new_symbol(pcb, rwi[i].string, rwi[i].type)) == NULL)
+		if ((n = new_symbol(pcb, rwi[i].string, rwi[i].type)) == NULL) {
 			return (Err_no_memory);
-		n->symval.i	   = rwi[i].val;
-		n->link		   = rf->parameters;
+		}
+		n->symval.i = rwi[i].val;
+		n->link = rf->parameters;
 		rf->parameters = n;
 	}
 	return Success;
@@ -2833,11 +2949,11 @@ bool po_check_undefined_funcs(Poco_cb* pcb, Symbol* sl)
 	while (sl != NULL) {
 		if (sl->flags & SFL_USED) {
 			if (po_is_func(sl->ti)) {
-				ti	= sl->ti;
+				ti = sl->ti;
 				fuf = ti->sdims[ti->comp_count - 1].pt;
 				if (!fuf->got_code) {
-					po_say_fatal(
-					  pcb, "function '%s' not found in source code or builtin library", sl->name);
+					po_say_fatal(pcb, "function '%s' not found in source code or builtin library",
+								 sl->name);
 				}
 			}
 		}
@@ -2846,37 +2962,422 @@ bool po_check_undefined_funcs(Poco_cb* pcb, Symbol* sl)
 	return ok;
 }
 
+static bool is_global_offset_op(int op)
+{
+	return (op >= OP_GLO_CVAR && op <= OP_GLO_DVAR) || (op >= OP_GLO_CASS && op <= OP_GLO_DASS) ||
+		   op == OP_GLO_ADDRESS
+#ifdef STRING_EXPERIMENT
+		   || op == OP_GLO_STRING_VAR || op == OP_GLO_STRING_ASS
+#endif
+		;
+}
+
+static Func_frame* find_linked_function(Poco_cb* pcb, const Func_frame* reference)
+{
+	Func_frame* frame;
+
+	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
+		if (!frame->got_code || frame->type != CFF_POCO ||
+			strcmp(frame->name, reference->name) != 0) {
+			continue;
+		}
+		if (reference->is_static) {
+			if (frame->unit_index == reference->unit_index) {
+				return frame;
+			}
+		} else if (!frame->is_static) {
+			return frame;
+		}
+	}
+	return NULL;
+}
+
+static Symbol* find_linked_global(Poco_cb* pcb, const Symbol* reference)
+{
+	Func_frame* frame;
+	Symbol* symbol;
+
+	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
+		if (frame->got_code) {
+			continue;
+		}
+		for (symbol = frame->parameters; symbol != NULL; symbol = symbol->link) {
+			if ((symbol->ti->flags & (TFL_EXTERN | TFL_STATIC)) == 0 &&
+				strcmp(symbol->name, reference->name) == 0) {
+				return symbol;
+			}
+		}
+	}
+	return NULL;
+}
+
+static bool patch_link_references(Poco_cb* pcb)
+{
+	Func_frame* frame;
+
+	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
+		UBYTE* cursor = frame->code_pt;
+		UBYTE* end = cursor + frame->code_size;
+
+		while (cursor < end) {
+			int op;
+			Poco_op_table* entry;
+			UBYTE* operand;
+
+			if ((size_t)(end - cursor) < sizeof(op)) {
+				po_say_internal(pcb, "truncated instruction while linking %s", frame->name);
+				return false;
+			}
+			memcpy(&op, cursor, sizeof(op));
+			cursor += sizeof(op);
+			if (op < 0 || op >= po_ins_table_els) {
+				po_say_internal(pcb, "invalid opcode while linking %s", frame->name);
+				return false;
+			}
+			entry = &po_ins_table[op];
+			if ((size_t)(end - cursor) < (size_t)entry->op_size) {
+				po_say_internal(pcb, "truncated operand while linking %s", frame->name);
+				return false;
+			}
+			operand = cursor;
+			if (entry->op_ext == OEX_FUNCTION) {
+				Func_frame* reference;
+				Func_frame* definition;
+
+				memcpy(&reference, operand, sizeof(reference));
+				if (reference != NULL && reference->type == CFF_POCO) {
+					definition = find_linked_function(pcb, reference);
+					if (definition == NULL) {
+						po_say_fatal(
+							pcb,
+							"function '%s' referenced by %s has no definition with visible linkage",
+							reference->name, frame->unit_name);
+						return false;
+					}
+					if (!po_types_same(reference->return_type, definition->return_type, 0) ||
+						!po_fuf_types_same(reference, definition)) {
+						po_say_fatal(pcb, "type mismatch linking function '%s' between %s and %s",
+									 reference->name, reference->unit_name, definition->unit_name);
+						return false;
+					}
+					memcpy(operand, &definition, sizeof(definition));
+				}
+			} else if (is_global_offset_op(op)) {
+				Func_frame* globals_frame;
+
+				for (globals_frame = pcb->run.fff; globals_frame != NULL;
+					 globals_frame = globals_frame->next) {
+					Symbol* reference;
+
+					if (globals_frame->got_code) {
+						continue;
+					}
+					for (reference = globals_frame->parameters; reference != NULL;
+						 reference = reference->link) {
+						int offset;
+						Symbol* definition;
+
+						if ((reference->ti->flags & TFL_EXTERN) == 0) {
+							continue;
+						}
+						memcpy(&offset, operand, sizeof(offset));
+						if (offset != reference->symval.doff) {
+							continue;
+						}
+						definition = find_linked_global(pcb, reference);
+						if (definition == NULL) {
+							po_say_fatal(pcb, "global '%s' referenced by %s has no definition",
+										 reference->name, frame->unit_name);
+							return false;
+						}
+						if (!po_types_same(reference->ti, definition->ti, 0)) {
+							po_say_fatal(pcb, "type mismatch linking global '%s' between %s and %s",
+										 reference->name, reference->unit_name,
+										 definition->unit_name);
+							return false;
+						}
+						offset = definition->symval.doff;
+						memcpy(operand, &offset, sizeof(offset));
+						goto patched_global;
+					}
+				}
+			}
+patched_global:
+			cursor += entry->op_size;
+		}
+	}
+	return true;
+}
+
+bool po_link_compiled_units(Poco_cb* pcb)
+{
+	Func_frame* frame;
+	Func_frame* other;
+	Symbol* symbol;
+	Symbol* other_symbol;
+	size_t main_count = 0;
+	char main_units[384] = "";
+
+	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
+		if (frame->got_code && frame->type == CFF_POCO && strcmp(frame->name, "main") == 0) {
+			size_t used = strlen(main_units);
+
+			snprintf(main_units + used, sizeof(main_units) - used, "%s%s",
+					 main_count == 0 ? "" : ", ", frame->unit_name);
+			++main_count;
+		}
+	}
+	if (main_count > 1) {
+		po_say_fatal(pcb, "multiple main() definitions in: %s", main_units);
+		return false;
+	}
+
+	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
+		if (!frame->got_code || frame->type != CFF_POCO || frame->is_static) {
+			continue;
+		}
+		for (other = frame->next; other != NULL; other = other->next) {
+			if (other->got_code && other->type == CFF_POCO && !other->is_static &&
+				strcmp(frame->name, other->name) == 0) {
+				po_say_fatal(pcb, "duplicate external function '%s' defined in %s and %s",
+							 frame->name, frame->unit_name, other->unit_name);
+				return false;
+			}
+		}
+		for (other = pcb->run.fff; other != NULL; other = other->next) {
+			if (other->got_code) {
+				continue;
+			}
+			for (symbol = other->parameters; symbol != NULL; symbol = symbol->link) {
+				if ((symbol->ti->flags & (TFL_EXTERN | TFL_STATIC)) == 0 &&
+					strcmp(frame->name, symbol->name) == 0) {
+					po_say_fatal(
+						pcb,
+						"duplicate external symbol '%s' defined as function in %s and global in %s",
+						frame->name, frame->unit_name, symbol->unit_name);
+					return false;
+				}
+			}
+		}
+	}
+
+	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
+		if (frame->got_code) {
+			continue;
+		}
+		for (symbol = frame->parameters; symbol != NULL; symbol = symbol->link) {
+			if ((symbol->ti->flags & (TFL_EXTERN | TFL_STATIC)) != 0) {
+				continue;
+			}
+			for (other = frame->next; other != NULL; other = other->next) {
+				if (other->got_code) {
+					continue;
+				}
+				for (other_symbol = other->parameters; other_symbol != NULL;
+					 other_symbol = other_symbol->link) {
+					if ((other_symbol->ti->flags & (TFL_EXTERN | TFL_STATIC)) == 0 &&
+						strcmp(symbol->name, other_symbol->name) == 0) {
+						po_say_fatal(pcb, "duplicate external global '%s' defined in %s and %s",
+									 symbol->name, symbol->unit_name, other_symbol->unit_name);
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return patch_link_references(pcb);
+}
+
+/*****************************************************************************
+ * Detach root-scope variables from the transient compiler frame so the
+ * immutable program retains the symbol metadata needed by embedding hosts.
+ * The global initializer Func_frame owns this list after compression.
+ ****************************************************************************/
+static Symbol* retain_global_variables(Poco_frame* frame, short* out_count)
+{
+	Symbol* retained = NULL;
+	Symbol** retained_tail = &retained;
+	Symbol** cursor = &frame->symbols;
+	short count = 0;
+
+	while (*cursor != NULL) {
+		Symbol* symbol = *cursor;
+
+		if (symbol->tok_type != PTOK_VAR || symbol->storage_scope != SCOPE_GLOBAL ||
+			po_is_func(symbol->ti)) {
+			cursor = &symbol->link;
+			continue;
+		}
+		*cursor = symbol->link;
+		symbol->link = NULL;
+		*retained_tail = symbol;
+		retained_tail = &symbol->link;
+		++count;
+	}
+	*out_count = count;
+	return retained;
+}
+
+static bool unit_is_directly_used(const Poco_cb* pcb, size_t unit_index)
+{
+	size_t index;
+
+	for (index = 0; index < pcb->current_use_count; ++index) {
+		if (pcb->current_use_indices[index] == unit_index) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static Type_info* clone_import_type(Poco_cb* pcb, Type_info* source)
+{
+	Itypi storage;
+	Type_info* temporary = po_typi_type(&storage);
+
+	if (!po_copy_type(pcb, source, temporary)) {
+		return NULL;
+	}
+	temporary->flags = source->flags;
+	return po_new_type_info(pcb, temporary, 0);
+}
+
+static Symbol* clone_import_parameter(Poco_cb* pcb, const Symbol* source)
+{
+	Symbol* clone = po_memzalloc(pcb, sizeof(*clone) + strlen(source->name) + 1);
+
+	clone->name = (char*)(clone + 1);
+	strcpy(clone->name, source->name);
+	clone->unit_name = pcb->current_unit_name;
+	clone->unit_index = pcb->current_unit_index;
+	clone->tok_type = source->tok_type;
+	clone->scope = source->scope;
+	clone->storage_scope = source->storage_scope;
+	clone->flags = source->flags;
+	clone->ti = clone_import_type(pcb, source->ti);
+	return clone;
+}
+
+static Func_frame* make_import_function(Poco_cb* pcb, const Func_frame* definition)
+{
+	Func_frame* reference = po_memzalloc(pcb, sizeof(*reference));
+	const Symbol* parameter;
+	Symbol** tail = &reference->parameters;
+
+	reference->name = po_clone_string(pcb, definition->name);
+	reference->pcount = definition->pcount;
+	reference->type = CFF_POCO;
+	reference->unit_name = pcb->current_unit_name;
+	reference->unit_index = pcb->current_unit_index;
+	reference->return_type = clone_import_type(pcb, definition->return_type);
+	for (parameter = definition->parameters; parameter != NULL; parameter = parameter->link) {
+		*tail = clone_import_parameter(pcb, parameter);
+		tail = &(*tail)->link;
+	}
+	reference->mlink = pcb->run.protos;
+	pcb->run.protos = reference;
+	return reference;
+}
+
+static bool import_used_symbols(Poco_cb* pcb)
+{
+	Func_frame* frame;
+
+	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
+		if (!unit_is_directly_used(pcb, frame->unit_index)) {
+			continue;
+		}
+		if (frame->got_code) {
+			Func_frame* reference;
+			Symbol* symbol;
+			Itypi storage;
+			Type_info* function_type;
+
+			if (frame->type != CFF_POCO || frame->is_static) {
+				continue;
+			}
+			reference = make_import_function(pcb, frame);
+			function_type = po_typi_type(&storage);
+			if (!po_copy_type(pcb, reference->return_type, function_type) ||
+				!po_append_type(pcb, function_type, TYPE_FUNCTION, 0, reference)) {
+				return false;
+			}
+			symbol = po_new_symbol(pcb, frame->name);
+			symbol->tok_type = PTOK_VAR;
+			symbol->storage_scope = SCOPE_GLOBAL;
+			symbol->ti = po_new_type_info(pcb, function_type, 0);
+			continue;
+		}
+		{
+			const Symbol* definition;
+
+			for (definition = frame->parameters; definition != NULL;
+				 definition = definition->link) {
+				Symbol* symbol;
+
+				if (definition->tok_type != PTOK_VAR ||
+					(definition->ti->flags & (TFL_EXTERN | TFL_STATIC)) != 0) {
+					continue;
+				}
+				symbol = po_new_symbol(pcb, definition->name);
+				symbol->tok_type = PTOK_VAR;
+				symbol->storage_scope = SCOPE_GLOBAL;
+				symbol->symval = definition->symval;
+				symbol->ti = clone_import_type(pcb, definition->ti);
+				symbol->ti->flags |= TFL_EXTERN;
+			}
+		}
+	}
+	return true;
+}
+
 /*****************************************************************************
  * compile pcb->file into pcb->run.fff.
  ****************************************************************************/
-bool po_compile_file(Poco_cb* pcb, char* name)
+static bool po_compile_source(Poco_cb* pcb, char* name, const char* source, size_t source_length,
+							  bool from_buffer)
 {
 	Tstack* dummy_token;
 	Func_frame* fuf = NULL;
-	Poco_frame* pf	= NULL;
+	Poco_frame* pf = NULL;
+	bool globals_retained = false;
+	Struct_info* previous_struct_infos = pcb->run.struct_infos;
+	Struct_info* struct_tail;
+
+	pcb->current_unit_name = po_clone_string(pcb, name);
+	if (pcb->current_unit_name == NULL) {
+		return false;
+	}
 
 #ifdef DEVELOPMENT
 	if (!po_check_instr_table(pcb)) {
 		po_say_internal(pcb, "instruction table failed self-check\n");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 	}
 	if (!po_check_type_names(pcb)) {
 		po_say_internal(pcb, "type_names table failed self-check\n");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 	}
 	if (!po_check_ido_table(pcb)) {
 		po_say_internal(pcb, "ido_table table failed self-check\n");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 	}
 #endif
 
 	po_init_qbop_table(pcb);
 
-	po_init_pp(pcb, name);
+	if (from_buffer) {
+		po_init_pp_buffer(pcb, name, source, source_length);
+	} else {
+		po_init_pp(pcb, name);
+	}
 
 	if (po_new_frame(pcb, SCOPE_GLOBAL, name, FTY_GLOBAL)) {
 		pf = pcb->rframe;
 		if (init_reserved_words(pcb) < Success) {
+			goto BADOUT;
+		}
+		if (!import_used_symbols(pcb)) {
 			goto BADOUT;
 		}
 
@@ -2886,7 +3387,7 @@ bool po_compile_file(Poco_cb* pcb, char* name)
 		 * walk that list on every parser exit path.
 		 */
 		dummy_token = po_memzalloc(pcb, sizeof(*dummy_token));
-		pcb->curtoken	 = dummy_token;
+		pcb->curtoken = dummy_token;
 		pcb->free_tokens = NULL;
 		dummy_token->next = build_token_list(pcb);
 
@@ -2894,20 +3395,19 @@ bool po_compile_file(Poco_cb* pcb, char* name)
 		lookup_token(pcb);
 		if (pcb->t.toktype != TOK_EOF) {
 			po_say_fatal(pcb, "unexpected '}'");
-   PO_CHECK_ABORT(pcb, false);
+			PO_CHECK_ABORT(pcb, false);
 		}
 
 		po_code_op(pcb, &pf->fcd, OP_END);
-		fuf				= po_memzalloc(pcb, sizeof(*fuf));
-		fuf->name		= po_clone_string(pcb, name);
-		fuf->mlink		= pcb->run.protos;
+		fuf = po_memzalloc(pcb, sizeof(*fuf));
+		fuf->name = po_clone_string(pcb, name);
+		fuf->mlink = pcb->run.protos;
 		pcb->run.protos = fuf;
 		if (!po_compress_func(pcb, pf, fuf)) {
 			goto BADOUT;
 		}
-		if (!po_check_undefined_funcs(pcb, pf->symbols)) {
-			goto BADOUT;
-		}
+		fuf->parameters = retain_global_variables(pf, &fuf->pcount);
+		globals_retained = true;
 		po_dump_file(pcb);
 		pcb->run.data_size = -pf->doff;
 	}
@@ -2918,9 +3418,24 @@ BADOUT:
 
 	po_free_symbol_list(&pf->parameters); /* free res. words */
 
-	if (fuf != NULL) {
+	if (fuf != NULL && !globals_retained) {
 		fuf->parameters = NULL; /* we just freed these above! */
 	}
+
+	/* Struct-valued C bindings build their libffi descriptors after parsing
+	 * returns.  Keep the root layouts (including member symbols) alive until
+	 * the compiled run environment is destroyed. */
+	pcb->run.struct_infos = pf->fsif;
+	if (pcb->run.struct_infos == NULL) {
+		pcb->run.struct_infos = previous_struct_infos;
+	} else {
+		struct_tail = pcb->run.struct_infos;
+		while (struct_tail->next != NULL) {
+			struct_tail = struct_tail->next;
+		}
+		struct_tail->next = previous_struct_infos;
+	}
+	pf->fsif = NULL;
 
 	po_old_frame(pcb);
 
@@ -2929,6 +3444,16 @@ BADOUT:
 	po_free_pp(pcb);
 
 	return Success;
+}
+
+bool po_compile_file(Poco_cb* pcb, char* name)
+{
+	return po_compile_source(pcb, name, NULL, 0, false);
+}
+
+bool po_compile_buffer(Poco_cb* pcb, char* name, const char* source, size_t source_length)
+{
+	return po_compile_source(pcb, name, source, source_length, true);
 }
 
 /*****************************************************************************
@@ -2962,4 +3487,5 @@ void po_free_run_env(Poco_run_env* pev)
 	po_ffi_free_structures(pev);
 	po_freelist(&pev->literals);
 	free_fuf_list(&pev->protos);
+	po_free_sif_list(&pev->struct_infos);
 }

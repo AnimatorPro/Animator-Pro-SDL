@@ -5,31 +5,25 @@
 
 static int failures;
 
-#define CHECK(condition, message) \
-	do { \
-		if (!(condition)) { \
+#define CHECK(condition, message)                                          \
+	do {                                                                   \
+		if (!(condition)) {                                                \
 			fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, (message)); \
-			++failures; \
-		} \
+			++failures;                                                    \
+		}                                                                  \
 	} while (0)
 
-static void check_split(const char* input,
-	const char* expected_device,
-	const char* expected_dir,
-	const char* expected_file,
-	const char* expected_suffix)
+static void check_split(const char* input, const char* expected_device, const char* expected_dir,
+						const char* expected_file, const char* expected_suffix)
 {
 	char device[8];
 	char dir[PATH_SIZE];
 	char file[PATH_SIZE];
 	char suffix[PATH_SIZE];
 
-	CHECK(poco_path_split(input,
-		device, sizeof(device),
-		dir, sizeof(dir),
-		file, sizeof(file),
-		suffix, sizeof(suffix)) == Success,
-		"split should succeed");
+	CHECK(poco_path_split(input, device, sizeof(device), dir, sizeof(dir), file, sizeof(file),
+						  suffix, sizeof(suffix)) == Success,
+		  "split should succeed");
 	CHECK(strcmp(device, expected_device) == 0, "unexpected device");
 	CHECK(strcmp(dir, expected_dir) == 0, "unexpected directory");
 	CHECK(strcmp(file, expected_file) == 0, "unexpected file");
@@ -53,27 +47,27 @@ static void test_split_errors_are_bounded(void)
 	char suffix[8] = "keep";
 	char path[PATH_SIZE + 1];
 
-	CHECK(poco_path_split(NULL,
-		device, sizeof(device), dir, sizeof(dir), file, sizeof(file), suffix, sizeof(suffix)) == Err_null_ref,
-		"NULL input must fail");
-	CHECK(poco_path_split("",
-		device, sizeof(device), dir, sizeof(dir), file, sizeof(file), suffix, sizeof(suffix)) == Err_null_ref,
-		"empty input must fail");
-	CHECK(poco_path_split("9:bad.poc",
-		device, sizeof(device), dir, sizeof(dir), file, sizeof(file), suffix, sizeof(suffix)) == Err_no_device,
-		"invalid drive must fail");
-	CHECK(poco_path_split("/path/name.poc",
-		device, sizeof(device), dir, sizeof(dir), file, 4, suffix, sizeof(suffix)) == Err_buf_too_small,
-		"small file buffer must fail");
-	CHECK(strcmp(device, "keep") == 0 && strcmp(dir, "keep") == 0
-		&& strcmp(file, "keep") == 0 && strcmp(suffix, "keep") == 0,
-		"failed split must not partially write components");
+	CHECK(poco_path_split(NULL, device, sizeof(device), dir, sizeof(dir), file, sizeof(file),
+						  suffix, sizeof(suffix)) == Err_null_ref,
+		  "NULL input must fail");
+	CHECK(poco_path_split("", device, sizeof(device), dir, sizeof(dir), file, sizeof(file), suffix,
+						  sizeof(suffix)) == Err_null_ref,
+		  "empty input must fail");
+	CHECK(poco_path_split("9:bad.poc", device, sizeof(device), dir, sizeof(dir), file, sizeof(file),
+						  suffix, sizeof(suffix)) == Err_no_device,
+		  "invalid drive must fail");
+	CHECK(poco_path_split("/path/name.poc", device, sizeof(device), dir, sizeof(dir), file, 4,
+						  suffix, sizeof(suffix)) == Err_buf_too_small,
+		  "small file buffer must fail");
+	CHECK(strcmp(device, "keep") == 0 && strcmp(dir, "keep") == 0 && strcmp(file, "keep") == 0 &&
+			  strcmp(suffix, "keep") == 0,
+		  "failed split must not partially write components");
 
 	memset(path, 'a', PATH_SIZE);
 	path[PATH_SIZE] = '\0';
-	CHECK(poco_path_split(path,
-		device, sizeof(device), dir, sizeof(dir), file, sizeof(file), suffix, sizeof(suffix)) == Err_dir_too_long,
-		"PATH_SIZE input must fail");
+	CHECK(poco_path_split(path, device, sizeof(device), dir, sizeof(dir), file, sizeof(file),
+						  suffix, sizeof(suffix)) == Err_dir_too_long,
+		  "PATH_SIZE input must fail");
 }
 
 static void test_merge_capacity_contract(void)
@@ -82,13 +76,13 @@ static void test_merge_capacity_contract(void)
 	char too_small[14] = "unchanged";
 
 	CHECK(poco_path_merge(exact, sizeof(exact), "C:", "\\tmp\\", "run", ".poc") == Success,
-		"exactly-sized destination must succeed");
+		  "exactly-sized destination must succeed");
 	CHECK(strcmp(exact, "C:\\tmp\\run.poc") == 0, "merge output mismatch");
-	CHECK(poco_path_merge(too_small, sizeof(too_small), "C:", "\\tmp\\", "run", ".poc") == Err_buf_too_small,
-		"small destination must fail");
+	CHECK(poco_path_merge(too_small, sizeof(too_small), "C:", "\\tmp\\", "run", ".poc") ==
+			  Err_buf_too_small,
+		  "small destination must fail");
 	CHECK(strcmp(too_small, "unchanged") == 0, "failed merge must not write destination");
-	CHECK(poco_path_merge(NULL, 0, "", "", "", "") == Err_null_ref,
-		"NULL destination must fail");
+	CHECK(poco_path_merge(NULL, 0, "", "", "", "") == Err_null_ref, "NULL destination must fail");
 }
 
 int main(void)

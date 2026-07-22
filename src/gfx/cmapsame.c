@@ -1,13 +1,14 @@
 #include "cmap.h"
 #include "memory.h"
 
-bool cmaps_same(Cmap *s1, Cmap *s2)
+bool cmaps_same(Cmap* s1, Cmap* s2)
 {
-USHORT cmpsize;
+	USHORT cmpsize;
 
-	if(s1->num_colors != s2->num_colors)
-		return(0);
+	if (s1->num_colors != s2->num_colors) {
+		return (0);
+	}
 
 	cmpsize = (s1->num_colors * sizeof(Rgb3));
-	return(pj_bcompare(s1->ctab, s2->ctab, cmpsize) == cmpsize);
+	return (pj_bcompare(s1->ctab, s2->ctab, cmpsize) == cmpsize);
 }

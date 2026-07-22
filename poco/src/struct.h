@@ -8,7 +8,6 @@
 #ifndef STRUCT_H
 #define STRUCT_H
 
-Struct_info *po_get_struct(Poco_cb *pcb, Poco_frame *pf);
+Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf);
 
 #endif /* STRUCT_H */
-

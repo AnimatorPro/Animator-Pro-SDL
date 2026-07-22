@@ -8,132 +8,140 @@ Autodesk Movie file pdr modules:
 ****************************************************************/
 #include "movie.h"
 
-static char fhdr10[] = FHDR1;  /* id string for movie files */
+static char fhdr10[] = FHDR1; /* id string for movie files */
 
 
-static void cleanup_headers(Mfile *mf)
+static void cleanup_headers(Mfile* mf)
 /* Free header index buffers */
 {
 	freez(&mf->hframe);
 }
-static Errcode read_alloc_headers(Mfile *mf, int num_frames)
-/* Allocate buffers for header index tables and read in the data from the 
+static Errcode read_alloc_headers(Mfile* mf, int num_frames)
+/* Allocate buffers for header index tables and read in the data from the
  * file. */
 {
-LONG bsize;
+	LONG bsize;
 
 	cleanup_headers(mf);
 
-	bsize = (sizeof(Framei) + sizeof(LONG) + sizeof(LONG) +sizeof(SHORT))
-			* num_frames;
+	bsize = (sizeof(Framei) + sizeof(LONG) + sizeof(LONG) + sizeof(SHORT)) * num_frames;
 
-	if((mf->hframe = malloc(bsize)) == NULL)
-		return(mf->lasterr = Err_no_memory);
+	if ((mf->hframe = malloc(bsize)) == NULL) {
+		return (mf->lasterr = Err_no_memory);
+	}
 
-	mf->hframea = OPTR(mf->hframe,sizeof(Framei)*num_frames);
-	mf->hfllim =  OPTR(mf->hframea,sizeof(LONG)*num_frames);
-	mf->hflen =  OPTR(mf->hfllim,sizeof(SHORT)*num_frames);
+	mf->hframea = OPTR(mf->hframe, sizeof(Framei) * num_frames);
+	mf->hfllim = OPTR(mf->hframea, sizeof(LONG) * num_frames);
+	mf->hflen = OPTR(mf->hfllim, sizeof(SHORT) * num_frames);
 
-	if(mf_read_oset(mf,mf->hframe,bsize,sizeof(Mhead)) < Success)
+	if (mf_read_oset(mf, mf->hframe, bsize, sizeof(Mhead)) < Success) {
 		goto error;
+	}
 
-	return(Success);
+	return (Success);
 error:
-	return(mf->lasterr);
+	return (mf->lasterr);
 }
-static void cleanup_buffers(Mfile *mf)
+static void cleanup_buffers(Mfile* mf)
 /* Free all dynamic work buffers associated with a movie file. */
 {
 	cleanup_headers(mf);
 }
 
-static void close_movie_file(Image_file **pif)
+static void close_movie_file(Image_file** pif)
 /* Close file if open and deallocate all buffers. */
 {
-Mfile *mf;
+	Mfile* mf;
 
-	if((mf = *((Mfile **)pif)) == NULL)
+	if ((mf = *((Mfile**)pif)) == NULL) {
 		return;
-	if(mf->file)
+	}
+	if (mf->file) {
 		fclose(mf->file);
+	}
 	cleanup_buffers(mf);
 	free(mf);
 	*pif = NULL;
 }
-static Errcode mfile_open_sub(Mfile **pmf, char *path, char *fmode)
+static Errcode mfile_open_sub(Mfile** pmf, char* path, char* fmode)
 /* Allocate a mfile and open the file handle in input fmode. */
 {
-Errcode err;
+	Errcode err;
 
-	if((*pmf = zalloc(sizeof(Mfile))) == NULL)
-		return(Err_no_memory);
+	if ((*pmf = zalloc(sizeof(Mfile))) == NULL) {
+		return (Err_no_memory);
+	}
 
-	if(((*pmf)->file = fopen(path, fmode)) == NULL)
+	if (((*pmf)->file = fopen(path, fmode)) == NULL) {
 		goto ioerror;
+	}
 
-	return(Success);
+	return (Success);
 
 ioerror:
 	err = pj_errno_errcode();
-	close_movie_file((Image_file **)pmf);
-	return(err);
+	close_movie_file((Image_file**)pmf);
+	return (err);
 }
 
-static Errcode movie_read_first_frame(Image_file *ifile, Rcel *screen)
-/* Now that we know the movie file has a depth <= 8 bits draw it in the 
+static Errcode movie_read_first_frame(Image_file* ifile, Rcel* screen)
+/* Now that we know the movie file has a depth <= 8 bits draw it in the
  * screen. */
 {
-Mfile *mf = (Mfile *)ifile;
+	Mfile* mf = (Mfile*)ifile;
 
 	mf->screen = screen;
 	mf->cur_frame = -1;
-	return(draw_next_frame(mf));
+	return (draw_next_frame(mf));
 }
 
-static Errcode movie_read_next_frame(Image_file *ifile, Rcel *screen)
-/* Now that we have read the first frame, or one after it. Read the next 
+static Errcode movie_read_next_frame(Image_file* ifile, Rcel* screen)
+/* Now that we have read the first frame, or one after it. Read the next
  * available frame in the file and draw it in the screen. */
 {
-Mfile *mf = (Mfile *)ifile;
+	Mfile* mf = (Mfile*)ifile;
 
 	mf->screen = screen;
-	return(draw_next_frame(mf));
+	return (draw_next_frame(mf));
 }
 
 
-static Errcode open_movie_file(Pdr *pd, char *path, Image_file **pif,
-							 Anim_info *ainfo )
+static Errcode open_movie_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 /* Open an existing movie file and query for header info. */
 {
-Errcode err;
-Mfile *mf;
-Mhead mh;
-int frame;
-USHORT ftype;
+	Errcode err;
+	Mfile* mf;
+	Mhead mh;
+	int frame;
+	USHORT ftype;
 
-	if((err = mfile_open_sub((Mfile **)pif, path, "rb")) < Success)
-		return(err);
+	if ((err = mfile_open_sub((Mfile**)pif, path, "rb")) < Success) {
+		return (err);
+	}
 
-	mf = *((Mfile **)pif);
+	mf = *((Mfile**)pif);
 
-	if((err = mf_read(mf,&mh,sizeof(mh))) < Success)
+	if ((err = mf_read(mf, &mh, sizeof(mh))) < Success) {
 		goto error;
+	}
 
-	if(strncmp(fhdr10,mh.hmfhdr,sizeof(mh.hmfhdr)) != 0)
+	if (strncmp(fhdr10, mh.hmfhdr, sizeof(mh.hmfhdr)) != 0) {
 		goto bad_magic;
+	}
 
 	mf->hdr = mh.h;
 
 	/* Allocate and read record index tables */
-	if(read_alloc_headers(mf, mh.h.hframes) < Success)
-		goto error;	   
+	if (read_alloc_headers(mf, mh.h.hframes) < Success) {
+		goto error;
+	}
 
 	/* Count up visible bit image frames. */
-	for(frame = 0;frame < mh.h.hframes;++frame)
-	{
-	    ftype = mf->hframe[frame].ftype;
-	    if(ftype & (FTBNOTIMG | FTBTEXT|FTBSLIDE|FTBMOVIE))
+	for (frame = 0; frame < mh.h.hframes; ++frame) {
+		ftype = mf->hframe[frame].ftype;
+		if (ftype & (FTBNOTIMG | FTBTEXT | FTBSLIDE | FTBMOVIE)) {
 			continue;
+		}
 
 		++mf->ainfo.num_frames;
 	}
@@ -143,48 +151,49 @@ USHORT ftype;
 	mf->ainfo.depth = 8;
 	mf->ainfo.millisec_per_frame = DEFAULT_AINFO_SPEED;
 
-	if(ainfo)
+	if (ainfo) {
 		*ainfo = mf->ainfo;
+	}
 
 success:
-	return(Success);
+	return (Success);
 
 bad_magic:
 	err = Err_bad_magic;
 	goto error;
 error:
 	close_movie_file(pif);
-	return(err);
+	return (err);
 }
 
 #ifdef SLUFFED
-Errcode movie_save_frame(Image_file *ifile, Rcel *screen, int num_frames,
-							  Errcode (*seek_frame)(int ix,void *seek_data),
-							  void *seek_data, Rcel *work_screen )
+Errcode movie_save_frame(Image_file* ifile, Rcel* screen, int num_frames,
+						 Errcode (*seek_frame)(int ix, void* seek_data), void* seek_data,
+						 Rcel* work_screen)
 {
-	return(Err_unimpl);
+	return (Err_unimpl);
 }
-static Errcode create_movie_file(Pdr *pd, char *path, Image_file **pif,
-								 Anim_info *ainfo )
+static Errcode create_movie_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 /* create a new movie file and prepare it for writing */
 {
-Errcode err;
+	Errcode err;
 
-	if((err = mfile_open_sub((Mfile **)pif,path,"wb")) >= Success)
-		(*(Mfile **)pif)->ainfo = *ainfo;
+	if ((err = mfile_open_sub((Mfile**)pif, path, "wb")) >= Success) {
+		(*(Mfile**)pif)->ainfo = *ainfo;
+	}
 
-	return(Err_unimpl);
+	return (Err_unimpl);
 }
-static Boolean movie_spec_best_fit(Anim_info *ainfo)
-{
-Boolean nofit;
 
-	nofit = (ainfo->depth == 8
-			 && ainfo->num_frames == 1);
+static Boolean movie_spec_best_fit(Anim_info* ainfo)
+{
+	Boolean nofit;
+
+	nofit = (ainfo->depth == 8 && ainfo->num_frames == 1);
 
 	ainfo->depth = 8;
 	ainfo->num_frames = 1;
-	return(nofit);
+	return (nofit);
 }
 #endif /* SLUFFED */
 
@@ -197,26 +206,27 @@ Boolean nofit;
 
 static char movie_title_info[] = "Autodesk movie format.";
 
-static char long_info[] = "This module will read EGA format Autodesk movie "
-						  "files.  It replaces the first 8 colors of the "
-						  "palette with those used by the image.  The "
-						  "other colors will remain unchanged.";
+static char long_info[] =
+	"This module will read EGA format Autodesk movie "
+	"files.  It replaces the first 8 colors of the "
+	"palette with those used by the image.  The "
+	"other colors will remain unchanged.";
 
 Pdr rexlib_header = {
-	{ REX_PICDRIVER, PDR_VERSION, NOFUNC, NOFUNC, HLIB_LIST },
-	movie_title_info, 		/* title_info */
-	long_info,              /* long_info */
-	".MOV",                 /* default_suffi */
-	0,4000,					/* max_write_frames, max_read_frames */
-	NOFUNC,					/* (*spec_best_fit)() */
-	NOFUNC,					/* (*create_image_file)() */
-	open_movie_file,		/* (*open_image_file)() */
-	close_movie_file, 		/* (*close_image_file)() */
-	movie_read_first_frame,	/* (*read_first_frame)() */
-	movie_read_next_frame,	/* (*read_delta_next)() */
-	NOFUNC, 				/* (*save_frames)() */
-	NULL,					/* pdr options */
-	NOFUNC,					/* (*rgb_seekstart)() */
-	NOFUNC,     			/* (*rgb_readline)() */
+	{REX_PICDRIVER, PDR_VERSION, NOFUNC, NOFUNC, HLIB_LIST},
+	movie_title_info, /* title_info */
+	long_info,        /* long_info */
+	".MOV",           /* default_suffi */
+	0,
+	4000,                   /* max_write_frames, max_read_frames */
+	NOFUNC,                 /* (*spec_best_fit)() */
+	NOFUNC,                 /* (*create_image_file)() */
+	open_movie_file,        /* (*open_image_file)() */
+	close_movie_file,       /* (*close_image_file)() */
+	movie_read_first_frame, /* (*read_first_frame)() */
+	movie_read_next_frame,  /* (*read_delta_next)() */
+	NOFUNC,                 /* (*save_frames)() */
+	NULL,                   /* pdr options */
+	NOFUNC,                 /* (*rgb_seekstart)() */
+	NOFUNC,                 /* (*rgb_readline)() */
 };
-

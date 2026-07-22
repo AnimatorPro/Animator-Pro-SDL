@@ -16,8 +16,7 @@ void free_alt(void)
 
 void qfree_alt(void)
 {
-	if(soft_yes_no_box("alt_delete"))
-	{
+	if (soft_yes_no_box("alt_delete")) {
 		free_alt();
 		set_trd_maxmem();
 	}
@@ -26,18 +25,17 @@ void qfree_alt(void)
 void grab_alt(void)
 {
 	free_alt();
-	if(NULL == (vl.alt_cel = clone_any_rcel(vb.pencel)))
-		softerr(Err_no_memory,"alt_alloc");
+	if (NULL == (vl.alt_cel = clone_any_rcel(vb.pencel))) {
+		softerr(Err_no_memory, "alt_alloc");
+	}
 }
 
 void swap_alt(void)
 {
-	if (vl.alt_cel)
-	{
+	if (vl.alt_cel) {
 		swap_pencels(vl.alt_cel, vb.pencel);
 		see_cmap();
 		zoom_it();
 		dirties();
 	}
 }
-

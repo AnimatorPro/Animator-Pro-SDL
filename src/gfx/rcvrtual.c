@@ -27,8 +27,8 @@ bool pj_rcel_make_virtual(Rcel* subcel, Rcel* root, Rectangle* toclip)
 {
 	bool ret;
 
-	ret = pj_clipbox_make(
-	  (Clipbox*)subcel, (Raster*)root, toclip->x, toclip->y, toclip->width, toclip->height);
+	ret = pj_clipbox_make((Clipbox*)subcel, (Raster*)root, toclip->x, toclip->y, toclip->width,
+						  toclip->height);
 	subcel->cmap = root->cmap;
 	return (ret);
 }

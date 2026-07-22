@@ -10,26 +10,25 @@
 #include "zoom.h"
 
 extern Poco_lib po_blit_lib;
-extern Flicel *thecel;
+extern Flicel* thecel;
 
 /*****************************************************************************
  * library resources cleanup routine
  ****************************************************************************/
-static void free_allocated_screens(Poco_lib *lib)
+static void free_allocated_screens(Poco_lib* lib)
 {
-Dlheader *sfi = &lib->resources;
-Dlnode *node, *next;
+	Dlheader* sfi = &lib->resources;
+	Dlnode *node, *next;
 
-if (sfi->head == NULL)
-	return;
+	if (sfi->head == NULL) {
+		return;
+	}
 
-for(node = sfi->head; NULL != (next = node->next); node = next)
-	{
-	pj_rcel_free(((Rnode *)node)->resource);
-	pj_free(node);
+	for (node = sfi->head; NULL != (next = node->next); node = next) {
+		pj_rcel_free(((Rnode*)node)->resource);
+		pj_free(node);
 	}
 }
-
 
 extern char dirty_frame, dirty_file;
 
@@ -49,7 +48,7 @@ static void po_dirties(void)
  ****************************************************************************/
 void* po_get_screen(void)
 {
-return vb.pencel;
+	return vb.pencel;
 }
 
 /*****************************************************************************
@@ -57,7 +56,7 @@ return vb.pencel;
  ****************************************************************************/
 void* po_get_swap(void)
 {
-return vl.alt_cel;
+	return vl.alt_cel;
 }
 
 /*****************************************************************************
@@ -65,7 +64,7 @@ return vl.alt_cel;
  ****************************************************************************/
 void* po_get_undo(void)
 {
-return undof;
+	return undof;
 }
 
 /*****************************************************************************
@@ -73,9 +72,10 @@ return undof;
  ****************************************************************************/
 static void* po_get_celscreen(void)
 {
-if (thecel == NULL)
-	return NULL;
-return thecel->rc;
+	if (thecel == NULL) {
+		return NULL;
+	}
+	return thecel->rc;
 }
 
 /*****************************************************************************
@@ -83,16 +83,14 @@ return thecel->rc;
  ****************************************************************************/
 void po_a_dot(void* pscreen, int color, int x, int y)
 {
-Raster *r;
-if ((r = pscreen) == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	Raster* r;
+	if ((r = pscreen) == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-pj_put_dot(r, color, x, y);
-if (r == (Raster *)vb.pencel)
-	{
-	dirty_file = dirty_frame = 1;
+	pj_put_dot(r, color, x, y);
+	if (r == (Raster*)vb.pencel) {
+		dirty_file = dirty_frame = 1;
 	}
 }
 
@@ -101,9 +99,10 @@ if (r == (Raster *)vb.pencel)
  ****************************************************************************/
 int po_a_get_dot(void* pscreen, int x, int y)
 {
-if (pscreen == NULL)
-	return(builtin_err = Err_null_ref);
-return(pj_get_dot(pscreen, x, y));
+	if (pscreen == NULL) {
+		return (builtin_err = Err_null_ref);
+	}
+	return (pj_get_dot(pscreen, x, y));
 }
 
 /*****************************************************************************
@@ -111,14 +110,12 @@ return(pj_get_dot(pscreen, x, y));
  ****************************************************************************/
 void po_get_dims(void* pscreen, int* width, int* height)
 {
-
-if (pscreen == NULL || width == NULL || height == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (pscreen == NULL || width == NULL || height == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-*width  = ((Raster *)pscreen)->width;
-*height = ((Raster *)pscreen)->height;
+	*width = ((Raster*)pscreen)->width;
+	*height = ((Raster*)pscreen)->height;
 }
 
 /*****************************************************************************
@@ -126,25 +123,22 @@ if (pscreen == NULL || width == NULL || height == NULL)
  ****************************************************************************/
 static void po_copy_screen(void* s, void* d)
 {
-Rcel *scel, *dcel;
-bool csame;
+	Rcel *scel, *dcel;
+	bool csame;
 
-if ((scel = s) == NULL || (dcel = d) == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if ((scel = s) == NULL || (dcel = d) == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-if (scel->width != dcel->width || scel->height != dcel->height)
-	{
-	builtin_err = Err_wrong_res;
-	return;
+	if (scel->width != dcel->width || scel->height != dcel->height) {
+		builtin_err = Err_wrong_res;
+		return;
 	}
-csame = cmaps_same(vb.pencel->cmap,undof->cmap);
-pj_rcel_copy(scel, dcel);
-if (dcel == vb.pencel)
-	{
-	see_cmap();
-	dirties();
+	csame = cmaps_same(vb.pencel->cmap, undof->cmap);
+	pj_rcel_copy(scel, dcel);
+	if (dcel == vb.pencel) {
+		see_cmap();
+		dirties();
 	}
 }
 
@@ -153,55 +147,47 @@ if (dcel == vb.pencel)
  ****************************************************************************/
 void po_swap_screen(void* s, void* d)
 {
-Rcel *scel, *dcel;
-bool csame;
+	Rcel *scel, *dcel;
+	bool csame;
 
-if ((scel = s) == NULL || (dcel = d) == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if ((scel = s) == NULL || (dcel = d) == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-if (scel->width != dcel->width || scel->height != dcel->height)
-	{
-	builtin_err = Err_wrong_res;
-	return;
+	if (scel->width != dcel->width || scel->height != dcel->height) {
+		builtin_err = Err_wrong_res;
+		return;
 	}
-csame = cmaps_same(vb.pencel->cmap,undof->cmap);
-swap_pencels(scel, dcel);
-if (dcel == vb.pencel)
-	{
-	see_cmap();
-	dirties();
+	csame = cmaps_same(vb.pencel->cmap, undof->cmap);
+	swap_pencels(scel, dcel);
+	if (dcel == vb.pencel) {
+		see_cmap();
+		dirties();
 	}
 }
-
 
 /*****************************************************************************
  * void SetBlock(Screen *s, char *pixbuf, int x, int y, int width, int height);
  ****************************************************************************/
 static void po_put_rectpix(void* r, char* pixbuf, int x, int y, int width, int height)
 {
-if (width < 0 || height < 0)
-	{
-	builtin_err = Err_parameter_range;
-	return;
+	if (width < 0 || height < 0) {
+		builtin_err = Err_parameter_range;
+		return;
 	}
-if (r == NULL || pixbuf == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (r == NULL || pixbuf == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-/* We do this one line at a time since put_hseg does clipping but
- * put_rectpix does not. */
-while (--height >= 0)
-	{
-	pj_put_hseg(r, pixbuf,  x, y, width);
-	pixbuf += width;
-	y += 1;
+	/* We do this one line at a time since put_hseg does clipping but
+	 * put_rectpix does not. */
+	while (--height >= 0) {
+		pj_put_hseg(r, pixbuf, x, y, width);
+		pixbuf += width;
+		y += 1;
 	}
-if (r == (void *)vb.pencel)
-	{
-	dirties();
+	if (r == (void*)vb.pencel) {
+		dirties();
 	}
 }
 
@@ -210,85 +196,75 @@ if (r == (void *)vb.pencel)
  ****************************************************************************/
 static void po_get_rectpix(void* r, char* pixbuf, int x, int y, int width, int height)
 {
-if (width < 0 || height < 0)
-	{
-	builtin_err = Err_parameter_range;
-	return;
+	if (width < 0 || height < 0) {
+		builtin_err = Err_parameter_range;
+		return;
 	}
-if (r == NULL || pixbuf == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (r == NULL || pixbuf == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-pj_get_rectpix(r, pixbuf, x, y, width, height);
+	pj_get_rectpix(r, pixbuf, x, y, width, height);
 }
 
 /*****************************************************************************
  * void IconBlit(char *source, int snext, int sx, int sy, int width, int height
  ****************************************************************************/
-static void po_icon_blit(void* msource, int mbpr, int mx, int my,
-	int width, int height, void* dest, int dx, int dy, int color)
+static void po_icon_blit(void* msource, int mbpr, int mx, int my, int width, int height, void* dest,
+						 int dx, int dy, int color)
 {
-
-if (msource == NULL || dest == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (msource == NULL || dest == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-if (width < 0 || height < 0)
-	{
-	builtin_err = Err_parameter_range;
-	return;
+	if (width < 0 || height < 0) {
+		builtin_err = Err_parameter_range;
+		return;
 	}
-color &= 0xff;
-pj_mask1blit(msource, mbpr, mx, my,
-	dest, dx, dy, width, height, color);
-if (dest == (void *)vb.pencel)
-	dirties();
+	color &= 0xff;
+	pj_mask1blit(msource, mbpr, mx, my, dest, dx, dy, width, height, color);
+	if (dest == (void*)vb.pencel) {
+		dirties();
+	}
 }
 
 /*****************************************************************************
  * void Blit(Screen *source, int sx, int sy, int width, int height
  ****************************************************************************/
-static void po_blit(void* source, int sx, int sy, int width, int height,
-	void* dest, int dx, int dy)
+static void po_blit(void* source, int sx, int sy, int width, int height, void* dest, int dx, int dy)
 {
-if (source == NULL || dest == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (source == NULL || dest == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-if (width < 0 || height < 0)
-	{
-	builtin_err = Err_parameter_range;
-	return;
+	if (width < 0 || height < 0) {
+		builtin_err = Err_parameter_range;
+		return;
 	}
-pj_blitrect(source, sx, sy, dest, dx, dy,
-	width, height);
-if (dest == (void *)vb.pencel)
-	dirties();
+	pj_blitrect(source, sx, sy, dest, dx, dy, width, height);
+	if (dest == (void*)vb.pencel) {
+		dirties();
+	}
 }
 
 /*****************************************************************************
  * void KeyBlit(Screen *source, int sx, int sy, int width, int height
  ****************************************************************************/
-static void po_key_blit(void* source, int sx, int sy, int width, int height,
-	void* dest, int dx, int dy, int key_color)
+static void po_key_blit(void* source, int sx, int sy, int width, int height, void* dest, int dx,
+						int dy, int key_color)
 {
-if (source == NULL || dest == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (source == NULL || dest == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-if (width < 0 || height < 0)
-	{
-	builtin_err = Err_parameter_range;
-	return;
+	if (width < 0 || height < 0) {
+		builtin_err = Err_parameter_range;
+		return;
 	}
-pj_tblitrect(source, sx, sy, dest, dx, dy,
-	width, height, key_color);
-if (dest == (void *)vb.pencel)
-	dirties();
+	pj_tblitrect(source, sx, sy, dest, dx, dy, width, height, key_color);
+	if (dest == (void*)vb.pencel) {
+		dirties();
+	}
 }
 
 /*****************************************************************************
@@ -296,31 +272,31 @@ if (dest == (void *)vb.pencel)
  ****************************************************************************/
 static Errcode po_alloc_screen(Popot* p, int w, int h)
 {
-Errcode err;
-Rnode *r;
+	Errcode err;
+	Rnode* r;
 
-if (p == NULL)
-	return(builtin_err = Err_null_ref);
-if (NULL == (r = pj_zalloc(sizeof(Rnode))))
-	return(builtin_err = Err_no_memory);
-
-if (w < 0 || h < 0)
-	{
-	pj_free(r);
-	return Err_parameter_range;
+	if (p == NULL) {
+		return (builtin_err = Err_null_ref);
+	}
+	if (NULL == (r = pj_zalloc(sizeof(Rnode)))) {
+		return (builtin_err = Err_no_memory);
 	}
 
-p->min = p->max = NULL;
-
-if ((err = valloc_anycel(&p->pt, w, h)) < Success)
-	{
-	pj_free(r);
-	return(err);
+	if (w < 0 || h < 0) {
+		pj_free(r);
+		return Err_parameter_range;
 	}
 
-add_head(&po_blit_lib.resources,&r->node);
-r->resource = p->pt;
-return(Success);
+	p->min = p->max = NULL;
+
+	if ((err = valloc_anycel(&p->pt, w, h)) < Success) {
+		pj_free(r);
+		return (err);
+	}
+
+	add_head(&po_blit_lib.resources, &r->node);
+	r->resource = p->pt;
+	return (Success);
 }
 
 /*****************************************************************************
@@ -328,25 +304,22 @@ return(Success);
  ****************************************************************************/
 static void po_free_screen(Popot* p)
 {
-Rnode *r;
+	Rnode* r;
 
-if (p == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (p == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
 
-if (NULL == (r = po_in_rlist(&po_blit_lib.resources, p->pt)))
-	{
-	builtin_err = Err_free_resources;
-	return;
+	if (NULL == (r = po_in_rlist(&po_blit_lib.resources, p->pt))) {
+		builtin_err = Err_free_resources;
+		return;
 	}
-rem_node((Dlnode *)r);
-pj_free(r);
+	rem_node((Dlnode*)r);
+	pj_free(r);
 
-pj_rcel_free(p->pt);
-p->pt = NULL;
-
+	pj_rcel_free(p->pt);
+	p->pt = NULL;
 }
 
 /*****************************************************************************
@@ -354,7 +327,7 @@ p->pt = NULL;
  ****************************************************************************/
 void* po_get_physical_screen(void)
 {
-return vb.screen;
+	return vb.screen;
 }
 
 /*****************************************************************************
@@ -362,14 +335,14 @@ return vb.screen;
  ****************************************************************************/
 void po_set_box(void* s, int color, int x, int y, int width, int height)
 {
-	if (s == NULL)
-		{
+	if (s == NULL) {
 		builtin_err = Err_null_ref;
 		return;
-		}
+	}
 	pj_set_rect(s, color, x, y, width, height);
-	if (s == (void *)vb.pencel)
+	if (s == (void*)vb.pencel) {
 		dirties();
+	}
 }
 
 /*****************************************************************************
@@ -378,14 +351,14 @@ void po_set_box(void* s, int color, int x, int y, int width, int height)
  ****************************************************************************/
 void po_menu_text(void* s, int color, int xoff, int yoff, char* text)
 {
-	if (s == NULL || text == NULL)
-		{
+	if (s == NULL || text == NULL) {
 		builtin_err = Err_null_ref;
 		return;
-		}
-	gftext(s,vb.screen->mufont,text,xoff,yoff,color,TM_MASK1,0);
-	if (s == (void *)vb.pencel)
+	}
+	gftext(s, vb.screen->mufont, text, xoff, yoff, color, TM_MASK1, 0);
+	if (s == (void*)vb.pencel) {
 		dirties();
+	}
 }
 
 /*****************************************************************************
@@ -394,11 +367,10 @@ void po_menu_text(void* s, int color, int xoff, int yoff, char* text)
  ****************************************************************************/
 int po_menu_text_width(char* text)
 {
-	if (text == NULL)
-		{
+	if (text == NULL) {
 		return (builtin_err = Err_null_ref);
-		}
-	return(fstring_width(vb.screen->mufont, text));
+	}
+	return (fstring_width(vb.screen->mufont, text));
 }
 
 /*****************************************************************************
@@ -407,7 +379,7 @@ int po_menu_text_width(char* text)
  ****************************************************************************/
 int po_menu_text_height(void)
 {
-	return(tallest_char(vb.screen->mufont));
+	return (tallest_char(vb.screen->mufont));
 }
 
 /*****************************************************************************
@@ -416,19 +388,17 @@ int po_menu_text_height(void)
  ****************************************************************************/
 static void po_get_menu_colors(int* black, int* grey, int* light, int* bright, int* red)
 {
-	Pixel *colors = vb.screen->mc_colors;
+	Pixel* colors = vb.screen->mc_colors;
 
-	if (black == NULL || grey == NULL || light == NULL
-	|| bright == NULL || red == NULL)
-		{
+	if (black == NULL || grey == NULL || light == NULL || bright == NULL || red == NULL) {
 		builtin_err = Err_null_ref;
 		return;
-		}
-	*black  = colors[MC_BLACK];
-	*grey   = colors[MC_GREY];
-	*light  = colors[MC_WHITE];
+	}
+	*black = colors[MC_BLACK];
+	*grey = colors[MC_GREY];
+	*light = colors[MC_WHITE];
 	*bright = colors[MC_BRIGHT];
-	*red    = colors[MC_RED];
+	*red = colors[MC_RED];
 }
 
 /*----------------------------------------------------------------------------
@@ -455,61 +425,58 @@ static void po_get_menu_colors(int* black, int* grey, int* light, int* bright, i
  *--------------------------------------------------------------------------*/
 
 PolibScreen po_libscreen = {
-po_get_screen,
+	po_get_screen,
 	"Screen  *GetPicScreen(void);",
-po_get_swap,
+	po_get_swap,
 	"Screen  *GetSwapScreen(void);",
-po_get_undo,
+	po_get_undo,
 	"Screen  *GetUndoScreen(void);",
-po_get_celscreen,
+	po_get_celscreen,
 	"Screen  *GetCelScreen(void);",
-po_alloc_screen,
+	po_alloc_screen,
 	"ErrCode AllocScreen(Screen **screen, int width, int height);",
-po_free_screen,
+	po_free_screen,
 	"void    FreeScreen(Screen **screen);",
-po_get_dims,
+	po_get_dims,
 	"void    GetScreenSize(Screen *s, int *x, int *y);",
-po_a_dot,
+	po_a_dot,
 	"void    SetPixel(Screen *s, int color, int x, int y);",
-po_a_get_dot,
+	po_a_get_dot,
 	"int     GetPixel(Screen *s, int x, int y);",
-po_put_rectpix,
+	po_put_rectpix,
 	"void    SetBlock(Screen *s, char *pixbuf, int x, int y, int width, int height);",
-po_get_rectpix,
+	po_get_rectpix,
 	"void    GetBlock(Screen *s, char *pixbuf, int x, int y, int width, int height);",
-po_icon_blit,
+	po_icon_blit,
 	"void    IconBlit(char *source, int snext, int sx, int sy, int width, int height, "
-				"Screen *dest, int dx, int dy, int color);",
-po_blit,
+	"Screen *dest, int dx, int dy, int color);",
+	po_blit,
 	"void    Blit(Screen *source, int sx, int sy, int width, int height, "
-				"Screen *dest, int dx, int dy);",
-po_key_blit,
+	"Screen *dest, int dx, int dy);",
+	po_key_blit,
 	"void    KeyBlit(Screen *source, int sx, int sy, int width, int height, "
-				"Screen *dest, int dx, int dy, int key_color);",
-po_copy_screen,
+	"Screen *dest, int dx, int dy, int key_color);",
+	po_copy_screen,
 	"void    CopyScreen(Screen *source, Screen *dest);",
-po_swap_screen,
+	po_swap_screen,
 	"void    TradeScreen(Screen *a, Screen *b);",
-po_dirties,
+	po_dirties,
 	"void    PicDirtied(void);",
-/* New with Ani Pro 1.5 */
-po_get_physical_screen,
+	/* New with Ani Pro 1.5 */
+	po_get_physical_screen,
 	"Screen  *GetPhysicalScreen(void);",
-po_set_box,
+	po_set_box,
 	"void    SetBox(Screen *s, int color, int x, int y, int width, int height);",
-po_menu_text,
+	po_menu_text,
 	"void	MenuText(Screen *screen, int color, int xoff, int yoff, char *text);",
-po_menu_text_width,
+	po_menu_text_width,
 	"int	MenuTextWidth(char *text);",
-po_menu_text_height,
+	po_menu_text_height,
 	"int	MenuTextHeight(void);",
-po_get_menu_colors,
+	po_get_menu_colors,
 	"void	GetMenuColors(int *black, int *grey, int *light, int *bright, int *red);",
 };
 
 Poco_lib po_blit_lib = {
-	NULL, "Screen",
-	(Lib_proto *)&po_libscreen, POLIB_SCREEN_SIZE,
-	NULL, free_allocated_screens,
-	};
-
+	NULL, "Screen", (Lib_proto*)&po_libscreen, POLIB_SCREEN_SIZE, NULL, free_allocated_screens,
+};

@@ -3,17 +3,14 @@
 /***********************************************************/
 /* returns length of doubly linked list */
 
-LONG listlen(Dlheader *list)
+LONG listlen(Dlheader* list)
 {
-register Dlnode *node;
-register Dlnode *next;
-register LONG len;
+	register Dlnode* node;
+	register Dlnode* next;
+	register LONG len;
 
-	for(node = list->head, len = 0;
-		NULL != (next = node->next);
-		node = next)
-	{
+	for (node = list->head, len = 0; NULL != (next = node->next); node = next) {
 		++len;
 	}
-	return(len);
+	return (len);
 }

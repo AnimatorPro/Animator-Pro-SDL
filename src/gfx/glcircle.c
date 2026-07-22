@@ -1,11 +1,10 @@
 #include "gfx.ih"
 
-void circle(void *r,Pixel color, Coor centx, 
-			Coor centy, Ucoor diameter, bool filled)
+void circle(void* r, Pixel color, Coor centx, Coor centy, Ucoor diameter, bool filled)
 
 /* for simple one color circles */
 {
-Sdat sd;
+	Sdat sd;
 
 	sd.rast = r;
 	sd.color = color;

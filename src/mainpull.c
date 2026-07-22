@@ -18,7 +18,7 @@
 #include "wildlist.h"
 
 
-bool do_mainpull(Menuhdr *mh)
+bool do_mainpull(Menuhdr* mh)
 /* set disable flags and goes to do the pull */
 {
 	static SHORT cel_pulltab[] = {
@@ -54,10 +54,10 @@ bool do_mainpull(Menuhdr *mh)
  *  ppull - put resulting Pulls here.
  *  ncount - input names.
  */
-static int new_pull_list(Pull **ppull, Names *nlist, int ncount, int startid)
+static int new_pull_list(Pull** ppull, Names* nlist, int ncount, int startid)
 {
-	Pull *list = NULL;
-	Pull *new;
+	Pull* list = NULL;
+	Pull* new;
 	int count;
 	Errcode err = Success;
 
@@ -72,7 +72,7 @@ static int new_pull_list(Pull **ppull, Names *nlist, int ncount, int startid)
 			break;
 		}
 
-		new->key2 = ((char *)(new->data))[0];
+		new->key2 = ((char*)(new->data))[0];
 		new->next = list;
 		new->id = ++startid;
 		list = new;
@@ -80,7 +80,7 @@ static int new_pull_list(Pull **ppull, Names *nlist, int ncount, int startid)
 	}
 
 	if (err < Success) {
-		free_wild_list((Names **)&list);
+		free_wild_list((Names**)&list);
 		*ppull = NULL;
 		return err;
 	}
@@ -89,9 +89,9 @@ static int new_pull_list(Pull **ppull, Names *nlist, int ncount, int startid)
 	return count;
 }
 
-static void prep_poc_list(Names *list)
+static void prep_poc_list(Names* list)
 {
-	char *p;
+	char* p;
 	char c;
 
 	while (list != NULL) {
@@ -107,20 +107,19 @@ static void prep_poc_list(Names *list)
 	}
 }
 
-Errcode init_poco_pull(Menuhdr *mh, SHORT prev_id, SHORT root_id)
+Errcode init_poco_pull(Menuhdr* mh, SHORT prev_id, SHORT root_id)
 {
 	Errcode err = Success;
 	int count;
-	Names *pocs = NULL;
-	Pull *prev = id_to_pull(mh, prev_id);
+	Names* pocs = NULL;
+	Pull* prev = id_to_pull(mh, prev_id);
 
 	build_wild_list(&pocs, resource_dir, "*.POC", false);
 	prep_poc_list(pocs);
 	count = new_pull_list(&prev->next, pocs, 10, prev_id);
 	if (count < Success) {
 		err = count;
-	}
-	else {
+	} else {
 		id_to_pull(mh, root_id)->children->height += prev->height * count;
 	}
 
@@ -129,13 +128,13 @@ Errcode init_poco_pull(Menuhdr *mh, SHORT prev_id, SHORT root_id)
 }
 
 #ifdef WITH_POCO
-static void poco_pull_path(Menuhdr *mh, int id, char *buf)
+static void poco_pull_path(Menuhdr* mh, int id, char* buf)
 {
 	make_resource_name(id_to_pull(mh, id)->data, buf);
 	strcat(buf, ".POC");
 }
 
-Errcode run_pull_poco(Menuhdr *mh, SHORT id)
+Errcode run_pull_poco(Menuhdr* mh, SHORT id)
 {
 	char ppath[PATH_SIZE];
 	poco_pull_path(mh, id, ppath);

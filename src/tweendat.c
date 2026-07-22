@@ -122,7 +122,7 @@ static Button twe_title_sel = MB_INIT1(
 
 // clang-format on
 
-static void twemenu_credraw(void *dat, USHORT why)
+static void twemenu_credraw(void* dat, USHORT why)
 {
 	(void)dat;
 	(void)why;
@@ -138,7 +138,7 @@ static Redraw_node twemenu_rn = {{NULL, NULL}, /* node */
 								 NEW_CCOLOR};
 
 /* also used in paste menu which uses same common buttons */
-static void twemenu_on_showhide(Menuhdr *mh, bool showing)
+static void twemenu_on_showhide(Menuhdr* mh, bool showing)
 {
 	(void)mh;
 
@@ -176,7 +176,7 @@ static Smu_button_list twe_smblist[] = {
 };
 
 /* Load up strings associated with tween panel */
-Errcode load_tween_panel_strings(void **ss)
+Errcode load_tween_panel_strings(void** ss)
 {
 	return soft_buttons("tween_panel", twe_smblist, Array_els(twe_smblist), ss);
 }

@@ -1,0 +1,5 @@
+int main(void)
+{
+	printf("binary/source parity: %d\n", 42);
+	return 23;
+}

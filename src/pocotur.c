@@ -20,12 +20,11 @@ static bool pendown;
  ****************************************************************************/
 void po_tur_home(void)
 {
-	xtur = fli_screen_width()>>1;
-	ytur = fli_screen_height()>>1;
+	xtur = fli_screen_width() >> 1;
+	ytur = fli_screen_height() >> 1;
 	atur = 0;
 	pendown = 1;
 }
-
 
 /*****************************************************************************
  * void Right(double angle)
@@ -35,7 +34,6 @@ static void po_tur_right(double degrees)
 	atur += degrees;
 }
 
-
 /*****************************************************************************
  * void Left(double angle)
  ****************************************************************************/
@@ -43,7 +41,6 @@ static void po_tur_left(double degrees)
 {
 	atur -= degrees;
 }
-
 
 /*****************************************************************************
  * void MoveTo(double x, double y, double angle)
@@ -60,8 +57,7 @@ static void po_tur_set_position(double x, double y, double degrees)
  ****************************************************************************/
 static void po_tur_get_position(double* x, double* y, double* degrees)
 {
-	if (x == NULL || y == NULL || degrees == NULL)
-	{
+	if (x == NULL || y == NULL || degrees == NULL) {
 		builtin_err = Err_null_ref;
 		return;
 	}
@@ -70,7 +66,7 @@ static void po_tur_get_position(double* x, double* y, double* degrees)
 	*degrees = atur;
 }
 
-#define  PI 3.141592
+#define PI 3.141592
 
 /*****************************************************************************
  * void Move(double amount)
@@ -82,14 +78,13 @@ static void po_tur_forward(double distance)
 
 	lx = xtur;
 	ly = ytur;
-	radians = atur*2.0*PI/360.0;
-	xtur += cos(radians)*distance;
-	ytur += sin(radians)*distance;
+	radians = atur * 2.0 * PI / 360.0;
+	xtur += cos(radians) * distance;
+	ytur += sin(radians) * distance;
 	if (pendown) {
 		po_ink_line(lx, ly, (int)xtur, (int)ytur);
 	}
 }
-
 
 /*****************************************************************************
  * void Back(double amount)
@@ -99,7 +94,6 @@ static void po_tur_backward(double distance)
 	po_tur_forward(-distance);
 }
 
-
 /*****************************************************************************
  * void PenUp(void)
  ****************************************************************************/
@@ -108,7 +102,6 @@ static void po_tur_pen_up(void)
 	pendown = false;
 }
 
-
 /*****************************************************************************
  * void PenDown(void)
  ****************************************************************************/
@@ -116,7 +109,6 @@ static void po_tur_pen_down(void)
 {
 	pendown = true;
 }
-
 
 /*****************************************************************************
  * Boolean IsDown(void)
@@ -150,32 +142,21 @@ static bool po_tur_get_pen(void)
  *--------------------------------------------------------------------------*/
 
 PolibTurtle po_libturtle = {
-	po_tur_forward,
-		"void    Move(double amount);",
-	po_tur_backward,
-		"void    Back(double amount);",
-	po_tur_left,
-		"void    Left(double angle);",
-	po_tur_right,
-		"void    Right(double angle);",
-	po_tur_pen_up,
-		"void    PenUp(void);",
-	po_tur_pen_down,
-		"void    PenDown(void);",
-	po_tur_get_pen,
-		"Boolean IsDown(void);",
-	po_tur_set_position,
-		"void    MoveTo(double x, double y, double angle);",
-	po_tur_get_position,
-		"void    Where(double *x, double *y, double *angle);",
-	po_tur_home,
-		"void    Home(void);",
+	po_tur_forward,      "void    Move(double amount);",
+	po_tur_backward,     "void    Back(double amount);",
+	po_tur_left,         "void    Left(double angle);",
+	po_tur_right,        "void    Right(double angle);",
+	po_tur_pen_up,       "void    PenUp(void);",
+	po_tur_pen_down,     "void    PenDown(void);",
+	po_tur_get_pen,      "Boolean IsDown(void);",
+	po_tur_set_position, "void    MoveTo(double x, double y, double angle);",
+	po_tur_get_position, "void    Where(double *x, double *y, double *angle);",
+	po_tur_home,         "void    Home(void);",
 };
 
-Poco_lib po_turtle_lib =
-{
+Poco_lib po_turtle_lib = {
 	NULL,
 	"Turtle Graphics",
-	(Lib_proto *)&po_libturtle, POLIB_TURTLE_SIZE,
+	(Lib_proto*)&po_libturtle,
+	POLIB_TURTLE_SIZE,
 };
-

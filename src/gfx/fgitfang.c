@@ -4,5 +4,5 @@
 
 double itheta_tofloat(int int_angle, int int_twopi)
 {
-	return(ITHETA_TOFLOAT(int_angle,int_twopi));
+	return (ITHETA_TOFLOAT(int_angle, int_twopi));
 }

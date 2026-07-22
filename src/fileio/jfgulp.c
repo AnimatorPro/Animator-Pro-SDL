@@ -9,19 +9,25 @@
  *
  *  Read in a file of known size all at once.
  */
-Errcode
-read_gulp(const char *name, void *buf, long size)
+Errcode read_gulp(const char* name, void* buf, long size)
 {
 	Errcode err;
-	XFILE *xf;
+	XFILE* xf;
 
-	if (!pj_assert(name != NULL)) return Err_bad_input;
-	if (!pj_assert(buf != NULL)) return Err_bad_input;
-	if (!pj_assert(size >= 0)) return Err_range;
+	if (!pj_assert(name != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(buf != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(size >= 0)) {
+		return Err_range;
+	}
 
 	err = xffopen(name, &xf, XREADONLY);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	err = xffread(xf, buf, size);
 
@@ -33,25 +39,32 @@ read_gulp(const char *name, void *buf, long size)
  *
  *  Write out a file of known size all at once.
  */
-Errcode
-write_gulp(const char *name, void *buf, long size)
+Errcode write_gulp(const char* name, void* buf, long size)
 {
 	Errcode err;
-	XFILE *xf;
+	XFILE* xf;
 
-	if (!pj_assert(name != NULL)) return Err_bad_input;
-	if (!pj_assert(buf != NULL)) return Err_bad_input;
-	if (!pj_assert(size >= 0)) return Err_range;
+	if (!pj_assert(name != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(buf != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(size >= 0)) {
+		return Err_range;
+	}
 
 	err = xffopen(name, &xf, XWRITEONLY);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	err = xffwrite(xf, buf, size);
 	xffclose(&xf);
 
-	if (err < Success)
+	if (err < Success) {
 		pj_delete(name);
+	}
 
 	return err;
 }

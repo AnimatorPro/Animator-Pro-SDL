@@ -1,0 +1,25 @@
+/* debugger stepping fixture */
+
+int leaf(int value)
+{
+	record(100 + value);
+	return value + 1;
+}
+
+int helper(int value)
+{
+	record(200 + value);
+	value = leaf(value);
+	record(300 + value);
+	return value + 1;
+}
+
+main()
+{
+	int value;
+	value = 1;
+	record(10);
+	value = helper(value);
+	record(20 + value);
+	return value;
+}

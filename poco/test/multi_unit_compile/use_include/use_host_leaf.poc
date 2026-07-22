@@ -1,0 +1,4 @@
+int host_used_value(void)
+{
+	return 23;
+}

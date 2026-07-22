@@ -4,5 +4,5 @@
 
 int float_toitheta(double angle, int int_twopi)
 {
-	return(FLOAT_TOITHETA(angle,int_twopi));
+	return (FLOAT_TOITHETA(angle, int_twopi));
 }

@@ -192,8 +192,7 @@ void qsave_pic(void)
 		return;
 	}
 
-	char* file_path =
-		pj_dialog_file_save("Save Image", get_pictype_suffi(), last_path);
+	char* file_path = pj_dialog_file_save("Save Image", get_pictype_suffi(), last_path);
 
 	if (file_path != NULL) {
 		unzoom();
@@ -262,7 +261,8 @@ static void go_pic_options()
 
 			case PICOPT_WRITE_ALPHA:
 				vs.pic_write_alpha =
-					(BYTE)(vs.pic_write_alpha == PIC_IO_NO_ALPHA ? PIC_IO_WRITE_ALPHA : PIC_IO_NO_ALPHA);
+					(BYTE)(vs.pic_write_alpha == PIC_IO_NO_ALPHA ? PIC_IO_WRITE_ALPHA
+																 : PIC_IO_NO_ALPHA);
 				break;
 
 			case PICOPT_JPEG_QUALITY:

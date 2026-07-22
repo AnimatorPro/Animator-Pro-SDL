@@ -17,11 +17,10 @@
  *
  *  Free a singly-linked list, assuming the nodes are simple.
  */
-void
-free_slist(Slnode *list)
+void free_slist(Slnode* list)
 {
 	while (list != NULL) {
-		Slnode *next = list->next;
+		Slnode* next = list->next;
 		pj_free(list);
 		list = next;
 	}
@@ -31,16 +30,17 @@ free_slist(Slnode *list)
  *
  *  Join two lists (or nodes).
  */
-void *
-join_slists(Slnode *s1, Slnode *s2)
+void* join_slists(Slnode* s1, Slnode* s2)
 {
-	Slnode *t;
+	Slnode* t;
 
-	if (s1 == NULL)
+	if (s1 == NULL) {
 		return s2;
+	}
 
-	if (s2 == NULL)
+	if (s2 == NULL) {
 		return s1;
+	}
 
 	t = slist_last(s1);
 	t->next = s2;
@@ -52,14 +52,15 @@ join_slists(Slnode *s1, Slnode *s2)
  *  Remove an element from the list.
  *  Returns the new list head, or NULL if the list is now empty.
  */
-void *
-remove_el(Slnode *list, Slnode *el)
+void* remove_el(Slnode* list, Slnode* el)
 {
 	Slnode tnode;
-	Slnode *prev;
-	Slnode *next;
+	Slnode* prev;
+	Slnode* next;
 
-	if (!pj_assert(el != NULL)) return NULL;
+	if (!pj_assert(el != NULL)) {
+		return NULL;
+	}
 
 	/* Backup with tnode to handle the NULL case,
 	 * and the case where el is the first element.
@@ -71,8 +72,9 @@ remove_el(Slnode *list, Slnode *el)
 		prev = next;
 		next = next->next;
 
-		if (next == NULL)
+		if (next == NULL) {
 			break;
+		}
 
 		if (next == el) {
 			prev->next = next->next;
@@ -91,16 +93,18 @@ remove_el(Slnode *list, Slnode *el)
  *
  *  Returns the list "index" of the given element, or -1 if not found.
  */
-int
-slist_ix(const Slnode *list, const Slnode *el)
+int slist_ix(const Slnode* list, const Slnode* el)
 {
 	int ix = 0;
 
-	if (!pj_assert(el != NULL)) return -1;
+	if (!pj_assert(el != NULL)) {
+		return -1;
+	}
 
 	while (list != NULL) {
-		if (list == el)
+		if (list == el) {
 			return ix;
+		}
 
 		ix++;
 		list = list->next;
@@ -113,12 +117,12 @@ slist_ix(const Slnode *list, const Slnode *el)
  *
  *  Returns the ix-th element in the list, or NULL if no such index.
  */
-void *
-slist_el(Slnode *list, int ix)
+void* slist_el(Slnode* list, int ix)
 {
 	while (list != NULL) {
-		if (ix <= 0)
+		if (ix <= 0) {
 			break;
+		}
 
 		ix--;
 		list = list->next;
@@ -131,8 +135,7 @@ slist_el(Slnode *list, int ix)
  *
  *  Returns the number of elements in the list.
  */
-int
-slist_len(const Slnode *list)
+int slist_len(const Slnode* list)
 {
 	int count = 0;
 
@@ -148,10 +151,9 @@ slist_len(const Slnode *list)
  *
  *  Returns the last element in the list, or NULL if list is empty.
  */
-void *
-slist_last(Slnode *list)
+void* slist_last(Slnode* list)
 {
-	Slnode *last = list;
+	Slnode* last = list;
 
 	while (list != NULL) {
 		last = list;

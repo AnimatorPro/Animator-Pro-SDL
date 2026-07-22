@@ -1,9 +1,8 @@
 #include "formatf.h"
 
-int
-fa_lenf(Formatarg *fa)
+int fa_lenf(Formatarg* fa)
 /* returns char length that a given formatf will give you */
 {
-	while(fa_getc(fa));
-	return(fa->count - 1);
+	while (fa_getc(fa));
+	return (fa->count - 1);
 }

@@ -5,9 +5,10 @@
 double clipto_pi(double theta)
 /* clips a <-PI to >+PI angle a -PI to +PI angle */
 {
-	if(theta > PI)
-		return(fmod(theta,PI*2) - PI*2);
-	else if(theta < -PI)
-		return(fmod(theta,PI*2) + PI*2);
-	return(theta);
+	if (theta > PI) {
+		return (fmod(theta, PI * 2) - PI * 2);
+	} else if (theta < -PI) {
+		return (fmod(theta, PI * 2) + PI * 2);
+	}
+	return (theta);
 }

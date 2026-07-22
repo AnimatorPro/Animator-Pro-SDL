@@ -23,7 +23,7 @@
 
 // ----------------------------------------------------------------------------
 /* Do PCX compression of buf into file out */
-static void pcx_comp_buf(XFILE *out, UBYTE *buf, int count)
+static void pcx_comp_buf(XFILE* out, UBYTE* buf, int count)
 {
 	int same_count, lcount;
 	int c;
@@ -52,13 +52,13 @@ static void pcx_comp_buf(XFILE *out, UBYTE *buf, int count)
 }
 
 // ----------------------------------------------------------------------------
-static bool sdlpdr_save_pcx(SDL_Surface *surface, const char *path)
+static bool sdlpdr_save_pcx(SDL_Surface* surface, const char* path)
 {
 	Pcx_header rhdr;
-	UBYTE *buf = NULL;
+	UBYTE* buf = NULL;
 	Errcode err = Success;
 	int width, height, i;
-	XFILE *out = NULL;
+	XFILE* out = NULL;
 
 	/* Check if the surface is in INDEX8 format */
 	if (surface->format != SDL_PIXELFORMAT_INDEX8) {
@@ -108,7 +108,7 @@ static bool sdlpdr_save_pcx(SDL_Surface *surface, const char *path)
 	/* Write each line of pixel data */
 	for (i = 0; i < height; i++) {
 		/* Get a row of pixel data */
-		UBYTE *src = (UBYTE *)surface->pixels + (i * surface->pitch);
+		UBYTE* src = (UBYTE*)surface->pixels + (i * surface->pitch);
 		memcpy(buf, src, width);
 
 		/* Compress and write the line */
@@ -128,7 +128,7 @@ static bool sdlpdr_save_pcx(SDL_Surface *surface, const char *path)
 	xfputc(PCX_CMAP_MAGIC, out);
 
 	/* Write palette */
-	SDL_Palette *palette = SDL_GetSurfacePalette(surface);
+	SDL_Palette* palette = SDL_GetSurfacePalette(surface);
 	if (palette) {
 		UBYTE rgb_palette[768]; /* 256 colors * 3 components */
 		for (i = 0; i < 256 && i < palette->ncolors; i++) {

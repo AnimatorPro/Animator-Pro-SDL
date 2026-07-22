@@ -36,15 +36,17 @@ endforeach()
 
 # Portable standard-library wrappers retain the C int result type.
 foreach(evidence
-    "static int po_sprintf(char* buf, char* format, ...)"
-    "{ po_sprintf, \"int     sprintf(char *buf, char *format, ...);\" }")
+	"static int po_sprintf(char* buf, char* format, PocoVm* vm, ...)"
+	"{ po_sprintf, \"int     sprintf(char *buf, char *format, ...);\", NULL"
+	"POCO_BINDING_RUN_CONTEXT")
     require_literal("${POCO_STRING}" "${evidence}")
 endforeach()
 foreach(evidence
-    "static int po_fprintf(FILE* f, char* format, ...)"
+	"static int po_fprintf(FILE* f, char* format, PocoVm* vm, ...)"
+	"POCO_BINDING_RUN_CONTEXT"
 	"static const PocoBindingContract fprintf_contract"
     "{po_fprintf,"
-	"&fprintf_contract}")
+	"&fprintf_contract,")
     require_literal("${POCO_FILE}" "${evidence}")
 endforeach()
 

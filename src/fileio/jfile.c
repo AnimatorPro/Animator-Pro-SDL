@@ -17,7 +17,7 @@
  ** msdos, ram-disk, or temp file),  and a union for a "handle"
  ** which contains data for that particular device.
  ** The device is primarily a jumptable of functions for open, close, etc.
- ** 
+ **
  ** So at this level our open/close/read/write/seek etc. functions
  ** do little but jump through to the corresponding functions in the
  ** attached device jumptable.   It serves as a way for dealing with
@@ -35,7 +35,7 @@
 #else /* __WATCOMC__ */
 #include <sys/stat.h>
 #ifndef _MSC_VER
-	#include <unistd.h>
+#include <unistd.h>
 #endif
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -49,11 +49,10 @@
 #include "memory.h"
 #include "msfile.h"
 
-
 /*
  * Delete a file.
  */
-Errcode pj_delete(const char *name)
+Errcode pj_delete(const char* name)
 {
 	int ret;
 
@@ -61,19 +60,17 @@ Errcode pj_delete(const char *name)
 	return ret == 0 ? Success : Err_stdio;
 }
 
-
-Errcode pj_rename(const char *old, const char *new)
+Errcode pj_rename(const char* old, const char* new)
 {
 	int ret = rename(old, new);
 	return ret == 0 ? Success : Err_stdio;
 }
 
-
 /* Does file exist? Boolean does not handle errors now */
-bool pj_exists(const char *title)
+bool pj_exists(const char* title)
 {
 	Errcode err;
-	XFILE *xf;
+	XFILE* xf;
 
 	err = xffopen(title, &xf, XREADONLY);
 	if (err < Success) {
@@ -84,15 +81,14 @@ bool pj_exists(const char *title)
 	return true;
 }
 
-
 /*
  * Return size of a (closed) file.
  */
-long pj_file_size(const char *title)
+long pj_file_size(const char* title)
 {
 	long size;
 	Errcode err;
-	XFILE *xf;
+	XFILE* xf;
 
 	err = xffopen(title, &xf, XREADONLY);
 	if (err < Success) {
@@ -104,17 +100,15 @@ long pj_file_size(const char *title)
 	return size;
 }
 
-
 /* returns 1 if device is fixed 0 if not < 0 if error */
-Errcode pj_is_fixed(const char *device)
+Errcode pj_is_fixed(const char* device)
 {
-	//#!TODO: Remove this function from usage?
+	// #!TODO: Remove this function from usage?
 	int dc = toupper(*device);
 
-	if(dc == 'A' || dc == 'B') {
+	if (dc == 'A' || dc == 'B') {
 		return 0;
 	}
 
 	return 1;
 }
-

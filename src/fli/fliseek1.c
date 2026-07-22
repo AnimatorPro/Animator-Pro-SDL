@@ -1,9 +1,9 @@
 #include "jfile.h"
 #include "fli.h"
 
-Errcode pj_fli_seek_first(Flifile *flif)
-/************************************************************************* 
- * Seeks to offset of first (Initial non-delta) frame in a Flifile in 
+Errcode pj_fli_seek_first(Flifile* flif)
+/*************************************************************************
+ * Seeks to offset of first (Initial non-delta) frame in a Flifile in
  * preparation for reading the first frame.
  *
  * Parameters:

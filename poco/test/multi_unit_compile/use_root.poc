@@ -1,0 +1,6 @@
+#pragma poco use <use_mid.poc>
+
+int main(void)
+{
+	return mid_call();
+}

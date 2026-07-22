@@ -1,0 +1,31 @@
+/* variable inspection and backtrace fixture */
+
+int leaf(int input)
+{
+	int local_int = input + 3;
+	long local_long = 123456L + input;
+	double local_double = 2.5 + input;
+	char *local_pointer = "debug";
+	int shadowed = 22;
+	static int persistent = 9;
+	record(local_int);
+	return local_int;
+}
+
+int helper(int seed)
+{
+	int caller_only = seed;
+	return leaf(caller_only);
+}
+
+main()
+{
+	int main_only = 4;
+	return helper(main_only);
+}
+
+int probe(int value)
+{
+	int nested = value + 2;
+	return nested;
+}

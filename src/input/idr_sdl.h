@@ -5,6 +5,6 @@
 
 struct idriver;
 
-extern Errcode init_sdl_idriver(struct idriver *idr);
+extern Errcode init_sdl_idriver(struct idriver* idr);
 
 #endif

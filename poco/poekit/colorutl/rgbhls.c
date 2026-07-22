@@ -10,7 +10,7 @@
 #include "stdtypes.h"
 
 typedef struct rgb3 {
-    UBYTE r,g,b;
+	UBYTE r, g, b;
 } Rgb3;
 
 static int pj_uscale_by(USHORT x, USHORT p, USHORT q)
@@ -18,12 +18,12 @@ static int pj_uscale_by(USHORT x, USHORT p, USHORT q)
  * return(x * p/q) done to avoid rounding error
  ****************************************************************************/
 {
-LONG l;
+	LONG l;
 
 	l = x;
 	l *= p;
 	l /= q;
-	return((int)l);
+	return ((int)l);
 }
 
 static LONG hlsrgb_value(LONG n1, LONG n2, SHORT hue)
@@ -33,89 +33,97 @@ static LONG hlsrgb_value(LONG n1, LONG n2, SHORT hue)
 {
 	LONG val;
 
-	while (hue >= 256)
+	while (hue >= 256) {
 		hue -= 256;
+	}
 
-	while (hue < 0)
+	while (hue < 0) {
 		hue += 256;
+	}
 
-	if (hue < (256/6))
-		val = n1 + (n2 - n1) * (long)hue / (256/6);
-	else if (hue < 256/2)
+	if (hue < (256 / 6)) {
+		val = n1 + (n2 - n1) * (long)hue / (256 / 6);
+	} else if (hue < 256 / 2) {
 		val = n2;
-	else if (hue < 2*256/3)
-		val = n1 + (long)(n2 - n1) * (2*256/3 - hue) / (256/6);
-	else
+	} else if (hue < 2 * 256 / 3) {
+		val = n1 + (long)(n2 - n1) * (2 * 256 / 3 - hue) / (256 / 6);
+	} else {
 		val = n1;
+	}
 
-	val>>=8;
-	if (val > 255) val = 255;
-	if (val<0) val = 0;
-	return(val);
+	val >>= 8;
+	if (val > 255) {
+		val = 255;
+	}
+	if (val < 0) {
+		val = 0;
+	}
+	return (val);
 }
 
 
-void hls_to_rgb(int *pr, int *pg, int *pb, int ih, int il, int is)
+void hls_to_rgb(int* pr, int* pg, int* pb, int ih, int il, int is)
 /*****************************************************************************
  *
  ****************************************************************************/
 {
-	long	m1, m2;
-	SHORT	h,l,s;
-	SHORT	rv, gv, bv;
+	long m1, m2;
+	SHORT h, l, s;
+	SHORT rv, gv, bv;
 
 	h = ih;
 	l = il;
 	s = is;
 
-	if (l <= 128)
+	if (l <= 128) {
 		m2 = (long)l * (256 + s);
-	else
-		m2 = ((long)(l + s)<<8) - (long)l * s;
+	} else {
+		m2 = ((long)(l + s) << 8) - (long)l * s;
+	}
 
-	m1 = 512 *(long)l - m2;
+	m1 = 512 * (long)l - m2;
 
-	if (s == 0)
-		{
+	if (s == 0) {
 		rv = l;
 		gv = l;
 		bv = l;
-		}
-	else
-		{
-		s = hlsrgb_value(m1, m2, h - 256/3);
+	} else {
+		s = hlsrgb_value(m1, m2, h - 256 / 3);
 		l = hlsrgb_value(m1, m2, h);
-		h = hlsrgb_value(m1, m2, h + 256/3);
+		h = hlsrgb_value(m1, m2, h + 256 / 3);
 		bv = s;
 		gv = l;
 		rv = h;
-		}
+	}
 
 	/* scale down to VGA values */
 	rv += 2;
 	bv += 2;
 	gv += 2;
-	if (rv > 255)
+	if (rv > 255) {
 		rv = 255;
-	if (gv > 255)
+	}
+	if (gv > 255) {
 		gv = 255;
-	if (bv > 255)
+	}
+	if (bv > 255) {
 		bv = 255;
+	}
 
 	*pr = rv;
 	*pg = gv;
 	*pb = bv;
 }
 
-void rgb_to_hls(int ir, int ig, int ib, int *ph, int *pl, int *ps)
+void rgb_to_hls(int ir, int ig, int ib, int* ph, int* pl, int* ps)
 /*****************************************************************************
  * routine copped from p618 of Foley and Van Dam Fundamentals of Interactive
  * computer graphics.  Converted to integer math by Jim Kent.
  ****************************************************************************/
 {
-	SHORT max,min;
-	SHORT rc,gc,bc;
-	SHORT r,g,b;
+	SHORT max, min;
+	SHORT rc, gc, bc;
+	SHORT r, g, b;
 	SHORT hv, lv, sv;
 
 	r = ir;
@@ -123,41 +131,53 @@ void rgb_to_hls(int ir, int ig, int ib, int *ph, int *pl, int *ps)
 	b = ib;
 
 	max = r;
-	if (g>max) max = g;
-	if (b>max) max = b;
+	if (g > max) {
+		max = g;
+	}
+	if (b > max) {
+		max = b;
+	}
 	min = r;
-	if (g<min) min = g;
-	if (b<min) min = b;
-	lv = (max+min)>>1;
+	if (g < min) {
+		min = g;
+	}
+	if (b < min) {
+		min = b;
+	}
+	lv = (max + min) >> 1;
 
-	if (max == min)
-		{
+	if (max == min) {
 		hv = sv = 0;
+	} else {
+		if (lv < 128) {
+			sv = ((long)(max - min) << 8) / (max + min);
+		} else {
+			sv = ((long)(max - min) << 8) / (512 - max - min);
 		}
-	else
-		{
-		if (lv < 128)
-			sv = ((long)(max-min)<<8)/(max+min);
-		else
-			sv = ((long)(max-min)<<8)/(512-max-min);
 
-		if (sv >= 256)
+		if (sv >= 256) {
 			sv = 255;
-		rc = pj_uscale_by(256, max-r, max-min);
-		gc = pj_uscale_by(256, max-g, max-min);
-		bc = pj_uscale_by(256, max-b, max-min);
+		}
+		rc = pj_uscale_by(256, max - r, max - min);
+		gc = pj_uscale_by(256, max - g, max - min);
+		bc = pj_uscale_by(256, max - b, max - min);
 
-		if (r == max)
+		if (r == max) {
 			hv = bc - gc;
-		else if (g == max)
-			hv = 2*256 + rc - bc;
-		else
-			hv = 4*256 + gc - rc;
+		} else if (g == max) {
+			hv = 2 * 256 + rc - bc;
+		} else {
+			hv = 4 * 256 + gc - rc;
+		}
 
 		hv /= 6;
-		while (hv < 0) hv += 256;
-		while (hv >= 256) hv -= 256;
+		while (hv < 0) {
+			hv += 256;
 		}
+		while (hv >= 256) {
+			hv -= 256;
+		}
+	}
 
 	*ph = hv;
 	*pl = lv;
@@ -165,21 +185,27 @@ void rgb_to_hls(int ir, int ig, int ib, int *ph, int *pl, int *ps)
 }
 
 /* Minimal host-side color utilities for this module */
-int color_dif(const Rgb3 *c1, const Rgb3 *c2)
+int color_dif(const Rgb3* c1, const Rgb3* c2)
 {
-    int dr = (int)c1->r - (int)c2->r;
-    int dg = (int)c1->g - (int)c2->g;
-    int db = (int)c1->b - (int)c2->b;
-    return dr*dr + dg*dg + db*db;
+	int dr = (int)c1->r - (int)c2->r;
+	int dg = (int)c1->g - (int)c2->g;
+	int db = (int)c1->b - (int)c2->b;
+	return dr * dr + dg * dg + db * db;
 }
 
-int closestc(const Rgb3 *rgb, const Rgb3 *cmap, int count)
+int closestc(const Rgb3* rgb, const Rgb3* cmap, int count)
 {
-    int best = 0;
-    int bestdif = 0x7fffffff;
-    for (int i = 0; i < count; ++i) {
-        int d = color_dif(rgb, &cmap[i]);
-        if (d < bestdif) { bestdif = d; best = i; if (d == 0) break; }
-    }
-    return best;
+	int best = 0;
+	int bestdif = 0x7fffffff;
+	for (int i = 0; i < count; ++i) {
+		int d = color_dif(rgb, &cmap[i]);
+		if (d < bestdif) {
+			bestdif = d;
+			best = i;
+			if (d == 0) {
+				break;
+			}
+		}
+	}
+	return best;
 }

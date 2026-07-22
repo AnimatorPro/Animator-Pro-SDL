@@ -28,14 +28,15 @@
  *
  *  Initialise a doubly-linked list.
  */
-Errcode
-init_list(Dlheader *list)
+Errcode init_list(Dlheader* list)
 {
-	if (!pj_assert(list != NULL)) return Err_bad_input;
+	if (!pj_assert(list != NULL)) {
+		return Err_bad_input;
+	}
 
-	list->head = (Dlnode *)&(list->tail);
+	list->head = (Dlnode*)&(list->tail);
 	list->tail = NULL;
-	list->tails_prev = (Dlnode *)&(list->head);
+	list->tails_prev = (Dlnode*)&(list->head);
 
 	return Success;
 }
@@ -44,14 +45,17 @@ init_list(Dlheader *list)
  *
  *  Free a doubly-linked list, assuming the nodes are simple.
  */
-Errcode
-free_dl_list(Dlheader *list)
+Errcode free_dl_list(Dlheader* list)
 {
-	Dlnode *node;
-	Dlnode *nextnode;
+	Dlnode* node;
+	Dlnode* nextnode;
 
-	if (!pj_assert(list != NULL)) return Err_bad_input;
-	if (!pj_assert(list->tails_prev != NULL)) return Err_internal_pointer;
+	if (!pj_assert(list != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(list->tails_prev != NULL)) {
+		return Err_internal_pointer;
+	}
 
 	for (node = list->tails_prev; node->prev != NULL; node = nextnode) {
 		nextnode = node->prev;
@@ -69,12 +73,17 @@ free_dl_list(Dlheader *list)
  *
  *  Insert node into the list after lnode.
  */
-Errcode
-insert_after(Dlnode *node, Dlnode *lnode)
+Errcode insert_after(Dlnode* node, Dlnode* lnode)
 {
-	if (!pj_assert(node != NULL)) return Err_bad_input;
-	if (!pj_assert(lnode != NULL)) return Err_bad_input;
-	if (!pj_assert(lnode->next != NULL)) return Err_internal_pointer;
+	if (!pj_assert(node != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(lnode != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(lnode->next != NULL)) {
+		return Err_internal_pointer;
+	}
 
 	node->prev = lnode;
 	node->next = lnode->next;
@@ -87,12 +96,17 @@ insert_after(Dlnode *node, Dlnode *lnode)
  *
  *  Insert node into the list before lnode.
  */
-Errcode
-insert_before(Dlnode *node, Dlnode *lnode)
+Errcode insert_before(Dlnode* node, Dlnode* lnode)
 {
-	if (!pj_assert(node != NULL)) return Err_bad_input;
-	if (!pj_assert(lnode != NULL)) return Err_bad_input;
-	if (!pj_assert(lnode->prev != NULL)) return Err_internal_pointer;
+	if (!pj_assert(node != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(lnode != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(lnode->prev != NULL)) {
+		return Err_internal_pointer;
+	}
 
 	node->next = lnode;
 	node->prev = lnode->prev;
@@ -105,12 +119,17 @@ insert_before(Dlnode *node, Dlnode *lnode)
  *
  *  Remove a node from the list.
  */
-Errcode
-rem_node(Dlnode *node)
+Errcode rem_node(Dlnode* node)
 {
-	if (!pj_assert(node != NULL)) return Err_bad_input;
-	if (!pj_assert(node->next != NULL)) return Err_internal_pointer;
-	if (!pj_assert(node->prev != NULL)) return Err_internal_pointer;
+	if (!pj_assert(node != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(node->next != NULL)) {
+		return Err_internal_pointer;
+	}
+	if (!pj_assert(node->prev != NULL)) {
+		return Err_internal_pointer;
+	}
 
 	node->prev->next = node->next;
 	node->next->prev = node->prev;
@@ -131,37 +150,41 @@ rem_node(Dlnode *node)
  *
  *  Add a node to the head of the list.
  */
-Errcode
-add_head(Dlheader *list, Dlnode *node)
+Errcode add_head(Dlheader* list, Dlnode* node)
 {
-	if (!pj_assert(list != NULL)) return Err_bad_input;
+	if (!pj_assert(list != NULL)) {
+		return Err_bad_input;
+	}
 
-	return insert_after(node, (Dlnode *)&(list->head));
+	return insert_after(node, (Dlnode*)&(list->head));
 }
 
 /* Function: add_tail
  *
  *  Add a node to the tail of the list.
  */
-Errcode
-add_tail(Dlheader *list, Dlnode *node)
+Errcode add_tail(Dlheader* list, Dlnode* node)
 {
-	if (!pj_assert(list != NULL)) return Err_bad_input;
+	if (!pj_assert(list != NULL)) {
+		return Err_bad_input;
+	}
 
-	return insert_before(node, (Dlnode *)&(list->tail));
+	return insert_before(node, (Dlnode*)&(list->tail));
 }
 
 /* Function: see_head
  *
  *  Returns the head of the list.
  */
-Dlnode *
-see_head(Dlheader *list)
+Dlnode* see_head(Dlheader* list)
 {
-	if (!pj_assert(list != NULL)) return NULL;
-
-	if ((Dlnode *)&(list->head) == list->tails_prev)
+	if (!pj_assert(list != NULL)) {
 		return NULL;
+	}
+
+	if ((Dlnode*)&(list->head) == list->tails_prev) {
+		return NULL;
+	}
 
 	return list->head;
 }
@@ -170,13 +193,15 @@ see_head(Dlheader *list)
  *
  *  Returns the tail of the list.
  */
-Dlnode *
-see_tail(Dlheader *list)
+Dlnode* see_tail(Dlheader* list)
 {
-	if (!pj_assert(list != NULL)) return NULL;
-
-	if ((Dlnode *)&(list->head) == list->tails_prev)
+	if (!pj_assert(list != NULL)) {
 		return NULL;
+	}
+
+	if ((Dlnode*)&(list->head) == list->tails_prev) {
+		return NULL;
+	}
 
 	return list->tails_prev;
 }
@@ -185,14 +210,14 @@ see_tail(Dlheader *list)
  *
  *  Remove and return the head of the list.
  */
-Dlnode *
-get_head(Dlheader *list)
+Dlnode* get_head(Dlheader* list)
 {
-	Dlnode *node;
+	Dlnode* node;
 
 	node = see_head(list);
-	if (node != NULL)
+	if (node != NULL) {
 		rem_node(node);
+	}
 
 	return node;
 }
@@ -201,14 +226,14 @@ get_head(Dlheader *list)
  *
  *  Remove and return the tail of the list.
  */
-Dlnode *
-get_tail(Dlheader *list)
+Dlnode* get_tail(Dlheader* list)
 {
-	Dlnode *node;
+	Dlnode* node;
 
 	node = see_tail(list);
-	if (node != NULL)
+	if (node != NULL) {
 		rem_node(node);
+	}
 
 	return node;
 }
@@ -221,21 +246,29 @@ get_tail(Dlheader *list)
  *
  *  Appends fromlist to the head of tolist.
  */
-Errcode
-list_tohead(Dlheader *fromlist, Dlheader *tolist)
+Errcode list_tohead(Dlheader* fromlist, Dlheader* tolist)
 {
-	Dlnode *fromtail;
+	Dlnode* fromtail;
 
-	if (!pj_assert(fromlist != NULL)) return Err_bad_input;
-	if (!pj_assert(tolist != NULL)) return Err_bad_input;
-	if (!pj_assert(fromlist->head != NULL)) return Err_internal_pointer;
-	if (!pj_assert(tolist->head != NULL)) return Err_internal_pointer;
+	if (!pj_assert(fromlist != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(tolist != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(fromlist->head != NULL)) {
+		return Err_internal_pointer;
+	}
+	if (!pj_assert(tolist->head != NULL)) {
+		return Err_internal_pointer;
+	}
 
 	fromtail = see_tail(fromlist);
 
 	/* Nothing to move. */
-	if (fromtail == NULL)
+	if (fromtail == NULL) {
 		return Success;
+	}
 
 	/* Link fromtail to tohead. */
 	fromtail->next = tolist->head;
@@ -243,7 +276,7 @@ list_tohead(Dlheader *fromlist, Dlheader *tolist)
 
 	/* Link fromhead onto tolist->head. */
 	tolist->head = fromlist->head;
-	tolist->head->prev = (Dlnode *)&(tolist->head);
+	tolist->head->prev = (Dlnode*)&(tolist->head);
 
 	/* Clear fromlist. */
 	init_list(fromlist);
@@ -255,21 +288,29 @@ list_tohead(Dlheader *fromlist, Dlheader *tolist)
  *
  *  Appends fromlist to the tail of tolist.
  */
-Errcode
-list_totail(Dlheader *fromlist, Dlheader *tolist)
+Errcode list_totail(Dlheader* fromlist, Dlheader* tolist)
 {
-	Dlnode *fromhead;
+	Dlnode* fromhead;
 
-	if (!pj_assert(fromlist != NULL)) return Err_bad_input;
-	if (!pj_assert(tolist != NULL)) return Err_bad_input;
-	if (!pj_assert(fromlist->tails_prev != NULL)) return Err_internal_pointer;
-	if (!pj_assert(tolist->tails_prev != NULL)) return Err_internal_pointer;
+	if (!pj_assert(fromlist != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(tolist != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(fromlist->tails_prev != NULL)) {
+		return Err_internal_pointer;
+	}
+	if (!pj_assert(tolist->tails_prev != NULL)) {
+		return Err_internal_pointer;
+	}
 
 	fromhead = see_head(fromlist);
 
 	/* Nothing to move. */
-	if (fromhead == NULL)
+	if (fromhead == NULL) {
 		return Success;
+	}
 
 	/* Link fromhead to totail. */
 	fromhead->prev = tolist->tails_prev;
@@ -277,7 +318,7 @@ list_totail(Dlheader *fromlist, Dlheader *tolist)
 
 	/* Link fromtail to tolist->tail. */
 	tolist->tails_prev = fromlist->tails_prev;
-	tolist->tails_prev->next = (Dlnode *)&(tolist->tail);
+	tolist->tails_prev->next = (Dlnode*)&(tolist->tail);
 
 	/* Clear fromlist. */
 	init_list(fromlist);

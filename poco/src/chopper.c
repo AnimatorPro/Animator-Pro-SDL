@@ -33,9 +33,37 @@
  ****************************************************************************/
 static bool po_is_all_white(register char* buf)
 {
-	while (isspace(*buf))
+	while (isspace(*buf)) {
 		++buf;
+	}
 	return (*buf == '\0');
+}
+
+static char* po_read_source_line(File_stack* source, char* buffer, int buffer_size)
+{
+	size_t available;
+	size_t copy_length;
+	const char* newline;
+
+	if (!(source->flags & FSF_ISBUFFER)) {
+		return fgets(buffer, buffer_size, source->source.file);
+	}
+	if (source->source.buffer.position >= source->source.buffer.length) {
+		return NULL;
+	}
+
+	available = source->source.buffer.length - source->source.buffer.position;
+	copy_length = available < (size_t)(buffer_size - 1) ? available : (size_t)(buffer_size - 1);
+	newline =
+		memchr(source->source.buffer.data + source->source.buffer.position, '\n', copy_length);
+	if (newline != NULL) {
+		copy_length =
+			(size_t)(newline - (source->source.buffer.data + source->source.buffer.position)) + 1;
+	}
+	memcpy(buffer, source->source.buffer.data + source->source.buffer.position, copy_length);
+	buffer[copy_length] = '\0';
+	source->source.buffer.position += copy_length;
+	return buffer;
 }
 
 /*****************************************************************************
@@ -43,16 +71,16 @@ static bool po_is_all_white(register char* buf)
  ****************************************************************************/
 char* po_get_csource_line(Poco_cb* pcb)
 {
-	bool splice	   = false;			/* Are we splicing lines?		*/
-	bool mlcomment  = false;			/* Are we doing ml comment? 	*/
-	int buflen		   = SZTOKE - 1;	/* Max logical line size.		*/
-	int icount		   = 0;				/* Significant character counter*/
-	Token* t		   = &pcb->t;		/* -> Token struct in pcb		*/
+	bool splice = false;                /* Are we splicing lines?		*/
+	bool mlcomment = false;             /* Are we doing ml comment? 	*/
+	int buflen = SZTOKE - 1;            /* Max logical line size.		*/
+	int icount = 0;                     /* Significant character counter*/
+	Token* t = &pcb->t;                 /* -> Token struct in pcb		*/
 	File_stack* fstack = t->file_stack; /* -> File_stack struct in pcb	*/
-	char* lbuf		   = t->line_b1;	/* -> Line buffer in Token		*/
-	char* buf		   = lbuf;			/* -> Cur I/O location in buf	*/
-	char* subbuf;						/* -> Cur scan location in buf	*/
-	char* endcomment;					/* -> End of inline comment 	*/
+	char* lbuf = t->line_b1;            /* -> Line buffer in Token		*/
+	char* buf = lbuf;                   /* -> Cur I/O location in buf	*/
+	char* subbuf;                       /* -> Cur scan location in buf	*/
+	char* endcomment;                   /* -> End of inline comment 	*/
 	char c;
 
 	t->line_buf = lbuf; /* So that errors can display the current line	*/
@@ -73,7 +101,6 @@ char* po_get_csource_line(Poco_cb* pcb)
 	 *--------------------------------------------------------------------------*/
 
 	do {
-
 		/*------------------------------------------------------------------------
 		 * Loop to splice together physical lines that are related.
 		 *	If the outer level loop has set the 'mlcomment' (multi-line comment)
@@ -86,13 +113,12 @@ char* po_get_csource_line(Poco_cb* pcb)
 		icount = 0;
 
 		do {
-
-			if (NULL == fgets(buf + icount, buflen - icount, fstack->source.file)) {
-				if (mlcomment) /* EOF in multi-line comment */
+			if (NULL == po_read_source_line(fstack, buf + icount, buflen - icount)) {
+				if (mlcomment) { /* EOF in multi-line comment */
 					po_say_fatal(pcb, "EOF in comment");
-				else if (splice) /* EOF instead of continuation */
+				} else if (splice) { /* EOF instead of continuation */
 					po_expecting_got_str(pcb, "EOF", "continuation line");
-				else /* Normal EOF */
+				} else /* Normal EOF */
 				{
 					lbuf = NULL;
 					goto NORMAL_EXIT;
@@ -100,41 +126,43 @@ char* po_get_csource_line(Poco_cb* pcb)
 				PO_CHECK_ABORT(pcb, NULL);
 			} else /* Not EOF, we got a line....	*/
 			{
-
 				pcb->error_line_number = ++fstack->line_count; /* Count the line*/
 
 				icount = strlen(buf) - 1; /* Size of string, less \n char.*/
 
 				if ('\n' == buf[icount]) /* If the last char is a \n,    */
-				{						 /* truncate at the \n; count has*/
-					buf[icount] = '\0';	 /* already been adjusted above. */
+				{                        /* truncate at the \n; count has*/
+					buf[icount] = '\0';  /* already been adjusted above. */
 				} else {
-					if (buflen == 2 + icount)				/* If there is no \n at */
-					{										/* EOL, check for buffer*/
+					if (buflen == 2 + icount)               /* If there is no \n at */
+					{                                       /* EOL, check for buffer*/
 						po_say_fatal(pcb, "line too long"); /* overflow. If not  */
-					PO_CHECK_ABORT(pcb, NULL);
-					}										/* it means last line	*/
-					++icount;								/* has no CRLF; adjust	*/
-				}											/* the count to match.	*/
+						PO_CHECK_ABORT(pcb, NULL);
+					} /* it means last line	*/
+					++icount; /* has no CRLF; adjust	*/
+				} /* the count to match.	*/
 
-				if (icount == 0)
+				if (icount == 0) {
 					continue; /* Empty line-try again.*/
+				}
 
 				if (mlcomment) /* If doing multi-line comment	*/
 				{
 					if (NULL == strstr(buf, "*/")) {
 						icount = 0; /* no significant chars on line */
-						continue;	/* No delim, read next physline */
-					} else
+						continue;   /* No delim, read next physline */
+					} else {
 						mlcomment = false; /* Found delim, end of ml state */
+					}
 				}
 
 				if ('\\' == buf[icount - 1]) /* If the last char on the line */
-				{							 /* is a backslash, splice the	*/
-					--icount;				 /* next physical line onto this */
-					splice = true;			 /* line, overlaying the \ char. */
-				} else
+				{                            /* is a backslash, splice the	*/
+					--icount;                /* next physical line onto this */
+					splice = true;           /* line, overlaying the \ char. */
+				} else {
 					splice = false;
+				}
 			}
 
 		} while (splice || mlcomment || icount == 0);
@@ -145,7 +173,6 @@ char* po_get_csource_line(Poco_cb* pcb)
 
 		subbuf = lbuf;
 		while (NULL != (subbuf = po_cmatch_scan(subbuf))) {
-
 			/*--------------------------------------------------------------------
 			 * Handle quotes --
 			 *	 We have to ignore everything inside the quotes, so we scan for
@@ -199,14 +226,14 @@ char* po_get_csource_line(Poco_cb* pcb)
 
 						subbuf += 2;
 						if (NULL == (endcomment = strstr(subbuf, "*/"))) {
-							*subbuf = '\0';		   /* We have a multi-line     */
+							*subbuf = '\0';        /* We have a multi-line     */
 							buflen -= strlen(buf); /* comment, set up to splice*/
-							buf		  = subbuf;	   /* more physical lines onto */
-							mlcomment = true;	   /* current logical line.	*/
+							buf = subbuf;          /* more physical lines onto */
+							mlcomment = true;      /* current logical line.	*/
 							goto ENDLOOP;
 						} else {
 							subbuf -= 2;
-							*(++endcomment) = ' ';		/* In-line comment, */
+							*(++endcomment) = ' ';      /* In-line comment, */
 							strcpy(subbuf, endcomment); /* replace w/space. */
 						}
 						break;
@@ -221,7 +248,7 @@ char* po_get_csource_line(Poco_cb* pcb)
 			} /* END handling for a slash character */
 
 		} /* END while slash or quote found in buffer */
-	ENDLOOP:;
+ENDLOOP:;
 	} while (true == mlcomment || NULL == po_skip_space(buf = lbuf));
 
 #ifdef DEBUG_JGETS
@@ -242,13 +269,16 @@ char* po_skip_space(register char* line)
 {
 	register char c;
 
-	if (!line)
+	if (!line) {
 		return (NULL);
+	}
 	for (;;) {
-		if (0 == (c = *line++))
+		if (0 == (c = *line++)) {
 			return (NULL);
-		if (!isspace(c))
+		}
+		if (!isspace(c)) {
 			break;
+		}
 	}
 	return (--line);
 }
@@ -261,10 +291,12 @@ char* po_chop_to(char* line, char* word, char letter)
 	register char c;
 
 	for (;;) {
-		if (0 == (c = *line++))
+		if (0 == (c = *line++)) {
 			break;
-		if (c == letter)
+		}
+		if (c == letter) {
 			break;
+		}
 		*word++ = c;
 	}
 	*word = '\0';

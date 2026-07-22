@@ -3,7 +3,7 @@
 
 Errcode jerr = Success;
 
-extern Errcode pj_close(Jfile f); // from syslib.c
+extern Errcode pj_close(Jfile f);  // from syslib.c
 
 Errcode pj_ioerr()
 {
@@ -32,4 +32,3 @@ error:
 	pj_close(tf);
 	return NULL;
 }
-

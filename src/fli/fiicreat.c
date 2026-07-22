@@ -16,7 +16,7 @@ Errcode pj_i_create(char* path, Flifile* flif)
 	flif->hdr.id.create_time = flif->hdr.id.update_time;
 	flif->hdr.id.create_user = flif->hdr.id.update_user;
 	flif->hdr.aspect_dx = flif->hdr.aspect_dy = 1; /* default value */
-	flif->hdr.bits_a_pixel					  = 8;
+	flif->hdr.bits_a_pixel = 8;
 
 	err = pj_i_flush_head(flif);
 	if (err < Success) {

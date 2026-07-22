@@ -23,7 +23,7 @@ extern char po_current_program_path[]; /* defined in qpoco.c */
  ****************************************************************************/
 static int po_dir_list(Popot* ppdest, char* pat, int get_dirs)
 {
-	//!TODO: Implement directory listing
+	//! TODO: Implement directory listing
 	(void)ppdest;
 	(void)pat;
 	(void)get_dirs;
@@ -37,13 +37,11 @@ static int po_dir_list(Popot* ppdest, char* pat, int get_dirs)
  ****************************************************************************/
 static void po_free_dir_list(Popot* list)
 {
-	if (list == NULL)
-	{
+	if (list == NULL) {
 		builtin_err = Err_null_ref;
 		return;
 	}
-	if (list->pt != NULL)
-	{
+	if (list->pt != NULL) {
 		pj_free(list->pt);
 		list->pt = list->min = list->max = NULL;
 	}
@@ -54,8 +52,7 @@ static void po_free_dir_list(Popot* list)
  ****************************************************************************/
 static Errcode po_get_dir(char* dir)
 {
-	if (dir == NULL)
-	{
+	if (dir == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 	return get_dir(dir);
@@ -66,8 +63,7 @@ static Errcode po_get_dir(char* dir)
  ****************************************************************************/
 static void po_get_resource_dir(char* dir)
 {
-	if (dir == NULL)
-	{
+	if (dir == NULL) {
 		builtin_err = Err_null_ref;
 		return;
 	}
@@ -79,9 +75,8 @@ static void po_get_resource_dir(char* dir)
  ****************************************************************************/
 static Errcode po_set_dir(char* dir)
 {
-	//!TODO: Implement SetDir
-	if (dir == NULL)
-	{
+	//! TODO: Implement SetDir
+	if (dir == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 	// return change_dir(dir);
@@ -93,8 +88,7 @@ static Errcode po_set_dir(char* dir)
  ****************************************************************************/
 static Errcode po_delete(char* name)
 {
-	if (name == NULL)
-	{
+	if (name == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 	return pj_delete(name);
@@ -105,8 +99,7 @@ static Errcode po_delete(char* name)
  ****************************************************************************/
 static Errcode po_rename(char* oldname, char* newname)
 {
-	if (oldname == NULL || newname == NULL)
-	{
+	if (oldname == NULL || newname == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 	return pj_rename(oldname, newname);
@@ -119,8 +112,7 @@ static Errcode po_dos_copy(char* source, char* dest)
 {
 	char* errfile;
 
-	if (source == NULL || dest == NULL)
-	{
+	if (source == NULL || dest == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 	return pj_cpfile(source, dest, &errfile);
@@ -131,8 +123,7 @@ static Errcode po_dos_copy(char* source, char* dest)
  ****************************************************************************/
 static bool po_exists(char* name)
 {
-	if (name == NULL)
-	{
+	if (name == NULL) {
 		builtin_err = Err_null_ref;
 		return false;
 	}
@@ -144,8 +135,7 @@ static bool po_exists(char* name)
  ****************************************************************************/
 static Errcode po_fnsplit(char* path, char* device, char* dir, char* file, char* suffix)
 {
-	if (path == NULL || device == NULL || dir == NULL || file == NULL || suffix == NULL)
-	{
+	if (path == NULL || device == NULL || dir == NULL || file == NULL || suffix == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 	return fnsplit(path, device, dir, file, suffix);
@@ -162,14 +152,12 @@ static Errcode po_fnmerge(char* path, char* device, char* dir, char* file, char*
 	char* file_str = file ? file : "";
 	char* suf_str = suffix ? suffix : "";
 
-	if (path == NULL)
-	{
+	if (path == NULL) {
 		return builtin_err = Err_null_ref;
 	}
 
 	total_len = strlen(dev_str) + strlen(dir_str) + strlen(file_str) + strlen(suf_str);
-	if (total_len >= PATH_SIZE)
-	{
+	if (total_len >= PATH_SIZE) {
 		return Err_dir_too_long;
 	}
 
@@ -185,8 +173,7 @@ static Errcode po_fnmerge(char* path, char* device, char* dir, char* file, char*
  ****************************************************************************/
 static void po_get_program_dir(char* dir)
 {
-	if (dir == NULL)
-	{
+	if (dir == NULL) {
 		builtin_err = Err_null_ref;
 		return;
 	}

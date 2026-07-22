@@ -1,0 +1,14 @@
+int shared_value = 4;
+int init_order = 1;
+
+static int helper(void)
+{
+	return 3;
+}
+
+int second(void);
+
+int main(void)
+{
+	return second() + helper() + init_order;
+}

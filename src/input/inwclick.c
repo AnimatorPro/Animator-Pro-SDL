@@ -2,5 +2,5 @@
 
 void wait_click(void)
 {
-	wait_input(KEYHIT|MBRIGHT|MBPEN);
+	wait_input(KEYHIT | MBRIGHT | MBPEN);
 }

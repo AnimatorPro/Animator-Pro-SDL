@@ -6,17 +6,17 @@
 
 #include "poco_errcodes.h"
 
-void *poco_port_malloc(size_t size);
-void *poco_port_zalloc(size_t size);
-void poco_port_free(void *pointer);
-void poco_port_gentle_free(void *pointer);
-void poco_port_freez(void *pointer_to_pointer);
+void* poco_port_malloc(size_t size);
+void* poco_port_zalloc(size_t size);
+void poco_port_free(void* pointer);
+void poco_port_gentle_free(void* pointer);
+void poco_port_freez(void* pointer_to_pointer);
 
-int poco_port_delete(const char *name);
+int poco_port_delete(const char* name);
 Errcode poco_port_ioerr(void);
 
-void poco_port_upc(char *text);
-char *poco_port_clone_string(const char *text);
+void poco_port_upc(char* text);
+char* poco_port_clone_string(const char* text);
 
 void poco_port_init_stdfiles(void);
 void poco_port_cleanup_lfiles(void);

@@ -11,7 +11,7 @@
 #include "memory.h"
 #include "rcel.h"
 
-void copy_fhead_common(Fli_head *sh, Fli_head *dh)
+void copy_fhead_common(Fli_head* sh, Fli_head* dh)
 {
 	/* copys all but magic, filesize, or user lock fields between
 	 * two fli headers */
@@ -19,7 +19,7 @@ void copy_fhead_common(Fli_head *sh, Fli_head *dh)
 			 FLIH_COMMONSIZE - sizeof(Chunk_id));
 }
 
-Errcode update_flx_path(Flxfile *flx, Fli_id *flid, char *fliname)
+Errcode update_flx_path(Flxfile* flx, Fli_id* flid, char* fliname)
 {
 	Errcode err;
 	Flipath fp;
@@ -32,7 +32,7 @@ Errcode update_flx_path(Flxfile *flx, Fli_id *flid, char *fliname)
 	return xffwriteoset(flx->xf, &fp, flx->hdr.path_oset, fp.id.size);
 }
 
-Errcode read_flx_path(Flxfile *flx, Flipath *fp)
+Errcode read_flx_path(Flxfile* flx, Flipath* fp)
 {
 	Errcode err;
 
@@ -45,21 +45,21 @@ Errcode read_flx_path(Flxfile *flx, Flipath *fp)
 }
 
 /* this will always leave file position at end of header and path record */
-Errcode create_flxfile(char *path, Flxfile *flx)
+Errcode create_flxfile(char* path, Flxfile* flx)
 {
 	clear_mem(flx, sizeof(*flx));
 	flx->hdr.type = FLIX_MAGIC;
 	flx->comp_type = pj_fli_comp_ani;
-	return (pj_i_create(path, (Flifile *)flx));
+	return (pj_i_create(path, (Flifile*)flx));
 }
 
 /* returns offset to first frame chunk in flix */
-LONG flx_data_offset(Flxfile *flx)
+LONG flx_data_offset(Flxfile* flx)
 {
 	return flx->hdr.index_oset + (long)sizeof(Flx) * flx->hdr.frames_in_table;
 }
 
-static Errcode flx_write_error(Errcode err, char *name)
+static Errcode flx_write_error(Errcode err, char* name)
 {
 	if (name) {
 		err = softerr(err, "!%s", "tflx_write1", name);
@@ -69,11 +69,11 @@ static Errcode flx_write_error(Errcode err, char *name)
 
 /* assumes this is the next record in the tempflx during serial creation
  * and previous record was written using this */
-static Errcode write_flxframe(Flxfile *flxf, char *name, void *frame)
+static Errcode write_flxframe(Flxfile* flxf, char* name, void* frame)
 {
 	Errcode err;
-	Flx *flx;
-	LONG size = ((Fli_frame *)frame)->size;
+	Flx* flx;
+	LONG size = ((Fli_frame*)frame)->size;
 
 	if (flxf->hdr.frame_count >= flxf->hdr.frames_in_table) {
 		err = Err_too_many_frames;
@@ -102,15 +102,15 @@ error:
 	return flx_write_error(err, name);
 }
 
-static Errcode flx_save_frame(char *name, /* name for error report, if NULL no report */
-							  Flxfile *flxf, void *comp_buf, Rcel *last_screen, Rcel *this_screen,
+static Errcode flx_save_frame(char* name, /* name for error report, if NULL no report */
+							  Flxfile* flxf, void* comp_buf, Rcel* last_screen, Rcel* this_screen,
 							  SHORT type)
 {
 	pj_fli_comp_cel(comp_buf, last_screen, this_screen, type, flxf->comp_type);
 	return write_flxframe(flxf, name, comp_buf);
 }
 
-static void frame1_prep(Flxfile *flxf, char *name)
+static void frame1_prep(Flxfile* flxf, char* name)
 {
 	(void)name;
 
@@ -121,42 +121,42 @@ static void frame1_prep(Flxfile *flxf, char *name)
 
 /* writes first frame of a fli assuming the output file is positioned to
  * the first frame position */
-Errcode write_first_flxframe(char *name, /* name for error reporting if NULL no reports */
-							 Flxfile *flxf, void *cbuf, Rcel *frame1)
+Errcode write_first_flxframe(char* name, /* name for error reporting if NULL no reports */
+							 Flxfile* flxf, void* cbuf, Rcel* frame1)
 {
 	frame1_prep(flxf, name);
 	return flx_save_frame(name, flxf, cbuf, NULL, frame1, COMP_FIRST_FRAME);
 }
 
 /* writes frame that is already compressed in Fli_frame */
-Errcode write_first_flxchunk(char *name, /* name for error reporting if NULL no reports */
-							 Flxfile *flxf, Fli_frame *frame)
+Errcode write_first_flxchunk(char* name, /* name for error reporting if NULL no reports */
+							 Flxfile* flxf, Fli_frame* frame)
 {
 	frame1_prep(flxf, name);
 	return write_flxframe(flxf, name, frame);
 }
 
-Errcode write_next_flxframe(char *name, /* name for error reporting if NULL no reports */
-							Flxfile *flxf, void *cbuf, Rcel *last_screen, Rcel *this_screen)
+Errcode write_next_flxframe(char* name, /* name for error reporting if NULL no reports */
+							Flxfile* flxf, void* cbuf, Rcel* last_screen, Rcel* this_screen)
 {
 	return flx_save_frame(name, flxf, cbuf, last_screen, this_screen, COMP_DELTA_FRAME);
 }
 
 /* writes frame that is already compressed in Fli_frame */
-Errcode write_next_flxchunk(char *name, /* name for error reporting if NULL no reports */
-							Flxfile *flxf, Fli_frame *frame)
+Errcode write_next_flxchunk(char* name, /* name for error reporting if NULL no reports */
+							Flxfile* flxf, Fli_frame* frame)
 {
 	return (write_flxframe(flxf, name, frame));
 }
 
-static Errcode write_flx_finish(Flxfile *flxf)
+static Errcode write_flx_finish(Flxfile* flxf)
 {
 	return flush_flx_hidx(flxf);
 }
 
 /* writes final ring frame of a fli file sets size and flushes the header */
-Errcode write_ring_flxframe(char *name, /* name for error reporting if NULL no reports */
-							Flxfile *flxf, void *cbuf, Rcel *last_screen, Rcel *first_screen)
+Errcode write_ring_flxframe(char* name, /* name for error reporting if NULL no reports */
+							Flxfile* flxf, void* cbuf, Rcel* last_screen, Rcel* first_screen)
 {
 	Errcode err;
 	int ocount;
@@ -175,8 +175,8 @@ error:
 }
 
 /* writes frame that is already compressed in Fli_frame */
-Errcode write_ring_flxchunk(char *name, /* name for error reporting if NULL no reports */
-							Flxfile *flxf, Fli_frame *frame)
+Errcode write_ring_flxchunk(char* name, /* name for error reporting if NULL no reports */
+							Flxfile* flxf, Fli_frame* frame)
 {
 	Errcode err;
 	int ocount;
@@ -196,12 +196,12 @@ error:
 }
 
 /* writes a first frame as a black frame for blank flis includes colors */
-Errcode write_first_flxblack(char *name, Flxfile *flxf, Rcel *screen)
+Errcode write_first_flxblack(char* name, Flxfile* flxf, Rcel* screen)
 {
-	void *cbuf;
+	void* cbuf;
 	Errcode err;
 
-	err = pj_fli_alloc_cbuf((void *)&cbuf, 16, 16, screen->cmap->num_colors);
+	err = pj_fli_alloc_cbuf((void*)&cbuf, 16, 16, screen->cmap->num_colors);
 	if (err < 0) {
 		goto error;
 	}
@@ -213,9 +213,9 @@ error:
 }
 
 /* writes a no change frame as next frame for blank flis */
-Errcode write_next_flxempty(char *name, Flxfile *flxf, int num_emptys)
+Errcode write_next_flxempty(char* name, Flxfile* flxf, int num_emptys)
 {
-	Flx *flx;
+	Flx* flx;
 
 	if (flxf->hdr.frame_count >= flxf->hdr.frames_in_table) {
 		return flx_write_error(Err_too_many_frames, name);
@@ -227,7 +227,7 @@ Errcode write_next_flxempty(char *name, Flxfile *flxf, int num_emptys)
 	return Success;
 }
 
-Errcode write_ring_flxempty(char *name, Flxfile *flxf)
+Errcode write_ring_flxempty(char* name, Flxfile* flxf)
 {
 	Fli_frame frame;
 	(void)name;

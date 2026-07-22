@@ -16,4 +16,4 @@ static bool po_tween_exists(void);
 static void po_tween_clear_links(void);
 #endif
 
-#endif // ANIMATOR_PRO_POCO_TWEEN_H
+#endif  // ANIMATOR_PRO_POCO_TWEEN_H

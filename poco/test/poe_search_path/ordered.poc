@@ -1,0 +1,6 @@
+#pragma poco library "ordered.poe"
+
+main()
+{
+	return SearchPathValue();
+}

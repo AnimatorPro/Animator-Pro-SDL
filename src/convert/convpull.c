@@ -18,8 +18,8 @@ void about_converter(void)
 	char relnum[16];
 
 	get_relvers(relnum);
-	soft_continu_box("!%s%s%.3s%.2s%.4s%.5s","conv_about", relnum,
-					"", &date[0], &date[4], &date[7], __TIME__ );
+	soft_continu_box("!%s%s%.3s%.2s%.4s%.5s", "conv_about", relnum, "", &date[0], &date[4],
+					 &date[7], __TIME__);
 }
 
 extern long largest_frag();
@@ -31,10 +31,9 @@ void qconvert_memory()
  *
  ****************************************************************************/
 {
-	soft_continu_box("!%ld%ld%ld%s%d%d%d", "conv_status",
-		mem_free, init_mem_free, largest_frag(),
-		(cs.ifi.cel == NULL ? empty_str : cs.in_name),
-		cs.ifi.ai.width, cs.ifi.ai.height, cs.ifi.ai.num_frames);
+	soft_continu_box("!%ld%ld%ld%s%d%d%d", "conv_status", mem_free, init_mem_free, largest_frag(),
+					 (cs.ifi.cel == NULL ? empty_str : cs.in_name), cs.ifi.ai.width,
+					 cs.ifi.ai.height, cs.ifi.ai.num_frames);
 }
 
 static void conv_st_pic()
@@ -42,18 +41,17 @@ static void conv_st_pic()
  *
  ****************************************************************************/
 {
-	switch (soft_qchoice(NULL, "conv_st_pics"))
-		{
-		case 0: 	/* Load Neochrome */
+	switch (soft_qchoice(NULL, "conv_st_pics")) {
+		case 0: /* Load Neochrome */
 			get_a_flic("neo.pdr", NULL, NULL);
 			break;
-		case 1: 	/* Load Degas */
+		case 1: /* Load Degas */
 			get_a_flic("degas.pdr", NULL, ".PI?");
 			break;
-		case 2: 	/* Load Degas Elite */
+		case 2: /* Load Degas Elite */
 			get_a_flic("degas.pdr", NULL, ".PC?");
 			break;
-		}
+	}
 }
 
 void conv_amiga_flic()
@@ -61,15 +59,14 @@ void conv_amiga_flic()
  *
  ****************************************************************************/
 {
-	switch (soft_qchoice(NULL, "conv_amiga_flic"))
-		{
+	switch (soft_qchoice(NULL, "conv_amiga_flic")) {
 		case 0:
 			get_a_flic("rif.pdr", NULL, NULL);
 			break;
 		case 1:
 			get_a_flic("anim.pdr", NULL, NULL);
 			break;
-		}
+	}
 }
 
 static void qwindow_size()
@@ -80,13 +77,12 @@ static void qwindow_size()
 	SHORT width = vb.pencel->width;
 	SHORT height = vb.pencel->height;
 
-	switch (soft_qchoice(NULL, "!%d%d", "conv_window", width, height))
-		{
-		case 0: 	/* full screen */
+	switch (soft_qchoice(NULL, "!%d%d", "conv_window", width, height)) {
+		case 0: /* full screen */
 			width = vb.screen->wndo.width;
 			height = vb.screen->wndo.height;
 			break;
-		case 1: 	/* image size */
+		case 1: /* image size */
 			width = cs.ifi.ai.width;
 			height = cs.ifi.ai.height;
 			break;
@@ -110,32 +106,31 @@ static void qwindow_size()
 			width = 1024;
 			height = 768;
 			break;
-		case 7: 	/* custom */
-			if (clip_soft_qreq_number(&width, 4, 10000, NULL, NULL,
-									  "conv_window_width"))
-				clip_soft_qreq_number(&height, 4, 10000, NULL, NULL,
-									  "conv_window_height");
+		case 7: /* custom */
+			if (clip_soft_qreq_number(&width, 4, 10000, NULL, NULL, "conv_window_width")) {
+				clip_soft_qreq_number(&height, 4, 10000, NULL, NULL, "conv_window_height");
+			}
 			break;
 		default:
 			return;
-		}
+	}
 	conv_set_pencel(width, height);
 }
 
 static void qquit_convert()
 {
-if(soft_yes_no_box("conv_quit"))
-	return_to_main(MRET_QUIT);
+	if (soft_yes_no_box("conv_quit")) {
+		return_to_main(MRET_QUIT);
+	}
 }
 
-static void convert_selit(Menuhdr *mh, SHORT hitid)
+static void convert_selit(Menuhdr* mh, SHORT hitid)
 /*****************************************************************************
  *
  ****************************************************************************/
 {
 	hide_mp();
-	switch(hitid)
-	{
+	switch (hitid) {
 		case CON_ABO: /* about */
 			about_converter();
 			break;
@@ -170,13 +165,12 @@ static void convert_selit(Menuhdr *mh, SHORT hitid)
 			view_flic();
 			break;
 		case FLI_OLD: /* save old flic */
-			save_a_flic(flilores_pdr_name, NULL, cs.ifi.ai.num_frames,
-						conv_seek);
+			save_a_flic(flilores_pdr_name, NULL, cs.ifi.ai.num_frames, conv_seek);
 			break;
 		case FLI_SAV: /* save PJ style flic */
 			save_a_flic(fli_pdr_name, NULL, cs.ifi.ai.num_frames, conv_seek);
 			break;
-		case FLI_SOT:	/* save other flic */
+		case FLI_SOT: /* save other flic */
 			save_other();
 			break;
 		case PIC_TAR: /* load targa pic */
@@ -203,22 +197,22 @@ static void convert_selit(Menuhdr *mh, SHORT hitid)
 		case PIC_TIF: /* load tiff */
 			get_a_flic("tiff.pdr", NULL, NULL);
 			break;
-		case PIC_VIE:	/* view */
+		case PIC_VIE: /* view */
 			view_pic();
 			break;
-		case PIC_SAG:	/* save GIF */
+		case PIC_SAG: /* save GIF */
 			save_a_pic(gif_pdr_name);
 			break;
-		case PIC_SAP:	/* save PCX */
+		case PIC_SAP: /* save PCX */
 			save_a_pic("pcx.pdr");
 			break;
-		case PIC_SAT:	/* save tiff */
+		case PIC_SAT: /* save tiff */
 			save_a_pic("tiff.pdr");
 			break;
-		case PIC_STA:	/* save targa */
+		case PIC_STA: /* save targa */
 			save_a_pic("targa.pdr");
 			break;
-		case PIC_SBM:	/* save bmp */
+		case PIC_SBM: /* save bmp */
 			save_a_pic("bmp.pdr");
 			break;
 		case EXT_SCR: /* screen size */
@@ -235,47 +229,34 @@ static void convert_selit(Menuhdr *mh, SHORT hitid)
 	show_mp();
 }
 
-static int conv_dopull(Menuhdr *mh)
+static int conv_dopull(Menuhdr* mh)
 /*****************************************************************************
  *
  ****************************************************************************/
 {
-	static SHORT nocel_pulltab[] =
-		{
-		CON_SCA,
-		CON_MOV,
-		CON_SLI,
-		FLI_OLD,
-		FLI_SOT,
-		FLI_SAV,
-		FLI_VIE,
-		PIC_VIE,
-		PIC_SAG,
-		PIC_SAP,
-		PIC_SAT,
-		PIC_STA,
-		PIC_SBM,
-		};
+	static SHORT nocel_pulltab[] = {
+		CON_SCA, CON_MOV, CON_SLI, FLI_OLD, FLI_SOT, FLI_SAV, FLI_VIE,
+		PIC_VIE, PIC_SAG, PIC_SAP, PIC_SAT, PIC_STA, PIC_SBM,
+	};
 	Boolean nocel = (cs.ifi.cel == NULL);
 
 	pul_xflag(mh, EXT_TIL, !cs.no_tile);
-	set_pultab_disable(mh, nocel_pulltab, Array_els(nocel_pulltab),
-		nocel);
-	return(menu_dopull(mh));
+	set_pultab_disable(mh, nocel_pulltab, Array_els(nocel_pulltab), nocel);
+	return (menu_dopull(mh));
 }
 
 Boolean convert_do_keys()
 {
-	if(!JSTHIT(KEYHIT))
-		return(FALSE);
-	switch(tolower((UBYTE)icb.inkey))
-	{
+	if (!JSTHIT(KEYHIT)) {
+		return (FALSE);
+	}
+	switch (tolower((UBYTE)icb.inkey)) {
 		case ESCKEY:
 		case 'q':
 			qquit_convert();
-			return(TRUE);
+			return (TRUE);
 	}
-	return(FALSE);
+	return (FALSE);
 }
 
 Errcode go_converter(void)
@@ -286,13 +267,10 @@ Errcode go_converter(void)
 	Errcode err;
 	Menuhdr tpull;
 
-		if ((err = load_soft_pull(&tpull, 0, "conv_pull", 0,
-								  convert_selit, conv_dopull)) >= Success)
-		{
-			err = do_menuloop(vb.screen,NULL,NULL,&tpull,convert_do_keys);
-			smu_free_pull(&tpull);
-		}
-		err = softerr(err,"conv_pull");
-		return(err);
+	if ((err = load_soft_pull(&tpull, 0, "conv_pull", 0, convert_selit, conv_dopull)) >= Success) {
+		err = do_menuloop(vb.screen, NULL, NULL, &tpull, convert_do_keys);
+		smu_free_pull(&tpull);
+	}
+	err = softerr(err, "conv_pull");
+	return (err);
 }
-

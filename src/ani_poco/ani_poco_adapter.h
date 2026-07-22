@@ -11,15 +11,15 @@
 #include <poco/poco.h>
 
 /* Install every Animator-owned binding category into an otherwise empty VM. */
-PocoStatus ani_poco_register_libraries(PocoVm *vm);
+PocoStatus ani_poco_register_libraries(PocoVm* vm);
 
 /* Write the Animator binding prototypes shown by the Poco-program menu. */
-PocoStatus ani_poco_write_library_list(const char *filename);
+PocoStatus ani_poco_write_library_list(const char* filename);
 
 /* Write the ordered Animator library categories used for baseline audits. */
-PocoStatus ani_poco_write_library_inventory(const char *filename);
+PocoStatus ani_poco_write_library_inventory(const char* filename);
 
 /* Enable the Animator-only fallback needed by retained native POE modules. */
-void ani_poco_configure_legacy_poe(PocoVmOptions *options);
+void ani_poco_configure_legacy_poe(PocoVmOptions* options);
 
 #endif /* ANI_POCO_ADAPTER_H */

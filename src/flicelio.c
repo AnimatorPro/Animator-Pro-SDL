@@ -643,8 +643,7 @@ static Errcode load_pic_fcel(char* pdr_name, Anim_info* ainfo, char* picpath, ch
 	}
 
 	err = make1_flicel(tempname, celfli_name, pfcel, rc);
-	if (err < Success)
-	{
+	if (err < Success) {
 		goto error;
 	}
 
@@ -715,7 +714,7 @@ Errcode go_load_the_cel(void)
 	char sph_buf[50];
 
 	if (thecel == NULL) {
-        fprintf(stderr, "Attempted to save NULL 'thecel'.\n");
+		fprintf(stderr, "Attempted to save NULL 'thecel'.\n");
 		return Err_bad_address;
 	}
 
@@ -934,7 +933,7 @@ void qsave_the_cel(void)
 	char sph_buf[50];
 
 	if (thecel == NULL) {
-                xfprintf(xstderr, "Attempted to save NULL 'thecel'.\n");
+		xfprintf(xstderr, "Attempted to save NULL 'thecel'.\n");
 		return;
 	}
 

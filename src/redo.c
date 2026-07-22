@@ -16,7 +16,7 @@
 #include "zoom.h"
 
 /* stuff to deal with redo-draw */
-static XFILE *rbf;
+static XFILE* rbf;
 
 Errcode start_save_redo_points(void)
 {
@@ -36,7 +36,7 @@ void end_save_redo_points(void)
 	}
 }
 
-Errcode save_redo_point(Pos_p *p)
+Errcode save_redo_point(Pos_p* p)
 {
 	if (xfwrite(p, 1, sizeof(*p), rbf) < sizeof(*p)) {
 		return softerr(xerrno(), "redo_points");
@@ -44,7 +44,7 @@ Errcode save_redo_point(Pos_p *p)
 	return Success;
 }
 
-Errcode save_spray_redo(Spray_redo *sr)
+Errcode save_spray_redo(Spray_redo* sr)
 {
 	if (xfwrite(sr, 1, sizeof(*sr), rbf) < sizeof(*sr)) {
 		return softerr(xerrno(), "redo_points");
@@ -52,7 +52,7 @@ Errcode save_spray_redo(Spray_redo *sr)
 	return Success;
 }
 
-bool get_spray_redo(Spray_redo *sr)
+bool get_spray_redo(Spray_redo* sr)
 {
 	return xfread(sr, 1, sizeof(*sr), rbf) == sizeof(*sr);
 }
@@ -76,9 +76,9 @@ Errcode save_redo_spray(void)
 	return Success;
 }
 
-static Errcode redo_draw_get_pos(Pos_p *p, void *xfile, SHORT mode)
+static Errcode redo_draw_get_pos(Pos_p* p, void* xfile, SHORT mode)
 {
-	XFILE *f = xfile;
+	XFILE* f = xfile;
 	Errcode err;
 	(void)mode;
 
@@ -92,7 +92,7 @@ static Errcode redo_draw_get_pos(Pos_p *p, void *xfile, SHORT mode)
 	return Success + 1; /* no more left, but not error */
 }
 
-static Errcode redo_draw(Redo_rec *r)
+static Errcode redo_draw(Redo_rec* r)
 {
 	Errcode err;
 
@@ -109,7 +109,7 @@ static Errcode redo_draw(Redo_rec *r)
 	return err;
 }
 
-static Errcode redo_gel(Redo_rec *r)
+static Errcode redo_gel(Redo_rec* r)
 {
 	Errcode err;
 	(void)r;
@@ -124,7 +124,7 @@ static Errcode redo_gel(Redo_rec *r)
 	return err;
 }
 
-static Errcode redo_spray(Redo_rec *r)
+static Errcode redo_spray(Redo_rec* r)
 {
 	Errcode err;
 	(void)r;
@@ -142,16 +142,16 @@ static Errcode redo_spray(Redo_rec *r)
 /* End stuff to redo-draw */
 
 /* Start stuff for redo separate */
-Errcode save_redo_sep(Sep_p *sep)
+Errcode save_redo_sep(Sep_p* sep)
 {
 	vs.redo.type = REDO_SEP;
 	vs.redo.p.sep_p = *sep;
 	return write_gulp(rbf_name, sep->ctable, (long)sep->ccount);
 }
 
-static Errcode redo_sep(Redo_rec *r)
+static Errcode redo_sep(Redo_rec* r)
 {
-	Sep_p *sep;
+	Sep_p* sep;
 	Errcode err;
 
 	sep = &r->p.sep_p;
@@ -169,7 +169,7 @@ static Errcode redo_sep(Redo_rec *r)
 
 /* end redo sep stuff */
 
-static Errcode redo_line(Redo_rec *r)
+static Errcode redo_line(Redo_rec* r)
 {
 	Errcode err;
 #define xys r->p.line_p
@@ -185,29 +185,29 @@ static Errcode redo_line(Redo_rec *r)
 #undef xys
 }
 
-static Errcode redo_flood(Redo_rec *r)
+static Errcode redo_flood(Redo_rec* r)
 {
 #define fpt r->p.flood_p
 	return flood(fpt[1].x, fpt[1].y, pj_get_dot(vb.pencel, fpt[0].x, fpt[0].y));
 #undef fpt
 }
 
-static Errcode redo_fill(Redo_rec *r)
+static Errcode redo_fill(Redo_rec* r)
 {
 	return fill(r->p.fill_p.x, r->p.fill_p.y);
 }
 
-static Errcode redo_circle(Redo_rec *r)
+static Errcode redo_circle(Redo_rec* r)
 {
 #define c (&r->p.circle_p)
 	Errcode err;
 	SHORT ocolor;
 
 	if (!vs.fillp) {
-		return render_circle((Raster *)vb.pencel, c->center.x, c->center.y, c->diam);
+		return render_circle((Raster*)vb.pencel, c->center.x, c->center.y, c->diam);
 	}
 
-	err = render_disk((Raster *)vb.pencel, c->center.x, c->center.y, c->diam);
+	err = render_disk((Raster*)vb.pencel, c->center.x, c->center.y, c->diam);
 	if (err < Success) {
 		return err;
 	}
@@ -215,7 +215,7 @@ static Errcode redo_circle(Redo_rec *r)
 	if (vs.color2) {
 		ocolor = vs.ccolor;
 		vs.ccolor = vs.inks[7];
-		err = render_circle((Raster *)vb.pencel, c->center.x, c->center.y, c->diam);
+		err = render_circle((Raster*)vb.pencel, c->center.x, c->center.y, c->diam);
 		vs.ccolor = ocolor;
 	}
 	return err;
@@ -237,12 +237,12 @@ Errcode rend_circ(int x, int y, int radius)
 }
 #endif /* WITH_POCO */
 
-static Errcode redo_box(Redo_rec *r)
+static Errcode redo_box(Redo_rec* r)
 {
 	return render_beveled_box(&r->p.rect_p, vs.box_bevel, vs.fillp);
 }
 
-static Errcode redo_text(Redo_rec *r)
+static Errcode redo_text(Redo_rec* r)
 {
 	(void)r;
 
@@ -252,12 +252,12 @@ static Errcode redo_text(Redo_rec *r)
 	return Err_abort;
 }
 
-static Errcode redo_edge(Redo_rec *r)
+static Errcode redo_edge(Redo_rec* r)
 {
 	return edge1(pj_get_dot(vb.pencel, r->p.edge_p.x, r->p.edge_p.y));
 }
 
-static Errcode redo_poly(Redo_rec *r)
+static Errcode redo_poly(Redo_rec* r)
 {
 	Errcode err;
 	int scf;
@@ -272,7 +272,7 @@ static Errcode redo_poly(Redo_rec *r)
 	return err;
 }
 
-static Errcode redo_spiral(Redo_rec *r)
+static Errcode redo_spiral(Redo_rec* r)
 {
 	Errcode err;
 	SHORT oclosed;
@@ -289,10 +289,10 @@ static Errcode redo_spiral(Redo_rec *r)
 	return err;
 }
 
-static Errcode redo_move(Redo_rec *r)
+static Errcode redo_move(Redo_rec* r)
 {
 	Errcode err;
-	Rcel *clipcel;
+	Rcel* clipcel;
 	Tcolxldat xld;
 	Pixel ctable[COLORS];
 
@@ -326,7 +326,7 @@ static Errcode redo_move(Redo_rec *r)
 #undef m
 }
 
-static Errcode redo_edit_text(Redo_rec *r)
+static Errcode redo_edit_text(Redo_rec* r)
 {
 	(void)r;
 
@@ -334,7 +334,7 @@ static Errcode redo_edit_text(Redo_rec *r)
 	return Success;
 }
 
-static Errcode redo_edit_poly(Redo_rec *r)
+static Errcode redo_edit_poly(Redo_rec* r)
 {
 	return (softerr(edit_poly_file(poly_name, r->p.poly_p.curve), "redo_poly"));
 }
@@ -342,7 +342,7 @@ static Errcode redo_edit_poly(Redo_rec *r)
 /* Performs any "pre edit" for a redo record type returns Success + 1
  * if the menus were hidden and an edit was performed, Success if no
  * edit was done */
-static Errcode _redo_edit(Redo_rec *r)
+static Errcode _redo_edit(Redo_rec* r)
 {
 	Errcode err = Success;
 	Errcode (*doedit)();
@@ -367,10 +367,10 @@ static Errcode _redo_edit(Redo_rec *r)
 }
 
 /* actually draws a redo record onto the screen */
-Errcode _redo_draw(Redo_rec *r)
+Errcode _redo_draw(Redo_rec* r)
 {
 	Errcode err;
-	Errcode (*rfunc)(Redo_rec *r);
+	Errcode (*rfunc)(Redo_rec* r);
 
 	switch (r->type) {
 		case REDO_NONE:
@@ -436,7 +436,7 @@ no_ccycle:
 	return rfunc(r);
 }
 
-static Errcode auto_redo_draw(void *r, int ix, int intween, int scale, Autoarg *aa)
+static Errcode auto_redo_draw(void* r, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)ix;
 	(void)intween;
@@ -493,7 +493,7 @@ void do_auto_redo(bool edit)
 	}
 }
 
-Errcode save_redo_box(Rectangle *r)
+Errcode save_redo_box(Rectangle* r)
 {
 	vs.redo.p.rect_p = *r;
 	vs.redo.type = REDO_BOX;
@@ -501,7 +501,7 @@ Errcode save_redo_box(Rectangle *r)
 	return Success;
 }
 
-Errcode save_redo_circle(Circle_p *cp)
+Errcode save_redo_circle(Circle_p* cp)
 {
 	vs.redo.p.circle_p = *cp;
 	vs.redo.type = REDO_CIRCLE;
@@ -521,7 +521,7 @@ Errcode save_redo_poly(char curve)
 	return Success;
 }
 
-Errcode save_redo_fill(Short_xy *p)
+Errcode save_redo_fill(Short_xy* p)
 {
 	vs.redo.type = REDO_FILL;
 	vs.redo.p.fill_p = *p;
@@ -535,7 +535,7 @@ Errcode save_redo_flood(Short_xy p[2])
 	return redo();
 }
 
-Errcode save_redo_edge(Short_xy *p)
+Errcode save_redo_edge(Short_xy* p)
 {
 	save_undo();
 	vs.redo.type = REDO_EDGE;
@@ -543,7 +543,7 @@ Errcode save_redo_edge(Short_xy *p)
 	return redo();
 }
 
-Errcode save_redo_line(Short_xy *xys)
+Errcode save_redo_line(Short_xy* xys)
 {
 	vs.redo.type = REDO_LINE;
 	pj_copy_bytes(xys, &vs.redo.p.line_p, sizeof(vs.redo.p.line_p));
@@ -557,7 +557,7 @@ Errcode save_redo_spiral(void)
 	return Success;
 }
 
-Errcode save_redo_move(Move_p *m)
+Errcode save_redo_move(Move_p* m)
 {
 	vs.redo.type = REDO_MOVE;
 	vs.redo.p.move_p = *m;

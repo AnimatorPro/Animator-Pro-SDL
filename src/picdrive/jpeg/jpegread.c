@@ -32,23 +32,22 @@
  */
 
 
-METHODDEF void
-output_init (decompress_info_ptr cinfo)
+METHODDEF void output_init(decompress_info_ptr cinfo)
 /* This routine should do any setup required */
 {
-  /* This routine can initialize for output based on the data passed in cinfo.
-   * Useful fields include:
-   *	image_width, image_height	Pretty obvious, I hope.
-   *	data_precision			bits per pixel value; typically 8.
-   *	out_color_space			output colorspace previously requested
-   *	color_out_comps			number of color components in same
-   *	final_out_comps			number of components actually output
-   * final_out_comps is 1 if quantize_colors is true, else it is equal to
-   * color_out_comps.
-   *
-   * If you have requested color quantization, the colormap is NOT yet set.
-   * You may wish to defer output initialization until put_color_map is called.
-   */
+	/* This routine can initialize for output based on the data passed in cinfo.
+	 * Useful fields include:
+	 *	image_width, image_height	Pretty obvious, I hope.
+	 *	data_precision			bits per pixel value; typically 8.
+	 *	out_color_space			output colorspace previously requested
+	 *	color_out_comps			number of color components in same
+	 *	final_out_comps			number of components actually output
+	 * final_out_comps is 1 if quantize_colors is true, else it is equal to
+	 * color_out_comps.
+	 *
+	 * If you have requested color quantization, the colormap is NOT yet set.
+	 * You may wish to defer output initialization until put_color_map is called.
+	 */
 }
 
 
@@ -72,22 +71,20 @@ output_init (decompress_info_ptr cinfo)
  * machine has only signed chars.
  */
 
-METHODDEF void
-put_color_map (decompress_info_ptr cinfo, int num_colors, JSAMPARRAY colormap)
+METHODDEF void put_color_map(decompress_info_ptr cinfo, int num_colors, JSAMPARRAY colormap)
 /* Write the color map */
 {
-int i;
-Rcel *screen = cinfo->output_file->image;
-Rgb3 *pj_cmap = screen->cmap->ctab;
-int cshift = cinfo->data_precision - 8;
+	int i;
+	Rcel* screen = cinfo->output_file->image;
+	Rgb3* pj_cmap = screen->cmap->ctab;
+	int cshift = cinfo->data_precision - 8;
 
-for (i=0; i<num_colors; ++i)
-	{
-	pj_cmap[i].r = GETJSAMPLE(colormap[0][i]) >> cshift;
-	pj_cmap[i].g = GETJSAMPLE(colormap[1][i]) >> cshift;
-	pj_cmap[i].b = GETJSAMPLE(colormap[2][i]) >> cshift;
+	for (i = 0; i < num_colors; ++i) {
+		pj_cmap[i].r = GETJSAMPLE(colormap[0][i]) >> cshift;
+		pj_cmap[i].g = GETJSAMPLE(colormap[1][i]) >> cshift;
+		pj_cmap[i].b = GETJSAMPLE(colormap[2][i]) >> cshift;
 	}
-pj_cmap_load(screen,screen->cmap); /* update hardware cmap if needed */
+	pj_cmap_load(screen, screen->cmap); /* update hardware cmap if needed */
 }
 
 
@@ -119,39 +116,35 @@ pj_cmap_load(screen,screen->cmap); /* update hardware cmap if needed */
  */
 
 
-METHODDEF void
-put_pixel_rows (decompress_info_ptr cinfo, int num_rows, JSAMPIMAGE pixel_data)
+METHODDEF void put_pixel_rows(decompress_info_ptr cinfo, int num_rows, JSAMPIMAGE pixel_data)
 /* Write some rows of output data */
 {
-/* This example shows how you might write full-color RGB data (3 components)
-* to an output file in which the data is stored 3 bytes per pixel.
-*/
-register JSAMPROW ptr0;
-register long col;
-register int row;
-struct ifileref *output = cinfo->output_file;
-Rcel *image = output->image;
-int y = output->y;
+	/* This example shows how you might write full-color RGB data (3 components)
+	 * to an output file in which the data is stored 3 bytes per pixel.
+	 */
+	register JSAMPROW ptr0;
+	register long col;
+	register int row;
+	struct ifileref* output = cinfo->output_file;
+	Rcel* image = output->image;
+	int y = output->y;
 
-for (row = 0; row < num_rows; row++) 
-	{
-	ptr0 = pixel_data[0][row];
-	pj_put_hseg(image, ptr0, 0, y, image->width);
-	++y;
+	for (row = 0; row < num_rows; row++) {
+		ptr0 = pixel_data[0][row];
+		pj_put_hseg(image, ptr0, 0, y, image->width);
+		++y;
 	}
-output->y = y;
+	output->y = y;
 }
 
 
-METHODDEF void
-output_term (decompress_info_ptr cinfo)
+METHODDEF void output_term(decompress_info_ptr cinfo)
 /* Finish up at the end of the output */
 {
-  /* This termination routine may not need to do anything. */
-  /* Note that the JPEG code will only call it during successful exit; */
-  /* if you want it called during error exit, you gotta do that yourself. */
+	/* This termination routine may not need to do anything. */
+	/* Note that the JPEG code will only call it during successful exit; */
+	/* if you want it called during error exit, you gotta do that yourself. */
 }
-
 
 /*
  * That's it for the routines that deal with writing the output image.
@@ -166,23 +159,21 @@ output_term (decompress_info_ptr cinfo)
  * any decompression parameter changes that are desirable.  For example,
  * if it is found that the JPEG file is grayscale, you might want to do
  * things differently than if it is color.  You can also delay setting
- * quantize_colors and associated options until this point. 
+ * quantize_colors and associated options until this point.
  *
  * j_d_defaults initializes out_color_space to CS_RGB.  If you want grayscale
  * output you should set out_color_space to CS_GRAYSCALE.  Note that you can
  * force grayscale output from a color JPEG file (though not vice versa).
  */
 
-METHODDEF void
-d_ui_method_selection (decompress_info_ptr cinfo)
+METHODDEF void d_ui_method_selection(decompress_info_ptr cinfo)
 {
-  /* select output routines */
-  cinfo->methods->output_init = output_init;
-  cinfo->methods->put_color_map = put_color_map;
-  cinfo->methods->put_pixel_rows = put_pixel_rows;
-  cinfo->methods->output_term = output_term;
+	/* select output routines */
+	cinfo->methods->output_init = output_init;
+	cinfo->methods->put_color_map = put_color_map;
+	cinfo->methods->put_pixel_rows = put_pixel_rows;
+	cinfo->methods->output_term = output_term;
 }
-
 
 /*
  * OK, here is the main function that actually causes everything to happen.
@@ -191,105 +182,99 @@ d_ui_method_selection (decompress_info_ptr cinfo)
  * The routine returns 1 if successful, 0 if not.
  */
 
-static void read(FILE *input, struct ifileref *output)
+static void read(FILE* input, struct ifileref* output)
 {
-  /* These three structs contain JPEG parameters and working data.
-   * They must survive for the duration of parameter setup and one
-   * call to jpeg_decompress; typically, making them local data in the
-   * calling routine is the best strategy.
-   */
-  struct Decompress_info_struct cinfo;
-  struct Decompress_methods_struct dc_methods;
-  struct External_methods_struct e_methods;
-
-  /* Select the input and output files.
-   */
-  cinfo.output_file = output;
-  cinfo.input_file = input;
-
-  /* Initialize the system-dependent method pointers. */
-  cinfo.methods = &dc_methods;	/* links to method structs */
-  cinfo.emethods = &e_methods;
-
-  /* Here we supply our own error handler; compare to use of standard error
-   * handler in the previous write_JPEG_file example.
-   */
-  set_error_methods(&e_methods);
-
-  /* Here we use the standard memory manager provided with the JPEG code.
-   * In some cases you might want to replace the memory manager, or at
-   * least the system-dependent part of it, with your own code.
-   */
-  jselmemmgr(&e_methods);	/* select std memory allocation routines */
-  /* If the decompressor requires full-image buffers (for two-pass color
-   * quantization or a noninterleaved JPEG file), it will create temporary
-   * files for anything that doesn't fit within the maximum-memory setting.
-   * You can change the default maximum-memory setting by changing
-   * e_methods.max_memory_to_use after jselmemmgr returns.
-   * On some systems you may also need to set up a signal handler to
-   * ensure that temporary files are deleted if the program is interrupted.
-   * (This is most important if you are on MS-DOS and use the jmemdos.c
-   * memory manager back end; it will try to grab extended memory for
-   * temp files, and that space will NOT be freed automatically.)
-   * See jcmain.c or jdmain.c for an example signal handler.
-   */
-
-  /* Here, set up the pointer to your own routine for post-header-reading
-   * parameter selection.  You could also initialize the pointers to the
-   * output data handling routines here, if they are not dependent on the
-   * image type.
-   */
-  dc_methods.d_ui_method_selection = d_ui_method_selection;
-
-  /* Set up default decompression parameters. */
-  j_d_defaults(&cinfo, TRUE);
-  /* TRUE indicates that an input buffer should be allocated.
-   * In unusual cases you may want to allocate the input buffer yourself;
-   * see jddeflts.c for commentary.
-   */
-
-  /* At this point you can modify the default parameters set by j_d_defaults
-   * as needed; for example, you can request color quantization or force
-   * grayscale output.  See jdmain.c for examples of what you might change.
-   */
-  cinfo.desired_number_of_colors = 256;
-  cinfo.quantize_colors = TRUE;
-
-  /* Set up to read a JFIF or baseline-JPEG file. */
-  /* This is the only JPEG file format currently supported. */
-  jselrjfif(&cinfo);
-
-  /* Here we go! */
-  jpeg_decompress(&cinfo);
-
-  /* You might want to test e_methods.num_warnings to see if bad data was
-   * detected.  In this example, we just blindly forge ahead.
-   */
-
-  /* Note: if you want to decompress more than one image, we recommend you
-   * repeat this whole routine.  You MUST repeat the j_d_defaults()/alter
-   * parameters/jpeg_decompress() sequence, as some data structures allocated
-   * in j_d_defaults are freed upon exit from jpeg_decompress.
-   */
-}
-
-
-extern jmp_buf setjmp_buffer;	/* for return to caller */
-
-Errcode jpeg_read_frame(FILE *input, struct ifileref *output)
-{
-Errcode err;
-if (err = setjmp(setjmp_buffer)) 
-	{
-	/* If we get here, the JPEG code has signaled an error.
+	/* These three structs contain JPEG parameters and working data.
+	 * They must survive for the duration of parameter setup and one
+	 * call to jpeg_decompress; typically, making them local data in the
+	 * calling routine is the best strategy.
 	 */
-	return err;
-	}
-else
-	{
-	read(input, output);
-	return Success;
-	}
+	struct Decompress_info_struct cinfo;
+	struct Decompress_methods_struct dc_methods;
+	struct External_methods_struct e_methods;
+
+	/* Select the input and output files.
+	 */
+	cinfo.output_file = output;
+	cinfo.input_file = input;
+
+	/* Initialize the system-dependent method pointers. */
+	cinfo.methods = &dc_methods; /* links to method structs */
+	cinfo.emethods = &e_methods;
+
+	/* Here we supply our own error handler; compare to use of standard error
+	 * handler in the previous write_JPEG_file example.
+	 */
+	set_error_methods(&e_methods);
+
+	/* Here we use the standard memory manager provided with the JPEG code.
+	 * In some cases you might want to replace the memory manager, or at
+	 * least the system-dependent part of it, with your own code.
+	 */
+	jselmemmgr(&e_methods); /* select std memory allocation routines */
+	/* If the decompressor requires full-image buffers (for two-pass color
+	 * quantization or a noninterleaved JPEG file), it will create temporary
+	 * files for anything that doesn't fit within the maximum-memory setting.
+	 * You can change the default maximum-memory setting by changing
+	 * e_methods.max_memory_to_use after jselmemmgr returns.
+	 * On some systems you may also need to set up a signal handler to
+	 * ensure that temporary files are deleted if the program is interrupted.
+	 * (This is most important if you are on MS-DOS and use the jmemdos.c
+	 * memory manager back end; it will try to grab extended memory for
+	 * temp files, and that space will NOT be freed automatically.)
+	 * See jcmain.c or jdmain.c for an example signal handler.
+	 */
+
+	/* Here, set up the pointer to your own routine for post-header-reading
+	 * parameter selection.  You could also initialize the pointers to the
+	 * output data handling routines here, if they are not dependent on the
+	 * image type.
+	 */
+	dc_methods.d_ui_method_selection = d_ui_method_selection;
+
+	/* Set up default decompression parameters. */
+	j_d_defaults(&cinfo, TRUE);
+	/* TRUE indicates that an input buffer should be allocated.
+	 * In unusual cases you may want to allocate the input buffer yourself;
+	 * see jddeflts.c for commentary.
+	 */
+
+	/* At this point you can modify the default parameters set by j_d_defaults
+	 * as needed; for example, you can request color quantization or force
+	 * grayscale output.  See jdmain.c for examples of what you might change.
+	 */
+	cinfo.desired_number_of_colors = 256;
+	cinfo.quantize_colors = TRUE;
+
+	/* Set up to read a JFIF or baseline-JPEG file. */
+	/* This is the only JPEG file format currently supported. */
+	jselrjfif(&cinfo);
+
+	/* Here we go! */
+	jpeg_decompress(&cinfo);
+
+	/* You might want to test e_methods.num_warnings to see if bad data was
+	 * detected.  In this example, we just blindly forge ahead.
+	 */
+
+	/* Note: if you want to decompress more than one image, we recommend you
+	 * repeat this whole routine.  You MUST repeat the j_d_defaults()/alter
+	 * parameters/jpeg_decompress() sequence, as some data structures allocated
+	 * in j_d_defaults are freed upon exit from jpeg_decompress.
+	 */
 }
 
+extern jmp_buf setjmp_buffer; /* for return to caller */
 
+Errcode jpeg_read_frame(FILE* input, struct ifileref* output)
+{
+	Errcode err;
+	if (err = setjmp(setjmp_buffer)) {
+		/* If we get here, the JPEG code has signaled an error.
+		 */
+		return err;
+	} else {
+		read(input, output);
+		return Success;
+	}
+}

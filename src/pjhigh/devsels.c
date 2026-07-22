@@ -1,4 +1,4 @@
-/* devsels.c stuff to handle allocated arrays of "device" buttons for use on 
+/* devsels.c stuff to handle allocated arrays of "device" buttons for use on
  * file menus */
 
 #include <ctype.h>
@@ -15,20 +15,20 @@
 
 typedef struct dsel_group {
 	SHORT devnum;
-	char *drawer;
-    Errcode (*on_newdrawer)(void *data);
-    void *on_newd_data;
+	char* drawer;
+	Errcode (*on_newdrawer)(void* data);
+	void* on_newd_data;
 	char curdev[DEV_NAME_LEN];
 } Dsel_group;
 
 /* A list of disk drives that look like they're really on this machine */
 
 
-static void go_updir(Button *b)
+static void go_updir(Button* b)
 /* move up one directory */
 {
-	Dsel_group *dg = b->group;
-	FilePath *filepath;
+	Dsel_group* dg = b->group;
+	FilePath* filepath;
 
 	hilight(b);
 
@@ -42,14 +42,16 @@ static void go_updir(Button *b)
 	(*dg->on_newdrawer)(dg->on_newd_data);
 	draw_buttontop(b);
 }
-static void go_rootdir(Button *b)
+
+static void go_rootdir(Button* b)
 {
-Dsel_group *dg = b->group;
-char *drawer = dg->drawer;
+	Dsel_group* dg = b->group;
+	char* drawer = dg->drawer;
 
 	hilight(b);
-	if (drawer[1] == DEV_DELIM)
+	if (drawer[1] == DEV_DELIM) {
 		drawer += 2;
+	}
 	strcpy(drawer, DIR_DELIM_STR);
 
 	(*dg->on_newdrawer)(dg->on_newd_data);
@@ -57,22 +59,23 @@ char *drawer = dg->drawer;
 }
 
 #if defined(__WATCOMC__)
-static void check_devicewait(char *device)
+static void check_devicewait(char* device)
 {
-	if(!pj_is_fixed(device))
-		soft_put_wait_box("!%s", "wait_fdread", device );
+	if (!pj_is_fixed(device)) {
+		soft_put_wait_box("!%s", "wait_fdread", device);
+	}
 }
 #endif /* __WATCOMC__ */
 
-static void set_device_group(Dsel_group *dg)
+static void set_device_group(Dsel_group* dg)
 {
 	current_device(dg->curdev);
-	dg->devnum = toupper(dg->curdev[0])-'A'; /* this only good for ms-dos */
+	dg->devnum = toupper(dg->curdev[0]) - 'A'; /* this only good for ms-dos */
 }
-static void new_dev(Button *b)
+
+static void new_dev(Button* b)
 {
-	switch(b->identity)
-	{
+	switch (b->identity) {
 		case -2:
 			go_updir(b);
 			return;
@@ -85,7 +88,7 @@ static void new_dev(Button *b)
 
 #if defined(__WATCOMC__)
 	{
-		Dsel_group *dg = b->group;
+		Dsel_group* dg = b->group;
 		char devname[2];
 		Errcode err;
 
@@ -101,23 +104,25 @@ static void new_dev(Button *b)
 			mb_hi_group(b);
 		}
 
-		errline(err,"%s:", devname);
+		errline(err, "%s:", devname);
 		(*dg->on_newdrawer)(dg->on_newd_data);
 	}
 #endif /* __WATCOMC__ */
 }
-static void hang_dev_sels(Button *b)
+
+static void hang_dev_sels(Button* b)
 {
-	if(b->children)
+	if (b->children) {
 		set_device_group(b->children->group);
+	}
 	hang_children(b);
 }
-static void see_device(Button *b)
-{
-char buf[2];
 
-	switch(b->identity)
-	{
+static void see_device(Button* b)
+{
+	char buf[2];
+
+	switch (b->identity) {
 		case -2:
 			b->datme = "..";
 			b->key_equiv = '.';
@@ -127,21 +132,20 @@ char buf[2];
 			b->key_equiv = DIR_DELIM;
 			break;
 		default:
-			buf[0] = b->identity+'A';
+			buf[0] = b->identity + 'A';
 			buf[1] = 0;
 			b->datme = buf;
 			break;
 	}
 	ccorner_text(b);
 }
-Errcode alloc_dev_sels(Button *hanger,  /* where to install device buttons */
-					   Rectangle *size, /* width and height is size 
-					   					 * x,y spacing UNSCALED referenced
-										 * to 320 X 200 */
-					   int numcols,int numrows,
-					   char *drawer,  /* string to put directory into */
+Errcode alloc_dev_sels(Button* hanger,                         /* where to install device buttons */
+					   Rectangle* size,                        /* width and height is size
+																* x,y spacing UNSCALED referenced
+																* to 320 X 200 */
+					   int numcols, int numrows, char* drawer, /* string to put directory into */
 					   /* function and data to call after drawer is changed */
-					   Errcode (*on_newdrawer)(void *), void *ond_data )
+					   Errcode (*on_newdrawer)(void*), void* ond_data)
 /*
  * Allocate and initialized one button on a file menu for each logical drive.
  * Store the button list on hanger->children.  Also allocates ".." and "\"
@@ -153,73 +157,74 @@ Errcode alloc_dev_sels(Button *hanger,  /* where to install device buttons */
  * how to process it if a drive or not.
  */
 {
-Errcode err;
-UBYTE devices[MAX_DEVICES];
-int dev_count;
-Dsel_group *dg;
-long bsize;
-Button *sel;
-int i,ix;
+	Errcode err;
+	UBYTE devices[MAX_DEVICES];
+	int dev_count;
+	Dsel_group* dg;
+	long bsize;
+	Button* sel;
+	int i, ix;
 
-	if((dev_count = pj_get_devices(devices)) < 0)
-		return(dev_count); 
+	if ((dev_count = pj_get_devices(devices)) < 0) {
+		return (dev_count);
+	}
 
-	bsize = (dev_count+2)*sizeof(Button);
+	bsize = (dev_count + 2) * sizeof(Button);
 
-		/* Allocate enough space for all buttons and a Dsel_group. */
-	if ((err = ealloc((void **)&(hanger->children), bsize + sizeof(Dsel_group)))
-			< Success)
-		return(err);
+	/* Allocate enough space for all buttons and a Dsel_group. */
+	if ((err = ealloc((void**)&(hanger->children), bsize + sizeof(Dsel_group))) < Success) {
+		return (err);
+	}
 
 	sel = hanger->children;
-	dg = (Dsel_group *)OPTR(sel,bsize);	/* Point dg to after buttons */
+	dg = (Dsel_group*)OPTR(sel, bsize); /* Point dg to after buttons */
 	dg->drawer = drawer;
 	dg->on_newd_data = ond_data;
 
 	if (on_newdrawer) {
 		dg->on_newdrawer = on_newdrawer;
-	}
-	else { /* just in case it's not supplied */
-		dg->on_newdrawer = (Errcode (*)(void *))pj_errdo_unimpl;
+	} else { /* just in case it's not supplied */
+		dg->on_newdrawer = (Errcode (*)(void*))pj_errdo_unimpl;
 	}
 
 	hanger->seeme = hang_dev_sels;
 
-	ix = 0; 
+	ix = 0;
 	--sel;
-	for(i = -2; i < dev_count;++i)
-	{
+	for (i = -2; i < dev_count; ++i) {
 		++sel;
 		clear_struct(sel);
-		sel->next = sel+1;
+		sel->next = sel + 1;
 		sel->orig_rect.width = size->width;
 		sel->orig_rect.height = size->height;
-		sel->orig_rect.x = size->x * (ix%numcols);
-		sel->orig_rect.y = size->y * (ix/numcols);
+		sel->orig_rect.x = size->x * (ix % numcols);
+		sel->orig_rect.y = size->y * (ix / numcols);
 		sel->seeme = see_device;
 		sel->feelme = new_dev;
 		sel->group = dg;
 
-		if(i >= 0)
-		{
+		if (i >= 0) {
 			sel->identity = devices[i];
-			sel->key_equiv = devices[i]+'a';
+			sel->key_equiv = devices[i] + 'a';
 			sel->flags = MB_GHILITE;
-		}
-		else
+		} else {
 			sel->identity = i;
+		}
 
-		if(++ix >= (numcols*numrows))
+		if (++ix >= (numcols * numrows)) {
 			break;
+		}
 	}
 	sel->next = NULL;
-	return(Success);
+	return (Success);
 }
-static void no_see(Button *b)
+
+static void no_see(Button* b)
 {
 	(void)b;
 }
-void cleanup_dev_sels(Button *hanger)
+
+void cleanup_dev_sels(Button* hanger)
 {
 	pj_freez(&hanger->children);
 	hanger->seeme = no_see;

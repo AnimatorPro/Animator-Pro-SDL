@@ -8,7 +8,8 @@ Gfxlib aa_gfxlib = {
 	/* header */
 	{
 		sizeof(Gfxlib),
-		AA_GFXLIB, AA_GFXLIB_VERSION,
+		AA_GFXLIB,
+		AA_GFXLIB_VERSION,
 	},
 	/* Stuff that goes to raster driver... */
 	pj_alloc_bytemap,
@@ -55,4 +56,3 @@ Gfxlib aa_gfxlib = {
 	pj_rcel_close,
 	pj_rcel_free,
 };
-

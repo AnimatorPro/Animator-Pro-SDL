@@ -43,30 +43,28 @@ char *pool;
 #endif
 }
 
-void *c_askmem(long nbytes)
+void* c_askmem(long nbytes)
 {
-Lochunk *pt;
+	Lochunk* pt;
 
-	nbytes += OFFSET(Lochunk,mem);
+	nbytes += OFFSET(Lochunk, mem);
 
-	if( nbytes < mem_free 
-		&& (pt = malloc( nbytes )) != NULL)
-	{
+	if (nbytes < mem_free && (pt = malloc(nbytes)) != NULL) {
 		pt->size = nbytes;
 		mem_free -= nbytes;
-		return(&(pt->mem));
+		return (&(pt->mem));
 	}
-	return(NULL);
+	return (NULL);
 }
-long c_freemem(void *pt)
+long c_freemem(void* pt)
 /* returns size freed keeps track of mem_free */
 {
-Lochunk *lc;
-long size;
+	Lochunk* lc;
+	long size;
 
-	lc = TOSTRUCT(Lochunk,mem,pt);
-	size = (lc->size - OFFSET(Lochunk,mem));
+	lc = TOSTRUCT(Lochunk, mem, pt);
+	size = (lc->size - OFFSET(Lochunk, mem));
 	mem_free += lc->size;
 	free(lc);
-	return(size);
+	return (size);
 }

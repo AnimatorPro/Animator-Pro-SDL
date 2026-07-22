@@ -14,12 +14,11 @@ Errcode po_poly_to_arrays(Poly* p, Popot* x, Popot* y);
 int twirl1(Celcfit* cfit, int ix, int frames, int scale);
 int a3d_get_auto_flags();
 
-extern Errcode po_arrays_to_poly(Poly* p, int ptcount, Popot* px, Popot* py); // from pocolibs.c
+extern Errcode po_arrays_to_poly(Poly* p, int ptcount, Popot* px, Popot* py);  // from pocolibs.c
 
 typedef struct xyzPoint {
 	double x, y, z; /* pixel coordinates */
 } XyzPoint;
-
 
 typedef struct optPos
 /* An optics move (well except for the path) */
@@ -34,7 +33,6 @@ typedef struct optPos
 	long bp, bq;          /* both scale.	Applied after x and y scale */
 } OptPos;
 
-
 typedef struct optState
 /* Contains all the motion information for an optics transformation */
 {
@@ -48,7 +46,6 @@ typedef struct optState
 	UBYTE outlined;    /* is element outlined? */
 	UBYTE el_type;     /* one of OPT_EL defines below */
 } OptState;
-
 
 /****** Support routines for converting between Poco's optics state
 		structures and Animator's *********/
@@ -302,8 +299,7 @@ static Errcode opt_get_state(Popot sta)
 
 	Errcode err = Popot_bufcheck(&sta, sizeof(OptState));
 
-		if (err < Success)
-	{
+	if (err < Success) {
 		return err;
 	}
 	get_a3d_state();

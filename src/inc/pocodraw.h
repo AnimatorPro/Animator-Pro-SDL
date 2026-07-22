@@ -15,4 +15,4 @@ ErrCode po_squeeze_colors(int* source_map, int source_count, int* dest_map, int 
 Errcode po_fit_screen_to_color_map(void* screen, int* new_colors, bool keep_key);
 
 
-#endif // ANIMATOR_PRO_POCODRAW_H
+#endif  // ANIMATOR_PRO_POCODRAW_H

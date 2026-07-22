@@ -1,0 +1,14 @@
+extern int shared_value;
+extern int init_order;
+
+int observed_order = init_order * 10 + 2;
+
+static int helper(void)
+{
+	return 5;
+}
+
+int second(void)
+{
+	return helper() + shared_value + observed_order;
+}

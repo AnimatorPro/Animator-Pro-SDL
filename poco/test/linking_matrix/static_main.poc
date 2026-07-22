@@ -1,0 +1,11 @@
+int static_library_value(void);
+
+static int same_name(void)
+{
+	return 10;
+}
+
+int main(void)
+{
+	return same_name() + static_library_value();
+}

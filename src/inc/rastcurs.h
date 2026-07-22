@@ -2,15 +2,15 @@
 #define RASTCURS_H
 
 #ifndef STDTYPES_H
-	#include "stdtypes.h"
+#include "stdtypes.h"
 #endif
 
 #ifndef INPUT_H
-	#include "input.h"
+#include "input.h"
 #endif
 
 #ifndef RASTER_H
-	#include "raster.h"
+#include "raster.h"
 #endif
 
 struct rcel;
@@ -20,12 +20,12 @@ struct tcolxldat;
 #define DFLT_CURS_HT 19
 #define DFLT_CURS_WID 19
 
-#define CURS_MC0	251   /* first cursor color */
-#define CURS_CCOLOR	250   /* cursor "ccolor" */
+#define CURS_MC0 251    /* first cursor color */
+#define CURS_CCOLOR 250 /* cursor "ccolor" */
 
 typedef struct cursorsave {
 	Bytemap r;
-	SHORT w,h; /* width and height of saved area */
+	SHORT w, h; /* width and height of saved area */
 } Cursorsave;
 
 typedef struct cursorcel {
@@ -34,9 +34,9 @@ typedef struct cursorcel {
 
 typedef struct rastcursor {
 	Cursorhdr hdr;
-	Cursorcel *cel;     /* the image cel */
-	Cursorsave *save;	/* save area set by rastcursor code not present in
-						 * default cursor */
+	Cursorcel* cel;   /* the image cel */
+	Cursorsave* save; /* save area set by rastcursor code not present in
+					   * default cursor */
 } Rastcursor;
 
 extern Cursorhdr pentool_cursor;
@@ -58,21 +58,21 @@ extern Rastcursor star_cursor;
 extern Rastcursor text_cursor;
 
 /* cursor.c */
-extern Cursorhdr *set_pen_cursor(Cursorhdr *ch);
+extern Cursorhdr* set_pen_cursor(Cursorhdr* ch);
 extern Errcode init_cursors(void);
 extern void cleanup_cursors(void);
-extern Errcode save_cursor(char *title, struct rcel *rc, struct short_xy *hot);
+extern Errcode save_cursor(char* title, struct rcel* rc, struct short_xy* hot);
 
 /* pjhigh/cursxlat.c */
-extern void set_cursor_ccolor(Pixel *pccolor);
-extern struct tcolxldat *get_cursor_xlat(void);
+extern void set_cursor_ccolor(Pixel* pccolor);
+extern struct tcolxldat* get_cursor_xlat(void);
 
 /* pjhigh/rastcurs.c */
-extern void show_rastcursor(Cursorhdr *rc);
-extern void hide_rastcursor(Cursorhdr *rc);
-extern void move_rastcursor(Cursorhdr *rc);
+extern void show_rastcursor(Cursorhdr* rc);
+extern void hide_rastcursor(Cursorhdr* rc);
+extern void move_rastcursor(Cursorhdr* rc);
 
 /* pjhigh/defltcur.c */
-extern Rastcursor *get_default_cursor(void);
+extern Rastcursor* get_default_cursor(void);
 
 #endif

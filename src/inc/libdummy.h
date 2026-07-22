@@ -2,7 +2,7 @@
 #define LIBDUMMY_H
 
 #ifndef STDTYPES_H
-	#include "stdtypes.h"
+#include "stdtypes.h"
 #endif
 
 struct rastlib;
@@ -15,7 +15,7 @@ Pixel pj_rcdo_nutin(void);
 Errcode pj_errdo_unimpl(void);
 Errcode pj_errdo_success(void);
 
-extern void pj_init_null_rastlib(struct rastlib *lib);
-extern struct rastlib *pj_get_null_lib(void);
+extern void pj_init_null_rastlib(struct rastlib* lib);
+extern struct rastlib* pj_get_null_lib(void);
 
 #endif /* LIBDUMMY_H */

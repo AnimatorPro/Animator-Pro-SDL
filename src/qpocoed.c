@@ -9,27 +9,24 @@
 #include "wordwrap.h"
 
 
-Vfont *get_poco_font();
+Vfont* get_poco_font();
 
 // from zoom.c
 void unzoom(void);
 void rezoom(void);
 
 
-
 // from hitext.c
-extern void etext_undraw_dot(SHORT x, SHORT y, void *r);
-extern void etext_undraw_rect(Raster *r, void *data, int x, int y,
-	int width, int height);
+extern void etext_undraw_dot(SHORT x, SHORT y, void* r);
+extern void etext_undraw_rect(Raster* r, void* data, int x, int y, int width, int height);
 
 // from resource.c
-char *make_resource_name(char *name, char *path_buf);
+char* make_resource_name(char* name, char* path_buf);
 
 // from qpoco.c
-Errcode run_poco_stripped_environment(char *source_name);
+Errcode run_poco_stripped_environment(char* source_name);
 
-
-static void poco_lookup_function(Text_file *gf)
+static void poco_lookup_function(Text_file* gf)
 {
 	(void)gf;
 	char lookup_path[PATH_SIZE];
@@ -38,12 +35,12 @@ static void poco_lookup_function(Text_file *gf)
 	run_poco_stripped_environment(lookup_path);
 }
 
-static Errcode open_text_screen_win(Wndo **win)
+static Errcode open_text_screen_win(Wndo** win)
 {
 	Errcode err;
 	WndoInit wi;
 
-	clear_mem(&wi,sizeof(wi));
+	clear_mem(&wi, sizeof(wi));
 	wi.width = vb.screen->wndo.width;
 	wi.height = vb.screen->wndo.height;
 	wi.screen = vb.screen;
@@ -51,71 +48,69 @@ static Errcode open_text_screen_win(Wndo **win)
 	wi.flags = (WNDO_BACKDROP);
 
 	err = open_wndo(win, &wi);
-	if(err < 0) {
+	if (err < 0) {
 		return softerr(err, "poco_edit");
 	}
 
-	(*win)->ioflags = (KEYHIT|ANY_CLICK);
+	(*win)->ioflags = (KEYHIT | ANY_CLICK);
 	return Success;
 }
 
 
-
-static long seek_char(char *file, long linepos, short charpos)
+static long seek_char(char* file, long linepos, short charpos)
 /* given a line and character on the line position, convert it to
    absolute character position */
 {
-long pos = 0;
-long lp = 1;
-short cp;
-char c;
+	long pos = 0;
+	long lp = 1;
+	short cp;
+	char c;
 
-for (;;)
-	{
-	if ((c = *file++) == 0)
-		break;
-	if (c == '\n')
-		{
-		lp++;
-		cp=0;
-		}
-	else
-		cp++;
-	if (lp >= linepos)
-		{
-		if (lp > linepos || cp > charpos)
+	for (;;) {
+		if ((c = *file++) == 0) {
 			break;
 		}
-	pos++;
+		if (c == '\n') {
+			lp++;
+			cp = 0;
+		} else {
+			cp++;
+		}
+		if (lp >= linepos) {
+			if (lp > linepos || cp > charpos) {
+				break;
+			}
+		}
+		pos++;
 	}
-return(pos);
+	return (pos);
 }
-
 
 /* Edit existing text full screen in same colors we use for menus over a
  * blank screen. Don't paste the text. */
-void full_screen_edit(Text_file *gf)
+void full_screen_edit(Text_file* gf)
 {
 	unzoom();
 	save_undo();
 	gf->raster = NULL;
-	if(open_text_screen_win((Wndo **)&(gf->raster)) >= Success)
-	{
-		if (sblack != 0)	/* backdrop window open will have done this case */
+	if (open_text_screen_win((Wndo**)&(gf->raster)) >= Success) {
+		if (sblack != 0) { /* backdrop window open will have done this case */
 			pj_set_rast(gf->raster, sblack);
+		}
 		gf->ccolor = swhite;
 		gf->undraw_data = gf->raster;
 		gf->undraw_rect = etext_undraw_rect;
 		gf->undraw_dot = etext_undraw_dot;
 		copy_rectfields(gf->raster, &gf->twin);
 		gf->justify_mode = JUST_LEFT;
-		if (vb.screen->is_hires)
+		if (vb.screen->is_hires) {
 			gf->font = vb.screen->mufont;
-		else
+		} else {
 			gf->font = get_poco_font();
+		}
 		edit_text_file(gf);
 	}
-	close_wndo((Wndo *)gf->raster);
+	close_wndo((Wndo*)gf->raster);
 	zoom_unundo();
 	rezoom();
 }
@@ -132,10 +127,8 @@ bool qedit_poco(long line, int cpos)
 	gf->tcursor_p = vs.ped_cursor_p;
 	gf->text_yoff = vs.ped_yoff;
 	gf->text_name = poco_source_name;
-	if (pj_exists(poco_source_name))
-	{
-		if (load_text_file(gf, poco_source_name) >= Success)
-		{
+	if (pj_exists(poco_source_name)) {
+		if (load_text_file(gf, poco_source_name) >= Success) {
 			if (line >= 0) {
 				gf->tcursor_p = seek_char(gf->text_buf, line, cpos);
 			}
@@ -151,4 +144,3 @@ bool qedit_poco(long line, int cpos)
 	return gf->is_changed;
 #undef gf
 }
-

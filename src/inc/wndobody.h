@@ -20,7 +20,7 @@ typedef struct wndobody {
 	Dlnode node;
 
 	/* The screen window is attached to. */
-	struct wscreen *screen;
+	struct wscreen* screen;
 } Wndobody;
 
 #endif

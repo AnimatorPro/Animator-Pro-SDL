@@ -8,24 +8,24 @@
 struct bitmap;
 struct button;
 
-extern struct bitmap *mask_rast;
+extern struct bitmap* mask_rast;
 
 /* freem.c */
 extern bool mask_is_present(void);
 
 /* mask.c. */
-extern void free_mask(struct bitmap *mask);
-extern Errcode alloc_mask(struct bitmap **mask, USHORT width, USHORT height);
+extern void free_mask(struct bitmap* mask);
+extern Errcode alloc_mask(struct bitmap** mask, USHORT width, USHORT height);
 extern void free_the_mask(void);
 extern int alloc_the_mask(void);
-extern int save_the_mask(char *name);
-extern int load_the_mask(char *name);
-extern void mb_toggle_mask(struct button *b);
+extern int save_the_mask(char* name);
+extern int load_the_mask(char* name);
+extern void mb_toggle_mask(struct button* b);
 extern void qmask(void);
 extern void qmask_keep_undo(void);
 
 /* quickdat.c. */
-extern void see_mask_button(struct button *b);
+extern void see_mask_button(struct button* b);
 
 /* vpaint.c */
 extern void qload_mask(void);

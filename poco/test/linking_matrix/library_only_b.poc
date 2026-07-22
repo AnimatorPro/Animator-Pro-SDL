@@ -1,0 +1,4 @@
+int library_second(void)
+{
+	return 22;
+}

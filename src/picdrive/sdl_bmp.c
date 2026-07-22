@@ -1,5 +1,5 @@
 /*****************************************************************************
-* sdl_bmp.c - picdriver for loading BMP files through SDL_Image
+ * sdl_bmp.c - picdriver for loading BMP files through SDL_Image
  ****************************************************************************/
 
 /*----------------------------------------------------------------------------
@@ -25,10 +25,4 @@ char bmp_long_description[] =
 	"All BMP files are saved as 8-bit.";
 
 
-SDL_PDR_CREATE(BMP,
-			   "BMP Format (SDL)",
-			   bmp_long_description,
-			   "bmp",
-			   SDL_LoadBMP,
-			   SDL_SaveBMP);
-
+SDL_PDR_CREATE(BMP, "BMP Format (SDL)", bmp_long_description, "bmp", SDL_LoadBMP, SDL_SaveBMP);

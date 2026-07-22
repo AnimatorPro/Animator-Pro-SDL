@@ -59,9 +59,9 @@ void po_init_code_buf(Poco_cb* pcb, Code_buf* c)
 {
 	(void)pcb;
 
-	c->cryptic	= CCRYPTIC;
+	c->cryptic = CCRYPTIC;
 	c->code_buf = c->code_pt = c->cbuf;
-	c->alloced_end			 = c->cbuf + sizeof(c->cbuf);
+	c->alloced_end = c->cbuf + sizeof(c->cbuf);
 }
 
 /*****************************************************************************
@@ -69,7 +69,6 @@ void po_init_code_buf(Poco_cb* pcb, Code_buf* c)
  ****************************************************************************/
 void po_trash_code_buf(Poco_cb* pcb, Code_buf* c)
 {
-
 #ifdef DEVELOPMENT
 	if (c->cryptic != CCRYPTIC) {
 		if (c->cryptic == CTRASHED) {
@@ -84,8 +83,9 @@ void po_trash_code_buf(Poco_cb* pcb, Code_buf* c)
 #endif /* DEVELOPMENT */
 
 	c->cryptic = CTRASHED;
-	if (c->code_buf != c->cbuf)
+	if (c->code_buf != c->cbuf) {
 		po_freemem(c->code_buf);
+	}
 }
 
 /*****************************************************************************
@@ -115,21 +115,22 @@ static bool add_code(Poco_cb* pcb, Code_buf* cbuf, void* ops, SHORT op_size)
 		Code *new_buf, *old_buf;
 		long old_used, new_size;
 
-		old_buf	 = cbuf->code_buf;
+		old_buf = cbuf->code_buf;
 		old_used = (UBYTE*)cbuf->code_pt - (UBYTE*)old_buf;
 		if (old_buf == cbuf->cbuf && old_used + ropsize < SMALLBLK_CACHE_SIZE) {
 			new_size = SMALLBLK_CACHE_SIZE;
-			new_buf	 = po_cache_malloc(pcb, &pcb->smallblk_cache);
+			new_buf = po_cache_malloc(pcb, &pcb->smallblk_cache);
 		} else {
 			new_size = ropsize + EXPANDCBUF * ((UBYTE*)cbuf->alloced_end - (UBYTE*)old_buf);
-			new_buf	 = po_memalloc(pcb, new_size);
+			new_buf = po_memalloc(pcb, new_size);
 		}
 		poco_copy_bytes(old_buf, new_buf, (size_t)old_used);
-		cbuf->code_buf	  = new_buf;
+		cbuf->code_buf = new_buf;
 		cbuf->alloced_end = new_buf + new_size;
-		cbuf->code_pt	  = new_buf + old_used;
-		if (old_buf != cbuf->cbuf)
+		cbuf->code_pt = new_buf + old_used;
+		if (old_buf != cbuf->cbuf) {
 			po_freemem(old_buf);
+		}
 		next_op = OPTR(cbuf->code_pt, ropsize);
 	}
 
@@ -176,7 +177,6 @@ bool po_add_op(Poco_cb* pcb, Code_buf* cbuf, int op, void* data, SHORT data_size
  ****************************************************************************/
 void po_backup_code(Poco_cb* pcb, Code_buf* cb, int op_size)
 {
-
 #ifdef DEVELOPMENT
 	if (cb->code_pt - cb->code_buf < op_size) { /* should never happen */
 		po_say_internal(pcb, "error in po_backup_code");
@@ -201,8 +201,9 @@ bool po_concatenate_code(Poco_cb* pcb, Code_buf* dest, Code_buf* end)
 {
 	SHORT size;
 
-	if (0 == (size = end->code_pt - end->code_buf))
+	if (0 == (size = end->code_pt - end->code_buf)) {
 		return true;
+	}
 	return (add_code(pcb, dest, end->code_buf, size));
 }
 
@@ -214,8 +215,9 @@ bool po_copy_code(Poco_cb* pcb, Code_buf* source, Code_buf* dest)
 	SHORT size;
 
 	dest->code_pt = dest->code_buf; /* reset dest code pt. back to start */
-	if (0 == (size = source->code_pt - source->code_buf))
+	if (0 == (size = source->code_pt - source->code_buf)) {
 		return true;
+	}
 	return (add_code(pcb, dest, source->code_buf, size));
 }
 
@@ -316,7 +318,7 @@ void po_code_popot(Poco_cb* pcb, Code_buf* cbuf, int op, void* min, void* max, v
 
 	ppt.min = min;
 	ppt.max = max;
-	ppt.pt	= pt;
+	ppt.pt = pt;
 	po_add_op(pcb, cbuf, op, &ppt, sizeof(ppt));
 }
 
@@ -339,7 +341,7 @@ static bool resolve_labels(Poco_cb* pcb, Poco_frame* pf)
 	Code* cbuf;
 	bool retval = true;
 
-	cbuf  = pf->fcd.code_buf;
+	cbuf = pf->fcd.code_buf;
 	cnext = pf->labels;
 	while ((cl = cnext) != NULL) {
 		if (cl->lvar != NULL && cl->code_pos == 0) {
@@ -348,9 +350,9 @@ static bool resolve_labels(Poco_cb* pcb, Poco_frame* pf)
 		}
 		unext = cl->uses;
 		while ((ul = unext) != NULL) {
-			offset							 = cl->code_pos - ul->code_pos;
+			offset = cl->code_pos - ul->code_pos;
 			((int*)(cbuf + ul->code_pos))[0] = offset;
-			unext							 = ul->next;
+			unext = ul->next;
 			po_freemem(ul);
 		}
 		cnext = cl->next;
@@ -365,12 +367,71 @@ static bool resolve_labels(Poco_cb* pcb, Poco_frame* pf)
  *	and convert local-symbol-list to parameter-only-list.
  *	Resolve labels. Then append func_frame to pcb->run.fff.
  ****************************************************************************/
+static bool append_debug_local(Poco_cb* pcb, PocoDebugLocal*** tail, const Symbol* symbol,
+							   long live_end)
+{
+	PocoDebugLocal* local;
+
+	if (symbol->tok_type != PTOK_VAR || symbol->ti == NULL) {
+		return true;
+	}
+	local = po_memzalloc(pcb, sizeof(*local));
+	if (local == NULL) {
+		return false;
+	}
+	local->name = po_clone_string(pcb, symbol->name);
+	local->type = po_new_type_info(pcb, symbol->ti, 0);
+	if (local->name == NULL || local->type == NULL) {
+		return false;
+	}
+	local->frame_offset = symbol->symval.doff;
+	local->scope = symbol->scope;
+	local->storage_scope = symbol->storage_scope;
+	local->live_start = 0;
+	local->live_end = live_end;
+	local->live_range_approximate = true;
+	**tail = local;
+	*tail = &local->next;
+	return true;
+}
+
+static bool capture_debug_locals(Poco_cb* pcb, Poco_frame* frame, Func_frame* function,
+								 long live_end)
+{
+	PocoDebugLocal** tail = &function->debug_locals;
+	const Symbol* symbol;
+
+	if (frame->frame_type != FTY_FUNC) {
+		return true;
+	}
+
+	for (symbol = frame->parameters; symbol != NULL; symbol = symbol->link) {
+		if (!append_debug_local(pcb, &tail, symbol, live_end)) {
+			return false;
+		}
+	}
+	for (symbol = frame->symbols; symbol != NULL; symbol = symbol->link) {
+		if (!append_debug_local(pcb, &tail, symbol, live_end)) {
+			return false;
+		}
+	}
+	/* Debug type descriptors can refer to function-local aggregate definitions.
+	 * Keep those arena allocations alive with the immutable program. */
+	if (function->debug_locals != NULL) {
+		frame->fsif = NULL;
+	}
+	return true;
+}
+
 bool po_compress_func(Poco_cb* pcb, Poco_frame* pf, Func_frame* new_frame)
 {
 	long csize;
 
-	if (!resolve_labels(pcb, pf))
+	if (!resolve_labels(pcb, pf)) {
 		return (false);
+	}
+	new_frame->unit_name = pcb->current_unit_name;
+	new_frame->unit_index = pcb->current_unit_index;
 
 #ifdef STRING_EXPERIMENT
 	po_free_local_string_list(pcb, pf);
@@ -378,19 +439,23 @@ bool po_compress_func(Poco_cb* pcb, Poco_frame* pf, Func_frame* new_frame)
 	/* Move code to place just big enough to fit */
 
 	csize = ((UBYTE*)(pf->fcd.code_pt)) - ((UBYTE*)(pf->fcd.code_buf));
-	if (csize == 0)
+	if (!capture_debug_locals(pcb, pf, new_frame, csize)) {
+		return false;
+	}
+	if (csize == 0) {
 		new_frame->code_pt = NULL;
-	else {
+	} else {
 		new_frame->code_pt = po_memalloc(pcb, csize);
 		poco_copy_bytes(pf->fcd.code_buf, new_frame->code_pt, csize);
 	}
-	new_frame->type	   = pf->type;
+	new_frame->type = pf->type;
 	new_frame->code_size = csize;
-	new_frame->ld		   = pf->ld;
-	if (!po_compress_line_data(pcb, new_frame->ld))
+	new_frame->ld = pf->ld;
+	if (!po_compress_line_data(pcb, new_frame->ld)) {
 		return (false);
-	new_frame->next	 = pcb->run.fff;
+	}
+	new_frame->next = pcb->run.fff;
 	pcb->run.fff = new_frame;
-	pf->ld		 = NULL;
+	pf->ld = NULL;
 	return true;
 }

@@ -29,9 +29,9 @@
 #define PREC_COUNT 11 /* This needs to be big enough to hold one for each */
 					  /* level of precedence, plus one */
 
-#define PREC_ADD 9	   /* Precedence of ADD/SUB ops. */
+#define PREC_ADD 9     /* Precedence of ADD/SUB ops. */
 #define PREC_COMPARE 7 /* Precedence of LT/LE/GT/GE ops. */
-#define PREC_EQ 6	   /* Precedence of EQ/NE ops. */
+#define PREC_EQ 6      /* Precedence of EQ/NE ops. */
 
 #define NOCOPY_TYPE 0
 #define COPY_TYPE 1
@@ -54,38 +54,37 @@ static SHORT enforce_simple(Poco_cb* pcb, Type_info* ti)
 			return (nt);
 		default:
 			po_say_fatal(pcb, "Simple data type expected.");
-   PO_CHECK_ABORT(pcb, 0);
+			PO_CHECK_ABORT(pcb, 0);
 			return (-1);
 	}
 }
 
-typedef struct bop_info
-{
+typedef struct bop_info {
 	SHORT precedence;
 	Op_type* ido_ops;
 	SHORT (*enforcer)(Poco_cb* pcb, Type_info* ti); /*  type enforcer */
 } Bop_info;
 
 static Bop_info bi_table[] = {
-	{ 0, NULL, NULL },
-	{ 10, po_mul_ops, po_force_num_exp },
-	{ 10, po_div_ops, po_force_num_exp },
-	{ 10, po_mod_ops, po_force_int_exp },
-	{ 9, po_add_ops, enforce_simple },
-	{ 9, po_sub_ops, po_force_num_exp },
-	{ 8, po_lshift_ops, po_force_int_exp },
-	{ 8, po_rshift_ops, po_force_int_exp },
-	{ 7, po_le_ops, enforce_simple },
-	{ 7, po_lt_ops, enforce_simple },
-	{ 7, po_ge_ops, enforce_simple },
-	{ 7, po_gt_ops, enforce_simple },
-	{ 6, po_eq_ops, enforce_simple },
-	{ 6, po_ne_ops, enforce_simple },
-	{ 5, po_band_ops, po_force_int_exp },
-	{ 4, po_xor_ops, po_force_int_exp },
-	{ 3, po_bor_ops, po_force_int_exp },
-	{ 2, po_land_ops, po_force_int_exp },
-	{ 1, po_lor_ops, po_force_int_exp },
+	{0, NULL, NULL},
+	{10, po_mul_ops, po_force_num_exp},
+	{10, po_div_ops, po_force_num_exp},
+	{10, po_mod_ops, po_force_int_exp},
+	{9, po_add_ops, enforce_simple},
+	{9, po_sub_ops, po_force_num_exp},
+	{8, po_lshift_ops, po_force_int_exp},
+	{8, po_rshift_ops, po_force_int_exp},
+	{7, po_le_ops, enforce_simple},
+	{7, po_lt_ops, enforce_simple},
+	{7, po_ge_ops, enforce_simple},
+	{7, po_gt_ops, enforce_simple},
+	{6, po_eq_ops, enforce_simple},
+	{6, po_ne_ops, enforce_simple},
+	{5, po_band_ops, po_force_int_exp},
+	{4, po_xor_ops, po_force_int_exp},
+	{3, po_bor_ops, po_force_int_exp},
+	{2, po_land_ops, po_force_int_exp},
+	{1, po_lor_ops, po_force_int_exp},
 };
 
 /*****************************************************************************
@@ -95,24 +94,24 @@ void po_init_qbop_table(Poco_cb* pcb)
 {
 	register UBYTE* ptab = pcb->qbop_table;
 
-	ptab['*']		 = 1;
-	ptab['/']		 = 2;
-	ptab['%']		 = 3;
-	ptab['+']		 = 4;
-	ptab['-']		 = 5;
+	ptab['*'] = 1;
+	ptab['/'] = 2;
+	ptab['%'] = 3;
+	ptab['+'] = 4;
+	ptab['-'] = 5;
 	ptab[TOK_LSHIFT] = 6;
 	ptab[TOK_RSHIFT] = 7;
-	ptab[TOK_LE]	 = 8;
-	ptab['<']		 = 9;
-	ptab[TOK_GE]	 = 10;
-	ptab['>']		 = 11;
-	ptab[TOK_EQ]	 = 12;
-	ptab[TOK_NE]	 = 13;
-	ptab['&']		 = 14;
-	ptab['^']		 = 15;
-	ptab['|']		 = 16;
-	ptab[TOK_LAND]	 = 17;
-	ptab[TOK_LOR]	 = 18;
+	ptab[TOK_LE] = 8;
+	ptab['<'] = 9;
+	ptab[TOK_GE] = 10;
+	ptab['>'] = 11;
+	ptab[TOK_EQ] = 12;
+	ptab[TOK_NE] = 13;
+	ptab['&'] = 14;
+	ptab['^'] = 15;
+	ptab['|'] = 16;
+	ptab[TOK_LAND] = 17;
+	ptab[TOK_LOR] = 18;
 }
 
 /*****************************************************************************
@@ -127,11 +126,12 @@ static void cat_exp(Poco_cb* pcb, Exp_frame* dest, Exp_frame* tail, short copy_t
 	dest->includes_assignment += tail->includes_assignment;
 	dest->left_complex += tail->left_complex;
 
-	dest->var  = tail->var;
+	dest->var = tail->var;
 	dest->doff = tail->doff;
 
-	if (copy_type_flag != NOCOPY_TYPE)
+	if (copy_type_flag != NOCOPY_TYPE) {
 		po_copy_type(pcb, &tail->ctc, &dest->ctc);
+	}
 }
 
 /*****************************************************************************
@@ -146,10 +146,10 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 	Bop_info* bi;
 	int stack_size;
 	SHORT dot0, /* ido_types of binary components */
-	  dot1;
+		dot1;
 
-	exp_stack  = exp_buf + Array_els(exp_buf);
-	bop_stack  = bop_buf + Array_els(bop_buf);
+	exp_stack = exp_buf + Array_els(exp_buf);
+	bop_stack = bop_buf + Array_els(bop_buf);
 	stack_size = 0;
 
 	for (;;) {
@@ -158,7 +158,7 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 		po_get_unop_expression(pcb, exp0);
 		PO_CHECK_ABORT_VOID(pcb);
 		lookup_token(pcb);
-		bi			   = &bi_table[pcb->qbop_table[pcb->t.toktype]];
+		bi = &bi_table[pcb->qbop_table[pcb->t.toktype]];
 		*(--exp_stack) = exp0;
 		*(--bop_stack) = bi;
 		++stack_size;
@@ -169,12 +169,13 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 				{
 					pushback_token(&pcb->t);
 					goto ALLDONE;
-				} else /* can't reduce further, oh well */
+				} else { /* can't reduce further, oh well */
 					break;
+				}
 			} else {
 				bi = bop_stack[1];
 				if (bop_stack[0]->precedence <= bi->precedence) {
-				REDO_POINTER_ARITHMETIC:
+REDO_POINTER_ARITHMETIC:
 					exp0 = exp_stack[0];
 					exp1 = exp_stack[1];
 					dot0 = exp0->ctc.ido_type;
@@ -191,18 +192,21 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 						&& (dot0 == IDO_POINTER || dot1 == IDO_POINTER)) {
 						if (dot0 == dot1) {
 							int typesize;
-							if (bi->ido_ops == po_add_ops)
+							if (bi->ido_ops == po_add_ops) {
 								po_say_fatal(pcb, "cannot add two pointers");
-        PO_CHECK_ABORT_VOID(pcb);
+							}
+							PO_CHECK_ABORT_VOID(pcb);
 							/*
 							 * code the subtraction of two pointers...
 							 */
-							if (!po_types_same(&exp1->ctc, &exp0->ctc, 0))
+							if (!po_types_same(&exp1->ctc, &exp0->ctc, 0)) {
 								po_say_fatal(pcb, "type mismatch in pointer subtraction");
-        PO_CHECK_ABORT_VOID(pcb);
-							if (0 == (typesize = po_get_subtype_size(pcb, &(exp1->ctc))))
+							}
+							PO_CHECK_ABORT_VOID(pcb);
+							if (0 == (typesize = po_get_subtype_size(pcb, &(exp1->ctc)))) {
 								po_say_fatal(pcb, "size of type is zero (void pointer)");
-        PO_CHECK_ABORT_VOID(pcb);
+							}
+							PO_CHECK_ABORT_VOID(pcb);
 							cat_exp(pcb, exp1, exp0, NOCOPY_TYPE);
 							clear_code_buf(pcb, &exp1->left);
 							po_code_int(pcb, &(exp1->ecd), OP_PTRDIFF, typesize);
@@ -245,11 +249,12 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 								po_coerce_to_string(pcb, exp0);
 								po_coerce_to_string(pcb, exp1);
 							}
-#endif											  /* STRING_EXPERIMENT */
+#endif                                            /* STRING_EXPERIMENT */
 							else if (dot0 > dot1) /* coerce num exp to larger type */
 								po_coerce_numeric_exp(pcb, exp1, dot0);
-							else
+							else {
 								po_coerce_numeric_exp(pcb, exp0, dot1);
+							}
 						}
 						/*
 						 * ensure the op is legal for the target type...
@@ -261,8 +266,9 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 						cat_exp(pcb, exp1, exp0, COPY_TYPE);
 						clear_code_buf(pcb, &exp1->left);
 						po_code_op(pcb, &(exp1->ecd), bi->ido_ops[dot0]);
-						if (bi->precedence == PREC_EQ || bi->precedence == PREC_COMPARE)
+						if (bi->precedence == PREC_EQ || bi->precedence == PREC_COMPARE) {
 							po_set_base_type(pcb, &exp1->ctc, TYPE_INT, 0, NULL);
+						}
 						po_fold_const(pcb, exp1);
 					}
 					po_dispose_expframe(pcb, exp0);
@@ -270,8 +276,9 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 					bop_stack[1] = bop_stack[0];
 					bop_stack += 1;
 					stack_size -= 1;
-				} else
+				} else {
 					break;
+				}
 			}
 		}
 	}

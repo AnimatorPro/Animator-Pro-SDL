@@ -3,17 +3,17 @@
 
 
 #ifdef _MSC_VER
-	#include <../include/limits.h>
-	#if _MSC_VER >= 1900
-		#include <../ucrt/stdlib.h>
-	#else
-		#include <../include/stdlib.h>
-	#endif
-	#ifndef PATH_MAX
-		#define PATH_MAX _MAX_PATH
-	#endif
+#include <../include/limits.h>
+#if _MSC_VER >= 1900
+#include <../ucrt/stdlib.h>
 #else
-	#include_next <limits.h>
+#include <../include/stdlib.h>
+#endif
+#ifndef PATH_MAX
+#define PATH_MAX _MAX_PATH
+#endif
+#else
+#include_next <limits.h>
 #endif
 
 
@@ -25,59 +25,59 @@
 #endif
 
 #ifndef STDTYPES_H
-	#include "stdtypes.h"
+#include "stdtypes.h"
 #endif
 
 #ifndef PTRMACRO_H
-	#include "ptrmacro.h"
+#include "ptrmacro.h"
 #endif
 
 #ifndef MEMORY_H
-	#include "memory.h"
+#include "memory.h"
 #endif
 
 #ifndef INPUT_H
-	#include "input.h"
-#endif 
+#include "input.h"
+#endif
 
 #ifndef FILEPATH_H
-	#include "filepath.h"
+#include "filepath.h"
 #endif
 
 #ifndef WNDO_H
-	#include "wndo.h"
+#include "wndo.h"
 #endif
 
 #ifndef MENUS_H
-	#include "menus.h"
+#include "menus.h"
 #endif
 
 #ifndef VDEVICE_H
-	#include "vdevice.h"
+#include "vdevice.h"
 #endif
 
 struct screen_mode;
 
 typedef struct vbasics_cb {
-	SHORT ivmode;	    /* initial Video mode program started from */
-	char init_drawer[PATH_SIZE];	/* directory program started from */
-	Vdevice *vd;    	/* video driver for main display */
-	Vdevice *ram_vd;	/* video driver for ram cels */
-	Rcel *cel_a;        /* two displayable cels for screen */
-	Rcel *cel_b;
-	Wscreen *screen;	/* the main window screen */
-	Short_xy scrcent;   /* pre calc'd center of screen */
-	Rcel *pencel;		/* the drawing cel This is an Rcel* for uniformity
-						 * with other Rcels even though it is actually
-						 * a Wndo* It is put here and will be set to the 
-						 * screen window by default unless altered */
+	SHORT ivmode;                /* initial Video mode program started from */
+	char init_drawer[PATH_SIZE]; /* directory program started from */
+	Vdevice* vd;                 /* video driver for main display */
+	Vdevice* ram_vd;             /* video driver for ram cels */
+	Rcel* cel_a;                 /* two displayable cels for screen */
+	Rcel* cel_b;
+	Wscreen* screen;  /* the main window screen */
+	Short_xy scrcent; /* pre calc'd center of screen */
+	Rcel* pencel;     /* the drawing cel This is an Rcel* for uniformity
+					   * with other Rcels even though it is actually
+					   * a Wndo* It is put here and will be set to the
+					   * screen window by default unless altered */
 
-#define PENWNDO ((Wndo *)(vb.pencel)) /* for when we need it as a Wndo */
+#define PENWNDO ((Wndo*)(vb.pencel)) /* for when we need it as a Wndo */
 
-	char *config_name;  /* config file name */
-	char *vdriver_name; /* video driver name from command line args */
+	char* config_name;  /* config file name */
+	char* vdriver_name; /* video driver name from command line args */
 	SHORT vdriver_mode; /* video driver mode from command line args */
-} Vbcb; 
+} Vbcb;
 
 /* defines for access to menu colors for screen */
 
@@ -89,31 +89,29 @@ typedef struct vbasics_cb {
 
 /***** globals *****/
 
-extern Vbcb vb;  				/* in pjhigh.lib(startup.c) */
+extern Vbcb vb; /* in pjhigh.lib(startup.c) */
 extern char resource_dir[PATH_SIZE];
-extern Errcode builtin_err;     /* in pocolib(pocoface.c) */
+extern Errcode builtin_err; /* in pocolib(pocoface.c) */
 
 /***** initializer functions ******/
 
 #ifdef SCRNINIT_CODE
-	#define OPTdata void*
+#define OPTdata void*
 #else
-	#define OPTdata ...
+#define OPTdata ...
 #endif
 
-Errcode open_pj_startup_screen(Errcode (*init_with_screen)(void *iwdat),
-					OPTdata);
+Errcode open_pj_startup_screen(Errcode (*init_with_screen)(void* iwdat), OPTdata);
 
-Errcode init_screen(struct screen_mode *smode, struct screen_mode *altmode,
-					Errcode (*init_with_screen)(void *iwdat), void* iwdat);
+Errcode init_screen(struct screen_mode* smode, struct screen_mode* altmode,
+					Errcode (*init_with_screen)(void* iwdat), void* iwdat);
 
-Errcode go_resize_screen(Errcode (*reinit)(void *dat),
-						 void (*close_reinit)(void *dat), void* dat);
+Errcode go_resize_screen(Errcode (*reinit)(void* dat), void (*close_reinit)(void* dat), void* dat);
 
 #undef OPTdata
 
-void get_default_cmap(Cmap *cm);
-void clip_penwinrect(Rectangle *r);
+void get_default_cmap(Cmap* cm);
+void clip_penwinrect(Rectangle* r);
 Errcode set_pencel_size(SHORT width, SHORT height, SHORT xcen, SHORT ycen);
 extern void fliborder_off(void);
 extern void fliborder_on(void);

@@ -70,8 +70,9 @@ Errcode alloc_fcel_raster(Flicel* fc)
 	}
 	fc->frame_loaded = !fc->cd.cur_frame; /* force reseek from start */
 	err = valloc_ramcel(&fc->rc, fc->flif.hdr.width, fc->flif.hdr.height);
-	if (err >= Success)
+	if (err >= Success) {
 		fc->flags |= FCEL_OWNS_RAST;
+	}
 	return err;
 }
 
@@ -83,7 +84,7 @@ void free_fcel(Flicel** pfc)
 		return;
 	}
 
-	free_fcel_raster(fc);	 /* only does if alloc'd and owned */
+	free_fcel_raster(fc);    /* only does if alloc'd and owned */
 	pj_fli_close(&fc->flif); /* only does if open */
 	free_flipath(&fc->cpath);
 	free_fcel_cfit(fc);
@@ -178,10 +179,10 @@ void clear_fcel_xform(Flicel* fc)
 void fcelpos_to_box(Flicel* fc, Fcelpos* pos, Rectangle* box)
 {
 	pos->rotang.x = pos->rotang.y = pos->rotang.z = 0;
-	pos->cent.x									  = box->x + (box->width >> 1);
-	pos->cent.y									  = box->y + (box->height >> 1);
-	pos->stretch.x								  = box->width - fc->flif.hdr.width;
-	pos->stretch.y								  = box->height - fc->flif.hdr.height;
+	pos->cent.x = box->x + (box->width >> 1);
+	pos->cent.y = box->y + (box->height >> 1);
+	pos->stretch.x = box->width - fc->flif.hdr.width;
+	pos->stretch.y = box->height - fc->flif.hdr.height;
 }
 
 static void fcel_to_box(Flicel* fc, Rectangle* box)
@@ -198,7 +199,7 @@ void scale_fcel_to_screen(Flicel* fcel, Rcel* screen)
 {
 	Rectangle box;
 
-	box.width  = screen->width;
+	box.width = screen->width;
 	box.height = screen->height;
 	box.x = box.y = 0;
 	fcel_to_box(fcel, &box);
@@ -209,8 +210,8 @@ void scale_fcel_to_screen(Flicel* fcel, Rcel* screen)
 void save_fcel_undo(Flicel* fc)
 {
 	maybe_ref_flicel_pos(fc);
-	save_undo_rect(
-	  fc->xf.mmax.x - 1, fc->xf.mmax.y - 1, fc->xf.mmax.width + 2, fc->xf.mmax.height + 2);
+	save_undo_rect(fc->xf.mmax.x - 1, fc->xf.mmax.y - 1, fc->xf.mmax.width + 2,
+				   fc->xf.mmax.height + 2);
 }
 
 void unsee_flicel(Flicel* fc)
@@ -229,9 +230,9 @@ void marqi_flicel(Flicel* fc, int dotmod, Pixel* save_buf)
 
 	vinit_marqihdr(&mh, 1, 1);
 	mh.dmod = mh.smod = dotmod;
-	if ((mh.dotbuf = save_buf) == NULL)
+	if ((mh.dotbuf = save_buf) == NULL) {
 		msome_vector(thecel->xf.bpoly, 4, mh.pdot, &mh, 0, sizeof(Short_xy));
-	else {
+	} else {
 		/* save four corners of cel rectangle */
 		for (pgpt = &thecel->xf.bpoly[0]; pgpt <= &thecel->xf.bpoly[3]; ++pgpt) {
 			*save_buf++ = pj_get_dot(vb.pencel, pgpt->x, pgpt->y);
@@ -248,9 +249,9 @@ void undo_flicel_marqi(Flicel* fc, Pixel* save_buf)
 	(void)fc;
 
 	vinit_marqihdr(&mh, 1, 1);
-	if (NULL == (mh.dotbuf = save_buf))
+	if (NULL == (mh.dotbuf = save_buf)) {
 		msome_vector(thecel->xf.bpoly, 4, undo_marqidot, &mh, 0, sizeof(Short_xy));
-	else {
+	} else {
 		mh.dotbuf = (UBYTE*)(save_buf + 4);
 		msome_vector(thecel->xf.bpoly, 4, restore_marqidot, &mh, 0, sizeof(Short_xy));
 
@@ -266,8 +267,9 @@ static Errcode draw_thecel_a_sec(void)
 	Errcode err;
 	Marqihdr mh;
 
-	if ((err = draw_flicel(thecel, DRAW_FIRST, NEW_CFIT)) < 0)
+	if ((err = draw_flicel(thecel, DRAW_FIRST, NEW_CFIT)) < 0) {
 		goto error;
+	}
 
 	vinit_marqihdr(&mh, 1, 1);
 	mh.smod = 8;
@@ -285,8 +287,9 @@ Errcode show_thecel_a_sec(void)
 {
 	Errcode err;
 
-	if (thecel == NULL)
+	if (thecel == NULL) {
 		return (Err_no_cel);
+	}
 
 	save_undo();
 	err = draw_thecel_a_sec();
@@ -320,8 +323,7 @@ error:
 	return (err);
 }
 
-typedef struct clipceldat
-{
+typedef struct clipceldat {
 	Rcel* rc;
 	Flicel** pfcel;
 	Rectangle start;
@@ -345,8 +347,8 @@ static Errcode clip1_celframe(void* clipceldat, int ix, int it, int scale, Autoa
 	(void)ix;
 	(void)it;
 
-	dx	   = cd->end.x - cd->start.x;
-	dy	   = cd->end.y - cd->start.y;
+	dx = cd->end.x - cd->start.x;
+	dy = cd->end.y - cd->start.y;
 	bounds = cd->start;
 	bounds.x += itmult(dx, scale);
 	bounds.y += itmult(dy, scale);
@@ -359,25 +361,28 @@ static Errcode clip1_celframe(void* clipceldat, int ix, int it, int scale, Autoa
 			/* first time we have to delete old cel and make a new one */
 
 			free_fcel(&cd->old_cel);
-			if ((err = clip_celrect(vb.pencel, &bounds, &rc)) < 0)
+			if ((err = clip_celrect(vb.pencel, &bounds, &rc)) < 0) {
 				goto error;
+			}
 
 			if ((err = create_celfli_start(cd->tempname, cd->fliname, cd->pfcel, rc)) < 0) {
 				pj_rcel_free(rc);
 				goto error;
 			}
-			fc				   = *(cd->pfcel);
+			fc = *(cd->pfcel);
 			fc->flif.hdr.speed = flix.hdr.speed; /* where it is coming from */
-			fc->flif.hdr.id	   = flix.hdr.id;	 /* you didn't really create this,
+			fc->flif.hdr.id = flix.hdr.id;       /* you didn't really create this,
 												  * did you ?? */
 
-			set_fcel_center(
-			  fc, clipcel.x + (clipcel.width >> 1), clipcel.y + (clipcel.height >> 1));
-		} else
+			set_fcel_center(fc, clipcel.x + (clipcel.width >> 1),
+							clipcel.y + (clipcel.height >> 1));
+		} else {
 			fc = *(cd->pfcel);
+		}
 
-		if ((err = pj_fli_cel_alloc_cbuf(&cbuf, &clipcel)) < 0)
+		if ((err = pj_fli_cel_alloc_cbuf(&cbuf, &clipcel)) < 0) {
 			goto error;
+		}
 
 		if (aa->cur_frame == 0) /* write first frame */
 		{
@@ -387,8 +392,9 @@ static Errcode clip1_celframe(void* clipceldat, int ix, int it, int scale, Autoa
 			err = pj_fli_add_next(cd->fliname, &fc->flif, cbuf, fc->rc, &clipcel);
 		}
 
-		if (err < Success)
+		if (err < Success) {
 			goto error;
+		}
 
 		if (aa->cur_frame == (aa->frames_in_seq - 1)) /* last frame, ringit */
 		{
@@ -402,8 +408,9 @@ static Errcode clip1_celframe(void* clipceldat, int ix, int it, int scale, Autoa
 				/* go back to end of file and write ring frame and finish */
 
 				err = xffseek(fc->flif.xf, 0, XSEEK_END);
-				if (err < Success)
+				if (err < Success) {
 					goto error;
+				}
 			}
 			if ((err = pj_fli_add_ring(cd->fliname, &fc->flif, cbuf, &clipcel, fc->rc)) < Success) {
 				goto error;
@@ -428,10 +435,7 @@ error:
 
 /* note *pfcel must be NULL unless it contains the old cel to be freed and
  * replaced by the new one */
-static Errcode multi_fli_clip(char* tempname,
-							  char* fliname,
-							  Flicel** pfcel,
-							  Rectangle* r,
+static Errcode multi_fli_clip(char* tempname, char* fliname, Flicel** pfcel, Rectangle* r,
 							  bool render_only)
 {
 	Errcode err;
@@ -442,43 +446,48 @@ static Errcode multi_fli_clip(char* tempname,
 	flx_clear_olays(); /* undraw cels cursors etc */
 
 	clear_struct(&cd);
-	cd.old_cel	= *pfcel;
-	cd.pfcel	= pfcel;
-	cd.end		= *r;
-	cd.start	= *r;
-	cd.fliname	= fliname;
+	cd.old_cel = *pfcel;
+	cd.pfcel = pfcel;
+	cd.end = *r;
+	cd.start = *r;
+	cd.fliname = fliname;
 	cd.tempname = tempname;
-	*pfcel		= NULL;
+	*pfcel = NULL;
 
 	push_cel(); /* disable push/pop or get rid of it here */
 
 	if (!render_only) {
-		if ((err = rect_in_place(&cd.start)) >= Success)
+		if ((err = rect_in_place(&cd.start)) >= Success) {
 			err = clip_move_rect(&cd.end);
-		if (err < 0 && err != Err_abort)
+		}
+		if (err < 0 && err != Err_abort) {
 			goto error;
+		}
 	}
 
 	clear_struct(&aa);
-	aa.avec	   = clip1_celframe;
+	aa.avec = clip1_celframe;
 	aa.avecdat = &cd;
-	aa.flags   = AUTO_READONLY | AUTO_UNZOOM;
+	aa.flags = AUTO_READONLY | AUTO_UNZOOM;
 
-	if (render_only)
+	if (render_only) {
 		err = noask_do_auto_time_mode(&aa);
-	else
+	} else {
 		err = do_auto(&aa);
+	}
 
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	/* write a temp info file for this cel's new fli */
 
 	fc = *cd.pfcel;
 	set_flicel_tcolor(fc, vs.inks[0]); /* set to current tcolor */
 
-	if ((err = save_fcel_temp(fc)) < Success)
+	if ((err = save_fcel_temp(fc)) < Success) {
 		goto error;
+	}
 
 	goto ok_out;
 error:
@@ -499,8 +508,7 @@ ok_out:
 
 /*******************************************************/
 
-typedef struct clipper_rast
-{
+typedef struct clipper_rast {
 	Rcel rc;
 	Pixel tcolor;
 	Raster* root;
@@ -508,15 +516,17 @@ typedef struct clipper_rast
 
 static void clpdot(Crast* cr, Pixel color, Coor x, Coor y)
 {
-	if (color == cr->tcolor)
+	if (color == cr->tcolor) {
 		return;
+	}
 	pj__put_dot(cr->root, color, x, y);
 }
 
 static void clsethline(Crast* cr, Pixel color, Coor x, Coor y, Ucoor width)
 {
-	if (color == cr->tcolor)
+	if (color == cr->tcolor) {
 		return;
+	}
 	pj__put_dot(cr->root, color, x, y);
 	pj__put_dot(cr->root, color, x + width - 1, y);
 }
@@ -559,31 +569,33 @@ static Errcode find_segment_clip(int from, int to, Rectangle* bounds)
 
 	/* save current state */
 
-	if ((err = scrub_cur_frame()) < Success)
+	if ((err = scrub_cur_frame()) < Success) {
 		return (err);
+	}
 
 	/* make up a "clipper rast" */
 
-	if (NULL == (cliprast = pj_zalloc(sizeof(Crast) + sizeof(Rastlib))))
+	if (NULL == (cliprast = pj_zalloc(sizeof(Crast) + sizeof(Rastlib)))) {
 		return (Err_no_memory);
+	}
 
-	cliprast->rc	 = *vb.pencel;
+	cliprast->rc = *vb.pencel;
 	cliprast->rc.lib = lib = (struct rastlib*)(cliprast + 1);
-	lib->put_dot		   = (rl_type_put_dot)clpdot;
-	lib->get_dot		   = nogetd;
-	lib->put_hseg		   = (rl_type_put_hseg)clphseg;
-	lib->set_hline		   = (rl_type_set_hline)clsethline;
+	lib->put_dot = (rl_type_put_dot)clpdot;
+	lib->get_dot = nogetd;
+	lib->put_hseg = (rl_type_put_hseg)clphseg;
+	lib->set_hline = (rl_type_set_hline)clsethline;
 	pj_set_grc_calls(lib);
 	cliprast->rc.type = RT_CLIPBOX;
-	cliprast->root	  = (Raster*)vb.pencel;
-	cliprast->tcolor  = vs.inks[0];
+	cliprast->root = (Raster*)vb.pencel;
+	cliprast->tcolor = vs.inks[0];
 
 	if (from > to) {
 		int swapr;
 
 		swapr = to;
-		to	  = from;
-		from  = swapr;
+		to = from;
+		from = swapr;
 	}
 
 	save_undo();
@@ -596,21 +608,26 @@ static Errcode find_segment_clip(int from, int to, Rectangle* bounds)
 	start_abort_atom();
 	while (from < to) {
 		if ((err = poll_abort()) < Success) {
-			if (soft_yes_no_box("clip_abort"))
+			if (soft_yes_no_box("clip_abort")) {
 				break;
+			}
 		}
-		if ((err = flx_ringseek(&cliprast->rc, from, from + 1)) < Success)
+		if ((err = flx_ringseek(&cliprast->rc, from, from + 1)) < Success) {
 			break;
+		}
 		++from;
 	}
-	if ((err = errend_abort_atom(err)) < Success)
+	if ((err = errend_abort_atom(err)) < Success) {
 		goto error;
+	}
 
-	if ((err = find_clip(vb.pencel, bounds, vs.inks[0])) < Success)
+	if ((err = find_clip(vb.pencel, bounds, vs.inks[0])) < Success) {
 		goto error;
+	}
 
-	if (!bounds->height)
+	if (!bounds->height) {
 		err = Err_clipped;
+	}
 
 error:
 	zoom_unundo();
@@ -634,8 +651,7 @@ Errcode clip_cel(void)
 	flx_clear_olays(); /* undraw cels cursors etc */
 	if (vs.multi && flix.hdr.frame_count > 1) {
 		oframe_ix = vs.frame_ix;
-		if ((err = go_autodraw((autoarg_func)pj_errdo_success,
-							   NULL,
+		if ((err = go_autodraw((autoarg_func)pj_errdo_success, NULL,
 							   AUTO_READONLY | AUTO_PREVIEW_ONLY | AUTO_UNZOOM)) < 0) {
 			goto error;
 		}
@@ -654,8 +670,9 @@ Errcode clip_cel(void)
 
 		if (err >= Success) {
 			err = multi_fli_clip(cel_name, cel_fli_name, &thecel, &bounds, true);
-			if (oframe_ix == vs.frame_ix)
+			if (oframe_ix == vs.frame_ix) {
 				goto error;
+			}
 		}
 		fli_abs_tseek(undof, oframe_ix);
 		zoom_unundo();
@@ -666,14 +683,16 @@ Errcode clip_cel(void)
 single_frame:
 
 	err = find_clip(vb.pencel, &bounds, vs.inks[0]);
-	if (err < 0)
+	if (err < 0) {
 		goto error;
+	}
 
 	if (bounds.height) {
 		free_the_cel();
 		err = clip_from_fli(cel_name, cel_fli_name, &thecel, &bounds);
-		if (err < 0)
+		if (err < 0) {
 			goto error;
+		}
 		show_cel_a_sec(thecel->rc);
 	}
 
@@ -730,8 +749,9 @@ void qget_changes(void)
 	SHORT cely;
 	Rcel_save opic;
 
-	if ((err = report_temp_save_rcel(&opic, vb.pencel)) < Success)
+	if ((err = report_temp_save_rcel(&opic, vb.pencel)) < Success) {
 		goto error;
+	}
 
 	fli_abs_tseek(undof, vs.frame_ix); /* put the unchanged screen into uf */
 
@@ -742,11 +762,13 @@ void qget_changes(void)
 	report_temp_restore_rcel(&opic, vb.pencel);
 
 	free_the_cel();
-	if (!bounds.height)
+	if (!bounds.height) {
 		goto done;
+	}
 
-	if ((err = clip_celrect(vb.pencel, &bounds, &chgcel)) < Success)
+	if ((err = clip_celrect(vb.pencel, &bounds, &chgcel)) < Success) {
 		goto error;
+	}
 
 	/* we assume that the undof and the pencel are the same size */
 
@@ -765,8 +787,9 @@ void qget_changes(void)
 	}
 	pj_free(newline);
 
-	if ((err = make1_flicel(cel_name, cel_fli_name, &thecel, chgcel)) < Success)
+	if ((err = make1_flicel(cel_name, cel_fli_name, &thecel, chgcel)) < Success) {
 		goto error;
+	}
 	chgcel = NULL;
 
 	show_thecel_a_sec();
@@ -780,8 +803,7 @@ done:
 	return;
 }
 
-typedef struct lasso_dat
-{
+typedef struct lasso_dat {
 	Pixel* lbuf;
 	Rcel* src;
 	Rcel* dst;
@@ -835,21 +857,26 @@ Errcode lasso_cel(void)
 	push_cel(); /* disable push/pop here */
 
 	clear_struct(&shape);
-	if ((err = get_rub_shape(&shape, swhite, sblack)) < 0)
+	if ((err = get_rub_shape(&shape, swhite, sblack)) < 0) {
 		goto error;
+	}
 
 	poly_bounds(&shape, &bounds);
 
 	lbufsize = bounds.MaxX - bounds.x;
 
-	if (bounds.x < 0)
+	if (bounds.x < 0) {
 		bounds.x = 0;
-	if (bounds.y < 0)
+	}
+	if (bounds.y < 0) {
 		bounds.y = 0;
-	if (bounds.MaxX > undof->width)
+	}
+	if (bounds.MaxX > undof->width) {
 		bounds.MaxX = undof->width;
-	if (bounds.MaxY > undof->height)
+	}
+	if (bounds.MaxY > undof->height) {
 		bounds.MaxY = undof->height;
+	}
 
 	crect_torect(&bounds, &celsize);
 
@@ -858,10 +885,11 @@ Errcode lasso_cel(void)
 		goto error;
 	}
 
-	if ((err = valloc_ramcel(&rc, celsize.width, celsize.height)) < 0)
+	if ((err = valloc_ramcel(&rc, celsize.width, celsize.height)) < 0) {
 		goto error;
+	}
 	pj_cmap_copy(vb.pencel->cmap, rc->cmap); /* copy in cmap */
-	pj_set_rast(rc, vs.inks[0]);			 /* fill with tcolor */
+	pj_set_rast(rc, vs.inks[0]);             /* fill with tcolor */
 
 	pj_rcel_make_virtual(&clipcel, undof, &celsize);
 	rc->x = celsize.x;
@@ -875,20 +903,22 @@ Errcode lasso_cel(void)
 		err = Err_no_memory;
 		goto error;
 	}
-	ldat.src  = &clipcel;
-	ldat.dst  = rc;
+	ldat.src = &clipcel;
+	ldat.dst = rc;
 	ldat.xoff = -celsize.x;
 	ldat.yoff = -celsize.y;
-	if ((err = fill_poly_inside(&shape, lasso_line, &ldat)) < 0)
+	if ((err = fill_poly_inside(&shape, lasso_line, &ldat)) < 0) {
 		goto error;
+	}
 
-	if ((err = make1_flicel(cel_name, cel_fli_name, &thecel, rc)) < 0)
+	if ((err = make1_flicel(cel_name, cel_fli_name, &thecel, rc)) < 0) {
 		goto error;
+	}
 
-	rc			  = NULL; /* now in thecel */
-	oclear		  = vs.zero_clear;
+	rc = NULL; /* now in thecel */
+	oclear = vs.zero_clear;
 	vs.zero_clear = 0;
-	err			  = draw_thecel_a_sec(); /* if we can't do this forget it */
+	err = draw_thecel_a_sec(); /* if we can't do this forget it */
 	vs.zero_clear = oclear;
 
 error:
@@ -896,8 +926,9 @@ error:
 	free_polypoints(&shape);
 	pj_rcel_free(rc);
 	zoom_unundo();
-	if (err < Success && undosave)
+	if (err < Success && undosave) {
 		pj_rcel_copy(undosave, undof);
+	}
 	pj_rcel_free(undosave);
 	err = cel_cant_clip(err);
 	pop_cel();
@@ -921,8 +952,8 @@ bool fcel_stretchsize(Flicel* cel, Srect* cr)
 	Rcel* ccel;
 	bool ret;
 
-	ccel	   = cel->rc;
-	cr->width  = ccel->width;
+	ccel = cel->rc;
+	cr->width = ccel->width;
 	cr->height = ccel->height;
 	cr->x = ccel->x = cel->cd.cent.x - (cr->width >> 1);
 	cr->y = ccel->y = cel->cd.cent.y - (cr->height >> 1);
@@ -930,14 +961,15 @@ bool fcel_stretchsize(Flicel* cel, Srect* cr)
 	if (cel->cd.stretch.x) {
 		cr->width += cel->cd.stretch.x;
 		cr->x = cel->cd.cent.x - (cr->width >> 1);
-		ret	  = true;
-	} else
+		ret = true;
+	} else {
 		ret = false;
+	}
 
 	if (cel->cd.stretch.y) {
 		cr->height += cel->cd.stretch.y;
 		cr->y = cel->cd.cent.y - (cr->height >> 1);
-		ret	  = true;
+		ret = true;
 	}
 	return (ret);
 }
@@ -954,12 +986,15 @@ bool maybe_ref_flicel_pos(Flicel* cel)
 
 	/* clip rotation angle */
 
-	if ((cel->cd.rotang.x = cel->cd.rotang.x % FCEL_TWOPI) < 0)
+	if ((cel->cd.rotang.x = cel->cd.rotang.x % FCEL_TWOPI) < 0) {
 		cel->cd.rotang.x += FCEL_TWOPI;
-	if ((cel->cd.rotang.y = cel->cd.rotang.y % FCEL_TWOPI) < 0)
+	}
+	if ((cel->cd.rotang.y = cel->cd.rotang.y % FCEL_TWOPI) < 0) {
 		cel->cd.rotang.y += FCEL_TWOPI;
-	if ((cel->cd.rotang.z = cel->cd.rotang.z % FCEL_TWOPI) < 0)
+	}
+	if ((cel->cd.rotang.z = cel->cd.rotang.z % FCEL_TWOPI) < 0) {
 		cel->cd.rotang.z += FCEL_TWOPI;
+	}
 
 	if (cel->pos_cksum == (cksum = mem_crcsum(&cel->cd.CDAT_POS_START, sizeof(Fcelpos)))) {
 		return (cel->flags & FCEL_XFORMED);
@@ -967,22 +1002,22 @@ bool maybe_ref_flicel_pos(Flicel* cel)
 	cel->pos_cksum = cksum;
 
 	ret = fcel_stretchsize(cel, &cr);
-	if (cr.width < 0)
+	if (cr.width < 0) {
 		--cr.x;
-	if (cr.height < 0)
+	}
+	if (cr.height < 0) {
 		--cr.y;
+	}
 
 	if (cel->cd.rotang.z) {
 		sq_poly(cr.width, cr.height, cr.x, cr.y, cel->xf.bpoly);
 
-		frotate_points2d(itheta_tofloat(cel->cd.rotang.z, FCEL_TWOPI),
-						 &cel->cd.cent,
-						 (Short_xy*)(cel->xf.bpoly),
-						 (Short_xy*)(cel->xf.bpoly),
-						 4);
+		frotate_points2d(itheta_tofloat(cel->cd.rotang.z, FCEL_TWOPI), &cel->cd.cent,
+						 (Short_xy*)(cel->xf.bpoly), (Short_xy*)(cel->xf.bpoly), 4);
 		++ret;
-	} else
+	} else {
 		sq_poly(cr.width, cr.height, cr.x, cr.y, cel->xf.bpoly);
+	}
 
 	if (ret) {
 		load_poly_minmax(&cel->xf);
@@ -1004,12 +1039,12 @@ static void zundraw_line(Coor x, Coor y, Ucoor width, Pixel* lbuf)
 {
 	pj_get_hseg(undof, lbuf, x, y, width);
 	pj_put_hseg(vb.pencel, lbuf, x, y, width);
-	if (vs.zoom_open)
+	if (vs.zoom_open) {
 		zoom_put_hseg((Raster*)vb.pencel, lbuf, x, y, width);
+	}
 }
 
-typedef struct plinedat
-{
+typedef struct plinedat {
 	Procline pline;
 	Tcolxldat tcxl;
 	Pixel* lbuf;
@@ -1021,16 +1056,18 @@ static Errcode fcel_putline(void* plinedat, Pixel* line, Coor x, Coor y, Ucoor w
 	Plinedat* pd = plinedat;
 
 	if (pd->pline == NULL) {
-		if (pd->tcxl.xlat != NULL)
+		if (pd->tcxl.xlat != NULL) {
 			pj_xlate(pd->tcxl.xlat, line, width);
+		}
 	} else {
 		pj_get_hseg(pd->blitsrc, pd->lbuf, x, y, width);
 		(*pd->pline)(line, pd->lbuf, width, &pd->tcxl);
 		line = pd->lbuf;
 	}
 	pj_put_hseg(vb.pencel, line, x, y, width);
-	if (vs.zoom_open)
+	if (vs.zoom_open) {
 		zoom_put_hseg((Raster*)vb.pencel, line, x, y, width);
+	}
 	return (0);
 }
 
@@ -1049,50 +1086,45 @@ Errcode draw_flicel(Flicel* fc, int drawmode, int cfitmode)
 	if (NULL != (cfit = fc->cfit)) {
 		switch (cfitmode) {
 			case FORCE_CFIT:
-				cfit->ccolor	= -1;
+				cfit->ccolor = -1;
 				cfit->src_cksum = 0x7FFFFFFF;
 				cfit->dst_cksum = 0;
 			case NEW_CFIT:
 				make_render_cfit(rc->cmap, cfit, fc->cd.tcolor);
 			case OLD_CFIT:
-				if (!(cfit->flags & CCFIT_NULL))
+				if (!(cfit->flags & CCFIT_NULL)) {
 					pld.tcxl.xlat = cfit->ctable;
+				}
 			case NO_CFIT:
 				break;
 		}
 	}
 
 	under_flag = vs.render_under;
-	if (vs.render_under)
+	if (vs.render_under) {
 		pld.tcxl.tcolor = vs.inks[0];
-	else
+	} else {
 		pld.tcxl.tcolor = fc->cd.tcolor;
+	}
 
 	if (fc->flags & FCEL_XFORMED ||
 		((drawmode != DRAW_FIRST) &&
 		 (fc->xf.ommax.width != fc->xf.mmax.width || fc->xf.ommax.height != fc->xf.mmax.height))) {
-
 		switch (drawmode) {
 			case DRAW_FIRST:
 				pld.blitsrc = vb.pencel;
 				goto src_set;
 			case DRAW_DELTA:
 				pld.blitsrc = undof;
-			src_set:
+src_set:
 				pld.pline = get_celprocline(pld.tcxl.xlat != NULL);
-				pld.lbuf  = pj_malloc(Max(fc->xf.mmax.width, fc->xf.ommax.width) * sizeof(Pixel));
+				pld.lbuf = pj_malloc(Max(fc->xf.mmax.width, fc->xf.ommax.width) * sizeof(Pixel));
 				if (pld.lbuf == NULL) {
 					err = Err_no_memory;
 					goto done;
 				}
-				err = raster_transform(rc,
-									   vb.pencel,
-									   &fc->xf,
-									   fcel_putline,
-									   &pld,
-									   drawmode == DRAW_DELTA,
-									   zundraw_line,
-									   zoom_undo_rect,
+				err = raster_transform(rc, vb.pencel, &fc->xf, fcel_putline, &pld,
+									   drawmode == DRAW_DELTA, zundraw_line, zoom_undo_rect,
 									   pld.lbuf);
 				pj_free(pld.lbuf);
 				goto done;
@@ -1109,30 +1141,20 @@ Errcode draw_flicel(Flicel* fc, int drawmode, int cfitmode)
 
 	switch (drawmode) {
 		case DRAW_DELTA:
-			do_leftbehind(fc->xf.ommax.x,
-						  fc->xf.ommax.y,
-						  fc->xf.mmax.x,
-						  fc->xf.mmax.y,
-						  fc->xf.ommax.width,
-						  fc->xf.ommax.height,
-						  (do_leftbehind_func)undo_rect_lbh,
-						  NULL);
+			do_leftbehind(fc->xf.ommax.x, fc->xf.ommax.y, fc->xf.mmax.x, fc->xf.mmax.y,
+						  fc->xf.ommax.width, fc->xf.ommax.height,
+						  (do_leftbehind_func)undo_rect_lbh, NULL);
 			blit = get_celmove(pld.tcxl.xlat != NULL);
 			goto blitit;
 		case DRAW_FIRST:
 			blit = get_celblit(pld.tcxl.xlat != NULL);
-		blitit:
+blitit:
 			(*blit)(rc, 0, 0, vb.pencel, rc->x, rc->y, rc->width, rc->height, &pld.tcxl);
 			if (vs.zoom_open) {
 				if (drawmode == DRAW_DELTA) {
-					do_leftbehind(fc->xf.ommax.x,
-								  fc->xf.ommax.y,
-								  fc->xf.mmax.x,
-								  fc->xf.mmax.y,
-								  fc->xf.mmax.width,
-								  fc->xf.mmax.height,
-								  (do_leftbehind_func)rect_zoom_it_lbh,
-								  NULL);
+					do_leftbehind(fc->xf.ommax.x, fc->xf.ommax.y, fc->xf.mmax.x, fc->xf.mmax.y,
+								  fc->xf.mmax.width, fc->xf.mmax.height,
+								  (do_leftbehind_func)rect_zoom_it_lbh, NULL);
 				}
 				zoom_cel(rc);
 			}
@@ -1145,7 +1167,7 @@ Errcode draw_flicel(Flicel* fc, int drawmode, int cfitmode)
 
 done:
 	fc->xf.ommax = fc->xf.mmax;
-	under_flag	 = 0;
+	under_flag = 0;
 #ifdef TESTING
 	errline(err, "err draw flicel!");
 #endif
@@ -1155,8 +1177,9 @@ done:
 #ifdef WITH_POCO
 Errcode render_thecel()
 {
-	if (thecel == NULL)
+	if (thecel == NULL) {
 		return (Err_abort);
+	}
 	return (draw_flicel(thecel, DRAW_RENDER, NEW_CFIT));
 }
 #endif /* WITH_POCO */
@@ -1169,17 +1192,19 @@ static void changetocel(UBYTE* oldline, UBYTE* newline, Rcel* cel, SHORT y, Pixe
 	UBYTE* d;
 	UBYTE* endpix;
 
-	if (cel->type != RT_BYTEMAP)
+	if (cel->type != RT_BYTEMAP) {
 		softerr(Err_unimpl, "cel_change");
+	}
 
-	d	   = ((Bytemap*)cel)->bm.bp[0] + (((Bytemap*)cel)->bm.bpr * y);
+	d = ((Bytemap*)cel)->bm.bp[0] + (((Bytemap*)cel)->bm.bpr * y);
 	endpix = d + ((Bytemap*)cel)->bm.bpr;
 
 	while (d < endpix) {
 		c = *newline++;
-		if (c == *oldline++)
+		if (c == *oldline++) {
 			*d++ = (UBYTE)tcolor;
-		else
+		} else {
 			*d++ = c;
+		}
 	}
 }

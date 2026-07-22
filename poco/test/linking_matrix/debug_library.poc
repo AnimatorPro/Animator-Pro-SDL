@@ -1,0 +1,5 @@
+int debug_library(int value)
+{
+	int result = value + 37;
+	return result;
+}

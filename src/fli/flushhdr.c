@@ -12,31 +12,29 @@
  *--------------------------------------------------------------------------*/
 
 #ifdef FLILIB_CODE
-	#define time(a) pj_time(a)
+#define time(a) pj_time(a)
 #endif
 
-void pj_i_update_id(Flifile *flif)
+void pj_i_update_id(Flifile* flif)
 /* updates modify time and user id in Flifile header's id field */
 {
 	flif->hdr.id.update_time = time(NULL);
 	flif->hdr.id.update_user = pj__fii_get_user_id();
 }
-Errcode pj_i_flush_head(Flifile *flif)
+Errcode pj_i_flush_head(Flifile* flif)
 
 /* Updates id and flushes header of a Flifile leaves file offset
  * at end of header */
 {
-Errcode err;
-LONG ospeed;
+	Errcode err;
+	LONG ospeed;
 
 	pj_i_update_id(flif);
 	ospeed = flif->hdr.speed;
-	if(flif->hdr.type == FLIH_MAGIC)
-	{
-		((Fhead_1_0 *)(&flif->hdr))->jiffy_speed
-					= ((((long)flif->hdr.speed)*70L)+500L)/1000L;
+	if (flif->hdr.type == FLIH_MAGIC) {
+		((Fhead_1_0*)(&flif->hdr))->jiffy_speed = ((((long)flif->hdr.speed) * 70L) + 500L) / 1000L;
 	}
 	err = xffwriteoset(flif->xf, &flif->hdr, 0, sizeof(flif->hdr));
 	flif->hdr.speed = ospeed;
-	return(err);
+	return (err);
 }

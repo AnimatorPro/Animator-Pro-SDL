@@ -45,7 +45,7 @@ Errcode gb_unfli_flx_frame(Flxfile* flx, Rcel* screen, int ix, int wait, Fli_fra
 {
 	Errcode err;
 
-    if ((err = read_flx_frame(flx, frame, ix)) < Success) {
+	if ((err = read_flx_frame(flx, frame, ix)) < Success) {
 		return err;
 	}
 	pj_fli_uncomp_frame(screen, frame, wait);
@@ -64,10 +64,10 @@ static Errcode gb_flx_ringseek(Flxfile* flx, Rcel* screen, int curix, int ix, Fl
 
 	while (curix != ix) {
 		++curix;
-        err = gb_unfli_flx_frame(flx, screen, curix, 0, frame);
-        if (err < 0) {
-            return softerr(err, "tflx_read2");
-        }
+		err = gb_unfli_flx_frame(flx, screen, curix, 0, frame);
+		if (err < 0) {
+			return softerr(err, "tflx_read2");
+		}
 		if (curix == flix.hdr.frame_count) {
 			curix = 0;
 		}
@@ -89,7 +89,7 @@ Errcode flx_ringseek(Rcel* screen, int curix, int ix)
 	Errcode err;
 	Fli_frame* frame;
 
-    err = pj_fli_cel_alloc_cbuf(&frame, screen);
+	err = pj_fli_cel_alloc_cbuf(&frame, screen);
 	if (err < 0) {
 		return softerr(err, "tflx_seek");
 	}

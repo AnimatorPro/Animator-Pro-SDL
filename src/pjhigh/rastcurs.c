@@ -7,50 +7,51 @@
 #include "resource.h"
 #include "picfile.h"
 
-
 /*************************************************/
 
-void show_rastcursor(Cursorhdr *rastcursor)
+void show_rastcursor(Cursorhdr* rastcursor)
 {
-Rastcursor *rc = (Rastcursor *)rastcursor;
-Cursorcel *r = rc->cel;
-SHORT cx, cy;
+	Rastcursor* rc = (Rastcursor*)rastcursor;
+	Cursorcel* r = rc->cel;
+	SHORT cx, cy;
 
 	cx = icb.cx - r->x;
 	cy = icb.cy - r->y;
-	pj_blitrect(vb.screen->viscel,
-			 cx,cy,rc->save,0,0,r->width,r->height); 
+	pj_blitrect(vb.screen->viscel, cx, cy, rc->save, 0, 0, r->width, r->height);
 	rc->save->r.x = cx;
 	rc->save->r.y = cy;
-	procblit(r,0,0,vb.screen->viscel,cx,cy,r->width,r->height,tbli_xlatline,
+	procblit(r, 0, 0, vb.screen->viscel, cx, cy, r->width, r->height, tbli_xlatline,
 			 get_cursor_xlat());
 }
-void hide_rastcursor(Cursorhdr *rastcursor)
-{
-	Rastcursor *rc = (Rastcursor *)rastcursor;
 
-	pj_blitrect(rc->save,0,0,
-	         vb.screen->viscel,rc->save->r.x,rc->save->r.y,
-			 rc->cel->width,rc->cel->height); 
+void hide_rastcursor(Cursorhdr* rastcursor)
+{
+	Rastcursor* rc = (Rastcursor*)rastcursor;
+
+	pj_blitrect(rc->save, 0, 0, vb.screen->viscel, rc->save->r.x, rc->save->r.y, rc->cel->width,
+				rc->cel->height);
 }
+
 /************************************************************************/
-static void erase_rcurs_leftover(Coor x, Coor y, Coor w, Coor h, Rastcursor *rc)
+static void erase_rcurs_leftover(Coor x, Coor y, Coor w, Coor h, Rastcursor* rc)
 {
-Cursorsave *save = rc->save;
-	pj_blitrect(save,x - save->r.x,y - save->r.y,vb.screen->viscel,x,y,w,h);
+	Cursorsave* save = rc->save;
+	pj_blitrect(save, x - save->r.x, y - save->r.y, vb.screen->viscel, x, y, w, h);
 }
-static void save_newcurs(Coor x, Coor y, Coor w, Coor h, Rastcursor *rc)
+
+static void save_newcurs(Coor x, Coor y, Coor w, Coor h, Rastcursor* rc)
 {
-Cursorsave *save = rc->save;
-	pj_blitrect(vb.screen->viscel,x,y,save,x - save->r.x,y - save->r.y,w,h);
+	Cursorsave* save = rc->save;
+	pj_blitrect(vb.screen->viscel, x, y, save, x - save->r.x, y - save->r.y, w, h);
 }
-void move_rastcursor(Cursorhdr *rastcursor)
+
+void move_rastcursor(Cursorhdr* rastcursor)
 {
-Rastcursor *rc = (Rastcursor *)rastcursor;
-Cursorcel *r = rc->cel;
-Cursorsave *save = rc->save;
-Coor cx, cy, ox, oy;
-Ucoor w, h;
+	Rastcursor* rc = (Rastcursor*)rastcursor;
+	Cursorcel* r = rc->cel;
+	Cursorsave* save = rc->save;
+	Coor cx, cy, ox, oy;
+	Ucoor w, h;
 
 	cx = icb.cx - r->x;
 	cy = icb.cy - r->y;
@@ -60,18 +61,18 @@ Ucoor w, h;
 	oy = save->r.y;
 
 	/* erase "leftover" area */
-	do_leftbehind(ox,oy,cx,cy,w,h,(do_leftbehind_func)erase_rcurs_leftover, rc);
+	do_leftbehind(ox, oy, cx, cy, w, h, (do_leftbehind_func)erase_rcurs_leftover, rc);
 
 	/* "scroll" part of save that is common to new location */
-	blitmove_rect(save,0,0,save,ox - cx, oy - cy, w, h);
+	blitmove_rect(save, 0, 0, save, ox - cx, oy - cy, w, h);
 
 	save->r.x = cx;
 	save->r.y = cy;
 
 	/* save new area */
-	do_leftbehind(cx,cy,ox,oy,w,h, (do_leftbehind_func)save_newcurs, rc);
+	do_leftbehind(cx, cy, ox, oy, w, h, (do_leftbehind_func)save_newcurs, rc);
 
 	/* redraw cursor */
-	abprocblit(r,0,0,vb.screen->viscel,cx,cy,w,h,save,0,0,tbli_xlatline,
+	abprocblit(r, 0, 0, vb.screen->viscel, cx, cy, w, h, save, 0, 0, tbli_xlatline,
 			   get_cursor_xlat());
 }

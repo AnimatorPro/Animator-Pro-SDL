@@ -1,0 +1,4 @@
+int library_first(void)
+{
+	return 20;
+}

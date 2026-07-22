@@ -58,63 +58,64 @@
  * prototypes for things that live in strfuncs.asm
  *--------------------------------------------------------------------------*/
 
-extern char *strchr(char *str, char chr);
-extern int	stricmp(char *str1, char *str2);
-extern char *stristr(char *str, char *substr);
+extern char* strchr(char* str, char chr);
+extern int stricmp(char* str1, char* str2);
+extern char* stristr(char* str, char* substr);
 
 /*----------------------------------------------------------------------------
  * prototypes for a couple 'forward reference' situations in this module
  *--------------------------------------------------------------------------*/
 
-static Errcode do_lookup_dialog(Popot *nameptrs,
-								char **protoptrs, int namecount);
+static Errcode do_lookup_dialog(Popot* nameptrs, char** protoptrs, int namecount);
 
-extern Lib_proto calls[];	/* not really extern, just need its type known */
+extern Lib_proto calls[]; /* not really extern, just need its type known */
 
 /*----------------------------------------------------------------------------
  * some global data...
  *--------------------------------------------------------------------------*/
 
-#define MIN_MAXNAMES	300 	/* the constants are used for parameter */
-#define MAX_MAXNAMES   5000 	/* range checking on the parms passed	*/
-#define MIN_MAXSTRLEN	 20 	/* in from the parent Poco program. 	*/
-#define MAX_MAXSTRLEN	 80
+#define MIN_MAXNAMES 300  /* the constants are used for parameter */
+#define MAX_MAXNAMES 5000 /* range checking on the parms passed	*/
+#define MIN_MAXSTRLEN 20  /* in from the parent Poco program. 	*/
+#define MAX_MAXSTRLEN 80
 
-int 	maxnames;				/* max names, passed in from lookup.poc */
-int 	maxstrlen;				/* max name length, passed in from lookup.poc */
+int maxnames;  /* max names, passed in from lookup.poc */
+int maxstrlen; /* max name length, passed in from lookup.poc */
 
-int 	fullnamecount	= 0;	/* how many names are in the 'full list' arrays */
-Popot	*fullnameptrs	= NULL; /* full list of library function names */
-char	**fullprotoptrs = NULL; /* full list of library function prototypes */
-char	*namestrs		= NULL; /* buffer to hold names distilled from protos */
-Popot	*curfullptr;			/* current name pointer when building full list */
-char	*curfullstr;			/* current name string when building full list */
-char	**curfullproto; 		/* current proto string when building full list */
+int fullnamecount = 0;       /* how many names are in the 'full list' arrays */
+Popot* fullnameptrs = NULL;  /* full list of library function names */
+char** fullprotoptrs = NULL; /* full list of library function prototypes */
+char* namestrs = NULL;       /* buffer to hold names distilled from protos */
+Popot* curfullptr;           /* current name pointer when building full list */
+char* curfullstr;            /* current name string when building full list */
+char** curfullproto;         /* current proto string when building full list */
 
-static int copy_thruchar(char *dest, char *src, char chr)
+static int copy_thruchar(char* dest, char* src, char chr)
 /*****************************************************************************
  * copy src to dest up through nullterm or specified char.
  ****************************************************************************/
 {
-	int len = 1;	/* we always copy at least one char */
+	int len = 1; /* we always copy at least one char */
 
 	for (;;) {
 		*dest = *src;
-		if (*dest == chr || *dest == '\0')
+		if (*dest == chr || *dest == '\0') {
 			return len;
+		}
 		++dest;
 		++src;
 		++len;
 	}
 }
 
-static char *add_spaces(char *dest, int count)
+static char* add_spaces(char* dest, int count)
 /*****************************************************************************
  * add some spaces to a string.
  ****************************************************************************/
 {
-	while (count--)
+	while (count--) {
 		*dest++ = ' ';
+	}
 
 	return dest;
 }
@@ -125,14 +126,14 @@ static void sort_namelist(void)
  * sort sequence is ascending alpha case-insensitive.
  ****************************************************************************/
 {
-	int 	i;
-	Popot	*nptr;
-	char	**pptr;
-	Popot	*pt1, *pt2;
-	Popot	swap;
-	short	swaps;
-	int 	space, ct;
-	int 	count;
+	int i;
+	Popot* nptr;
+	char** pptr;
+	Popot *pt1, *pt2;
+	Popot swap;
+	short swaps;
+	int space, ct;
+	int count;
 
 	/*
 	 * first copy all the proto pointers into the 'min' elements of the name
@@ -156,13 +157,14 @@ static void sort_namelist(void)
 	 */
 
 	count = fullnamecount;
-	space = count/2;
-	if (count < 2)	/* very short arrays are already sorted */
+	space = count / 2;
+	if (count < 2) { /* very short arrays are already sorted */
 		goto ALREADY_SORTED;
+	}
 	--count; /* since we look at two elements at once...*/
 
 	for (;;) {
-		do	{
+		do {
 			swaps = 0;
 			pt2 = pt1 = fullnameptrs;
 			pt2 += space;
@@ -178,8 +180,9 @@ static void sort_namelist(void)
 				pt2++;
 			}
 		} while (swaps);
-		if ( (space = space/2) == 0)
+		if ((space = space / 2) == 0) {
 			break;
+		}
 	}
 
 ALREADY_SORTED:
@@ -198,16 +201,16 @@ ALREADY_SORTED:
 	}
 }
 
-static void add_name(unsigned char *proto)
+static void add_name(unsigned char* proto)
 /*****************************************************************************
  * add a function name to the name pointers and names strings arrays.
  ****************************************************************************/
 {
 	int len;
 	static Boolean warning_shown = 0;
-	static Popot ovflow_warning = {"Maximum of %d functions exceeded.  "
-								   "Some functions will not appear in the list."
-								  };
+	static Popot ovflow_warning = {
+		"Maximum of %d functions exceeded.  "
+		"Some functions will not appear in the list."};
 
 	/*
 	 * make sure we don't overflow our pointer tables, whine if we do...
@@ -219,7 +222,7 @@ static void add_name(unsigned char *proto)
 
 	if (fullnamecount >= maxnames) {
 		if (!warning_shown) {
-			++warning_shown;		  /* prevent repeats of the warning message */
+			++warning_shown; /* prevent repeats of the warning message */
 			poeQtext(ovflow_warning.pt, maxnames);
 		}
 		return; /* don't add name */
@@ -235,7 +238,7 @@ static void add_name(unsigned char *proto)
 	 */
 
 	curfullptr->pt = curfullptr->min = curfullptr->max = curfullstr;
-	*curfullproto  = proto;
+	*curfullproto = proto;
 	++curfullptr;
 	++curfullproto;
 	++fullnamecount;
@@ -246,11 +249,13 @@ static void add_name(unsigned char *proto)
 	 * (this will turn "FILE     *fopen()" into "fopen", for example.)
 	 */
 
-	while (*proto && *proto != ' ' && *proto != '\t')
+	while (*proto && *proto != ' ' && *proto != '\t') {
 		++proto;
+	}
 
-	while (*proto && (*proto == '*' || *proto == ' ' || *proto == '\t'))
+	while (*proto && (*proto == '*' || *proto == ' ' || *proto == '\t')) {
 		++proto;
+	}
 
 	/*
 	 * copy the function name into the big string buffer.  we'll copy up to
@@ -258,16 +263,16 @@ static void add_name(unsigned char *proto)
 	 * on empty parens to make it look more like a function name.
 	 */
 
-	for (len = 0; *proto && *proto != '(' && len < maxstrlen-3; ++len)
+	for (len = 0; *proto && *proto != '(' && len < maxstrlen - 3; ++len) {
 		*curfullstr++ = *proto++;
+	}
 
 	*curfullstr++ = '(';
 	*curfullstr++ = ')';
 	*curfullstr++ = '\0';
-
 }
 
-static void add_library(Lib_proto *plib, int count)
+static void add_library(Lib_proto* plib, int count)
 /*****************************************************************************
  * add all the functions from a library to the names/protos lists.
  *
@@ -281,11 +286,11 @@ static void add_library(Lib_proto *plib, int count)
 	for (i = 0; i < count; ++i, ++plib) {
 		if (plib->func != NULL) {
 			add_name(plib->proto);
-			if (builtin_err)
+			if (builtin_err) {
 				return;
+			}
 		}
 	}
-
 }
 
 static Errcode build_function_list(void)
@@ -293,31 +298,33 @@ static Errcode build_function_list(void)
  * build the lists of all lib function names and protos, sort the lists.
  ****************************************************************************/
 {
-	Lib_proto *lib;
-	int 	   libcount;
+	Lib_proto* lib;
+	int libcount;
 
 	/*
 	 * init the global 'cur' vars to indicate empty lists...
 	 */
 
-	curfullptr	  = fullnameptrs;
-	curfullstr	  = namestrs;
-	curfullproto  = fullprotoptrs;
+	curfullptr = fullnameptrs;
+	curfullstr = namestrs;
+	curfullproto = fullprotoptrs;
 	fullnamecount = 0;
 
 	/*
 	 * build the name and proto lists for the builtin library functions...
 	 */
 
-	libcount = FindPoe("poco$builtin", &lib);   /* get first builtin lib */
-	if (libcount < Success)
+	libcount = FindPoe("poco$builtin", &lib); /* get first builtin lib */
+	if (libcount < Success) {
 		return libcount;
+	}
 
-	do	{										/* loop thru builtin libs... */
+	do { /* loop thru builtin libs... */
 		add_library(lib, libcount);
-		if (builtin_err)
+		if (builtin_err) {
 			return builtin_err;
-		libcount = FindPoe(NULL, &lib); 		/* get next builtin lib */
+		}
+		libcount = FindPoe(NULL, &lib); /* get next builtin lib */
 	} while (libcount > 0);
 
 	/*
@@ -325,17 +332,19 @@ static Errcode build_function_list(void)
 	 * (note that we filter ourselves out of the loaded library listing.)
 	 */
 
-	libcount = FindPoe("poco$loaded", &lib);    /* get first loaded lib */
-	if (libcount < Success)
+	libcount = FindPoe("poco$loaded", &lib); /* get first loaded lib */
+	if (libcount < Success) {
 		return libcount;
+	}
 
 	do {
-		if (lib != calls) { 					/* as long as it's not us...*/
+		if (lib != calls) { /* as long as it's not us...*/
 			add_library(lib, libcount);
-			if (builtin_err)
+			if (builtin_err) {
 				return builtin_err;
+			}
 		}
-		libcount = FindPoe(NULL, &lib); 		/* get next loaded lib */
+		libcount = FindPoe(NULL, &lib); /* get next loaded lib */
 	} while (libcount > 0);
 
 	/*
@@ -347,18 +356,18 @@ static Errcode build_function_list(void)
 	return Success;
 }
 
-static void show_proto(char *proto)
+static void show_proto(char* proto)
 /*****************************************************************************
  * put up a Qtext() display box with the full function prototype in it.
  ****************************************************************************/
 {
-	int  len;
-	int  indent_count;
+	int len;
+	int indent_count;
 	char formatted_proto[1024];
-	char *pfmt = formatted_proto;
-	char *ptmp;
+	char* pfmt = formatted_proto;
+	char* ptmp;
 	static Popot prompt = {"Syntax is:                         \n\n%s\n"};
-									/*	^^ this whitespace ^^ is intentional */
+	/*	^^ this whitespace ^^ is intentional */
 
 	/*
 	 * pretty up the proto for display...
@@ -375,49 +384,53 @@ static void show_proto(char *proto)
 	 *	the sides of the box, since that can be kinda ugly.
 	 */
 
-	pfmt = add_spaces(pfmt, 2); 					/* nice white gutter.	  */
+	pfmt = add_spaces(pfmt, 2); /* nice white gutter.	  */
 
-	while (*proto && *proto != ' ' && *proto != '\t')
-		*pfmt++ = *proto++; 						/* copy return type.	  */
+	while (*proto && *proto != ' ' && *proto != '\t') {
+		*pfmt++ = *proto++; /* copy return type.	  */
+	}
 
-	*pfmt++ = ' ';                                  /* add one space.         */
+	*pfmt++ = ' '; /* add one space.         */
 
-	indent_count = 1 + (pfmt - formatted_proto);	/* remember indent. 	  */
+	indent_count = 1 + (pfmt - formatted_proto); /* remember indent. 	  */
 
-	while (*proto && (*proto == ' ' || *proto == '\t'))
-		++proto;									/* skip other spaces.	  */
+	while (*proto && (*proto == ' ' || *proto == '\t')) {
+		++proto; /* skip other spaces.	  */
+	}
 
-	if (NULL != (ptmp = strchr(proto, ','))) {      /* if multiple args...    */
+	if (NULL != (ptmp = strchr(proto, ','))) { /* if multiple args...    */
 
-		if (NULL == strchr(ptmp+1, ','))            /* if only two args,      */
-			goto COPY_FULLINE;						/* do it as one line.	  */
+		if (NULL == strchr(ptmp + 1, ',')) { /* if only two args,      */
+			goto COPY_FULLINE;               /* do it as one line.	  */
+		}
 
-		len = copy_thruchar(pfmt, proto, '(');      /* copy function name     */
-		pfmt += len;								/* up thru opening paren. */
+		len = copy_thruchar(pfmt, proto, '('); /* copy function name     */
+		pfmt += len;                           /* up thru opening paren. */
 		proto += len;
-		pfmt = add_spaces(pfmt,2);					/* add trailing gutter.   */
-		*pfmt++ = '\n';                             /* args go on later lines.*/
-		*pfmt++ = ' ';                              /* extra space looks good.*/
+		pfmt = add_spaces(pfmt, 2); /* add trailing gutter.   */
+		*pfmt++ = '\n';             /* args go on later lines.*/
+		*pfmt++ = ' ';              /* extra space looks good.*/
 
-		while (NULL != strchr(proto, ',')) {        /* while more args left...*/
-			pfmt = add_spaces(pfmt, indent_count);	/* indent the arg.		  */
-			len = copy_thruchar(pfmt, proto, ',');  /* copy arg thru comma.   */
+		while (NULL != strchr(proto, ',')) {       /* while more args left...*/
+			pfmt = add_spaces(pfmt, indent_count); /* indent the arg.		  */
+			len = copy_thruchar(pfmt, proto, ','); /* copy arg thru comma.   */
 			pfmt += len;
 			proto += len;
-			pfmt = add_spaces(pfmt,2);				/* add trailing gutter.   */
-			*pfmt++ = '\n';                         /* next arg on next line. */
+			pfmt = add_spaces(pfmt, 2); /* add trailing gutter.   */
+			*pfmt++ = '\n';             /* next arg on next line. */
 		}
-		pfmt = add_spaces(pfmt, indent_count);		/* indent last arg line.  */
+		pfmt = add_spaces(pfmt, indent_count); /* indent last arg line.  */
 	}
 
 COPY_FULLINE:
 
-	while (*proto)									/* copy rest of line.	  */
+	while (*proto) { /* copy rest of line.	  */
 		*pfmt++ = *proto++;
+	}
 
-	pfmt = add_spaces(pfmt,2);						/* add trailing gutter.   */
+	pfmt = add_spaces(pfmt, 2); /* add trailing gutter.   */
 
-	*pfmt = '\0';                                   /* nullterm display str.  */
+	*pfmt = '\0'; /* nullterm display str.  */
 
 	/*
 	 * display string is all formatted, show it to the user...
@@ -428,27 +441,25 @@ COPY_FULLINE:
 	 */
 
 	poeQtext(prompt.pt, formatted_proto);
-
 }
 
-static Errcode do_sublist_dialog(Popot *nameptrs, char **protoptrs,
-								 int namecount, char *substr)
+static Errcode do_sublist_dialog(Popot* nameptrs, char** protoptrs, int namecount, char* substr)
 /*****************************************************************************
  * build & display a sublist of functions with names containing the substring.
  ****************************************************************************/
 {
 	Errcode err;
-	Popot	*subnameptrs   = NULL;
-	char	**subprotoptrs = NULL;
-	Popot	*cursubname;
-	char	**cursubproto;
-	Popot	*curname;
-	char	**curproto;
-	int 	subcount;
-	int 	i;
-	static Popot notfound = {"No function names contain the string\n"
-							 " '%s' "
-							};
+	Popot* subnameptrs = NULL;
+	char** subprotoptrs = NULL;
+	Popot* cursubname;
+	char** cursubproto;
+	Popot* curname;
+	char** curproto;
+	int subcount;
+	int i;
+	static Popot notfound = {
+		"No function names contain the string\n"
+		" '%s' "};
 
 	/*
 	 * get a couple new pointer arrays to hold the sublists...
@@ -459,10 +470,12 @@ static Errcode do_sublist_dialog(Popot *nameptrs, char **protoptrs,
 
 	err = Err_no_memory;
 
-	if (NULL == (subnameptrs = zalloc(namecount*sizeof(Popot))))
+	if (NULL == (subnameptrs = zalloc(namecount * sizeof(Popot)))) {
 		goto ERROR_EXIT;
-	if (NULL == (subprotoptrs = zalloc(namecount*sizeof(char *))))
+	}
+	if (NULL == (subprotoptrs = zalloc(namecount * sizeof(char*)))) {
 		goto ERROR_EXIT;
+	}
 	subcount = 0;
 
 	/*
@@ -473,13 +486,13 @@ static Errcode do_sublist_dialog(Popot *nameptrs, char **protoptrs,
 	 * from a sequential walk of the already-sorted full list.
 	 */
 
-	curname 	= nameptrs;
-	curproto	= protoptrs;
-	cursubname	= subnameptrs;
+	curname = nameptrs;
+	curproto = protoptrs;
+	cursubname = subnameptrs;
 	cursubproto = subprotoptrs;
 	for (i = 0; i < namecount; ++i) {
 		if (NULL != stristr(curname->pt, substr)) {
-			*cursubname  = *curname;
+			*cursubname = *curname;
 			*cursubproto = *curproto;
 			++cursubname;
 			++cursubproto;
@@ -495,7 +508,7 @@ static Errcode do_sublist_dialog(Popot *nameptrs, char **protoptrs,
 
 	if (subcount == 0) {
 		poeQtext(notfound.pt, substr);
-		err = builtin_err;	/* in case Qtext croaked for some reason */
+		err = builtin_err; /* in case Qtext croaked for some reason */
 		goto ERROR_EXIT;
 	}
 
@@ -511,25 +524,26 @@ static Errcode do_sublist_dialog(Popot *nameptrs, char **protoptrs,
 
 ERROR_EXIT:
 
-	if (subnameptrs != NULL)
+	if (subnameptrs != NULL) {
 		free(subnameptrs);
-	if (subprotoptrs != NULL)
+	}
+	if (subprotoptrs != NULL) {
 		free(subprotoptrs);
+	}
 
 	return err;
-
 }
 
- Errcode do_lookup_dialog(Popot *nameptrs, char **protoptrs, int namecount)
+Errcode do_lookup_dialog(Popot* nameptrs, char** protoptrs, int namecount)
 /*****************************************************************************
  * drive the display of and interaction with a function list.
  ****************************************************************************/
 {
 	Errcode err;
 	Boolean ctinue;
-	int 	choice;
-	int 	lastpos = 0;
-	char	choicestr[MAX_MAXSTRLEN];
+	int choice;
+	int lastpos = 0;
+	char choicestr[MAX_MAXSTRLEN];
 	(void)0; /* Popot wrappers no longer needed */
 
 	/*
@@ -543,26 +557,26 @@ ERROR_EXIT:
 	 */
 
 	for (;;) {
-
 		/*
 		 * start with a clean type-in string; display the list...
 		 */
 
 		choicestr[0] = '\0';
-		ctinue = poeQlist(choicestr, &choice,
-						  nameptrs, namecount,
-						  &lastpos, "Select Library Function to Look Up:");
+		ctinue = poeQlist(choicestr, &choice, nameptrs, namecount, &lastpos,
+						  "Select Library Function to Look Up:");
 
 		/*
 		 * if a builtin_error occurred, return it to our caller.  if the user
 		 * picked CANCEL, exit the loop.
 		 */
 
-		if (builtin_err != Success)
+		if (builtin_err != Success) {
 			return builtin_err;
+		}
 
-		if (!ctinue)
+		if (!ctinue) {
 			break;
+		}
 
 		/*
 		 * if a list item was selected, format and display it, else go build
@@ -584,15 +598,17 @@ ERROR_EXIT:
 			show_proto(protoptrs[choice]);
 			break;
 		} else {
-			if (choicestr[0] == '\0')
+			if (choicestr[0] == '\0') {
 				break;
-			if (Success != (err = do_sublist_dialog(nameptrs, protoptrs,
-													namecount, choicestr)))
+			}
+			if (Success != (err = do_sublist_dialog(nameptrs, protoptrs, namecount, choicestr))) {
 				return err;
+			}
 		}
 
-		if (builtin_err != Success)
+		if (builtin_err != Success) {
 			return builtin_err;
+		}
 	}
 
 	return Success;
@@ -610,12 +626,14 @@ Errcode poe_main(int mnames, int mlen)
 	 * to the corresponding global vars...
 	 */
 
-	if (mnames < MIN_MAXNAMES || mnames > MAX_MAXNAMES)
+	if (mnames < MIN_MAXNAMES || mnames > MAX_MAXNAMES) {
 		return builtin_err = Err_parameter_range;
-	if (mlen < MIN_MAXSTRLEN || mlen > MAX_MAXSTRLEN)
+	}
+	if (mlen < MIN_MAXSTRLEN || mlen > MAX_MAXSTRLEN) {
 		return builtin_err = Err_parameter_range;
+	}
 
-	maxnames  = mnames;
+	maxnames = mnames;
 	maxstrlen = mlen;
 
 	/*
@@ -624,26 +642,33 @@ Errcode poe_main(int mnames, int mlen)
 
 	err = Err_no_memory;
 
-	if (NULL == (fullnameptrs = zalloc(maxnames*sizeof(Popot))))
+	if (NULL == (fullnameptrs = zalloc(maxnames * sizeof(Popot)))) {
 		goto ERROR_EXIT;
-	if (NULL == (namestrs = malloc(maxnames*maxstrlen)))
+	}
+	if (NULL == (namestrs = malloc(maxnames * maxstrlen))) {
 		goto ERROR_EXIT;
-	if (NULL == (fullprotoptrs = zalloc(maxnames*sizeof(char *))))
+	}
+	if (NULL == (fullprotoptrs = zalloc(maxnames * sizeof(char*)))) {
 		goto ERROR_EXIT;
+	}
 
-	if (Success != (err = build_function_list()))
+	if (Success != (err = build_function_list())) {
 		goto ERROR_EXIT;
+	}
 
 	err = do_lookup_dialog(fullnameptrs, fullprotoptrs, fullnamecount);
 
 ERROR_EXIT:
 
-	if (fullnameptrs != NULL)
+	if (fullnameptrs != NULL) {
 		free(fullnameptrs);
-	if (namestrs != NULL)
+	}
+	if (namestrs != NULL) {
 		free(namestrs);
-	if (fullprotoptrs != NULL)
+	}
+	if (fullprotoptrs != NULL) {
 		free(fullprotoptrs);
+	}
 
 	return err;
 }
@@ -653,8 +678,7 @@ ERROR_EXIT:
  *--------------------------------------------------------------------------*/
 
 static Lib_proto calls[] = {
-	{ poe_main, "ErrCode __lookup__poemain(int maxnames, int maxnamelen);"},
+	{poe_main, "ErrCode __lookup__poemain(int maxnames, int maxnamelen);"},
 };
 
-Setup_Pocorex(NOFUNC,NOFUNC,"Library Lookup Utility", calls);
-
+Setup_Pocorex(NOFUNC, NOFUNC, "Library Lookup Utility", calls);

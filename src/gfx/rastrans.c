@@ -12,7 +12,7 @@
 
 typedef struct rot_seg {
 	Short_xy s;
-	SHORT dxoff;	/* x offset of this line of dest */
+	SHORT dxoff; /* x offset of this line of dest */
 } Rot_seg;
 
 typedef struct thread {
@@ -25,47 +25,46 @@ typedef struct rxfdata {
 	Short_xy source_poly[4];
 	bool moved;
 	Rot_seg *rs1, *rs2;
-	Rcel *src_cel;
+	Rcel* src_cel;
 	Thread thread1;
 	Thread thread2;
 } Rxfdata;
 
-
-void init_xformspec(Xformspec *xf)
+void init_xformspec(Xformspec* xf)
 {
-	clear_mem(xf,sizeof(Xformspec));
+	clear_mem(xf, sizeof(Xformspec));
 }
-void load_rect_minmax(Rectangle *rect,Xformspec *xf)
+
+void load_rect_minmax(Rectangle* rect, Xformspec* xf)
 {
-	rect_tofrect(rect,(Fullrect *)&(xf->mmax.FRECTSTART));
+	rect_tofrect(rect, (Fullrect*)&(xf->mmax.FRECTSTART));
 	xf->mmax.ymin_ix = 0;
 	xf->mmax.ymax_ix = 3;
 }
-void load_poly_minmax(Xformspec *xf)
+void load_poly_minmax(Xformspec* xf)
 /* find the bounding box of a flicel polygon and load min max data */
 {
-register SHORT *source = (SHORT *)&(xf->bpoly[0]);
-register SHORT a;
-register SHORT i;
+	register SHORT* source = (SHORT*)&(xf->bpoly[0]);
+	register SHORT a;
+	register SHORT i;
 
 	xf->mmax.x = xf->mmax.MaxX = *source++;
-	xf->mmax.y = xf->mmax.MaxY= *source++;
+	xf->mmax.y = xf->mmax.MaxY = *source++;
 	xf->mmax.ymin_ix = xf->mmax.ymax_ix = 0;
-	for (i=1; i<4; i++)
-	{
+	for (i = 1; i < 4; i++) {
 		a = *source++;
-		if (a < xf->mmax.x)
+		if (a < xf->mmax.x) {
 			xf->mmax.x = a;
-		if (a > xf->mmax.MaxX)
+		}
+		if (a > xf->mmax.MaxX) {
 			xf->mmax.MaxX = a;
+		}
 		a = *source++;
-		if (a < xf->mmax.y)
-		{
+		if (a < xf->mmax.y) {
 			xf->mmax.y = a;
 			xf->mmax.ymin_ix = i;
 		}
-		if (a > xf->mmax.MaxY)
-		{
+		if (a > xf->mmax.MaxY) {
 			xf->mmax.MaxY = a;
 			xf->mmax.ymax_ix = i;
 		}
@@ -77,27 +76,21 @@ register SHORT i;
 	xf->mmax.width = xf->mmax.MaxX - xf->mmax.x;
 }
 
-
-static void find_thread(register Thread *thread,
-						Xformspec *xf, Rxfdata *rxd,
-						SHORT dir)
+static void find_thread(register Thread* thread, Xformspec* xf, Rxfdata* rxd, SHORT dir)
 {
-register SHORT ix, oix;
-register SHORT count;
-bool first;
+	register SHORT ix, oix;
+	register SHORT count;
+	bool first;
 
 	first = true;
 	oix = ix = xf->mmax.ymin_ix;
 	count = 0;
-	do
-	{
+	do {
 		ix += dir;
 		ix &= 3;
-		if (first)
-		{
+		if (first) {
 			count = 0;
-			if (xf->bpoly[oix].y != xf->bpoly[ix].y)
-			{
+			if (xf->bpoly[oix].y != xf->bpoly[ix].y) {
 				thread->dpoints[0] = xf->bpoly[oix];
 				thread->spoints[0] = rxd->source_poly[oix];
 				first = false;
@@ -107,26 +100,25 @@ bool first;
 		thread->dpoints[count] = xf->bpoly[ix];
 		thread->spoints[count] = rxd->source_poly[ix];
 		oix = ix;
-	}
-	while (ix != xf->mmax.ymax_ix);
+	} while (ix != xf->mmax.ymax_ix);
 
 	thread->count = count;
 }
 
-static void fill_sbuf(Thread *thread,struct rot_seg *seg)
+static void fill_sbuf(Thread* thread, struct rot_seg* seg)
 
-/* Make up a rot_seg from a thread.  A rot_seg's basically a list for 
-	1 side of a convex polygon with 1 element for each scan-line of 
-	the polygon.  This becomes food for my diagonal line to horizontal 
+/* Make up a rot_seg from a thread.  A rot_seg's basically a list for
+	1 side of a convex polygon with 1 element for each scan-line of
+	the polygon.  This becomes food for my diagonal line to horizontal
 	line mapper. */
 {
-int tcount;
-int ds, ddx, dsx, dsy;
-int dxerr, sxerr, syerr;
-int dx, sx, sy;
-int incdx, incsx, incsy;
-Short_xy *dpt, *spt;
-int dots;
+	int tcount;
+	int ds, ddx, dsx, dsy;
+	int dxerr, sxerr, syerr;
+	int dx, sx, sy;
+	int incdx, incsx, incsy;
+	Short_xy *dpt, *spt;
+	int dots;
 
 	tcount = thread->count;
 	dpt = thread->dpoints;
@@ -136,11 +128,9 @@ int dots;
 	seg->s.x = spt->x;
 	seg->s.y = spt->y;
 	seg++;
-	while (--tcount >= 0)
-	{
+	while (--tcount >= 0) {
 		/* skip horizontal segments */
-		if ((dots = ds = (dpt+1)->y - dpt->y) == 0) 
-		{
+		if ((dots = ds = (dpt + 1)->y - dpt->y) == 0) {
 			spt++;
 			dpt++;
 			continue;
@@ -148,44 +138,37 @@ int dots;
 		dx = dpt->x;
 		sx = spt->x;
 		sy = spt->y;
-		if ((ddx = (dpt+1)->x - dx) < 0)
-		{
+		if ((ddx = (dpt + 1)->x - dx) < 0) {
 			incdx = -1;
 			ddx = -ddx;
-		}
-		else
+		} else {
 			incdx = 1;
-		if ((dsx = (spt+1)->x - sx) < 0)
-		{
+		}
+		if ((dsx = (spt + 1)->x - sx) < 0) {
 			incsx = -1;
 			dsx = -dsx;
-		}
-		else
+		} else {
 			incsx = 1;
-		if ((dsy = (spt+1)->y - sy) < 0)
-		{
+		}
+		if ((dsy = (spt + 1)->y - sy) < 0) {
 			incsy = -1;
 			dsy = -dsy;
-		}
-		else
+		} else {
 			incsy = 1;
-		dxerr = ddx - (ds>>1);
-		sxerr = dsx - (ds>>1);
-		syerr = dsy - (ds>>1);
-		while (--dots >= 0)
-		{
-			while (dxerr > 0)
-			{
+		}
+		dxerr = ddx - (ds >> 1);
+		sxerr = dsx - (ds >> 1);
+		syerr = dsy - (ds >> 1);
+		while (--dots >= 0) {
+			while (dxerr > 0) {
 				dx += incdx;
 				dxerr -= ds;
 			}
-			while (sxerr > 0)
-			{
+			while (sxerr > 0) {
 				sx += incsx;
 				sxerr -= ds;
 			}
-			while (syerr > 0)
-			{
+			while (syerr > 0) {
 				sy += incsy;
 				syerr -= ds;
 			}
@@ -201,14 +184,16 @@ int dots;
 		dpt++;
 	}
 }
-static void free_threads(Rxfdata *rxd)
+
+static void free_threads(Rxfdata* rxd)
 {
 	pj_freez(&(rxd->rs1));
 }
-static Errcode build_threads(Xformspec *xf, Rxfdata *rxd)
+
+static Errcode build_threads(Xformspec* xf, Rxfdata* rxd)
 {
-long rssize;
-Rcel *b;
+	long rssize;
+	Rcel* b;
 
 	b = rxd->src_cel;
 	rxd->rs1 = NULL;
@@ -217,70 +202,69 @@ Rcel *b;
 
 	/* single pixel high dests do screw things up.  Actually the bug is
 	   in find_thread or fill_sbuf, but the quick fix is here*/
-	if (xf->mmax.height <= 1)
-		return(Success);
+	if (xf->mmax.height <= 1) {
+		return (Success);
+	}
 
 	/* try to get buffer to hold the "segment-list" that will eventually
 	   pass to fast raster-rotater */
 	rssize = 2 * (long)xf->mmax.height * sizeof(Rot_seg);
-	if(rssize >= 60000L)
-		return(Err_too_big);
+	if (rssize >= 60000L) {
+		return (Err_too_big);
+	}
 
-	if ((rxd->rs1 = (Rot_seg *)pj_malloc(rssize)) == NULL)
-		return(Err_no_memory);
+	if ((rxd->rs1 = (Rot_seg*)pj_malloc(rssize)) == NULL) {
+		return (Err_no_memory);
+	}
 
-	rxd->rs2 = rxd->rs1+(xf->mmax.height);
+	rxd->rs2 = rxd->rs1 + (xf->mmax.height);
 	/* go do all the twisted calls to make up the segment list */
 	find_thread(&rxd->thread1, xf, rxd, 1);
 	find_thread(&rxd->thread2, xf, rxd, -1);
 	fill_sbuf(&rxd->thread1, rxd->rs1);
 	fill_sbuf(&rxd->thread2, rxd->rs2);
-	return(Success);
+	return (Success);
 }
 
-Errcode raster_transform(Rcel *src_cel,Rcel *dscreen,Xformspec *xf,
-						 Errcode (*putline)(void *plinedat, Pixel *line,
-						 					Coor x, Coor y, Ucoor width), 
-						 void *plinedat,
-  bool erase_last,
+Errcode raster_transform(Rcel* src_cel, Rcel* dscreen, Xformspec* xf,
+						 Errcode (*putline)(void* plinedat, Pixel* line, Coor x, Coor y,
+											Ucoor width),
+						 void* plinedat, bool erase_last,
 
 						 /* these are only needed if erase_last is true */
 
-						 void (*undraw_line)(Coor x, Coor y, Ucoor width,
-						 					 void *edat), 
-						 void (*undraw_rect)(Coor x, Coor y,
-						 					 Ucoor width, Ucoor height,
-											 void *edat), 
-						 void *edat)
+						 void (*undraw_line)(Coor x, Coor y, Ucoor width, void* edat),
+						 void (*undraw_rect)(Coor x, Coor y, Ucoor width, Ucoor height, void* edat),
+						 void* edat)
 {
-Errcode err;
-Rxfdata rxd;
-SHORT height,yoff;
-int x1, xmax, swap; /* x1 is stzrt of line xmax is one pixel beyond line */
-Rot_seg *swapr, *seg1, *seg2;
-int wid;
-Pixel *srcline;
+	Errcode err;
+	Rxfdata rxd;
+	SHORT height, yoff;
+	int x1, xmax, swap; /* x1 is stzrt of line xmax is one pixel beyond line */
+	Rot_seg *swapr, *seg1, *seg2;
+	int wid;
+	Pixel* srcline;
 
 	/* single pixel high dests do screw things up.  Actually the bug is
 	   in find_thread or fill_sbuf, but the quick fix is here*/
 
-	if(xf->mmax.height <= 1)
-		return(Success); /* successful ?? */
+	if (xf->mmax.height <= 1) {
+		return (Success); /* successful ?? */
+	}
 
 	rxd.src_cel = src_cel;
-	if((err = build_threads(xf, &rxd)) < 0)
-		return(err);
+	if ((err = build_threads(xf, &rxd)) < 0) {
+		return (err);
+	}
 
-	if(NULL == (srcline = pj_malloc(xf->mmax.width*sizeof(Pixel))))
-	{
+	if (NULL == (srcline = pj_malloc(xf->mmax.width * sizeof(Pixel)))) {
 		err = Err_no_memory;
 		goto error;
 	}
 
-	if(erase_last && ((height = xf->mmax.y - xf->ommax.y) > 0))
-	{
-		(*undraw_rect)(xf->ommax.x,xf->ommax.y,
-				  	   xf->ommax.width,Min(height,xf->ommax.height),edat);
+	if (erase_last && ((height = xf->mmax.y - xf->ommax.y) > 0)) {
+		(*undraw_rect)(xf->ommax.x, xf->ommax.y, xf->ommax.width, Min(height, xf->ommax.height),
+					   edat);
 	}
 
 	seg1 = rxd.rs1;
@@ -288,16 +272,13 @@ Pixel *srcline;
 	yoff = xf->mmax.y;
 	height = xf->mmax.height;
 
-	while (--height >= 0)
-	{
+	while (--height >= 0) {
 		/* note that yoff < 0 is really huge as unsigned */
 
-		if(((USHORT)yoff) < dscreen->height)
-		{
+		if (((USHORT)yoff) < dscreen->height) {
 			x1 = seg1->dxoff;
 			xmax = seg2->dxoff;
-			if (x1 > xmax)
-			{
+			if (x1 > xmax) {
 				swap = x1;
 				x1 = xmax;
 				xmax = swap;
@@ -307,46 +288,39 @@ Pixel *srcline;
 			}
 			++xmax; /* one bigger to conform with MaxX in ommax & mmax */
 
-			if(erase_last && yoff >= xf->ommax.y && yoff < xf->ommax.MaxY)
-			{
-				if (x1 > xf->ommax.x)
-				{
-					if((wid = x1 - xf->ommax.x) > xf->ommax.width)
+			if (erase_last && yoff >= xf->ommax.y && yoff < xf->ommax.MaxY) {
+				if (x1 > xf->ommax.x) {
+					if ((wid = x1 - xf->ommax.x) > xf->ommax.width) {
 						wid = xf->ommax.width;
-					(*undraw_line)(xf->ommax.x,yoff,wid,edat);
+					}
+					(*undraw_line)(xf->ommax.x, yoff, wid, edat);
 				}
-				if (xmax < xf->ommax.MaxX)
-				{
-					if((wid = xf->ommax.MaxX-xmax) >= xf->ommax.width)
-						(*undraw_line)(xf->ommax.x,yoff,xf->ommax.width,edat);
-					else
-						(*undraw_line)(xmax,yoff,wid,edat);
+				if (xmax < xf->ommax.MaxX) {
+					if ((wid = xf->ommax.MaxX - xmax) >= xf->ommax.width) {
+						(*undraw_line)(xf->ommax.x, yoff, xf->ommax.width, edat);
+					} else {
+						(*undraw_line)(xmax, yoff, wid, edat);
+					}
 				}
 			}
-			wid = xmax-x1;
+			wid = xmax - x1;
 
-			pj_diag_to_ptable(src_cel, srcline,
-						   wid, seg1->s.x,seg1->s.y,seg2->s.x,seg2->s.y);
+			pj_diag_to_ptable(src_cel, srcline, wid, seg1->s.x, seg1->s.y, seg2->s.x, seg2->s.y);
 
-			if((err = (*putline)(plinedat,srcline,x1,yoff,wid)) < Success)
+			if ((err = (*putline)(plinedat, srcline, x1, yoff, wid)) < Success) {
 				goto error;
+			}
 		}
 		++seg1;
 		++seg2;
 		++yoff;
 	}
 
-	if(erase_last && ((height = xf->ommax.MaxY - xf->mmax.MaxY) > 0))
-	{
-		if(height >= xf->ommax.height)
-		{
-			(*undraw_rect)(xf->ommax.x,xf->ommax.y,
-						   xf->ommax.width,xf->ommax.height,edat);
-		}
-		else
-		{
-			(*undraw_rect)(xf->ommax.x,xf->mmax.MaxY,
-						   xf->ommax.width,height,edat);
+	if (erase_last && ((height = xf->ommax.MaxY - xf->mmax.MaxY) > 0)) {
+		if (height >= xf->ommax.height) {
+			(*undraw_rect)(xf->ommax.x, xf->ommax.y, xf->ommax.width, xf->ommax.height, edat);
+		} else {
+			(*undraw_rect)(xf->ommax.x, xf->mmax.MaxY, xf->ommax.width, height, edat);
 		}
 	}
 	err = Success;
@@ -354,41 +328,38 @@ Pixel *srcline;
 error:
 	pj_free(srcline);
 	free_threads(&rxd);
-	return(err);
+	return (err);
 }
 
-bool isin_bpoly(Xformspec *xf,Rcel *src_cel,SHORT x,SHORT y)
+bool isin_bpoly(Xformspec* xf, Rcel* src_cel, SHORT x, SHORT y)
 {
 	bool ret;
-Rxfdata rxd;
-SHORT myy;
-SHORT x1, x2;
+	Rxfdata rxd;
+	SHORT myy;
+	SHORT x1, x2;
 
 	rxd.src_cel = src_cel;
-	if(build_threads(xf, &rxd) < Success)
-		return(true);
+	if (build_threads(xf, &rxd) < Success) {
+		return (true);
+	}
 
-	if (x >= xf->mmax.x && x < xf->mmax.MaxX && 
-		y >= xf->mmax.y && y < xf->mmax.MaxY)
-	{
-		if (xf->mmax.height <= 1)	/* yuck special case */
+	if (x >= xf->mmax.x && x < xf->mmax.MaxX && y >= xf->mmax.y && y < xf->mmax.MaxY) {
+		if (xf->mmax.height <= 1) /* yuck special case */
 		{
 			ret = true;
-		}
-		else
-		{
+		} else {
 			myy = y - xf->mmax.y;
-			x1 = (rxd.rs1+myy)->dxoff;
-			x2 = (rxd.rs2+myy)->dxoff;
-			if (x1 > x2)
+			x1 = (rxd.rs1 + myy)->dxoff;
+			x2 = (rxd.rs2 + myy)->dxoff;
+			if (x1 > x2) {
 				ret = (x <= x1 && x >= x2);
-			else
+			} else {
 				ret = (x <= x2 && x >= x1);
+			}
 		}
-	}
-	else 
+	} else {
 		ret = false;
+	}
 	free_threads(&rxd);
-	return(ret);
+	return (ret);
 }
-

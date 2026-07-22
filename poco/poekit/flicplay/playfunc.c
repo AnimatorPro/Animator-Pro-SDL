@@ -4,14 +4,14 @@
 
 #include "flicplay.h"
 
-typedef Boolean (EventFunc)(Flic *pflic);
+typedef Boolean(EventFunc)(Flic* pflic);
 
-static void rcel_copy(Rcel *d, Rcel *s)
+static void rcel_copy(Rcel* d, Rcel* s)
 /*****************************************************************************
  * copy a raster.
  ****************************************************************************/
 {
-	pj_blitrect(s,0,0,d,0,0,d->width,d->height);
+	pj_blitrect(s, 0, 0, d, 0, 0, d->width, d->height);
 	pj_cmap_copy(s->cmap, d->cmap);
 }
 
@@ -20,44 +20,46 @@ static Boolean any_user_input(void)
  * use Poco builtin function to check mouse buttons and keyboard.
  ****************************************************************************/
 {
-	int x,y,lb,rb,key;
+	int x, y, lb, rb, key;
 
 	poePollInput(var2ppt(x), var2ppt(y), var2ppt(lb), var2ppt(rb), var2ppt(key));
 
 	return (key || lb || rb);
 }
 
-static Boolean until_keyhit(Flic *notused)
+static Boolean until_keyhit(Flic* notused)
 /*****************************************************************************
  * event-detector for flic_play, ends playback when a kit is hit.
  ****************************************************************************/
 {
-	if (any_user_input())
-		return FALSE;	/* stop playback */
-	else
-		return TRUE;	/* continue playback */
+	if (any_user_input()) {
+		return FALSE; /* stop playback */
+	} else {
+		return TRUE; /* continue playback */
+	}
 }
 
-static Boolean until_time_expires(Flic *pflic)
+static Boolean until_time_expires(Flic* pflic)
 /*****************************************************************************
  * event-detector for flic_play_timed, stops after timer exceeds expiry.
  ****************************************************************************/
 {
-	if (pflic->eventdata < pj_clock_1000())
-		return FALSE;	// clock exceeds expiry time, stop the flic
-	else
-		return TRUE;	// keep playing
+	if (pflic->eventdata < pj_clock_1000()) {
+		return FALSE;  // clock exceeds expiry time, stop the flic
+	} else {
+		return TRUE;  // keep playing
+	}
 }
 
-static Boolean until_once_through(Flic *pflic)
+static Boolean until_once_through(Flic* pflic)
 /*****************************************************************************
  * event-detector for flic_play_once, stops after one time through flic.
  ****************************************************************************/
 {
-	return (pflic->cur_frame < pflic->num_frames-1);
+	return (pflic->cur_frame < pflic->num_frames - 1);
 }
 
-static Boolean until_frame_count(Flic *pflic)
+static Boolean until_frame_count(Flic* pflic)
 /*****************************************************************************
  *
  ****************************************************************************/
@@ -65,29 +67,31 @@ static Boolean until_frame_count(Flic *pflic)
 	return (pflic->frames_played < pflic->eventdata);
 }
 
-static Errcode play_until(Flic *pflic, EventFunc *event_detect)
+static Errcode play_until(Flic* pflic, EventFunc* event_detect)
 /*****************************************************************************
  * play a flic until the user-specified event routine returns FALSE to stop.
  ****************************************************************************/
 {
-	Errcode 		err;
-	ULONG			clock;
-	Flifile 		*flif;
-	Fli_head		*flihdr;
-	Boolean 		stop_the_playback;
+	Errcode err;
+	ULONG clock;
+	Flifile* flif;
+	Fli_head* flihdr;
+	Boolean stop_the_playback;
 
 	/*------------------------------------------------------------------------
 	 * do some misc setup before starting the actual playback...
 	 *----------------------------------------------------------------------*/
 
-	if (pflic->root_raster == GetPicScreen())
+	if (pflic->root_raster == GetPicScreen()) {
 		poePicDirtied();
+	}
 
-	flif   = pflic->flifile;
+	flif = pflic->flifile;
 	flihdr = &flif->hdr;
 
-	if (pflic->speed < 0)
+	if (pflic->speed < 0) {
 		pflic->speed = flihdr->speed;
+	}
 
 	if (pflic->cur_frame == BEFORE_FIRST_FRAME) {
 		pj_seek(flif->fd, flihdr->frame1_oset, JSEEK_START);
@@ -99,8 +103,7 @@ static Errcode play_until(Flic *pflic, EventFunc *event_detect)
 
 	stop_the_playback = FALSE;
 
-	do	{
-
+	do {
 		/*--------------------------------------------------------------------
 		 * get the current clock now, so that the delta time between frames
 		 * includes the time it takes to render the frame.
@@ -109,9 +112,10 @@ static Errcode play_until(Flic *pflic, EventFunc *event_detect)
 
 		clock = pflic->speed + pj_clock_1000();
 
-		if(Success > (err = pj_fli_read_uncomp(NULL, flif,
-								pflic->playback_raster, pflic->framebuf,TRUE)))
+		if (Success >
+			(err = pj_fli_read_uncomp(NULL, flif, pflic->playback_raster, pflic->framebuf, TRUE))) {
 			goto ERROR_EXIT;
+		}
 
 		/*--------------------------------------------------------------------
 		 * increment the frame counter; if it becomes greater than the frame
@@ -133,9 +137,9 @@ static Errcode play_until(Flic *pflic, EventFunc *event_detect)
 		 * after each event_detect() call, if the caller has asked for that.
 		 *------------------------------------------------------------------*/
 
-		do	{
-			if (FALSE == event_detect(pflic)
-			 || (pflic->keyhit_stops_playback && any_user_input())) {
+		do {
+			if (FALSE == event_detect(pflic) ||
+				(pflic->keyhit_stops_playback && any_user_input())) {
 				stop_the_playback = TRUE;
 				break;
 			}
@@ -150,7 +154,7 @@ ERROR_EXIT:
 	return err;
 }
 
-void do_rewind(Flic *pflic)
+void do_rewind(Flic* pflic)
 /*****************************************************************************
  * rewind flic; makes next play call start at first frame.
  ****************************************************************************/
@@ -159,7 +163,7 @@ void do_rewind(Flic *pflic)
 	pflic->frames_played = 0;
 }
 
-Errcode do_play(Flic *pflic)
+Errcode do_play(Flic* pflic)
 /*****************************************************************************
  * play the named flic until a key is hit.
  ****************************************************************************/
@@ -167,7 +171,7 @@ Errcode do_play(Flic *pflic)
 	return play_until(pflic, until_keyhit);
 }
 
-Errcode do_play_timed(Flic *pflic, ULONG for_milliseconds)
+Errcode do_play_timed(Flic* pflic, ULONG for_milliseconds)
 /*****************************************************************************
  * play a flic for the specified length of time.
  ****************************************************************************/
@@ -176,7 +180,7 @@ Errcode do_play_timed(Flic *pflic, ULONG for_milliseconds)
 	return play_until(pflic, until_time_expires);
 }
 
-Errcode do_play_once(Flic *pflic)
+Errcode do_play_once(Flic* pflic)
 /*****************************************************************************
  * play a flic once then stop.
  ****************************************************************************/
@@ -184,13 +188,14 @@ Errcode do_play_once(Flic *pflic)
 	return play_until(pflic, until_once_through);
 }
 
-Errcode do_play_count(Flic *pflic, int frames_to_play)
+Errcode do_play_count(Flic* pflic, int frames_to_play)
 /*****************************************************************************
  * play the specified number of frames.
  ****************************************************************************/
 {
-	if (frames_to_play == 0)
+	if (frames_to_play == 0) {
 		return Success;
+	}
 
 	if (frames_to_play < 0) {
 		do_rewind(pflic);
@@ -201,16 +206,16 @@ Errcode do_play_count(Flic *pflic, int frames_to_play)
 	return play_until(pflic, until_frame_count);
 }
 
-void do_seek_frame(Flic *pflic, int the_frame)
+void do_seek_frame(Flic* pflic, int the_frame)
 /*****************************************************************************
  * seek to the specified frame in the flic.  (yuck!  but it's really needed)
  ****************************************************************************/
 {
-	int 	play_count;
-	int 	cur_frame;
-	int 	original_speed;
-	void	*original_raster;
-	Rcel	*seek_raster;
+	int play_count;
+	int cur_frame;
+	int original_speed;
+	void* original_raster;
+	Rcel* seek_raster;
 	Boolean seek_raster_used;
 
 	/*------------------------------------------------------------------------
@@ -232,7 +237,7 @@ void do_seek_frame(Flic *pflic, int the_frame)
 		play_count = ++the_frame;
 		do_rewind(pflic);
 	} else {
-		play_count = the_frame-cur_frame;
+		play_count = the_frame - cur_frame;
 	}
 
 	/*------------------------------------------------------------------------
@@ -248,8 +253,8 @@ void do_seek_frame(Flic *pflic, int the_frame)
 	 * requested location.
 	 *----------------------------------------------------------------------*/
 
-	original_speed	 = pflic->speed;
-	original_raster  = pflic->playback_raster;
+	original_speed = pflic->speed;
+	original_raster = pflic->playback_raster;
 	seek_raster_used = FALSE;
 	pflic->speed = 0;
 

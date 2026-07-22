@@ -15,7 +15,6 @@ static Errcode delete_middle_frames(int start, int frames);
 static Errcode make_frames(int frames);
 Errcode set_flx_length(int frames);
 
-
 void qinsert_frames(void)
 {
 	short x;

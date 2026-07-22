@@ -1,4 +1,25 @@
+/*
+ * Exercise Poco's runtime allocation and standard-library surface -- data
+ * segment, string formatting, and variadic FFI -- so that an accidental
+ * unprefixed reference to Animator's pj_malloc/pj_free family would be reached
+ * and rejected rather than sitting on a code path this fixture never runs.
+ */
+char buf[64];
+int values[8];
+
 main()
 {
-	return 37;
+	int i;
+	int total;
+
+	total = 0;
+	for (i = 0; i < 8; ++i)
+	{
+		values[i] = i * 3;
+		total = total + values[i];
+	}
+	sprintf(buf, "total=%d count=%d", total, 8);
+	if (strcmp(buf, "total=84 count=8") != 0)
+		return 0;
+	return total - 47;
 }

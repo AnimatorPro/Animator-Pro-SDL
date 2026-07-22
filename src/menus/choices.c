@@ -19,7 +19,7 @@ typedef struct choicer {
 	Button buttons[1];
 } Choicer;
 
-static void hide_on_choice(Button *b)
+static void hide_on_choice(Button* b)
 {
 	if (b->identity != 0) {
 		mb_hide_menu(b);
@@ -32,16 +32,16 @@ static void hide_on_choice(Button *b)
 #define CMAX 10
 
 /* function for the domenu function choice requestor */
-static int do_choicemenu(Menuhdr *hdr)
+static int do_choicemenu(Menuhdr* hdr)
 {
 	int ret;
-	Button *hit;
-	Button *mbs;
-	Button *last_hilit = NULL;
+	Button* hit;
+	Button* mbs;
+	Button* last_hilit = NULL;
 
 	for (;;) /* take over until mouse exits menu */
 	{
-		mbs = ((Button *)hdr->mbs)->next; /* note: mbs->next is first choice */
+		mbs = ((Button*)hdr->mbs)->next; /* note: mbs->next is first choice */
 		if (JSTHIT(MMOVE)) {
 			if (last_hilit != (hit = hit_button(mbs, icb.mx, icb.my))) {
 				safe_mc_frame(last_hilit, MC_WHITE);
@@ -52,7 +52,7 @@ static int do_choicemenu(Menuhdr *hdr)
 			}
 		}
 
-		if (0 != (ret = button_keyhit(hdr, hdr->mbs, ((Choicer *)hdr)->do_on_hit))) {
+		if (0 != (ret = button_keyhit(hdr, hdr->mbs, ((Choicer*)hdr)->do_on_hit))) {
 			safe_mc_frame(last_hilit, MC_WHITE);
 			if (ret == 2) /* ate key */ {
 				return 1;
@@ -71,9 +71,9 @@ static int do_choicemenu(Menuhdr *hdr)
 }
 
 /* see titlebar, but stop at a newline or null */
-static void see_choice_title(Button *b)
+static void see_choice_title(Button* b)
 {
-	char *send = strchr(b->datme, '\n');
+	char* send = strchr(b->datme, '\n');
 	if (send != NULL) {
 		*send = 0;
 	}
@@ -83,15 +83,15 @@ static void see_choice_title(Button *b)
 	}
 }
 
-static void see_choice(Button *b)
+static void see_choice(Button* b)
 {
 	char buff[100];
 	int x, y;
-	Vfont *f = b->root->font;
+	Vfont* f = b->root->font;
 	Pixel color;
 
 	/* this will terminate choice string with either a newline or a null */
-	char *send = strchr(b->datme, '\n');
+	char* send = strchr(b->datme, '\n');
 	if (send != NULL) {
 		*send = 0;
 	}
@@ -99,7 +99,7 @@ static void see_choice(Button *b)
 
 	x = b->x + (fchar_spacing(f, " ") >> 1) + 1, y = b->y + font_ycent_oset(f, b->height),
 
-	sprintf(buff, "%c %s", b->key_equiv, (const char *)b->group);
+	sprintf(buff, "%c %s", b->key_equiv, (const char*)b->group);
 	color = wbg_textcolor(b);
 	gftext(b->root, f, buff, x, y, color, TM_MASK1);
 	x += fstring_width(f, "9 *");
@@ -109,12 +109,12 @@ static void see_choice(Button *b)
 	}
 }
 
-static void auto_selectid(Button *b)
+static void auto_selectid(Button* b)
 {
 	mb_close_code(b, b->identity);
 }
 
-void cleanup_qchoice(Menuhdr *mh)
+void cleanup_qchoice(Menuhdr* mh)
 {
 	if (mh) {
 		pj_free(mh);
@@ -126,19 +126,19 @@ void cleanup_qchoice(Menuhdr *mh)
  ** cleanup_qchoice() must be used to free it. All choices are terminated with
  ** newlines or '\0' chars, The input strings are not altered, The last item
  ** will not be asterisked of disabled if there are feelers ***/
-Errcode build_qchoice(Wscreen *s, Menuhdr **pmh, char *header, char **choices, int ccount,
-					  VFUNC *feelers, bool hide_on_hit, USHORT *flags)
+Errcode build_qchoice(Wscreen* s, Menuhdr** pmh, char* header, char** choices, int ccount,
+					  VFUNC* feelers, bool hide_on_hit, USHORT* flags)
 {
-	Choicer *ch;
-	Vfont *f;
+	Choicer* ch;
+	Vfont* f;
 	SHORT bheight; /* choice button height */
 	SHORT hdrht;   /* header height */
 	SHORT hdrwid;
-	Button *b;
+	Button* b;
 	SHORT by;
 	int i;
 	int flag;
-	char *choice;
+	char* choice;
 
 	if (ccount > CMAX) { /* defensive programming */
 		ccount = CMAX;
@@ -148,7 +148,7 @@ Errcode build_qchoice(Wscreen *s, Menuhdr **pmh, char *header, char **choices, i
 		return Err_no_memory;
 	}
 
-	ch = (Choicer *)(*pmh);
+	ch = (Choicer*)(*pmh);
 	b = &ch->buttons[0];
 	ch->mh.mbs = b;
 

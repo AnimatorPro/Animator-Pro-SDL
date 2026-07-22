@@ -68,7 +68,7 @@ void cleanup_idriver(void)
 	close_idriver(&icb.idriver);
 }
 
-Errcode init_idriver(char *name, UBYTE *modes, SHORT comm_port)
+Errcode init_idriver(char* name, UBYTE* modes, SHORT comm_port)
 {
 	return (load_idriver(&icb.idriver, name, modes, comm_port));
 }
@@ -80,7 +80,7 @@ Errcode reset_input(void)
 {
 	long xclip, yclip;
 	long idrw, idrh;
-	Raster *screen = (Raster *)(icb.input_screen);
+	Raster* screen = (Raster*)(icb.input_screen);
 #define SCREEN_AX 320
 #define SCREEN_AY 200
 
@@ -154,7 +154,7 @@ Errcode reset_input(void)
 /***** function to set "hot" key function returns pointer to old hot key
 	   function *****/
 
-FUNC set_hotkey_func(bool (*do_hot_key)(Global_icb *gicb))
+FUNC set_hotkey_func(bool (*do_hot_key)(Global_icb* gicb))
 {
 	FUNC ohot;
 
@@ -165,7 +165,7 @@ FUNC set_hotkey_func(bool (*do_hot_key)(Global_icb *gicb))
 
 /***** functions to load and alter mouse settings control in the icb *******/
 
-static void do_nocursor(Cursorhdr *ch)
+static void do_nocursor(Cursorhdr* ch)
 {
 	(void)ch;
 }
@@ -176,7 +176,7 @@ static Cursorhdr null_cursor = {
 	do_nocursor,
 };
 
-void gen_move_cursor(Cursorhdr *ch)
+void gen_move_cursor(Cursorhdr* ch)
 {
 	(void)ch;
 
@@ -184,7 +184,7 @@ void gen_move_cursor(Cursorhdr *ch)
 	(*(icb.curs->showit))(icb.curs);
 }
 
-void set_cursor(Cursorhdr *cd)
+void set_cursor(Cursorhdr* cd)
 {
 	if (!cd || !cd->showit) {
 		cd = &null_cursor;
@@ -286,12 +286,12 @@ void set_procmouse(procmouse_func procmouse)
 	reset_icb();
 }
 
-void get_mouset(Mouset *mset)
+void get_mouset(Mouset* mset)
 {
 	*mset = icb.mset;
 }
 
-void load_mouset(Mouset *mset)
+void load_mouset(Mouset* mset)
 {
 	if (mset->on) {
 		show_mouse();
@@ -320,17 +320,17 @@ void reuse_input(void)
  * the data which is not pushed is the leading sizeof(struct icb_savebuf)
  * part of the icb */
 
-void save_icb_state(Icb_savebuf *save_area)
+void save_icb_state(Icb_savebuf* save_area)
 {
-	*save_area = *((Icb_savebuf *)&icb); /* save input state */
+	*save_area = *((Icb_savebuf*)&icb); /* save input state */
 }
 
-void restore_icb_state(Icb_savebuf *saved)
+void restore_icb_state(Icb_savebuf* saved)
 {
 	if (icb.mcurs_up > 0 && icb.mset.on) {
 		UNDRAWCURSOR();
 	}
-	*((Icb_savebuf *)&icb) = *saved;
+	*((Icb_savebuf*)&icb) = *saved;
 	if (icb.mcurs_up > 0 && icb.mset.on) {
 		DRAWCURSOR();
 	}
@@ -340,9 +340,9 @@ void restore_icb_state(Icb_savebuf *saved)
  * that new state is with cursor count off in "virgin" condition
  * returns pointer to buffer if it did push the global_icb
  * buffer only valid within stack frame of _poll_input() one level up */
-Icb_savebuf *check_push_icb(void)
+Icb_savebuf* check_push_icb(void)
 {
-	Icb_savebuf *pushed;
+	Icb_savebuf* pushed;
 
 	if (icb.push) /* if we are entering one level down */
 	{
@@ -358,7 +358,7 @@ Icb_savebuf *check_push_icb(void)
 	return (NULL);
 }
 
-void _pop_icb(Icb_savebuf *pushed)
+void _pop_icb(Icb_savebuf* pushed)
 {
 	wait_mbup(MBPEN | MBRIGHT);
 	restore_icb_state(pushed);
@@ -400,7 +400,7 @@ bool _poll_input(bool do_cursor)
 #endif /* INPUT_MACROS */
 
 	(*icb.idriver->lib->input)(icb.idriver);
-	idr_clip((Idriver *)icb.idriver, 0, 1);
+	idr_clip((Idriver*)icb.idriver, 0, 1);
 
 	/* only look at 2 buttons */
 	icb.state = icb.idriver->buttons & (MBPEN | MBRIGHT);
@@ -417,7 +417,7 @@ bool _poll_input(bool do_cursor)
 	/* note that we have intel word in long word order here to
 	   shift caps bits to upper 16 */
 
-	((USHORT *)&icb.state)[1] |=
+	((USHORT*)&icb.state)[1] |=
 		(((KBRSHIFT | KBLSHIFT | KBRCTRL | KBRALT | KBSCRLOCK | KBNUMLOCK | KBCAPLOCK) >> 16) &
 		 dos_key_shift());
 
@@ -429,7 +429,6 @@ bool _poll_input(bool do_cursor)
 			icb.inkey = 0;
 		}
 	} else if ((icb.inkey = icb.idriver->key_code) != 0) {
-
 got_inkey:
 		icb.state |= KEYHIT;
 	}
@@ -706,8 +705,7 @@ static Errcode _wait_timeout(ULONG timeout_1000)
 		} else if (timeout_1000 > 0x0f) {
 			/* busy wait on 62nd of a sec not synced to beam */
 			t &= ~(0x0f);
-			while (t == (~(0xf) & pj_clock_1000()))
-				;
+			while (t == (~(0xf) & pj_clock_1000()));
 		}
 	}
 
@@ -764,7 +762,7 @@ Errcode wait_til(ULONG clock_1000)
  * The func's intent is to produce
  * animated cursors and the like and should not do any input waits
  * but can check the input state and read values in the icb which are valid */
-int anim_wait_input(ULONG waitflags, ULONG forceflags, int maxfields, FUNC func, void *funcdata)
+int anim_wait_input(ULONG waitflags, ULONG forceflags, int maxfields, FUNC func, void* funcdata)
 {
 	int ret;
 	int fcount;

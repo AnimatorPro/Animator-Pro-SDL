@@ -1,13 +1,13 @@
 /* grcfulib.c - Contains all remaining calls not contained in the
    comp calls dcomp calls or common calls and a function to load
    all of them into a fully loaded library
-   
-   	   Generic display driver for hi-res animator.
+
+	   Generic display driver for hi-res animator.
    Useful to fill in parts of a driver that are not implemented.
    Requires you to fill in _get_dot and _put_dot.  The rest of
    the system will funnel through these.  Over-ride other
-   functions for increased performance.  Does reasonably well 
-   speedwise if _get_hseg(), _put_hseg(), and pj__set_hline() are 
+   functions for increased performance.  Does reasonably well
+   speedwise if _get_hseg(), _put_hseg(), and pj__set_hline() are
    implemented as higher level functions such as the blits go through
    these. */
 
@@ -22,290 +22,269 @@
 #include "libdummy.h"
 
 
-static void _grc_put_vseg(Raster *v, Pixel *pixbuf,
-		Coor x, Coor y, Ucoor height)
+static void _grc_put_vseg(Raster* v, Pixel* pixbuf, Coor x, Coor y, Ucoor height)
 /* Move pixels from memory to a vertical line of destination raster. */
 /* (Unclipped) */
 {
-while (height-- > 0)
-	PUT_DOT(v, *pixbuf++, x, y++);
+	while (height-- > 0) {
+		PUT_DOT(v, *pixbuf++, x, y++);
+	}
 }
 
-static void _grc_get_vseg(Raster *v, Pixel *pixbuf,
-		Coor x, Coor y, Ucoor height)
+static void _grc_get_vseg(Raster* v, Pixel* pixbuf, Coor x, Coor y, Ucoor height)
 /* Move pixels from a vertical line of source raster to memory buffer. */
 /* (Unclipped) */
 {
-while (height-- > 0)
-	*pixbuf++ = GET_DOT(v, x, y++);
+	while (height-- > 0) {
+		*pixbuf++ = GET_DOT(v, x, y++);
+	}
 }
 
-static void _grc_set_vline(Raster *v, Pixel color,
-		Coor x, Coor y, Ucoor height)
+static void _grc_set_vline(Raster* v, Pixel color, Coor x, Coor y, Ucoor height)
 /* Draw a solid vertical line. */
 /* (Unclipped) */
 {
-assert(x >= 0 && y >= 0);
-while (height-- > 0)
-	PUT_DOT(v, color, x, y++);
+	assert(x >= 0 && y >= 0);
+	while (height-- > 0) {
+		PUT_DOT(v, color, x, y++);
+	}
 }
 
-static void _grc_xor_rect(Raster *v, Pixel color,
-		Coor x, Coor y, Ucoor width, Ucoor height)
+static void _grc_xor_rect(Raster* v, Pixel color, Coor x, Coor y, Ucoor width, Ucoor height)
 /* Xor a rectangular piece of the raster with color. */
 /* (Unclipped) */
 {
-Pixel sbuf[SBUF_SIZE/sizeof(Pixel)];
-Pixel *lbuf;
+	Pixel sbuf[SBUF_SIZE / sizeof(Pixel)];
+	Pixel* lbuf;
 
 
-lbuf = sbuf;
-if(width > Array_els(sbuf))
-	{
-	if ((lbuf = pj_malloc(width*sizeof(Pixel))) == NULL)
-		goto SLOW;
-	}
-while (height-- > 0)
-	{
-	GET_HSEG(v,lbuf,x,y,width);
-	pj_xor_bytes(color,lbuf,width);
-	PUT_HSEG(v,lbuf,x,y++,width);
-	}
-if (lbuf != sbuf)
-	pj_free(lbuf);
-return;
-SLOW:
-while (height-- > 0)
-	{
-	Coor x1 = x;
-	Ucoor w1 = width;
-	while (w1-- > 0)
-		{
-		PUT_DOT(v, color^GET_DOT(v,x1,y), x1, y);
-		x1++;
+	lbuf = sbuf;
+	if (width > Array_els(sbuf)) {
+		if ((lbuf = pj_malloc(width * sizeof(Pixel))) == NULL) {
+			goto SLOW;
 		}
-	y++;
+	}
+	while (height-- > 0) {
+		GET_HSEG(v, lbuf, x, y, width);
+		pj_xor_bytes(color, lbuf, width);
+		PUT_HSEG(v, lbuf, x, y++, width);
+	}
+	if (lbuf != sbuf) {
+		pj_free(lbuf);
+	}
+	return;
+SLOW:
+	while (height-- > 0) {
+		Coor x1 = x;
+		Ucoor w1 = width;
+		while (w1-- > 0) {
+			PUT_DOT(v, color ^ GET_DOT(v, x1, y), x1, y);
+			x1++;
+		}
+		y++;
 	}
 }
 
 #ifdef UNTESTED
-static void mask1line(UBYTE *mbytes, UBYTE bit1, Pixel *lbuf, Coor width,
-					 const Pixel oncolor)
+static void mask1line(UBYTE* mbytes, UBYTE bit1, Pixel* lbuf, Coor width, const Pixel oncolor)
 
 /* Expand an array of bits in memory into pixel buffer.  Where there are
    1's in the source bit-array set to oncolor. */
 /* (Private to grc_driver.) */
 {
-UBYTE byte;
+	UBYTE byte;
 
 	byte = *mbytes++;
-	while(--width >= 0)
-	{
-		if(bit1 & byte)
+	while (--width >= 0) {
+		if (bit1 & byte) {
 			*lbuf++ = oncolor;
+		}
 
-		if((bit1>>=1) == 0)
-		{
+		if ((bit1 >>= 1) == 0) {
 			bit1 = 0x80;
 			byte = *mbytes++;
 		}
 	}
 }
-static void _grc_mask1blit(UBYTE *mbytes, const unsigned mbpr, 
- 	Coor src_x, Coor src_y, 
-	const Raster *dest, 
-	Coor dest_x, Coor dest_y,
-	Coor width, Coor height, 
-	const Pixel oncolor)
+static void _grc_mask1blit(UBYTE* mbytes, const unsigned mbpr, Coor src_x, Coor src_y,
+						   const Raster* dest, Coor dest_x, Coor dest_y, Coor width, Coor height,
+						   const Pixel oncolor)
 /* Expand a memory buffer arranged as a bit-plane into a rectangular
    area of dest raster.  Used to implement graphics text and icons.
-   1's in bit-plane are set to oncolor in dest.  
+   1's in bit-plane are set to oncolor in dest.
    0's in bit-plane leave dest unchanged. */
 /* (Unclipped.) */
 {
-Pixel *lbuf;
-Pixel sbuf[SBUF_SIZE/sizeof(Pixel)];
-UBYTE bit1;
+	Pixel* lbuf;
+	Pixel sbuf[SBUF_SIZE / sizeof(Pixel)];
+	UBYTE bit1;
 
 	lbuf = sbuf;
-	if(width > Array_els(sbuf))
-	{
-		if((lbuf = pj_malloc(width*sizeof(Pixel))) == NULL)
+	if (width > Array_els(sbuf)) {
+		if ((lbuf = pj_malloc(width * sizeof(Pixel))) == NULL) {
 			return;
+		}
 	}
 
-	bit1 = (0x80>>(src_x&7));
-	mbytes += (src_x>>3) + src_y*mbpr;
+	bit1 = (0x80 >> (src_x & 7));
+	mbytes += (src_x >> 3) + src_y * mbpr;
 
-	while(--height >= 0)
-	{
-		GET_HSEG(dest,lbuf,dest_x,dest_y,width);
-		mask1line(mbytes,bit1,lbuf,width,oncolor);
-		PUT_HSEG(dest,lbuf,dest_x,dest_y++,width);
+	while (--height >= 0) {
+		GET_HSEG(dest, lbuf, dest_x, dest_y, width);
+		mask1line(mbytes, bit1, lbuf, width, oncolor);
+		PUT_HSEG(dest, lbuf, dest_x, dest_y++, width);
 		mbytes += mbpr;
 	}
-	if(lbuf != sbuf)
+	if (lbuf != sbuf) {
 		pj_free(lbuf);
+	}
 }
 #endif /* UNTESTED */
 
-static void mask1line(UBYTE *mbytes, UBYTE bit1, Ucoor width,
-	const Raster *dest, Coor dest_x, const Coor dest_y, 
-	const Pixel oncolor)
+static void mask1line(UBYTE* mbytes, UBYTE bit1, Ucoor width, const Raster* dest, Coor dest_x,
+					  const Coor dest_y, const Pixel oncolor)
 /* Expand an array of bits in memory into dest raster.  Where there are
    0's in the source bit-array leave the raster as is.
    1's in the source bit-array set raster to oncolor. */
 /* (Private to grc_driver.) */
 {
-UBYTE byte;
+	UBYTE byte;
 
-byte = *mbytes++;
-while (width-- > 0)
-	{
-	if (bit1 & byte)
-		PUT_DOT(dest, oncolor, dest_x, dest_y);
-	dest_x++;
-	if ((bit1>>=1) == 0)
-		{
-		bit1 = 0x80;
-		byte = *mbytes++;
+	byte = *mbytes++;
+	while (width-- > 0) {
+		if (bit1 & byte) {
+			PUT_DOT(dest, oncolor, dest_x, dest_y);
+		}
+		dest_x++;
+		if ((bit1 >>= 1) == 0) {
+			bit1 = 0x80;
+			byte = *mbytes++;
 		}
 	}
 }
 
-static void _grc_mask1blit(UBYTE *mbytes, unsigned int mbpr,
- 	Coor src_x, Coor src_y, 
-	Raster *dest,
-	Coor dest_x, Coor dest_y,
-	Ucoor width, Ucoor height,
-	Pixel oncolor)
+static void _grc_mask1blit(UBYTE* mbytes, unsigned int mbpr, Coor src_x, Coor src_y, Raster* dest,
+						   Coor dest_x, Coor dest_y, Ucoor width, Ucoor height, Pixel oncolor)
 /* Expand a memory buffer arranged as a bit-plane into a rectangular
    area of dest raster.  Used to implement graphics text and icons.
-   1's in bit-plane are set to oncolor in dest.  
+   1's in bit-plane are set to oncolor in dest.
    0's in bit-plane leave dest unchanged. */
 /* (Unclipped.) */
 {
-UBYTE bit1;
+	UBYTE bit1;
 
-bit1 = (0x80>>(src_x&7));
-mbytes += (src_x>>3) + src_y*mbpr;
-while (height-- > 0)
-	{
-	mask1line(mbytes, bit1, width, dest, dest_x, dest_y, oncolor);
-	mbytes += mbpr;
-	++src_y;
-	++dest_y;
+	bit1 = (0x80 >> (src_x & 7));
+	mbytes += (src_x >> 3) + src_y * mbpr;
+	while (height-- > 0) {
+		mask1line(mbytes, bit1, width, dest, dest_x, dest_y, oncolor);
+		mbytes += mbpr;
+		++src_y;
+		++dest_y;
 	}
 }
 
 
-static void mask2line(UBYTE *mbytes, UBYTE bit1, Pixel *lbuf, Ucoor width,
-					 const Pixel oncolor, const Pixel offcolor)
+static void mask2line(UBYTE* mbytes, UBYTE bit1, Pixel* lbuf, Ucoor width, const Pixel oncolor,
+					  const Pixel offcolor)
 
 /* Expand an array of bits in memory into pixel buffer.  Where there are
    0's in the source bit-array set to offcolor.
    1's in the source bit-array set to oncolor. */
 /* (Private to grc_driver.) */
 {
-UBYTE byte;
+	UBYTE byte;
 
 	byte = *mbytes++;
-	while (width-- > 0)
-	{
-		if(bit1 & byte)
+	while (width-- > 0) {
+		if (bit1 & byte) {
 			*lbuf++ = oncolor;
-		else
+		} else {
 			*lbuf++ = offcolor;
+		}
 
-		if((bit1>>=1) == 0)
-		{
+		if ((bit1 >>= 1) == 0) {
 			bit1 = 0x80;
 			byte = *mbytes++;
 		}
 	}
 }
 
-static void _grc_mask2blit(UBYTE *mbytes, unsigned int mbpr,
-	Coor src_x, Coor src_y, 
-	Raster *dest,
-	Coor dest_x, Coor dest_y,
-	Ucoor width, Ucoor height,
-	Pixel oncolor, Pixel offcolor)
+static void _grc_mask2blit(UBYTE* mbytes, unsigned int mbpr, Coor src_x, Coor src_y, Raster* dest,
+						   Coor dest_x, Coor dest_y, Ucoor width, Ucoor height, Pixel oncolor,
+						   Pixel offcolor)
 
 /* Expand a memory buffer arranged as a bit-plane into a rectangular
    area of dest raster.  Used to implement graphics text and icons.
-   1's in bit-plane are set to oncolor in dest.  
+   1's in bit-plane are set to oncolor in dest.
    0's in bit-plane are set to offcolor in dest. */
 /* (Unclipped.) */
 
 {
-Pixel *lbuf;
-Pixel sbuf[SBUF_SIZE/sizeof(Pixel)];
-UBYTE bit1;
+	Pixel* lbuf;
+	Pixel sbuf[SBUF_SIZE / sizeof(Pixel)];
+	UBYTE bit1;
 
 	lbuf = sbuf;
-	if(width > Array_els(sbuf))
-	{
-		if((lbuf = pj_malloc(width*sizeof(Pixel))) == NULL)
+	if (width > Array_els(sbuf)) {
+		if ((lbuf = pj_malloc(width * sizeof(Pixel))) == NULL) {
 			return;
+		}
 	}
 
-	bit1 = (0x80>>(src_x&7));
-	mbytes += (src_x>>3) + src_y*mbpr;
+	bit1 = (0x80 >> (src_x & 7));
+	mbytes += (src_x >> 3) + src_y * mbpr;
 
-	while (height-- > 0)
-	{
-		mask2line(mbytes,bit1,lbuf,width,oncolor,offcolor);
+	while (height-- > 0) {
+		mask2line(mbytes, bit1, lbuf, width, oncolor, offcolor);
 		mbytes += mbpr;
-		PUT_HSEG(dest,lbuf,dest_x,dest_y++,width);
+		PUT_HSEG(dest, lbuf, dest_x, dest_y++, width);
 	}
-	if(lbuf != sbuf)
+	if (lbuf != sbuf) {
 		pj_free(lbuf);
+	}
 }
 
-static void grc_swaprect(Raster *ra,			 	 /* raster a */
-			  Coor ax, Coor ay,  		 /* ra Minx and Miny */
-			  Raster *rb,   		     /* raster b */
-			  Coor bx, Coor by, 		 /* rb minx and miny */
-			  Ucoor width, Ucoor height) /* blit size */
+static void grc_swaprect(Raster* ra,                /* raster a */
+						 Coor ax, Coor ay,          /* ra Minx and Miny */
+						 Raster* rb,                /* raster b */
+						 Coor bx, Coor by,          /* rb minx and miny */
+						 Ucoor width, Ucoor height) /* blit size */
 /* unclipped swap rectangles in a and b this is NOT clipped */
 {
-UBYTE la[150], lb[150];
-LONG wbx, wax;
-LONG width_left;
-LONG get_width;
+	UBYTE la[150], lb[150];
+	LONG wbx, wax;
+	LONG width_left;
+	LONG get_width;
 
-	if(width <= sizeof(la))
-	{
-		while(height--)
-		{
-			GET_HSEG(ra,la,ax,ay,width);
-			GET_HSEG(rb,lb,bx,by,width);
-			PUT_HSEG(ra,lb,ax,ay++,width);
-			PUT_HSEG(rb,la,bx,by++,width);
+	if (width <= sizeof(la)) {
+		while (height--) {
+			GET_HSEG(ra, la, ax, ay, width);
+			GET_HSEG(rb, lb, bx, by, width);
+			PUT_HSEG(ra, lb, ax, ay++, width);
+			PUT_HSEG(rb, la, bx, by++, width);
 		}
 		return;
 	}
 
-	while(height--)
-	{
-		wax = ax; 
+	while (height--) {
+		wax = ax;
 		wbx = bx;
 		width_left = width;
 		get_width = sizeof(la);
-		for(;;)
-		{
-			GET_HSEG(ra,la,wax,ay,get_width);
-			GET_HSEG(rb,lb,wbx,by,get_width);
-			PUT_HSEG(ra,lb,wax,ay,get_width);
-			PUT_HSEG(rb,la,wbx,by,get_width);
+		for (;;) {
+			GET_HSEG(ra, la, wax, ay, get_width);
+			GET_HSEG(rb, lb, wbx, by, get_width);
+			PUT_HSEG(ra, lb, wax, ay, get_width);
+			PUT_HSEG(rb, la, wbx, by, get_width);
 
-			if((width_left -= sizeof(la)) <= 0)
+			if ((width_left -= sizeof(la)) <= 0) {
 				break;
+			}
 			wax += get_width;
 			wbx += get_width;
-			if(width_left < get_width)
+			if (width_left < get_width) {
 				get_width = width_left;
+			}
 		}
 		++ay;
 		++by;
@@ -313,257 +292,254 @@ LONG get_width;
 	return;
 }
 
-void pj_tbli_line(Pixel *src, Pixel *dst, Ucoor w, const Tcolxldat *tcxl)
+void pj_tbli_line(Pixel* src, Pixel* dst, Ucoor w, const Tcolxldat* tcxl)
 {
 	Ucoor i;
 
 	for (i = 0; i < w; i++) {
-		if (src[i] != tcxl->tcolor)
+		if (src[i] != tcxl->tcolor) {
 			dst[i] = src[i];
+		}
 	}
 }
 
-static Errcode grc_tblitrect(Raster *src,	/* source raster */
-				  Coor src_x, Coor src_y,	/* source Minx and Miny */
-				  Raster *dest,				/* destination raster */
-				  Coor dest_x, Coor dest_y, /* destination minx and miny */
-				  Ucoor width, Ucoor height, /* blit size */
-				  Pixel tcolor)				/* transparent color */
+static Errcode grc_tblitrect(Raster* src,               /* source raster */
+							 Coor src_x, Coor src_y,    /* source Minx and Miny */
+							 Raster* dest,              /* destination raster */
+							 Coor dest_x, Coor dest_y,  /* destination minx and miny */
+							 Ucoor width, Ucoor height, /* blit size */
+							 Pixel tcolor)              /* transparent color */
 /* Copys rectangle from src to dest except for transparent color in
    source. */
 {
-Pixel *source_buf, *dest_buf;
-Pixel sbuf[SBUF_SIZE/sizeof(Pixel)];
-Pixel ptcolor;
+	Pixel *source_buf, *dest_buf;
+	Pixel sbuf[SBUF_SIZE / sizeof(Pixel)];
+	Pixel ptcolor;
 
 	ptcolor = tcolor;
 	source_buf = sbuf;
-	if(width > (Array_els(sbuf)/2))
-	{
-		if ((source_buf = pj_malloc((width+width)*sizeof(Pixel))) == NULL)
-			return(Err_no_memory);
+	if (width > (Array_els(sbuf) / 2)) {
+		if ((source_buf = pj_malloc((width + width) * sizeof(Pixel))) == NULL) {
+			return (Err_no_memory);
+		}
 	}
 	dest_buf = source_buf + width;
-	while(height--)
-	{
-		GET_HSEG(src,source_buf,src_x,src_y++,width);
-		GET_HSEG(dest,dest_buf,dest_x,dest_y,width);
-		pj_tbli_line(source_buf, dest_buf, width, (void *)&ptcolor);
-		PUT_HSEG(dest,dest_buf,dest_x,dest_y++,width);
+	while (height--) {
+		GET_HSEG(src, source_buf, src_x, src_y++, width);
+		GET_HSEG(dest, dest_buf, dest_x, dest_y, width);
+		pj_tbli_line(source_buf, dest_buf, width, (void*)&ptcolor);
+		PUT_HSEG(dest, dest_buf, dest_x, dest_y++, width);
 	}
-	if(source_buf != sbuf)
+	if (source_buf != sbuf) {
 		pj_free(source_buf);
-	return(Success);
+	}
+	return (Success);
 }
 
-static void xor_line(Pixel *source, Pixel *dest, Coor count)
+static void xor_line(Pixel* source, Pixel* dest, Coor count)
 /* (Private to grc_driver.) */
 {
-Pixel *maxdest;
+	Pixel* maxdest;
 
 	maxdest = dest + count;
-	while(dest < maxdest)
+	while (dest < maxdest) {
 		*dest++ ^= *source++;
+	}
 }
 
-static Errcode grc_xor_rast(Raster *source, Raster *dest)
+static Errcode grc_xor_rast(Raster* source, Raster* dest)
 /* Xor source raster into dest.  Assumes source and dest are same size */
 {
-Pixel *source_buf, *dest_buf;
-Ucoor width, height;
-Pixel sbuf[SBUF_SIZE/sizeof(Pixel)];
-int y;
+	Pixel *source_buf, *dest_buf;
+	Ucoor width, height;
+	Pixel sbuf[SBUF_SIZE / sizeof(Pixel)];
+	int y;
 
 	width = dest->width;
 	height = dest->height;
 	y = 0;
 
 	source_buf = sbuf;
-	if(width > (Array_els(sbuf)/2))
-	{
-		if ((source_buf = pj_malloc((width+width)*sizeof(Pixel))) == NULL)
-			return(Err_no_memory);
+	if (width > (Array_els(sbuf) / 2)) {
+		if ((source_buf = pj_malloc((width + width) * sizeof(Pixel))) == NULL) {
+			return (Err_no_memory);
+		}
 	}
 
 	dest_buf = source_buf + width;
-	while (height-- > 0)
-	{
-		GET_HSEG(source,source_buf,0,y,width);
-		GET_HSEG(dest,dest_buf,0,y,width);
+	while (height-- > 0) {
+		GET_HSEG(source, source_buf, 0, y, width);
+		GET_HSEG(dest, dest_buf, 0, y, width);
 		xor_line(source_buf, dest_buf, width);
-		PUT_HSEG(dest,dest_buf,0,y++,width);
+		PUT_HSEG(dest, dest_buf, 0, y++, width);
 	}
-	if(source_buf != sbuf)
+	if (source_buf != sbuf) {
 		pj_free(source_buf);
-	return(Success);
+	}
+	return (Success);
 }
 
-static Errcode pj_grc_zoomblit(Raster *source, /* source raster */
-	           Coor src_x, Coor src_y,  /* source Minx and Miny */
-	           Raster *dest,   		/* destination raster */
-	           Coor dest_x, Coor dest_y,   /* destination minx and miny */
-	           Ucoor width, Ucoor height,  /* destination blit size */  
-	           LONG zoom_x, LONG zoom_y )  /* zoom scalers */
+static Errcode pj_grc_zoomblit(Raster* source,            /* source raster */
+							   Coor src_x, Coor src_y,    /* source Minx and Miny */
+							   Raster* dest,              /* destination raster */
+							   Coor dest_x, Coor dest_y,  /* destination minx and miny */
+							   Ucoor width, Ucoor height, /* destination blit size */
+							   LONG zoom_x, LONG zoom_y)  /* zoom scalers */
 /* Move rectangular area of raster expanding pixels as you go. */
 {
-Pixel *hline; /* note not too big here will have to be re-done */
-Coor swidth;
-Coor maxy;
-Coor nexty;
-Pixel *testzx;
-Pixel *zend;
-Pixel *lend;
-int rightpix;
-Pixel sbuf[SBUF_SIZE/sizeof(Pixel)];
+	Pixel* hline; /* note not too big here will have to be re-done */
+	Coor swidth;
+	Coor maxy;
+	Coor nexty;
+	Pixel* testzx;
+	Pixel* zend;
+	Pixel* lend;
+	int rightpix;
+	Pixel sbuf[SBUF_SIZE / sizeof(Pixel)];
 
-	if(!height)
-		return(0);
+	if (!height) {
+		return (0);
+	}
 
 	hline = sbuf;
-	if(width > Array_els(sbuf))
-	{
-		if ((hline = pj_malloc(width*sizeof(Pixel))) == NULL)
-			return(Err_no_memory);
+	if (width > Array_els(sbuf)) {
+		if ((hline = pj_malloc(width * sizeof(Pixel))) == NULL) {
+			return (Err_no_memory);
+		}
 	}
-	swidth = width/zoom_x;
+	swidth = width / zoom_x;
 
-	if((rightpix = width%zoom_x) != 0)
+	if ((rightpix = width % zoom_x) != 0) {
 		++swidth;
-	else
+	} else {
 		rightpix = zoom_x;
+	}
 
-	maxy = dest_y + height; 
+	maxy = dest_y + height;
 	nexty = dest_y;
 
-	for(;;)
-	{
-		GET_HSEG(source,hline,src_x,src_y,swidth);
+	for (;;) {
+		GET_HSEG(source, hline, src_x, src_y, swidth);
 		++src_y;
 
 		zend = &hline[width] - 1;
 		lend = &hline[swidth] - 1;
 
 		testzx = zend - rightpix;
-		for(;;)
-		{
-			if(testzx < hline)
-			{
-				while(zend >= hline)
+		for (;;) {
+			if (testzx < hline) {
+				while (zend >= hline) {
 					*zend-- = *lend;
+				}
 				break;
 			}
-			while(zend > testzx)
+			while (zend > testzx) {
 				*zend-- = *lend;
+			}
 			--lend;
 			testzx -= zoom_x;
 		}
-		if((nexty += zoom_y) >= maxy)
-		{
-			while(dest_y < maxy)
-				PUT_HSEG(dest,hline,dest_x,dest_y++,width);
+		if ((nexty += zoom_y) >= maxy) {
+			while (dest_y < maxy) {
+				PUT_HSEG(dest, hline, dest_x, dest_y++, width);
+			}
 			goto OUT;
 		}
-		while(dest_y < nexty)
-			PUT_HSEG(dest,hline,dest_x,dest_y++,width);
+		while (dest_y < nexty) {
+			PUT_HSEG(dest, hline, dest_x, dest_y++, width);
+		}
 	}
 OUT:
-	if(hline != sbuf)
+	if (hline != sbuf) {
 		pj_free(hline);
-	return(Success);
+	}
+	return (Success);
 }
 #ifndef FLILIB_CODE
-static void grc_diag_to_ptable( Raster *src, Pixel *dseg, Ucoor dsize,
-			   			        Coor x0, Coor y0, Coor x1, Coor y1)
+static void grc_diag_to_ptable(Raster* src, Pixel* dseg, Ucoor dsize, Coor x0, Coor y0, Coor x1,
+							   Coor y1)
 
 /* copy from an arbitrary line in src to a pixel array dsize long starting
    at dseg. This scales the pixels read from the source to the size of the
    destination buffer */
 {
-int incx, incy;
-int dx, dy;
-int dots;
-int xerr, yerr;
-bool didx;
-Pixel spixel;
+	int incx, incy;
+	int dx, dy;
+	int dots;
+	int xerr, yerr;
+	bool didx;
+	Pixel spixel;
 
-	if((dx = x1 - x0) < 0)
-	{
+	if ((dx = x1 - x0) < 0) {
 		incx = -1;
-	}
-	else
-	{
+	} else {
 		incx = 1;
 		dx = -dx;
 	}
-	if((dy = y1 - y0) < 0)
-	{
+	if ((dy = y1 - y0) < 0) {
 		incy = -1;
-	}
-	else
-	{
+	} else {
 		incy = +1;
 		dy = -dy;
 	}
 	dots = dsize;
-	xerr = dots + (dx>>1);
-	yerr = dots + (dy>>1);
+	xerr = dots + (dx >> 1);
+	yerr = dots + (dy >> 1);
 	dx -= 1;
 	dy -= 1;
 
-	spixel = pj__get_dot(src,x0,y0);
+	spixel = pj__get_dot(src, x0, y0);
 	didx = false;
 
-	while (--dots >= 0)
-	{
-		*dseg++ = spixel; 	/* output one pixel */
-		if((xerr += dx) <= 0)
-		{
+	while (--dots >= 0) {
+		*dseg++ = spixel; /* output one pixel */
+		if ((xerr += dx) <= 0) {
 			didx = true;
-NEXTX:      
+NEXTX:
 			x0 += incx;
-			if ((xerr += dsize) <= 0)
+			if ((xerr += dsize) <= 0) {
 				goto NEXTX;
+			}
 		}
-		if((yerr += dy) > 0)
-		{
-			if(!didx)
+		if ((yerr += dy) > 0) {
+			if (!didx) {
 				continue;
-		}
-		else
-		{
+			}
+		} else {
 NEXTY:
 			y0 += incy;
-			if ((yerr += dsize) <= 0)
+			if ((yerr += dsize) <= 0) {
 				goto NEXTY;
+			}
 		}
-		spixel = pj__get_dot(src,x0,y0);
+		spixel = pj__get_dot(src, x0, y0);
 		didx = false;
 	}
 }
 #endif /* FLILIB_CODE */
 
 #ifdef SLUFFED
-void grc_wseg(const Raster *v, const SHORT pix2, Coor x, Coor y, Coor count)
+void grc_wseg(const Raster* v, const SHORT pix2, Coor x, Coor y, Coor count)
 {
 #define WPSZ 100
-SHORT pbuf[WPSZ];
-short lc;
+	SHORT pbuf[WPSZ];
+	short lc;
 
-while (count > 0)
-	{
-	lc = count;
-	if (lc > WPSZ)
-		lc = WPSZ;
-	pj_stuff_words(pix2, pbuf, lc);
-	PUT_HSEG(v, pbuf, x, y, lc+lc);
-	count -= lc;
+	while (count > 0) {
+		lc = count;
+		if (lc > WPSZ) {
+			lc = WPSZ;
+		}
+		pj_stuff_words(pix2, pbuf, lc);
+		PUT_HSEG(v, pbuf, x, y, lc + lc);
+		count -= lc;
 	}
 #undef WPSZ
 }
 #endif /* SLUFFED */
 
 
-void pj_grc_load_fullcalls(struct rastlib *lib)
+void pj_grc_load_fullcalls(struct rastlib* lib)
 /* Return pointer to generic display function jump-table */
 {
 #ifdef NEVER
@@ -613,7 +589,7 @@ void pj_grc_load_fullcalls(struct rastlib *lib)
 #endif /* IN_COMMONCALLS */
 
 	lib->put_vseg = _grc_put_vseg;
-	lib->get_vseg = _grc_get_vseg;	
+	lib->get_vseg = _grc_get_vseg;
 
 	lib->set_vline = _grc_set_vline;
 

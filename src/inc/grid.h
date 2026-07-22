@@ -8,6 +8,6 @@
 extern USHORT constrain_angle(SHORT angle);
 extern void qgrid_keep_undo(void);
 extern void qgrid(void);
-extern void grid_flixy(SHORT *flix, SHORT *fliy);
+extern void grid_flixy(SHORT* flix, SHORT* fliy);
 
 #endif
