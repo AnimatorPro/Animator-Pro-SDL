@@ -6,23 +6,22 @@
 #include "errcodes.h"
 #include "picdrive.h"
 
-
-Errcode pdr_load_picture(char *pdr_path,char *picname, Rcel *screen)
+Errcode pdr_load_picture(char* pdr_path, char* picname, Rcel* screen)
 {
 	Errcode err;
-	Pdr *pd;
-	Image_file *ifile;
+	Pdr* pd;
+	Image_file* ifile;
 	Rcel virt;
 	Anim_info ainfo;
 
 	err = load_pdr(pdr_path, &pd);
-	if(err < Success) {
-		return cant_use_module(err,pdr_path);
+	if (err < Success) {
+		return cant_use_module(err, pdr_path);
 	}
 
 	get_screen_ainfo(screen, &ainfo);
 	err = pdr_open_ifile(pd, picname, &ifile, &ainfo);
-	if(err < Success) {
+	if (err < Success) {
 		free_pdr(&pd);
 		return err;
 	}

@@ -26,18 +26,18 @@
 #include "tween.h"
 #include "zoom.h"
 
-static Errcode ado_mouse_ptfunc(Pentool *pt, Wndo *w);
-static Errcode eload_a3d(char *name);
-static Errcode save_a3d(char *title);
+static Errcode ado_mouse_ptfunc(Pentool* pt, Wndo* w);
+static Errcode eload_a3d(char* name);
+static Errcode save_a3d(char* title);
 
 /************** Stuff for 2-Dimensional point-lists *****************/
 typedef struct poly2 {
 	int count;
-	Short_xy *p2;
+	Short_xy* p2;
 } Poly2;
 
 /* Initialize Poly2 structure and allocate buffer for count points */
-static Errcode poly2_init(Poly2 *p, int count)
+static Errcode poly2_init(Poly2* p, int count)
 {
 	clear_struct(p);
 	p->p2 = pj_malloc(count * sizeof(Short_xy));
@@ -49,7 +49,7 @@ static Errcode poly2_init(Poly2 *p, int count)
 }
 
 /* Cleanup Poly2 structure and free point buffer */
-static void poly2_cleanup(Poly2 *p)
+static void poly2_cleanup(Poly2* p)
 {
 	pj_gentle_free(p->p2);
 	clear_struct(p);
@@ -58,16 +58,16 @@ static void poly2_cleanup(Poly2 *p)
 /************** Stuff for 3-Dimensional point-lists *****************/
 typedef struct poly3 {
 	int count;
-	Short_xyz *p3;      /* 3-D point list */
-	Short_xyz *p3alloc; /* allocated 3-D points */
+	Short_xyz* p3;      /* 3-D point list */
+	Short_xyz* p3alloc; /* allocated 3-D points */
 } Poly3;
 
-static void poly3_cleanup(Poly3 *p);
+static void poly3_cleanup(Poly3* p);
 
 /* Initialize a poly3 structure.  If points is NULL then allocate
  * a array big enough for count 3-D points.
  * In any case allocate a 2-D point array of count elements */
-static Errcode poly3_init(Poly3 *p, int count, Short_xyz *points)
+static Errcode poly3_init(Poly3* p, int count, Short_xyz* points)
 {
 	clear_struct(p);
 	if (points == NULL) {
@@ -84,7 +84,7 @@ static Errcode poly3_init(Poly3 *p, int count, Short_xyz *points)
 }
 
 /* Free point arrays of a Poly3 */
-static void poly3_cleanup(Poly3 *p)
+static void poly3_cleanup(Poly3* p)
 {
 	pj_gentle_free(p->p3alloc);
 	clear_struct(p);
@@ -93,7 +93,7 @@ static void poly3_cleanup(Poly3 *p)
 /**************** Optics motion stuff *******************/
 /* Do the yaw, pitch, and roll rotation to a 3-d point relative to
    wherever they've twisted the axis.  */
-static void act_rotate(register Short_xyz *point, register struct ado_setting *op, SHORT scale)
+static void act_rotate(register Short_xyz* point, register struct ado_setting* op, SHORT scale)
 {
 	register SHORT theta;
 
@@ -137,7 +137,7 @@ static void act_rotate(register Short_xyz *point, register struct ado_setting *o
 }
 
 /* Do the x, y, and both scaling to a single 3-d point */
-static void act_size(register Short_xyz *point, register struct ado_setting *op, SHORT scale)
+static void act_size(register Short_xyz* point, register struct ado_setting* op, SHORT scale)
 {
 	int dif1, dif2;
 
@@ -153,13 +153,13 @@ static void act_size(register Short_xyz *point, register struct ado_setting *op,
 }
 
 /* Do the move (translation) part of optics transform to 1 point */
-static void act_move(Short_xyz *p, Short_xyz *op, SHORT scale)
+static void act_move(Short_xyz* p, Short_xyz* op, SHORT scale)
 {
 	int i;
 
 	i = 3;
 	while (--i >= 0) {
-		*(SHORT *)p += itmult(*(SHORT *)op, scale);
+		*(SHORT*)p += itmult(*(SHORT*)op, scale);
 		p = OPTR(p, sizeof(p->x));
 		op = OPTR(op, sizeof(op->x));
 	}
@@ -167,7 +167,7 @@ static void act_move(Short_xyz *p, Short_xyz *op, SHORT scale)
 
 /**************** Gnarly optics stuff that depends on globals *************/
 /* Variables to hold our graphic element (source for optics) */
-static Rcel *ado_cel; /* if it's a raster element */
+static Rcel* ado_cel; /* if it's a raster element */
 static Poly ado_poly_el;
 static Tween_state ado_tween_el;
 static Tw_tlist ado_tlist;
@@ -262,12 +262,12 @@ static void ado_unload_element(void)
 
 static int
 /* Do one full optics transformation to a list of points */
-move_vpoly(Short_xyz *s,           /* Point list before transformation */
-		   Short_xyz *d,           /* It's ok for s & d to point to same list */
+move_vpoly(Short_xyz* s,           /* Point list before transformation */
+		   Short_xyz* d,           /* It's ok for s & d to point to same list */
 		   int count,              /* point count */
-		   struct ado_setting *op, /* the transformation */
+		   struct ado_setting* op, /* the transformation */
 		   int scale,              /* How far into this tranformation?  0 to SCALE_ONE */
-		   Poly *path_poly, int path_type, bool path_closed) /* We got a path to cope with too? */
+		   Poly* path_poly, int path_type, bool path_closed) /* We got a path to cope with too? */
 {
 	Short_xyz path_point;
 	Poly sp_poly;
@@ -313,11 +313,11 @@ move_vpoly(Short_xyz *s,           /* Point list before transformation */
 /* Take a 3-d poly and run it through transformation stack.  Then
    put result through a perspective calculation to yield a 2-D
    result. */
-static Errcode ado_transform(Short_xyz *points, int count, int scale, Short_xy *dest)
+static Errcode ado_transform(Short_xyz* points, int count, int scale, Short_xy* dest)
 {
 	Errcode err;
-	struct ado_setting *as;
-	Poly *path = NULL;
+	struct ado_setting* as;
+	Poly* path = NULL;
 
 	as = &vs.move3;
 	if (got_path) {
@@ -338,7 +338,7 @@ static Errcode ado_transform(Short_xyz *points, int count, int scale, Short_xy *
 }
 
 /* figure out the center of graphic element */
-void default_center(Short_xyz *v)
+void default_center(Short_xyz* v)
 {
 	if (is_vector()) {
 		if (ado_load_element() >= Success) {
@@ -371,7 +371,7 @@ void a3d_default_centers(void)
 	pj_copy_structure(&vs.move3.spin_center, &vs.move3.size_center, sizeof(&vs.move3.size_center));
 }
 
-static Errcode poly3_from_poly(Poly3 *p3, Poly *poly)
+static Errcode poly3_from_poly(Poly3* p3, Poly* poly)
 {
 	Errcode err = poly3_init(p3, poly->pt_count, NULL);
 	if (err >= Success) {
@@ -384,7 +384,7 @@ static Errcode poly3_from_poly(Poly3 *p3, Poly *poly)
  * optics elements after all transformations and perspective
  * calculations.   Generally you'll need to do a poly2_free(dpoly)
  * eventually as dpoly's pointlist is allocated here. */
-static Errcode ado_calc_poly(Poly2 *dpoly, Rcel *form, SHORT scale)
+static Errcode ado_calc_poly(Poly2* dpoly, Rcel* form, SHORT scale)
 {
 	Rectangle rect;
 	int i;
@@ -392,7 +392,7 @@ static Errcode ado_calc_poly(Poly2 *dpoly, Rcel *form, SHORT scale)
 	Errcode err;
 	bool tclosed;
 	int tcount;
-	Short_xyz *tpoints;
+	Short_xyz* tpoints;
 
 	clear_struct(dpoly);
 	switch (vs.ado_source) {
@@ -414,7 +414,7 @@ static Errcode ado_calc_poly(Poly2 *dpoly, Rcel *form, SHORT scale)
 				goto OUT;
 			}
 			for (i = 0; i < 4; ++i) {
-				*(Short_xy *)(&vpoly.p3[i]) = thecel->xf.bpoly[i];
+				*(Short_xy*)(&vpoly.p3[i]) = thecel->xf.bpoly[i];
 				vpoly.p3[i].z = 0;
 			}
 			break;
@@ -442,13 +442,13 @@ OUT:
 	return err;
 }
 
-static Errcode rado_poly(Short_xy *ado_s, int ptcount, int curved)
+static Errcode rado_poly(Short_xy* ado_s, int ptcount, int curved)
 /* Render a 2-Dimensional array of points */
 {
 	Poly p;
 	Errcode err;
 	int i;
-	LLpoint *list = p.clipped_list = pj_malloc(ptcount * sizeof(LLpoint));
+	LLpoint* list = p.clipped_list = pj_malloc(ptcount * sizeof(LLpoint));
 	if (list == NULL) {
 		return Err_no_memory;
 	}
@@ -469,10 +469,10 @@ static Errcode rado_poly(Short_xy *ado_s, int ptcount, int curved)
 }
 
 /* This is the 'auto vec' to render optics on one frame */
-Errcode twirl1(void *celcfit, int ix, int frames, int scale, Autoarg *aa)
+Errcode twirl1(void* celcfit, int ix, int frames, int scale, Autoarg* aa)
 {
-	Celcfit *cfit = celcfit;
-	Rcel *tf = NULL;
+	Celcfit* cfit = celcfit;
+	Rcel* tf = NULL;
 	Errcode err;
 	Xformspec xf;
 	Tcolxldat tcxl;
@@ -538,7 +538,7 @@ render_rast:
 			}
 
 			if (vs.ado_outline) {
-				Ink *oink;
+				Ink* oink;
 
 				oink = vl.ink;
 				id_set_curink(opq_INKID);
@@ -619,13 +619,13 @@ static int zscale_by(int x, int p, int q)
 
 /* Transform one turn slider into 0-TWOPI based angle.  Copes with
    sliders being in degrees, 1/8 circles, 1/4 circle, etc. */
-static void nscale_theta(Short_xyz *s, Short_xyz *d, int ix)
+static void nscale_theta(Short_xyz* s, Short_xyz* d, int ix)
 {
-	((SHORT *)d)[ix] = zscale_by(((SHORT *)s)[ix], TWOPI, vs.ado_turn);
+	((SHORT*)d)[ix] = zscale_by(((SHORT*)s)[ix], TWOPI, vs.ado_turn);
 }
 
 /* feelme for one of the optics x/y/z sliders */
-void ado_xyz_slider(Button *b)
+void ado_xyz_slider(Button* b)
 {
 	feel_qslider(b);
 	if (inspin) {
@@ -635,7 +635,7 @@ void ado_xyz_slider(Button *b)
 
 /* zero out an optics x/y/z slider.  Usual response to right click over
    optics x/y/z slider */
-void xyz_zero_sl(Button *m)
+void xyz_zero_sl(Button* m)
 {
 	zero_sl(m);
 	if (inspin) {
@@ -663,9 +663,9 @@ static Short_xyz cdvecs[4];
 static Short_xy cdpts[4];
 
 /* Display center.  */
-static Errcode dcenter(dotout_func dotout, void *dotdat, int scale)
+static Errcode dcenter(dotout_func dotout, void* dotdat, int scale)
 {
-	register Short_xyz *pt;
+	register Short_xyz* pt;
 	int i, theta;
 	int sizer;
 	Errcode err;
@@ -697,7 +697,7 @@ static Errcode dcenter(dotout_func dotout, void *dotdat, int scale)
 }
 
 /* Draw marqi'd wireframe and center */
-static void marqi_ado_poly(Marqihdr *mh, Poly2 *dpoly, int scale)
+static void marqi_ado_poly(Marqihdr* mh, Poly2* dpoly, int scale)
 {
 	mh->dmod = mh->smod;
 	dcenter(mh->pdot, mh, scale);
@@ -706,7 +706,7 @@ static void marqi_ado_poly(Marqihdr *mh, Poly2 *dpoly, int scale)
 }
 
 /* Undraw marqi'd wireframe and center */
-static void undo_ado_poly(Marqihdr *mh, Poly2 *apoly, int scale)
+static void undo_ado_poly(Marqihdr* mh, Poly2* apoly, int scale)
 {
 	msome_vector(apoly->p2, apoly->count, undo_marqidot, mh, is_vector() && !vs.closed_curve,
 				 sizeof(apoly->p2[0]));
@@ -843,7 +843,7 @@ void mauto_ado(void)
 /* sets top of transform stack to default values */
 static void ado_clear_top(void)
 {
-	struct ado_setting *next;
+	struct ado_setting* next;
 
 	next = vs.move3.next;
 	pj_copy_structure(&default_vs.move3, &vs.move3, sizeof(vs.move3));
@@ -862,7 +862,7 @@ void ado_clear_pos(void)
 /* free optics transform stack */
 static void ado_free_trans(void)
 {
-	free_slist((Slnode *)vs.move3.next);
+	free_slist((Slnode*)vs.move3.next);
 	vs.move3.next = NULL;
 }
 
@@ -942,7 +942,7 @@ static void clock_line(int theta, dotout_func dotout)
 
 #define CLK_RAD 24
 
-	polar(theta - TWOPI / 4, CLK_RAD, (short *)&clk);
+	polar(theta - TWOPI / 4, CLK_RAD, (short*)&clk);
 	pj_cline(vb.pencel->width / 2, CLK_RAD, vb.pencel->width / 2 + clk.x, CLK_RAD + clk.y, dotout,
 			 NULL);
 
@@ -950,13 +950,12 @@ static void clock_line(int theta, dotout_func dotout)
 }
 
 /* Gather a sampled path from user mouse move */
-static int sample_path(Poly *poly, int delay, int maxpts, int clock)
+static int sample_path(Poly* poly, int delay, int maxpts, int clock)
 {
 	int i, theta;
 
-	LLpoint *this = start_polyt(poly);
-	if (this == NULL)
-	{
+	LLpoint* this = start_polyt(poly);
+	if (this == NULL) {
 		return Err_nogood;
 	}
 	if (clock) {
@@ -990,7 +989,7 @@ OUT:
 }
 
 /* try to calculate and then draw transformed poly */
-static int calc_see_ado_poly(Rcel *cel, SHORT scale)
+static int calc_see_ado_poly(Rcel* cel, SHORT scale)
 {
 	Errcode err;
 	Marqihdr mh;
@@ -1056,7 +1055,7 @@ static Errcode make_path(void)
 }
 
 /* keep sizing sliders in reasonable range */
-static void check_prop(SHORT *pq)
+static void check_prop(SHORT* pq)
 {
 	if (pq[0] > 100) {
 		pq[1] = zscale_by(pq[1], 100, pq[0]);
@@ -1085,7 +1084,7 @@ static Errcode mouse_move_element(void)
 	Errcode err = Success;
 	struct ado_setting oset;
 	int lastx, lasty, dx, dy;
-	Short_xyz *a3d_vertex;
+	Short_xyz* a3d_vertex;
 	int remake_op;
 	Marqihdr mh;
 	Poly2 dpoly;
@@ -1157,7 +1156,7 @@ static Errcode mouse_move_element(void)
 			break;
 	}
 	if (mouse_xyz) {
-		xvertex = yvertex = (SHORT *)a3d_vertex;
+		xvertex = yvertex = (SHORT*)a3d_vertex;
 
 #define XPOS 0
 #define YPOS 1
@@ -1319,7 +1318,7 @@ static void ado_mouse_move(void)
 }
 
 /* What do we do in response to a pull-down selection? */
-static void ado_selit(Menuhdr *mh, SHORT hitid)
+static void ado_selit(Menuhdr* mh, SHORT hitid)
 {
 	switch (hitid) {
 		case MOV_IN__PUL: /* ease */
@@ -1419,7 +1418,7 @@ static Pentool ado_mouse_ptool = PTOOLINIT1(NONEXT, empty_str, /* real name fill
 
 /* Hide menus and then go move things around with the mouse above
  * or abort if a right click */
-static Errcode ado_mouse_ptfunc(Pentool *pt, Wndo *w)
+static Errcode ado_mouse_ptfunc(Pentool* pt, Wndo* w)
 {
 	(void)pt;
 	(void)w;
@@ -1451,9 +1450,9 @@ Errcode set_a3d_state(void)
 }
 
 /* response to 'continue move' */
-void move_along(Button *m)
+void move_along(Button* m)
 {
-	struct ado_setting *as;
+	struct ado_setting* as;
 	LLpoint *first, *last;
 	Poly wpoly;
 
@@ -1467,7 +1466,7 @@ void move_along(Button *m)
 				if (load_a_poly(ppoly_name, &wpoly) >= 0) {
 					as = vs.move3.next;
 					first = wpoly.clipped_list;
-					last = slist_el((Slnode *)first, wpoly.pt_count - 1);
+					last = slist_el((Slnode*)first, wpoly.pt_count - 1);
 					as->move.x += last->x - first->x;
 					as->move.y += last->y - first->y;
 					as->move.z += last->z - first->z;
@@ -1486,16 +1485,16 @@ struct magic_moves {
 	SHORT moves;
 };
 
-static Errcode load_a3d(char *title)
+static Errcode load_a3d(char* title)
 
 /* Load up transformation stack from some file somebody must have liked
    sometime... */
 {
 	Errcode err;
 	struct magic_moves mm;
-	XFILE *xf;
+	XFILE* xf;
 	int i;
-	struct ado_setting *as;
+	struct ado_setting* as;
 
 	ado_clear();
 
@@ -1539,16 +1538,16 @@ cleanup:
 }
 
 /* Try and save the transformation stack */
-static Errcode well_save_a3d(char *title)
+static Errcode well_save_a3d(char* title)
 {
 	Errcode err;
 	struct magic_moves mm;
-	XFILE *xf;
+	XFILE* xf;
 	int i;
-	struct ado_setting *as;
+	struct ado_setting* as;
 
 	mm.magic = A3D_MAGIC;
-	i = mm.moves = slist_len((Slnode *)&vs.move3);
+	i = mm.moves = slist_len((Slnode*)&vs.move3);
 
 	err = xffopen(title, &xf, XWRITEONLY);
 	if (err < Success) {
@@ -1561,7 +1560,7 @@ static Errcode well_save_a3d(char *title)
 	}
 
 	while (--i >= 0) {
-		as = slist_el((Slnode *)&vs.move3, i);
+		as = slist_el((Slnode*)&vs.move3, i);
 		err = xffwrite(xf, as, sizeof(vs.move3));
 		if (err < Success) {
 			goto cleanup;
@@ -1580,7 +1579,7 @@ cleanup:
 }
 
 /* Save current transformation stack */
-static Errcode save_a3d(char *title)
+static Errcode save_a3d(char* title)
 {
 	Errcode err = well_save_a3d(title);
 
@@ -1592,7 +1591,7 @@ static Errcode save_a3d(char *title)
 }
 
 /* load optics state from file and report error */
-static Errcode eload_a3d(char *name)
+static Errcode eload_a3d(char* name)
 {
 	return cant_load(load_a3d(name), name);
 }
@@ -1603,7 +1602,7 @@ static char opt_suff[] = ".OPT";
 void qload_a3d(void)
 {
 	char buf[50];
-	char *title =
+	char* title =
 		vset_get_filename(stack_string("load_opt", buf), opt_suff, load_str, OPTICS_PATH, NULL, 0);
 	if (title != NULL) {
 		eload_a3d(title);
@@ -1614,7 +1613,7 @@ void qload_a3d(void)
 void qsave_a3d(void)
 {
 	char buf[50];
-	char *title =
+	char* title =
 		vset_get_filename(stack_string("save_opt", buf), opt_suff, save_str, OPTICS_PATH, NULL, 1);
 
 	if (title != NULL) {
@@ -1671,7 +1670,7 @@ Errcode do_move_along(void)
 {
 	make_rot_op();
 
-	struct ado_setting *as = pj_malloc(sizeof(*as));
+	struct ado_setting* as = pj_malloc(sizeof(*as));
 	if (as == NULL) {
 		return Err_no_memory;
 	}
@@ -1682,7 +1681,7 @@ Errcode do_move_along(void)
 
 /* make sure that the optics element exists.  If it doesn't set it to
  * the Flic */
-void a3d_check_el(bool *no_poly, bool *no_tween)
+void a3d_check_el(bool* no_poly, bool* no_tween)
 {
 	bool np, nt;
 
@@ -1706,7 +1705,7 @@ void a3d_check_el(bool *no_poly, bool *no_tween)
 }
 
 /* set disable flags and asterisks in items. */
-static bool do_a3dpull(Menuhdr *mh)
+static bool do_a3dpull(Menuhdr* mh)
 {
 	bool no_poly, no_tween;
 
@@ -1743,8 +1742,8 @@ void go_ado(void)
 {
 	Menuhdr tpull;
 	char optics_str[16]; /* The word optics in local language */
-	void *ss;
-	Pentool *optool;
+	void* ss;
+	Pentool* optool;
 	bool no_poly, no_tween;
 
 	stack_string("optics_str", optics_str);

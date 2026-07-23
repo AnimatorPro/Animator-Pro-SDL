@@ -31,9 +31,9 @@ static void show_brush(void)
 	vl.hide_brush = 0;
 }
 
-static int pticheck(void *dat)
+static int pticheck(void* dat)
 {
-	Wndo *ckwndo;
+	Wndo* ckwndo;
 	(void)dat;
 
 	check_top_wndo_pos(); /* move top window if necessary. */
@@ -47,7 +47,7 @@ static int pticheck(void *dat)
 		}
 		ckwndo = vl.zoomwndo;
 	} else {
-		ckwndo = (Wndo *)(vb.pencel);
+		ckwndo = (Wndo*)(vb.pencel);
 	}
 
 	if (!wndo_dot_visible(ckwndo, icb.sx - ckwndo->behind.x, icb.sy - ckwndo->behind.y)) {
@@ -91,9 +91,9 @@ bool pti_input(void)
 }
 
 /* do it function for a pentool window */
-int do_pen_tool(void *wndo)
+int do_pen_tool(void* wndo)
 {
-	Wndo *w = wndo;
+	Wndo* w = wndo;
 	Errcode err;
 
 	if (vl.ptool) {
@@ -108,10 +108,10 @@ int do_pen_tool(void *wndo)
 /* usually from a pulldown menu replaces current pen tool, waits for a
  * pen down then executes pen tool until it exits. Restores
  * the original pen tool on return.  Reports errors from tool */
-void do_pentool_once(Pentool *ptool)
+void do_pentool_once(Pentool* ptool)
 {
-	Pentool *optool;
-	Wndo *w;
+	Pentool* optool;
+	Wndo* w;
 
 	optool = vl.ptool;
 	if (set_curptool(ptool) < Success) {
@@ -126,7 +126,7 @@ done:
 	set_curptool(optool);
 }
 
-Errcode box_tool(Pentool *pt, Wndo *w)
+Errcode box_tool(Pentool* pt, Wndo* w)
 {
 	Errcode err;
 	Rectangle rect;
@@ -146,7 +146,7 @@ error:
 	return err;
 }
 
-Errcode fill_tool(Pentool *pt, Wndo *w)
+Errcode fill_tool(Pentool* pt, Wndo* w)
 {
 	Short_xy fpt;
 	(void)pt;
@@ -161,7 +161,7 @@ Errcode fill_tool(Pentool *pt, Wndo *w)
 	return save_redo_fill(&fpt);
 }
 
-Errcode flood_tool(Pentool *pt, Wndo *w)
+Errcode flood_tool(Pentool* pt, Wndo* w)
 {
 	Errcode err;
 	Short_xy fpt[2];
@@ -189,7 +189,7 @@ Errcode flood_tool(Pentool *pt, Wndo *w)
 	return err;
 }
 
-Errcode edge_tool(Pentool *pt, Wndo *w)
+Errcode edge_tool(Pentool* pt, Wndo* w)
 {
 	Short_xy fpt;
 	(void)pt;
@@ -203,7 +203,7 @@ Errcode edge_tool(Pentool *pt, Wndo *w)
 	return save_redo_edge(&fpt);
 }
 
-Errcode drizl_tool(Pentool *pt, Wndo *w)
+Errcode drizl_tool(Pentool* pt, Wndo* w)
 {
 	Errcode err;
 	(void)pt;
@@ -215,7 +215,7 @@ Errcode drizl_tool(Pentool *pt, Wndo *w)
 	return err;
 }
 
-Errcode streak_tool(Pentool *pt, Wndo *w)
+Errcode streak_tool(Pentool* pt, Wndo* w)
 {
 	(void)pt;
 	(void)w;
@@ -223,7 +223,7 @@ Errcode streak_tool(Pentool *pt, Wndo *w)
 	return dtool(DT_STREAK);
 }
 
-Errcode draw_tool(Pentool *pt, Wndo *w)
+Errcode draw_tool(Pentool* pt, Wndo* w)
 {
 	Errcode err;
 	(void)pt;
@@ -237,7 +237,7 @@ Errcode draw_tool(Pentool *pt, Wndo *w)
 }
 
 /* Get input from mouse/digitizer for draw tool loop */
-Errcode dtool_input(Pos_p *p, void *dummy, SHORT mode)
+Errcode dtool_input(Pos_p* p, void* dummy, SHORT mode)
 {
 	Errcode err;
 	(void)dummy;
@@ -274,7 +274,7 @@ Errcode dtool_input(Pos_p *p, void *dummy, SHORT mode)
 	return Success;
 }
 
-Errcode dtool_loop(Errcode (*get_posp)(Pos_p *pp, void *idata, SHORT mode), void *idata, SHORT mode)
+Errcode dtool_loop(Errcode (*get_posp)(Pos_p* pp, void* idata, SHORT mode), void* idata, SHORT mode)
 {
 #define DL 3
 #define DLMAX 16
@@ -422,7 +422,7 @@ static Errcode dtool(int mode)
 }
 
 /************** Start of line-at-a-time undo saver */
-static UBYTE *ychanged;
+static UBYTE* ychanged;
 
 Errcode start_line_undo(void)
 {
@@ -482,7 +482,7 @@ static void save_thik_line_undo(SHORT y1, SHORT y2, SHORT brushsize)
 }
 
 /************** End of line-at-a-time undo saver */
-Errcode spray_loop(Errcode (*get_posp)(Pos_p *pp, void *idata, SHORT mode), void *idata,
+Errcode spray_loop(Errcode (*get_posp)(Pos_p* pp, void* idata, SHORT mode), void* idata,
 				   bool redoing)
 {
 	Errcode err;
@@ -570,7 +570,7 @@ Errcode spray_loop(Errcode (*get_posp)(Pos_p *pp, void *idata, SHORT mode), void
 	return err;
 }
 
-Errcode spray_tool(Pentool *pt, Wndo *w)
+Errcode spray_tool(Pentool* pt, Wndo* w)
 {
 	Errcode err;
 	(void)pt;
@@ -595,7 +595,7 @@ Errcode spray_tool(Pentool *pt, Wndo *w)
 	return err;
 }
 
-Errcode circle_tool(Pentool *pt, Wndo *w)
+Errcode circle_tool(Pentool* pt, Wndo* w)
 {
 	Errcode err;
 	Circle_p circp;
@@ -615,7 +615,7 @@ error:
 	return err;
 }
 
-Errcode line_tool(Pentool *pt, Wndo *w)
+Errcode line_tool(Pentool* pt, Wndo* w)
 {
 	Errcode err;
 	Short_xy xys[2];
@@ -640,7 +640,7 @@ error:
 static Errcode move_or_copy_tool(bool clear_move_out)
 {
 	Errcode err;
-	Rcel *clipcel;
+	Rcel* clipcel;
 	Move_p mop;
 
 	if (!pti_input()) {
@@ -675,7 +675,7 @@ error:
 	return err;
 }
 
-Errcode move_tool(Pentool *pt, Wndo *w)
+Errcode move_tool(Pentool* pt, Wndo* w)
 {
 	(void)pt;
 	(void)w;
@@ -683,7 +683,7 @@ Errcode move_tool(Pentool *pt, Wndo *w)
 	return move_or_copy_tool(true);
 }
 
-Errcode copy_tool(Pentool *pt, Wndo *w)
+Errcode copy_tool(Pentool* pt, Wndo* w)
 {
 	(void)pt;
 	(void)w;

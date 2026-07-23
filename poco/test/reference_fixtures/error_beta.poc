@@ -1,0 +1,4 @@
+main()
+{
+	return reference_beta_error();
+}

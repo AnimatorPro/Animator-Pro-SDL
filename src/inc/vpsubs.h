@@ -14,24 +14,24 @@ int fli_screen_width(void);
 int fli_screen_height(void);
 #endif /* WITH_POCO */
 
-void ccolor_dot(SHORT x, SHORT y, void *data);
-void undo_dot(SHORT x, SHORT y, void *data);
-void undo_rect(Coor x,Coor y,Coor w,Coor h);
-void save_undo_rect(Coor x,Coor y,Coor w,Coor h);
-void zoom_undo_rect(Coor x,Coor y,Coor w,Coor h);
+void ccolor_dot(SHORT x, SHORT y, void* data);
+void undo_dot(SHORT x, SHORT y, void* data);
+void undo_rect(Coor x, Coor y, Coor w, Coor h);
+void save_undo_rect(Coor x, Coor y, Coor w, Coor h);
+void zoom_undo_rect(Coor x, Coor y, Coor w, Coor h);
 bool check_esc_abort(void);
 bool check_pen_abort(void);
 bool check_toggle_menu(void);
 bool check_toggle_abort(void);
 int cluster_count(void);
-UBYTE *cluster_bundle(void);
+UBYTE* cluster_bundle(void);
 void see_cmap(void);
 SHORT uscale_vscoor(Vscoor vcoor, SHORT relto);
 Vscoor scale_vscoor(SHORT coor, SHORT relto);
 void reres_settings(void);
-void mb_quickmenu_to_bottom(Button *b);
-void mb_move_quickmenu(Button *b);
-void menu_to_quickcent(Menuhdr *mh);
+void mb_quickmenu_to_bottom(Button* b);
+void mb_move_quickmenu(Button* b);
+void menu_to_quickcent(Menuhdr* mh);
 void save_undo(void);
 void zoom_unundo(void);
 void swap_undo(void);
@@ -44,7 +44,7 @@ void kill_seq(void);
 void flush_tempflx(void);
 void hide_mp(void);
 void show_mp(void);
-int interp_range(int c1,int c2,int i,int divi);
+int interp_range(int c1, int c2, int i, int divi);
 
 
-#endif // ANIMATOR_PRO_VPSUBS_H
+#endif  // ANIMATOR_PRO_VPSUBS_H

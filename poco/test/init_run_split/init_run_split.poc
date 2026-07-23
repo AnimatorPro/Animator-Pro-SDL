@@ -1,0 +1,14 @@
+int lifecycle_value = 41;
+
+probe_initialized_global()
+{
+	capture_global(&lifecycle_value);
+	return lifecycle_value;
+}
+
+main()
+{
+	lifecycle_value += 32;
+	capture_global(&lifecycle_value);
+	return lifecycle_value;
+}

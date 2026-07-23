@@ -7,7 +7,7 @@ void old_video(void)
 /* only used to restore screen for bad cookie message in util\memalloc.c */
 {
 	disable_textboxes();
-	pj_close_vdriver(&vb.vd); 
+	pj_close_vdriver(&vb.vd);
 	restore_ivmode();
 }
 #endif /* SLUFFED */

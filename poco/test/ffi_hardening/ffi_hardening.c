@@ -10,12 +10,12 @@
 
 static int failures;
 
-#define CHECK(condition, message) \
-	do { \
-		if (!(condition)) { \
+#define CHECK(condition, message)                                   \
+	do {                                                            \
+		if (!(condition)) {                                         \
 			fprintf(stderr, "poco_ffi_hardening: %s\n", (message)); \
-			++failures; \
-		} \
+			++failures;                                             \
+		}                                                           \
 	} while (0)
 
 static int fixture_function(void)
@@ -30,13 +30,12 @@ static int fixture_add(int left, int right)
 
 enum { FIXTURE_DYNAMIC_ARGUMENT_COUNT = 20 };
 
-static int fixture_sum_20(int a01, int a02, int a03, int a04, int a05,
-	int a06, int a07, int a08, int a09, int a10,
-	int a11, int a12, int a13, int a14, int a15,
-	int a16, int a17, int a18, int a19, int a20)
+static int fixture_sum_20(int a01, int a02, int a03, int a04, int a05, int a06, int a07, int a08,
+						  int a09, int a10, int a11, int a12, int a13, int a14, int a15, int a16,
+						  int a17, int a18, int a19, int a20)
 {
-	return a01 + a02 + a03 + a04 + a05 + a06 + a07 + a08 + a09 + a10 +
-		a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20;
+	return a01 + a02 + a03 + a04 + a05 + a06 + a07 + a08 + a09 + a10 + a11 + a12 + a13 + a14 + a15 +
+		   a16 + a17 + a18 + a19 + a20;
 }
 
 static int fixture_variadic_sum(int count, ...)
@@ -77,12 +76,10 @@ static void fixture_void_result(void)
 	fixture_void_called = 1;
 }
 
-typedef union fixture_stack
-{
+typedef union fixture_stack {
 	double double_alignment;
 	void* pointer_alignment;
-	unsigned char bytes[sizeof(int) +
-		(FIXTURE_DYNAMIC_ARGUMENT_COUNT * sizeof(int))];
+	unsigned char bytes[sizeof(int) + (FIXTURE_DYNAMIC_ARGUMENT_COUNT * sizeof(int))];
 } FixtureStack;
 
 static void init_environment(Poco_run_env* env, C_frame* binding)
@@ -99,8 +96,8 @@ static void init_environment(Poco_run_env* env, C_frame* binding)
 	env->protos = &root;
 }
 
-static void init_binding(C_frame* frame, const char* name, void* function,
-	Type_info* return_type, Symbol* parameters, short parameter_count)
+static void init_binding(C_frame* frame, const char* name, void* function, Type_info* return_type,
+						 Symbol* parameters, short parameter_count)
 {
 	memset(frame, 0, sizeof(*frame));
 	frame->name = (char*)name;
@@ -135,12 +132,11 @@ static void test_descriptor_validation(void)
 	init_binding(&binding, "null_function", NULL, &int_type, NULL, 0);
 	check_invalid_binding("null function must be rejected", &binding);
 
-	init_binding(&binding, "unsupported_parameter", (void*)fixture_function,
-		&int_type, &unsupported_parameter, 1);
+	init_binding(&binding, "unsupported_parameter", (void*)fixture_function, &int_type,
+				 &unsupported_parameter, 1);
 	check_invalid_binding("unsupported parameter type must be rejected", &binding);
 
-	init_binding(&binding, "invalid_return", (void*)fixture_function,
-		&function_type, NULL, 0);
+	init_binding(&binding, "invalid_return", (void*)fixture_function, &function_type, NULL, 0);
 	check_invalid_binding("unsupported return type must be rejected", &binding);
 }
 
@@ -157,7 +153,7 @@ static void test_duplicate_descriptors(void)
 	first.mlink = &second;
 	init_environment(&env, &first);
 	CHECK(po_ffi_build_structures(&env) == Err_poco_ffi_invalid_binding,
-		"duplicate function names must be rejected");
+		  "duplicate function names must be rejected");
 	CHECK(env.func_map == NULL, "duplicate names must not leave a partial map");
 	po_ffi_free_structures(&env);
 
@@ -166,7 +162,7 @@ static void test_duplicate_descriptors(void)
 	first.mlink = &second;
 	init_environment(&env, &first);
 	CHECK(po_ffi_build_structures(&env) == Err_poco_ffi_invalid_binding,
-		"duplicate function addresses must be rejected");
+		  "duplicate function addresses must be rejected");
 	CHECK(env.func_map == NULL, "duplicate addresses must not leave a partial map");
 	po_ffi_free_structures(&env);
 }
@@ -203,19 +199,20 @@ static void test_dynamic_call_storage(void)
 	int_type.ido_type = IDO_INT;
 	for (index = 0; index < FIXTURE_DYNAMIC_ARGUMENT_COUNT; ++index) {
 		fixed_parameters[index].ti = &int_type;
-		fixed_parameters[index].link = index + 1 < FIXTURE_DYNAMIC_ARGUMENT_COUNT ?
-			&fixed_parameters[index + 1] : NULL;
+		fixed_parameters[index].link =
+			index + 1 < FIXTURE_DYNAMIC_ARGUMENT_COUNT ? &fixed_parameters[index + 1] : NULL;
 		expected_sum += index + 1;
 		write_int(&stack, (size_t)index * sizeof(int), index + 1);
 	}
-	init_binding(&binding, "dynamic_fixed_arguments", (void*)fixture_sum_20,
-		&int_type, fixed_parameters, FIXTURE_DYNAMIC_ARGUMENT_COUNT);
-	ffi_binding = build_binding(&env, &binding,
-		"more than sixteen fixed arguments must build safely");
+	init_binding(&binding, "dynamic_fixed_arguments", (void*)fixture_sum_20, &int_type,
+				 fixed_parameters, FIXTURE_DYNAMIC_ARGUMENT_COUNT);
+	ffi_binding =
+		build_binding(&env, &binding, "more than sixteen fixed arguments must build safely");
 	if (ffi_binding != NULL) {
-		builtin_err = Success;
+		env.builtin_error = Success;
 		result = po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, NULL, NULL);
-		CHECK(builtin_err == Success, "dynamic fixed-argument call must not set an FFI error");
+		CHECK(env.builtin_error == Success,
+			  "dynamic fixed-argument call must not set an FFI error");
 		CHECK(result.i == expected_sum, "dynamic fixed-argument call result");
 	}
 	po_ffi_free_structures(&env);
@@ -232,17 +229,17 @@ static void test_dynamic_call_storage(void)
 	offset += sizeof(int);
 	for (index = 0; index < FIXTURE_DYNAMIC_ARGUMENT_COUNT; ++index) {
 		write_int(&stack, offset + ((size_t)index * sizeof(int)), index + 1);
-		CHECK(po_ffi_variadic_types_append(&variadic, &ffi_type_sint32) == Success,
-			"variadic descriptor must record each actual argument type");
+		CHECK(po_ffi_variadic_types_append(NULL, &variadic, &ffi_type_sint32) == Success,
+			  "variadic descriptor must record each actual argument type");
 	}
-	init_binding(&binding, "dynamic_variadic_arguments", (void*)fixture_variadic_sum,
-		&int_type, variadic_parameters, 2);
-	ffi_binding = build_binding(&env, &binding,
-		"fixed-plus-variadic descriptor must build safely");
+	init_binding(&binding, "dynamic_variadic_arguments", (void*)fixture_variadic_sum, &int_type,
+				 variadic_parameters, 2);
+	ffi_binding = build_binding(&env, &binding, "fixed-plus-variadic descriptor must build safely");
 	if (ffi_binding != NULL) {
-		builtin_err = Success;
+		env.builtin_error = Success;
 		result = po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, &variadic, NULL);
-		CHECK(builtin_err == Success, "dynamic fixed-plus-variadic call must not set an FFI error");
+		CHECK(env.builtin_error == Success,
+			  "dynamic fixed-plus-variadic call must not set an FFI error");
 		CHECK(result.i == expected_sum, "dynamic fixed-plus-variadic call result");
 	}
 	po_ffi_variadic_types_release(&variadic);
@@ -250,28 +247,27 @@ static void test_dynamic_call_storage(void)
 
 	memset(&stack, 0, sizeof(stack));
 	write_int(&stack, 0, 0);
-	init_binding(&binding, "invalid_variadic_count", (void*)fixture_variadic_sum,
-		&int_type, variadic_parameters, 2);
-	ffi_binding = build_binding(&env, &binding,
-		"zero-variadic descriptor must build safely");
+	init_binding(&binding, "invalid_variadic_count", (void*)fixture_variadic_sum, &int_type,
+				 variadic_parameters, 2);
+	ffi_binding = build_binding(&env, &binding, "zero-variadic descriptor must build safely");
 	if (ffi_binding != NULL) {
-		builtin_err = Success;
+		env.builtin_error = Success;
 		(void)po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, &variadic, NULL);
-		CHECK(builtin_err == Success,
-			"zero variadic arguments must not require a hidden stack count");
+		CHECK(env.builtin_error == Success,
+			  "zero variadic arguments must not require a hidden stack count");
 	}
 	po_ffi_free_structures(&env);
 
-	CHECK(po_ffi_variadic_types_append(&variadic, &ffi_type_void) ==
-		Err_poco_ffi_invalid_binding,
-		"void must be rejected as an unsupported variadic promotion");
-	CHECK(po_ffi_variadic_types_append(&variadic, &ffi_type_float) ==
-		Err_poco_ffi_invalid_binding,
-		"float must be rejected until promoted to double for a variadic call");
+	CHECK(po_ffi_variadic_types_append(NULL, &variadic, &ffi_type_void) ==
+			  Err_poco_ffi_invalid_binding,
+		  "void must be rejected as an unsupported variadic promotion");
+	CHECK(po_ffi_variadic_types_append(NULL, &variadic, &ffi_type_float) ==
+			  Err_poco_ffi_invalid_binding,
+		  "float must be rejected until promoted to double for a variadic call");
 	if (sizeof(int) > sizeof(int8_t)) {
-		CHECK(po_ffi_variadic_types_append(&variadic, &ffi_type_sint8) ==
-			Err_poco_ffi_invalid_binding,
-			"narrow integers must be rejected until promoted for a variadic call");
+		CHECK(po_ffi_variadic_types_append(NULL, &variadic, &ffi_type_sint8) ==
+				  Err_poco_ffi_invalid_binding,
+			  "narrow integers must be rejected until promoted for a variadic call");
 	}
 	po_ffi_variadic_types_release(&variadic);
 }
@@ -327,7 +323,8 @@ static void test_abi_safe_return_storage(void)
 	po_ffi_free_structures(&env);
 
 	pointer_type.ido_type = IDO_CPT;
-	init_binding(&binding, "c_pointer_return", (void*)fixture_pointer_result, &pointer_type, NULL, 0);
+	init_binding(&binding, "c_pointer_return", (void*)fixture_pointer_result, &pointer_type, NULL,
+				 0);
 	ffi_binding = build_binding(&env, &binding, "C pointer return descriptor must build");
 	if (ffi_binding != NULL) {
 		result = po_ffi_call(ffi_binding, NULL, NULL, NULL);
@@ -355,13 +352,11 @@ static void test_valid_descriptor_cleanup(void)
 
 	int_type.ido_type = IDO_INT;
 	for (iteration = 0; iteration != 32; ++iteration) {
-		init_binding(&binding, "valid_descriptor", (void*)fixture_function,
-			&int_type, NULL, 0);
+		init_binding(&binding, "valid_descriptor", (void*)fixture_function, &int_type, NULL, 0);
 		init_environment(&env, &binding);
-		CHECK(po_ffi_build_structures(&env) == Success,
-			"valid descriptor must build");
+		CHECK(po_ffi_build_structures(&env) == Success, "valid descriptor must build");
 		CHECK(po_ffi_find_binding_by_name(&env, "valid_descriptor") != NULL,
-			"valid descriptor must be findable by name");
+			  "valid descriptor must be findable by name");
 		po_ffi_free_structures(&env);
 		CHECK(env.func_map == NULL, "descriptor cleanup must reset the function map");
 	}
@@ -383,15 +378,14 @@ static void test_public_vm_cycles(void)
 		int32_t result = 0;
 
 		CHECK(poco_vm_create(NULL, &vm) == POCO_STATUS_OK, "create VM for cycle");
-		if (vm == NULL)
+		if (vm == NULL) {
 			continue;
-		CHECK(poco_vm_register_library(vm, &library) == POCO_STATUS_OK,
-			"register cycle binding");
+		}
+		CHECK(poco_vm_register_library(vm, &library) == POCO_STATUS_OK, "register cycle binding");
 		CHECK(poco_vm_compile_file(vm, FIXTURE_PATH("valid.poc"), &program) == POCO_STATUS_OK,
-			"compile cycle program");
+			  "compile cycle program");
 		if (program != NULL) {
-			CHECK(poco_vm_run(vm, program, NULL, &result) == POCO_STATUS_OK,
-				"run cycle program");
+			CHECK(poco_vm_run(vm, program, NULL, &result) == POCO_STATUS_OK, "run cycle program");
 			CHECK(result == 42, "cycle program result");
 		}
 		poco_program_destroy(program);

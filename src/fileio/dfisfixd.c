@@ -1,13 +1,14 @@
 #include "dfile.ih"
 
-Errcode pj_is_fixed(char *device)
+Errcode pj_is_fixed(char* device)
 
 /* returns 1 if device is fixed 0 if not < 0 if error */
 {
-char dc;
+	char dc;
 
 	dc = toupper(*device);
-	if(dc == 'A' || dc == 'B')
-		return(0);
-	return(1);
+	if (dc == 'A' || dc == 'B') {
+		return (0);
+	}
+	return (1);
 }

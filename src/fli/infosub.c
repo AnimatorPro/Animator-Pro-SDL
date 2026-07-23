@@ -10,14 +10,14 @@
  *  and returns.  Will leave file open if successful.  Used by linked
  *  in PDR.
  */
-Errcode
-pj_fli_info_open(Flifile *flif, char *path, Anim_info *ainfo)
+Errcode pj_fli_info_open(Flifile* flif, char* path, Anim_info* ainfo)
 {
 	Errcode err;
 
 	err = pj_fli_open(path, flif, XREADONLY);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	if (ainfo != NULL) {
 		memset(ainfo, 0, sizeof(*ainfo));

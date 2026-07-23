@@ -20,13 +20,13 @@
  * so we can have 2 yes 2 codes in one */
 
 typedef struct config_pdr_info {
-	void *next;
-	char *local_name;
-	char *save_pdr;
-	char *default_pdr;
+	void* next;
+	char* local_name;
+	char* save_pdr;
+	char* default_pdr;
 	char save_suffi[PDR_SUFFI_SIZE];
 	UBYTE suffi_loaded;
-	Errcode (*local_get_ainfo)(char *ifname, Anim_info *ainfo);
+	Errcode (*local_get_ainfo)(char* ifname, Anim_info* ainfo);
 	char last_read[FILE_NAME_SIZE]; /* type of last successful read */
 	UBYTE type;
 } Config_pdr;
@@ -61,24 +61,24 @@ static Config_pdr pdrconf[2] = {
 	},
 };
 
-static bool is_local_pdr(char *path, int type)
+static bool is_local_pdr(char* path, int type)
 {
 	return !txtcmp(pj_get_path_name(path), pdrconf[type].local_name);
 }
 
-static bool is_pic_pdr_name(char *path)
+static bool is_pic_pdr_name(char* path)
 {
 	return is_local_pdr(path, PICTYPE);
 }
 
-bool is_fli_pdr_name(char *path)
+bool is_fli_pdr_name(char* path)
 {
 	return is_local_pdr(path, FLICTYPE);
 }
 
-static char *get_save_pdr(char *pathbuf, int type)
+static char* get_save_pdr(char* pathbuf, int type)
 {
-	Config_pdr *cpdr = &pdrconf[type];
+	Config_pdr* cpdr = &pdrconf[type];
 
 	if (is_local_pdr(cpdr->save_pdr, type)) {
 		strcpy(pathbuf, cpdr->local_name);
@@ -91,26 +91,26 @@ static char *get_save_pdr(char *pathbuf, int type)
 	return pathbuf;
 }
 
-char *get_flisave_pdr(char *pdr_path)
+char* get_flisave_pdr(char* pdr_path)
 {
 	return get_save_pdr(pdr_path, FLICTYPE);
 }
 
-static char *get_picsave_pdr(char *pdr_path)
+static char* get_picsave_pdr(char* pdr_path)
 {
 	return get_save_pdr(pdr_path, PICTYPE);
 }
 
 /* gets info for current user selection of picture io module type */
-static Errcode cur_pdrtype_info(char *sufbuf, char *titlebuf, int titlesize, bool flitype,
+static Errcode cur_pdrtype_info(char* sufbuf, char* titlebuf, int titlesize, bool flitype,
 								int rwmode) /* 0 = dontcare
 											   1 = must_write
 											   2 = must_read */
 {
 	Errcode err;
 	char pdr_name[PATH_SIZE];
-	Config_pdr *cpdr;
-	Pdr *pd;
+	Config_pdr* cpdr;
+	Pdr* pd;
 
 	if (flitype) {
 		flitype = 1;
@@ -152,7 +152,7 @@ error:
 
 /* to be called before user request to save images to verify pdr is writable
  * and to get header info for prompt menu */
-static Errcode get_pdrsave_info(char *sufbuf, char *titlebuf, int titlesize, int type)
+static Errcode get_pdrsave_info(char* sufbuf, char* titlebuf, int titlesize, int type)
 {
 	Errcode err;
 	/* If get info fails or module is read only then query user to pick
@@ -168,19 +168,19 @@ static Errcode get_pdrsave_info(char *sufbuf, char *titlebuf, int titlesize, int
 	return err;
 }
 
-Errcode get_picsave_info(char *sufbuf, char *titlebuf, int titlesize)
+Errcode get_picsave_info(char* sufbuf, char* titlebuf, int titlesize)
 {
 	return get_pdrsave_info(sufbuf, titlebuf, titlesize, PICTYPE);
 }
 
-Errcode get_flisave_info(char *sufbuf, char *titlebuf, int titlesize)
+Errcode get_flisave_info(char* sufbuf, char* titlebuf, int titlesize)
 {
 	return get_pdrsave_info(sufbuf, titlebuf, titlesize, FLICTYPE);
 }
 
 /* we have a little static suffi area to avoid re-loading picture module
  * every time */
-char *get_pictype_suffi(void)
+char* get_pictype_suffi(void)
 {
 	if (!pdrconf[PICTYPE].suffi_loaded) {
 		cur_pdrtype_info(pdrconf[PICTYPE].save_suffi, NULL, 0, PICTYPE, 0);
@@ -190,7 +190,7 @@ char *get_pictype_suffi(void)
 
 /* we have a little static suffi area to avoid re-loading picture module
  * every time */
-static char *get_flitype_suffi(void)
+static char* get_flitype_suffi(void)
 {
 	if (!pdrconf[FLICTYPE].suffi_loaded) {
 		cur_pdrtype_info(pdrconf[FLICTYPE].save_suffi, NULL, 0, FLICTYPE, 0);
@@ -200,10 +200,10 @@ static char *get_flitype_suffi(void)
 
 static void reset_pdr_stuff(int file_type)
 {
-	Config_pdr *cpdr = &pdrconf[file_type];
+	Config_pdr* cpdr = &pdrconf[file_type];
 	Vset_path vsp;
 	int ptype;
-	char *suffi;
+	char* suffi;
 	char suffix[5];
 
 	ptype = file_type == PICTYPE ? PIC_PATH : FLI_PATH;
@@ -220,10 +220,10 @@ static void reset_pdr_stuff(int file_type)
 static Errcode select_save_pdr(int type)
 {
 	Errcode err;
-	Config_pdr *cpdr;
-	Config_pdr *opdr;
+	Config_pdr* cpdr;
+	Config_pdr* opdr;
 	char hdr[80];
-	char *hdr_key;
+	char* hdr_key;
 
 	cpdr = &pdrconf[type];
 
@@ -237,8 +237,8 @@ static Errcode select_save_pdr(int type)
 	cpdr->next = opdr;
 	opdr->next = NULL;
 
-	err = go_pdr_menu(stack_string(hdr_key, hdr), cpdr->save_pdr, cpdr->save_suffi, (Names *)cpdr,
-					  0, type);
+	err = go_pdr_menu(stack_string(hdr_key, hdr), cpdr->save_pdr, cpdr->save_suffi, (Names*)cpdr, 0,
+					  type);
 
 	if (err >= Success) {
 		reset_pdr_stuff(type);
@@ -262,10 +262,10 @@ void go_flic_pdr_menu(void)
 /* will open the pdr and attempt open of image file, and retrieve info,
  * close image file and free pdr if this is checked out you can read the
  * image */
-static Errcode check_try_pdr(char *pdr_name, char *ifname, Anim_info *ainfo)
+static Errcode check_try_pdr(char* pdr_name, char* ifname, Anim_info* ainfo)
 {
-	Pdr *pd;
-	Image_file *ifile;
+	Pdr* pd;
+	Image_file* ifile;
 	Errcode err = load_pdr(pdr_name, &pd);
 	if (err >= Success) {
 		if (pd->max_read_frames < 1) {
@@ -287,13 +287,13 @@ static Errcode check_try_pdr(char *pdr_name, char *ifname, Anim_info *ainfo)
  * it closes the Image_file and the pdr and puts the name of the pdr in
  * pdr_name. The screen is the screen tho match if loader is a resolution
  * independent loader */
-Errcode find_pdr_loader(char *ifname, bool multi_frame, Anim_info *ainfo, char *pdr_name,
-						Rcel *screen)
+Errcode find_pdr_loader(char* ifname, bool multi_frame, Anim_info* ainfo, char* pdr_name,
+						Rcel* screen)
 {
 	Errcode err;
 	int type, check_type;
 	Anim_info screen_info;
-	Config_pdr *cpd;
+	Config_pdr* cpd;
 
 	if (!pj_exists(ifname)) {
 		return (Err_no_file);
@@ -361,7 +361,7 @@ Errcode find_pdr_loader(char *ifname, bool multi_frame, Anim_info *ainfo, char *
 
 /* attempts to load any of the current valid picture file types if pic is
  * smaller will clear screen with vs.inks[0] */
-Errcode load_any_picture(char *name, Rcel *screen)
+Errcode load_any_picture(char* name, Rcel* screen)
 {
 	Errcode err;
 	Anim_info ainfo;
@@ -393,13 +393,13 @@ Errcode load_any_picture(char *name, Rcel *screen)
 }
 
 /* what a kludge!! but this will do it right */
-static char *get_fload_suffi(char *sufbuf, int for_cel)
+static char* get_fload_suffi(char* sufbuf, int for_cel)
 {
 	char *buf, *pdrsuf;
 	char suffi[PDR_SUFFI_SIZE];
 	int num_todo;
 	bool picdone = false;
-	static char *suffs[] = {".FL?;", ".CEL;"};
+	static char* suffs[] = {".FL?;", ".CEL;"};
 
 	if (!for_cel) {
 		pdrsuf = get_flitype_suffi();
@@ -446,33 +446,33 @@ static char *get_fload_suffi(char *sufbuf, int for_cel)
 	return sufbuf;
 }
 
-char *get_fliload_suffi(char *sufbuf)
+char* get_fliload_suffi(char* sufbuf)
 {
 	return get_fload_suffi(sufbuf, 0);
 }
 
-char *get_celload_suffi(char *sufbuf)
+char* get_celload_suffi(char* sufbuf)
 {
 	return get_fload_suffi(sufbuf, 1);
 }
 
-static Errcode pdr_check_save_abort(int ix, void *dat)
+static Errcode pdr_check_save_abort(int ix, void* dat)
 {
 	(void)ix;
 
 	if (poll_abort() < Success) {
-		if (soft_yes_no_box("!%s", "save_abort", pj_get_path_name((char *)dat))) {
+		if (soft_yes_no_box("!%s", "save_abort", pj_get_path_name((char*)dat))) {
 			return Err_abort;
 		}
 	}
 	return Success;
 }
 
-static Errcode save_picture_file(char *pdr_path, char *picname, Rcel *screen)
+static Errcode save_picture_file(char* pdr_path, char* picname, Rcel* screen)
 {
 	Errcode err;
-	Pdr *pd;
-	Image_file *ifile = NULL;
+	Pdr* pd;
+	Image_file* ifile = NULL;
 	Anim_info spec;
 	Rcel virt;
 
@@ -529,14 +529,14 @@ out:
 }
 
 /* save picture to current configured picture type */
-Errcode save_current_pictype(char *name, Rcel *screen)
+Errcode save_current_pictype(char* name, Rcel* screen)
 {
 	char pdr_name[PATH_SIZE];
 	get_picsave_pdr(pdr_name);
 	return save_picture_file(pdr_name, name, screen);
 }
 
-Errcode save_gif(char *name, Rcel *screen)
+Errcode save_gif(char* name, Rcel* screen)
 {
 	char pathbuf[PATH_SIZE];
 	make_resource_name(gif_pdr_name, pathbuf);

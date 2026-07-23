@@ -10,4 +10,4 @@
 void cleanup(bool save_state);
 
 
-#endif // ANIMATOR_PRO_PJMAIN_H
+#endif  // ANIMATOR_PRO_PJMAIN_H

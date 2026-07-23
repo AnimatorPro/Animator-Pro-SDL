@@ -15,14 +15,14 @@
 #include "softmenu.h"
 #include "zoom.h"
 
-void free_mask(Bitmap *mask)
+void free_mask(Bitmap* mask)
 {
-	pj_rast_free((Raster *)mask);
+	pj_rast_free((Raster*)mask);
 }
 
 /* allocates a single bit plane mask of width and height.
  * if either w or h is 0 it will use the the size of the penwndo */
-Errcode alloc_mask(Bitmap **mask, USHORT width, USHORT height)
+Errcode alloc_mask(Bitmap** mask, USHORT width, USHORT height)
 {
 	Errcode err;
 	Rasthdr bmspec;
@@ -46,7 +46,7 @@ Errcode alloc_mask(Bitmap **mask, USHORT width, USHORT height)
 
 void free_the_mask(void)
 {
-	pj_rast_free((Raster *)mask_rast);
+	pj_rast_free((Raster*)mask_rast);
 	mask_rast = NULL;
 }
 
@@ -66,18 +66,18 @@ static int newmask(void)
 	return (err);
 }
 
-int save_the_mask(char *name)
+int save_the_mask(char* name)
 {
 	/* note even though mask has no cmap save pic will work since
 	 * save_colors is FALSE */
 
 	if (mask_rast != NULL) {
-		return (save_pic(name, (Rcel *)mask_rast, 0, false));
+		return (save_pic(name, (Rcel*)mask_rast, 0, false));
 	}
 	return (Err_nogood);
 }
 
-int load_the_mask(char *name)
+int load_the_mask(char* name)
 {
 	Errcode err;
 
@@ -87,7 +87,7 @@ int load_the_mask(char *name)
 	if ((err = newmask()) < 0) {
 		return (err);
 	}
-	return (load_pic(name, (Rcel *)mask_rast, 0, false));
+	return (load_pic(name, (Rcel*)mask_rast, 0, false));
 }
 
 static void qcreate_mask(void)
@@ -115,13 +115,13 @@ static bool tog_mask(void)
 	return (1);
 }
 
-void mb_toggle_mask(Button *b)
+void mb_toggle_mask(Button* b)
 {
 	tog_mask();
 	draw_button(b);
 }
 
-static Errcode paste1_mask(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode paste1_mask(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	Errcode err;
 	(void)data;
@@ -154,9 +154,9 @@ static void qshow_mask(void)
 {
 	Errcode err;
 	int twocolor;
-	Cmap *cmap;
-	Rgb3 *grey;
-	Rgb3 *white;
+	Cmap* cmap;
+	Rgb3* grey;
+	Rgb3* white;
 
 	if (mask_rast == NULL) {
 		return;
@@ -207,14 +207,14 @@ static void qshow_mask(void)
 /* this assumes the mask is the same dimension as the vb.pencel */
 static void qgrab_mask(void)
 {
-	UBYTE *hline;
-	UBYTE *hbyte;
+	UBYTE* hline;
+	UBYTE* hbyte;
 	int numpix;
 	SHORT liney;
 	UBYTE mbit;
 	UBYTE mbits;
-	UBYTE *mbyte;
-	UBYTE *mplane;
+	UBYTE* mbyte;
+	UBYTE* mplane;
 
 	if (newmask() < 0) {
 		return;

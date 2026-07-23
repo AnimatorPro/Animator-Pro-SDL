@@ -1,0 +1,8 @@
+#pragma poco use "use_leaf.poc"
+
+int mid_global = used_global + 1;
+
+int mid_call(void)
+{
+	return used_add(mid_global);
+}

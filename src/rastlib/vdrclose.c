@@ -8,8 +8,8 @@
 /* next rtype for type assigning */
 static SHORT next_rtype = RT_FIRST_VDRIVER;
 
-void pj_close_vdriver(Vdevice **pvd)
-/************************************************************************* 
+void pj_close_vdriver(Vdevice** pvd)
+/*************************************************************************
  * This is the inverse of pj_open_ddriver() or pj_open_vdriver().
  * Call this to when you are finished with a display driver to free
  * up all resources associated with the driver.
@@ -18,53 +18,58 @@ void pj_close_vdriver(Vdevice **pvd)
  *		Vdevice **pvd;	 Vdevice from pj_open_ddriver() or pj_open_vdriver()
  *************************************************************************/
 {
-Vdevice *vd = *pvd;
-typedef void (*Vd_cleanup)(Vdevice *vd);
+	Vdevice* vd = *pvd;
+	typedef void (*Vd_cleanup)(Vdevice* vd);
 
-	if(vd == NULL)
+	if (vd == NULL) {
 		return;
+	}
 
-	if((vd->first_rtype + vd->num_rtypes) == next_rtype)
+	if ((vd->first_rtype + vd->num_rtypes) == next_rtype) {
 		next_rtype = vd->first_rtype;
+	}
 
-	if(vd->lib != NULL)
-	{
-		if (vd->lib->close_graphics != NULL)
+	if (vd->lib != NULL) {
+		if (vd->lib->close_graphics != NULL) {
 			(*vd->lib->close_graphics)(vd);
+		}
 	}
 
 #ifdef USE_DYNAMIC_VIDEO_DRIVERS
-	if(vd->hdr.host_data != NULL) /* this is a loaded driver */
-		pj_rexlib_free((Rexlib **)pvd);
-	else if(vd->hdr.cleanup)  /* one of our static drivers */
+	if (vd->hdr.host_data != NULL) { /* this is a loaded driver */
+		pj_rexlib_free((Rexlib**)pvd);
+	} else if (vd->hdr.cleanup) { /* one of our static drivers */
 		((Vd_cleanup)(vd->hdr.cleanup))(vd);
-#else /* USE_DYNAMIC_VIDEO_DRIVERS */
-	if(vd->hdr.cleanup)  /* one of our static drivers */
+	}
+#else  /* USE_DYNAMIC_VIDEO_DRIVERS */
+	if (vd->hdr.cleanup) { /* one of our static drivers */
 		((Vd_cleanup)(vd->hdr.cleanup))(vd);
+	}
 #endif /* USE_DYNAMIC_VIDEO_DRIVERS */
 
-	*pvd = NULL; 
+	*pvd = NULL;
 }
-Errcode pj__vdr_initload_open(Errcode (*loadit)(Vdevice **pvd,char *name),
-					       Vdevice **pvd, char *name)
+Errcode pj__vdr_initload_open(Errcode (*loadit)(Vdevice** pvd, char* name), Vdevice** pvd,
+							  char* name)
 
 /* subroutine that calls a routine (*loadit)() that provides the (loaded)
- * library */ 
+ * library */
 {
-Vdevice *vd;
-Errcode err;
+	Vdevice* vd;
+	Errcode err;
 
-	if ((err = (*loadit)(pvd,name)) < Success)
+	if ((err = (*loadit)(pvd, name)) < Success) {
 		goto error;
+	}
 	vd = *pvd;
 
 #ifdef USE_DYNAMIC_VIDEO_DRIVERS
-	if((err = pj_rexlib_init(&vd->hdr)) < Success)
+	if ((err = pj_rexlib_init(&vd->hdr)) < Success) {
 		goto error;
+	}
 #endif /* USE_DYNAMIC_VIDEO_DRIVERS */
 
-	if(vd->num_rtypes == 0)
-	{
+	if (vd->num_rtypes == 0) {
 		err = Err_driver_protocol;
 		goto error;
 	}
@@ -76,5 +81,5 @@ Errcode err;
 error:
 	pj_close_vdriver(pvd);
 done:
-	return(err);
+	return (err);
 }

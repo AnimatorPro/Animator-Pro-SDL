@@ -19,14 +19,10 @@ static const PocoLibrary module_hook_library = {
 };
 
 static const PocoModuleDescriptor module_hook_module = {
-	POCO_MODULE_ABI_VERSION,
-	"module-hook-valid",
-	&module_hook_library,
-	NULL,
-	NULL,
+	POCO_MODULE_ABI_VERSION, "module-hook-valid", &module_hook_library, NULL, NULL,
 };
 
-POCO_MODULE_EXPORT const PocoModuleDescriptor *poco_module_get(void)
+POCO_MODULE_EXPORT const PocoModuleDescriptor* poco_module_get(void)
 {
 	return &module_hook_module;
 }

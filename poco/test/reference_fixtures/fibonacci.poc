@@ -1,0 +1,15 @@
+main()
+{
+	int previous = 0;
+	int current = 1;
+	int next;
+	int index;
+
+	for (index = 2; index <= 10; ++index) {
+		next = previous + current;
+		previous = current;
+		current = next;
+	}
+	current = reference_identity(current);
+	return current;
+}

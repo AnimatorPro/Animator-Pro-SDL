@@ -14,7 +14,7 @@
  *		Success (0) if all goes well, a negative error code if not.
  *		(see errcodes.h)
  *************************************************************************/
-Errcode pj_fli_create(char *path, Flifile *flif)
+Errcode pj_fli_create(char* path, Flifile* flif)
 {
 	pj_stuff_bytes(0, flif, sizeof(*flif));
 	flif->hdr.type = FLIHR_MAGIC;

@@ -13,7 +13,7 @@ These rgb to hls routines work with rgbhls all in [0,255]
 
 /*routine copped from p618 of Foley and Van Dam Fundamentals of Interactive
   computer graphics.  Converted to integer math by Jim Kent.*/
-void rgb_to_hls(SHORT r, SHORT g, SHORT b, SHORT *h, SHORT *l, SHORT *s)
+void rgb_to_hls(SHORT r, SHORT g, SHORT b, SHORT* h, SHORT* l, SHORT* s)
 {
 	SHORT max, min;
 	SHORT rc, gc, bc;

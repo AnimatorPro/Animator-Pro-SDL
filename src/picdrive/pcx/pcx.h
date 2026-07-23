@@ -26,7 +26,7 @@ STATIC_ASSERT(pcx, sizeof(Pcx_header) == 128);
 
 typedef struct pcx_image_file {
 	Image_file hdr;
-	XFILE *file;
+	XFILE* file;
 	Anim_info ainfo; /* info created with or opened with */
 } Pcx_file;
 

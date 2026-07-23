@@ -3,12 +3,12 @@
 #include "softmenu.h"
 
 /* subroutine to various soft_qreq_number routines */
-bool vsoft_qreq_number(short *inum, short min, short max, char *key, va_list args,
-					   Errcode (*update)(void *data, SHORT val), void *uddat)
+bool vsoft_qreq_number(short* inum, short min, short max, char* key, va_list args,
+					   Errcode (*update)(void* data, SHORT val), void* uddat)
 {
 	bool ret;
-	char *text;
-	char *formats;
+	char* text;
+	char* formats;
 
 	if (soft_load_ftext_type(key, &args, &formats, &text) < Success) {
 		ret = false;

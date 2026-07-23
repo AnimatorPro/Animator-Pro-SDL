@@ -248,13 +248,13 @@ Vbcb vb = /* yep, this is where it is */
 Vlcb vl; /* local control block data, all zeros, see jimk.h */
 
 
-Rcel *undof; /* undo cel */
+Rcel* undof; /* undo cel */
 
 /* Not just any cel, it's THE cel... */
-Flicel *thecel;
+Flicel* thecel;
 
 /* Mr. Mask */
-Bitmap *mask_rast; /* the new one !! both are set by alloc mask */
+Bitmap* mask_rast; /* the new one !! both are set by alloc mask */
 
 
 /* Set to 1 when want to blit under something.  Be sure to set it

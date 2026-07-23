@@ -15,12 +15,12 @@
  * legacy POE modules and the Animator host share the same addresses.
  */
 
-ANIMHOST_EXPORT Hostlib _a_a_syslib   = { NULL, AA_SYSLIB,    AA_SYSLIB_VERSION };
-ANIMHOST_EXPORT Hostlib _a_a_loadpath = { NULL, AA_LOADPATH,  AA_LOADPATH_VERSION };
-ANIMHOST_EXPORT Hostlib _a_a_stdiolib = { NULL, AA_STDIOLIB,  AA_STDIOLIB_VERSION };
-ANIMHOST_EXPORT Hostlib _a_a_gfxlib   = { NULL, AA_GFXLIB,    AA_GFXLIB_VERSION };
-ANIMHOST_EXPORT Hostlib _a_a_pocolib  = { NULL, AA_POCOLIB,   AA_POCOLIB_VERSION };
-ANIMHOST_EXPORT Hostlib _a_a_mathlib  = { NULL, AA_MATHLIB,   AA_MATHLIB_VERSION };
+ANIMHOST_EXPORT Hostlib _a_a_syslib = {NULL, AA_SYSLIB, AA_SYSLIB_VERSION};
+ANIMHOST_EXPORT Hostlib _a_a_loadpath = {NULL, AA_LOADPATH, AA_LOADPATH_VERSION};
+ANIMHOST_EXPORT Hostlib _a_a_stdiolib = {NULL, AA_STDIOLIB, AA_STDIOLIB_VERSION};
+ANIMHOST_EXPORT Hostlib _a_a_gfxlib = {NULL, AA_GFXLIB, AA_GFXLIB_VERSION};
+ANIMHOST_EXPORT Hostlib _a_a_pocolib = {NULL, AA_POCOLIB, AA_POCOLIB_VERSION};
+ANIMHOST_EXPORT Hostlib _a_a_mathlib = {NULL, AA_MATHLIB, AA_MATHLIB_VERSION};
 
 /*
  * Standalone fallback for the pocolib host table.
@@ -46,11 +46,8 @@ static int _standalone_builtin_err;
 
 static struct {
 	Libhead hdr;
-	int*    pl_builtin_err;
-} _standalone_porexlib_stub = {
-	{0, 0, 0},
-	&_standalone_builtin_err
-};
+	int* pl_builtin_err;
+} _standalone_porexlib_stub = {{0, 0, 0}, &_standalone_builtin_err};
 
 ANIMHOST_EXPORT void animhost_ensure_pocolib(void)
 {
@@ -58,4 +55,3 @@ ANIMHOST_EXPORT void animhost_ensure_pocolib(void)
 		_a_a_pocolib.next = &_standalone_porexlib_stub;
 	}
 }
-

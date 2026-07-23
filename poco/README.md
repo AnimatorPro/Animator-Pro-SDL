@@ -94,6 +94,63 @@ into each program at compile time, so later registrations do not alter an
 already compiled program.  Compile/run calls on a VM are not concurrently
 re-entrant.
 
+## Host-driven invocation
+
+The example above runs a whole script to completion with `poco_vm_run`.  A host
+that drives a script over time — calling functions by name, keeping state
+between calls, or supplying `argc`/`argv` — acquires an activation and keeps it
+alive instead.  `poco_vm_run` is itself a convenience wrapper over this model.
+
+An activation binds one mutable data segment to a program's immutable code.
+Acquire it once, run its global initializers, then call into it repeatedly.
+Reset discards per-run state but keeps the allocated storage, so a host pool can
+reuse an activation without recompiling.  Different activations of one program
+may run concurrently; a single activation is owned by one thread at a time.
+
+```c
+PocoActivation *activation = NULL;
+PocoCallbackValue value;
+
+if (poco_activation_acquire(program, &activation) != POCO_STATUS_OK)
+	return 1;
+if (poco_activation_init(activation) != POCO_STATUS_OK) /* run global inits */
+	return 1;
+
+/* Seed a global the script reads: int difficulty; */
+PocoCallbackValue seed = { POCO_CALLBACK_VALUE_INT, { .int_value = 3 } };
+poco_activation_set_global(activation, "difficulty", seed);
+
+/* Call a script function by name: int update(int frame); */
+PocoCall *call = NULL;
+if (poco_call_begin(activation, "update", &call) == POCO_STATUS_OK) {
+	poco_call_push_int(call, 0);
+	if (poco_call_invoke(call, &value) == POCO_STATUS_OK &&
+	    value.kind == POCO_CALLBACK_VALUE_INT)
+		printf("update -> %d\n", value.value.int_value);
+}
+poco_call_end(call); /* one-shot; end it whether invoke succeeded or not */
+
+/* Read a global back out: int score; */
+value = poco_activation_get_global(activation, "score");
+if (value.kind == POCO_CALLBACK_VALUE_INT)
+	printf("score = %d\n", value.value.int_value);
+
+poco_activation_release(activation);
+```
+
+Numeric arguments are coerced to the declared parameter types at invoke time.
+`poco_call_push_pointer()` borrows an exact host span with requested read/write
+permissions; the host keeps that memory alive across `poco_call_invoke()`.  To
+run a conventional entry point instead of individual functions, call
+`poco_activation_run_main(activation, argc, argv, &result)` after
+`poco_activation_init()`.
+
+`poco_vm_compile_files()` links several `.poc` sources into one program — a flat
+namespace with per-file `static` privacy — which then acquires activations the
+same way.  `poco/examples/snake` is a complete host that drives a Poco game by
+name (`init`, `load_assets`, `update`, `draw`, `shutdown`) over SDL3 using this
+model.
+
 ## Native bindings and standard library
 
 Each `PocoBinding` pairs a Poco prototype string with the exact C function

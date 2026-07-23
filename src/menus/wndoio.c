@@ -7,14 +7,14 @@
 #include "ptrmacro.h"
 
 /***************** input waits while scanning windows ***************/
-static int anim_check_wndos(Wndo **ciwin)
+static int anim_check_wndos(Wndo** ciwin)
 {
-	Wndo *w;
-	Dlnode *next;
+	Wndo* w;
+	Dlnode* next;
 
 	*ciwin = NULL;
-	for (w = (Wndo *)(icb.input_screen->wilist.head); (next = ((Dlnode *)w)->next) != NULL;
-		 w = (Wndo *)next) {
+	for (w = (Wndo*)(icb.input_screen->wilist.head); (next = ((Dlnode*)w)->next) != NULL;
+		 w = (Wndo*)next) {
 		w = TOSTRUCT(Wndo, W_node, w);
 		if (w->flags & WNDO_HIDDEN) {
 			continue;
@@ -31,9 +31,9 @@ static int anim_check_wndos(Wndo **ciwin)
 /* this is like wait input but loads cursors and io state as it passes
  * windows returns pointer to window under cursor NULL if over screen
  * leaves iostate set to whatever the last hit window was */
-Wndo *wait_wndo_input(ULONG ioflags)
+Wndo* wait_wndo_input(ULONG ioflags)
 {
-	Wndo *iowndo = NULL;
+	Wndo* iowndo = NULL;
 
 	display_cursor();
 	anim_wait_input(ioflags, ANY_INPUT, -1, anim_check_wndos, &iowndo);
@@ -42,13 +42,13 @@ Wndo *wait_wndo_input(ULONG ioflags)
 }
 
 typedef struct win_anim_data {
-	Wndo *iowndo;
+	Wndo* iowndo;
 	ULONG forceflags;
 	FUNC afunc;
-	void *adata;
+	void* adata;
 } Wadat;
 
-static int anim_anim(Wadat *wd)
+static int anim_anim(Wadat* wd)
 {
 	anim_check_wndos(&(wd->iowndo));
 	if (JSTHIT(wd->forceflags | ICB_TIMEOUT)) {
@@ -60,7 +60,7 @@ static int anim_anim(Wadat *wd)
 /* same as anim_wait_input() but scans windows and switches iostate and
  * cursors.  does not save or restore io environment so current
  * icb.iowndo will be set to current cursor window mouse is in */
-int anim_wndo_input(ULONG waitflags, ULONG forceflags, int maxfields, FUNC func, void *funcdata)
+int anim_wndo_input(ULONG waitflags, ULONG forceflags, int maxfields, FUNC func, void* funcdata)
 {
 	Wadat wd;
 
@@ -73,7 +73,7 @@ int anim_wndo_input(ULONG waitflags, ULONG forceflags, int maxfields, FUNC func,
 }
 
 /***************** menu opener processor loops ******************/
-static Errcode startloop_open(Mugroup *mg, Menuhdr *menu, Button *initb, Menuhdr *pull)
+static Errcode startloop_open(Mugroup* mg, Menuhdr* menu, Button* initb, Menuhdr* pull)
 {
 	Errcode err;
 
@@ -99,13 +99,13 @@ error:
 	return (err);
 }
 
-static int do_closegroup(Mugroup *mg)
+static int do_closegroup(Mugroup* mg)
 {
 	close_group_code(mg, Err_abort);
 	return (1);
 }
 
-static int do_doitfunc(Wscreen *s, FUNC func, void *dat)
+static int do_doitfunc(Wscreen* s, FUNC func, void* dat)
 {
 	int ret;
 
@@ -120,13 +120,12 @@ static int do_doitfunc(Wscreen *s, FUNC func, void *dat)
 
 #define do_wndodoit(w) do_doitfunc(screen, (w)->doit, w)
 
-static void find_wndo_cursor(Wscreen *screen)
+static void find_wndo_cursor(Wscreen* screen)
 {
-	register Dlnode *next;
-	register Wndo *w;
+	register Dlnode* next;
+	register Wndo* w;
 
-	for (w = (Wndo *)(screen->wilist.head); (next = ((Dlnode *)w)->next) != NULL;
-		 w = (Wndo *)next) {
+	for (w = (Wndo*)(screen->wilist.head); (next = ((Dlnode*)w)->next) != NULL; w = (Wndo*)next) {
 		w = TOSTRUCT(Wndo, W_node, w);
 		if (w->flags & WNDO_HIDDEN) {
 			continue;
@@ -142,12 +141,12 @@ static void find_wndo_cursor(Wscreen *screen)
  * to start the loop with. as long as there is at least 1 menu or a pull in the
  * group left it will continue looping. if its the bottom level for the
  * screen it will wait until group0 is empty also */
-LONG do_menuloop(Wscreen *screen, register Menuhdr *mh, Button *initb, Menuhdr *pull,
+LONG do_menuloop(Wscreen* screen, register Menuhdr* mh, Button* initb, Menuhdr* pull,
 				 FUNC default_doclick)
 {
 	Mouset mset;
 	Mugroup mg;
-	register Dlnode *next;
+	register Dlnode* next;
 	register Wndo *w, *hitwndo;
 
 	if (screen->glevel) {
@@ -175,8 +174,8 @@ LONG do_menuloop(Wscreen *screen, register Menuhdr *mh, Button *initb, Menuhdr *
 		if (JSTHIT(KEYHIT)) {
 			/* check for hidden menus that want keys */
 
-			for (mh = (Menuhdr *)(mg.menuhdrs.head); NULL != (next = ((Dlnode *)mh)->next);
-				 mh = (Menuhdr *)next) {
+			for (mh = (Menuhdr*)(mg.menuhdrs.head); NULL != (next = ((Dlnode*)mh)->next);
+				 mh = (Menuhdr*)next) {
 				mh = TOSTRUCT(Menuhdr, node, mh);
 				if (!(mh->flags & MENU_KEYSONHIDE)) {
 					continue;
@@ -191,8 +190,8 @@ LONG do_menuloop(Wscreen *screen, register Menuhdr *mh, Button *initb, Menuhdr *
 			}
 		}
 
-		for (w = (Wndo *)(screen->wilist.head); (next = ((Dlnode *)w)->next) != NULL;
-			 w = (Wndo *)next) {
+		for (w = (Wndo*)(screen->wilist.head); (next = ((Dlnode*)w)->next) != NULL;
+			 w = (Wndo*)next) {
 			w = TOSTRUCT(Wndo, W_node, w);
 
 			if (w->flags & WNDO_HIDDEN) {
@@ -259,15 +258,15 @@ error:
 	}
 	return (mg.retcode);
 }
-static void find_menu_cursor(Mugroup *mg)
+static void find_menu_cursor(Mugroup* mg)
 
 /* detects what menu cursor is over and loads it's cursor etc into input */
 {
-	register Dlnode *next;
-	register Menuhdr *mh;
+	register Dlnode* next;
+	register Menuhdr* mh;
 
-	for (mh = (Menuhdr *)(mg->menuhdrs.head); NULL != (next = ((Dlnode *)mh)->next);
-		 mh = (Menuhdr *)next) {
+	for (mh = (Menuhdr*)(mg->menuhdrs.head); NULL != (next = ((Dlnode*)mh)->next);
+		 mh = (Menuhdr*)next) {
 		mh = TOSTRUCT(Menuhdr, node, mh);
 		if (cursin_menu(mh)) {
 			load_wndo_iostate(&(mh->mw->w));
@@ -284,14 +283,14 @@ static void find_menu_cursor(Mugroup *mg)
  * present on entry it will return the retcode from the last menu close
  * or group close (on the current group) or Err_abort if it was canceled
  * by a right click or space bar */
-LONG do_reqloop(Wscreen *screen, register Menuhdr *mh, Button *initb, Menuhdr *pull,
+LONG do_reqloop(Wscreen* screen, register Menuhdr* mh, Button* initb, Menuhdr* pull,
 				FUNC default_doclick)
 {
 	Mouset mset;
 	Mugroup mg;
-	Menuwndo *mw;
-	Menuwndo *hitwndo;
-	register Dlnode *next;
+	Menuwndo* mw;
+	Menuwndo* hitwndo;
+	register Dlnode* next;
 	int altmouset;
 
 	if (screen->glevel) {
@@ -322,8 +321,8 @@ LONG do_reqloop(Wscreen *screen, register Menuhdr *mh, Button *initb, Menuhdr *p
 		hitwndo = NULL; /* no hits yet */
 		altmouset = 0;
 
-		for (mh = (Menuhdr *)(mg.menuhdrs.head); NULL != (next = ((Dlnode *)mh)->next);
-			 mh = (Menuhdr *)next) {
+		for (mh = (Menuhdr*)(mg.menuhdrs.head); NULL != (next = ((Dlnode*)mh)->next);
+			 mh = (Menuhdr*)next) {
 			mh = TOSTRUCT(Menuhdr, node, mh);
 
 			if ((mw = mh->mw) != NULL) {

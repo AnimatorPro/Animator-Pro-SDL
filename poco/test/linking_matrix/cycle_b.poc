@@ -1,0 +1,6 @@
+#pragma poco use "cycle_a.poc"
+
+int cycle_value(void)
+{
+	return 42;
+}

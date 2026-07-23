@@ -16,10 +16,10 @@
 #error This STDDEF.H file is for use with Poco C only!
 #endif
 
-typedef long 	ptrdiff_t;
-typedef long	size_t;
-typedef char 	wchar_t;
+typedef long ptrdiff_t;
+typedef long size_t;
+typedef char wchar_t;
 
-#define offsetof(struc, mbr)  (size_t)( (char *)(&(((struc *)NULL)->mbr))-(char *)NULL )
+#define offsetof(struc, mbr) (size_t)((char*)(&(((struc*)NULL)->mbr)) - (char*)NULL)
 
 #endif

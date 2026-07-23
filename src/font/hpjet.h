@@ -2,8 +2,7 @@
 #ifndef HPJET_H
 #define HPJET_H
 
-typedef struct hpj_head
-	{
+typedef struct hpj_head {
 	UBYTE format;
 	UBYTE type;
 	USHORT reserved;
@@ -32,10 +31,9 @@ typedef struct hpj_head
 	UBYTE height_extended;
 	UBYTE cap_height;
 	UBYTE reserved4[5];
-	} Hpj_head;
+} Hpj_head;
 
-typedef struct hpj_letter
-	{
+typedef struct hpj_letter {
 	UBYTE format;
 	UBYTE continuation;
 	UBYTE descriptor_size;
@@ -47,16 +45,16 @@ typedef struct hpj_letter
 	SHORT character_width;
 	SHORT character_height;
 	SHORT delta_x;
-	} Hpj_letter;
+} Hpj_letter;
 
-typedef struct hfcb		/* HP Laser Jet font control block */
-	{
-	Hpj_letter **letters;
+typedef struct hfcb /* HP Laser Jet font control block */
+{
+	Hpj_letter** letters;
 	Hpj_head head;
 	SHORT widest;
 	SHORT tallest;
-	} Hfcb;
+} Hfcb;
 
-extern Hfcb *glo_hfcb;
+extern Hfcb* glo_hfcb;
 
 #endif /* HPJET_H */

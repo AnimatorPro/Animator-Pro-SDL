@@ -1,0 +1,4 @@
+main()
+{
+	return reference_alpha_error();
+}

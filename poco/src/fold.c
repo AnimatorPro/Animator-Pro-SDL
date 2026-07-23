@@ -26,96 +26,106 @@
  ****************************************************************************/
 
 #include "poco.h"
+#include "activation.h"
 
-static char 		fold_stack[16*sizeof(double)];
-static Poco_run_env foldenv = {fold_stack, sizeof(fold_stack), false };
-
-void po_fold_const(Poco_cb *pcb, Exp_frame *exp)
+void po_fold_const(Poco_cb* pcb, Exp_frame* exp)
 /*****************************************************************************
  * a little shell to run the interpreter on an expression's code_buf.
  ****************************************************************************/
 {
-SHORT	 csize;
-Code_buf *cb;
-Errcode  err;
+	SHORT csize;
+	Code_buf* cb;
+	Errcode err;
+	char fold_stack[16 * sizeof(double)] = {0};
+	const Poco_program_code fold_code = {.stack_size = sizeof(fold_stack)};
+	PocoActivation foldenv = {
+		.code = &fold_code,
+		.stack = fold_stack,
+		.stack_size = sizeof(fold_stack),
+	};
 
-//	printf("\nWant to fold_const this code (%d):\n", exp->pure_const);
-//	po_dump_codebuf(pcb, &exp->ecd);
+	//	printf("\nWant to fold_const this code (%d):\n", exp->pure_const);
+	//	po_dump_codebuf(pcb, &exp->ecd);
 
-	if (!exp->pure_const)
+	if (!exp->pure_const) {
 		return;
+	}
 
 	cb = &exp->ecd;
 	po_code_op(pcb, cb, OP_END);
-	if (Success > (err = po_run_ops(&foldenv, cb->code_buf, NULL)))
-		{
+	if (Success > (err = po_run_ops(&foldenv, cb->code_buf, NULL))) {
 		pcb->global_err = err;
 		po_say_fatal(pcb, "cannot evaluate constant expression");
-  PO_CHECK_ABORT_VOID(pcb);
-		}
+		PO_CHECK_ABORT_VOID(pcb);
+	}
 	csize = po_get_type_size(&exp->ctc);
 	clear_code_buf(pcb, cb);
 	po_add_op(pcb, cb, po_con_ops[exp->ctc.ido_type],
-		fold_stack+sizeof(fold_stack)-csize-sizeof(void *), csize);
+			  fold_stack + sizeof(fold_stack) - csize - sizeof(void*), csize);
 
-//	printf("Did it, now it looks like:\n");
-//	po_dump_codebuf(pcb, &exp->ecd);
-
+	//	printf("Did it, now it looks like:\n");
+	//	po_dump_codebuf(pcb, &exp->ecd);
 }
 
-int po_eval_const_expression(Poco_cb *pcb, Exp_frame *exp)
+int po_eval_const_expression(Poco_cb* pcb, Exp_frame* exp)
 /*****************************************************************************
  * return the value of an integer constant expression.
  ****************************************************************************/
 {
-Code_buf *cb;
-Errcode  err;
+	Code_buf* cb;
+	Errcode err;
+	char fold_stack[16 * sizeof(double)] = {0};
+	const Poco_program_code fold_code = {.stack_size = sizeof(fold_stack)};
+	PocoActivation foldenv = {
+		.code = &fold_code,
+		.stack = fold_stack,
+		.stack_size = sizeof(fold_stack),
+	};
 
-if (!exp->pure_const)
-	po_say_fatal(pcb, "integer constant expression required");
- PO_CHECK_ABORT(pcb, 0);
+	if (!exp->pure_const) {
+		po_say_fatal(pcb, "integer constant expression required");
+	}
+	PO_CHECK_ABORT(pcb, 0);
 
-po_coerce_numeric_exp(pcb, exp, IDO_INT);
+	po_coerce_numeric_exp(pcb, exp, IDO_INT);
 
-cb = &exp->ecd;
-po_code_op(pcb, cb, OP_END);
-if (Success > (err = po_run_ops(&foldenv, cb->code_buf, NULL)))
-	{
-	pcb->global_err = err;
-	po_say_fatal(pcb, "cannot evaluate constant expression");
- PO_CHECK_ABORT(pcb, 0);
+	cb = &exp->ecd;
+	po_code_op(pcb, cb, OP_END);
+	if (Success > (err = po_run_ops(&foldenv, cb->code_buf, NULL))) {
+		pcb->global_err = err;
+		po_say_fatal(pcb, "cannot evaluate constant expression");
+		PO_CHECK_ABORT(pcb, 0);
 	}
 
-return *(fold_stack + sizeof(fold_stack) - sizeof(int) - sizeof(void *));
-
+	return *(fold_stack + sizeof(fold_stack) - sizeof(int) - sizeof(void*));
 }
 
-bool po_is_static_init_const(Poco_cb *pcb, Code_buf *cb)
+bool po_is_static_init_const(Poco_cb* pcb, Code_buf* cb)
 /*****************************************************************************
  * return TRUE if code in buffer qualifies as purely constant by the rules
  * of static initializer expressions.
  ****************************************************************************/
 {
-	int 			op;
-	Poco_op_table	*pta  = po_ins_table;
-	void			*code;
+	int op;
+	Poco_op_table* pta = po_ins_table;
+	void* code;
 	bool rv = true;
 
 	(void)pcb;
 
-//	printf("\nTesting is_static_init_const on this code:\n");
-//	po_dump_codebuf(pcb, cb);
+	//	printf("\nTesting is_static_init_const on this code:\n");
+	//	po_dump_codebuf(pcb, cb);
 
 	for (code = cb->code_buf; code < (void*)cb->code_pt; /* nothing */) {
-		op = *(int *)code;
+		op = *(int*)code;
 		if (pta[op].op_flags & OFL_NOTCON) {
 			rv = false;
 			break;
 		}
-		code = OPTR(code, pta[op].op_size+sizeof(op));
+		code = OPTR(code, pta[op].op_size + sizeof(op));
 	}
 
-//	printf("Result: %d\n\n", rv);
+	//	printf("Result: %d\n\n", rv);
 
 	return rv;
 }

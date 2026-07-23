@@ -1,0 +1,33 @@
+read_values(int *values)
+{
+	return values[0] + values[2];
+}
+
+int *saved_values;
+
+remember_values(int *values)
+{
+	saved_values = values;
+	return values[0];
+}
+
+read_saved_value()
+{
+	return saved_values[0];
+}
+
+write_value(int *values, int index, int value)
+{
+	values[index] = value;
+	return values[index];
+}
+
+add_one(int value)
+{
+	return value + 1;
+}
+
+main()
+{
+	return 0;
+}

@@ -6,7 +6,7 @@
 
 #define MIN_BILEVEL_CONTRAST 45
 
-static int luminanceof(Rgb3 *c)
+static int luminanceof(Rgb3* c)
 /*****************************************************************************
  * return luminance of an rgb value.
  ***************************************************************************/
@@ -14,15 +14,23 @@ static int luminanceof(Rgb3 *c)
 	int max, min;
 
 	max = c->r;
-	if (c->g>max) max = c->g;
-	if (c->b>max) max = c->b;
+	if (c->g > max) {
+		max = c->g;
+	}
+	if (c->b > max) {
+		max = c->b;
+	}
 	min = c->r;
-	if (c->g<min) min = c->g;
-	if (c->b<min) min = c->b;
-	return (max+min)>>1;
+	if (c->g < min) {
+		min = c->g;
+	}
+	if (c->b < min) {
+		min = c->b;
+	}
+	return (max + min) >> 1;
 }
 
-static void toscreen_monochrome_palette(Tiff_file *tf)
+static void toscreen_monochrome_palette(Tiff_file* tf)
 /*****************************************************************************
  * build and set the PJ color palette before loading a monochrome image.
  *
@@ -41,57 +49,47 @@ static void toscreen_monochrome_palette(Tiff_file *tf)
  *	factored in to the greyscale loop somehow.
  ****************************************************************************/
 {
-	int 	luminance0;
-	int 	luminance1;
-	int 	greylevel;
-	int 	greydelta;
-	int 	greystart;
-	int 	counter;
-	Rcel	*screen = tf->screen_rcel;
-	Rgb3	black = {0,0,0};
-	Rgb3	lgrey = {200,200,200};
-	Rgb3	*ctab = screen->cmap->ctab;
+	int luminance0;
+	int luminance1;
+	int greylevel;
+	int greydelta;
+	int greystart;
+	int counter;
+	Rcel* screen = tf->screen_rcel;
+	Rgb3 black = {0, 0, 0};
+	Rgb3 lgrey = {200, 200, 200};
+	Rgb3* ctab = screen->cmap->ctab;
 
-	if (tf->bits_per_sample[0] == 1)
-		{
+	if (tf->bits_per_sample[0] == 1) {
 		luminance0 = luminanceof(&ctab[0]);
 		luminance1 = luminanceof(&ctab[1]);
 		if ((luminance0 == 0 && luminance1 < MIN_BILEVEL_CONTRAST) ||
-			(luminance1 == 0 && luminance0 < MIN_BILEVEL_CONTRAST) )
-			{
-			if (tf->photometric == PHMET_GREY_0ISWHITE)
-				{
+			(luminance1 == 0 && luminance0 < MIN_BILEVEL_CONTRAST)) {
+			if (tf->photometric == PHMET_GREY_0ISWHITE) {
 				ctab[0] = lgrey;
 				ctab[1] = black;
-				}
-			else
-				{
+			} else {
 				ctab[0] = black;
 				ctab[1] = lgrey;
-				}
 			}
 		}
-	else
-		{
+	} else {
 		greystart = 0;
 		greydelta = 255 / (tf->max_sample_value);
-		if (tf->photometric == 0)
-			{
+		if (tf->photometric == 0) {
 			greydelta = -greydelta;
 			greystart = 255;
-			}
-		for (counter = 0, greylevel = greystart;
-			 counter <= tf->max_sample_value;
-			 ++counter, greylevel += greydelta)
-			 {
-			 ctab[counter].r = ctab[counter].g = ctab[counter].b = greylevel;
-			 }
 		}
+		for (counter = 0, greylevel = greystart; counter <= tf->max_sample_value;
+			 ++counter, greylevel += greydelta) {
+			ctab[counter].r = ctab[counter].g = ctab[counter].b = greylevel;
+		}
+	}
 
 	pj_cmap_load(screen, screen->cmap);
 }
 
-static void toscreen_monoplane_row(Tiff_file *tf, char *sourcep, char *wrkbuf)
+static void toscreen_monoplane_row(Tiff_file* tf, char* sourcep, char* wrkbuf)
 /*****************************************************************************
  * output a bits-packed-into-bytes line to the screen.
  *
@@ -106,12 +104,11 @@ static void toscreen_monoplane_row(Tiff_file *tf, char *sourcep, char *wrkbuf)
  *	we unpack the samples into a byte buffer, then write the full buffer.
  ****************************************************************************/
 {
-	int 	width	= tf->width;
-	int 	row 	= tf->image_row_cur;
-	Rcel	*screen = tf->screen_rcel;
+	int width = tf->width;
+	int row = tf->image_row_cur;
+	Rcel* screen = tf->screen_rcel;
 
-	switch (tf->bits_per_sample[0])
-		{
+	switch (tf->bits_per_sample[0]) {
 		case 1:
 			pj_mask1blit(sourcep, 32767, 0, 0, screen, 0, row, width, 1, 1);
 			break;
@@ -122,15 +119,13 @@ static void toscreen_monoplane_row(Tiff_file *tf, char *sourcep, char *wrkbuf)
 			unpack_samples(sourcep, wrkbuf, width, tf->bits_per_sample[0]);
 			pj_put_hseg(screen, wrkbuf, 0, row, width);
 			break;
-		}
+	}
 
 	return;
 }
 
-static Errcode toscreen_monoplane_strip(Tiff_file *tf,
-										 char *stripbuf,
-										 char *decompressbuf,
-										 char *samples2bytesbuf)
+static Errcode toscreen_monoplane_strip(Tiff_file* tf, char* stripbuf, char* decompressbuf,
+										char* samples2bytesbuf)
 /*****************************************************************************
  * drive processing and writing to the screen each of the rows in a strip.
  *
@@ -141,23 +136,21 @@ static Errcode toscreen_monoplane_strip(Tiff_file *tf,
  *	it before reaching this point; here we just treat it as uncompressed.
  ****************************************************************************/
 {
-	int 	bpr;
-	int 	rowcount;
-	int 	height = tf->height;
-	int 	width = tf->width;
-	int 	rows_per_strip = tf->rows_per_strip;
-	int 	compression = tf->compression;
+	int bpr;
+	int rowcount;
+	int height = tf->height;
+	int width = tf->width;
+	int rows_per_strip = tf->rows_per_strip;
+	int compression = tf->compression;
 
 	bpr = ((width * tf->bits_per_sample[0]) + 7) >> 3; /* bytes per row */
-	if (tf->compression == CMPRS_WNONE && (bpr & 0x01))
-		++bpr;	/* force word alignment for this compression type */
+	if (tf->compression == CMPRS_WNONE && (bpr & 0x01)) {
+		++bpr; /* force word alignment for this compression type */
+	}
 
-	for (rowcount = 0;
-		  (rowcount < rows_per_strip) && (tf->image_row_cur < height);
-		  ++rowcount, ++tf->image_row_cur)
-		{
-		switch (compression)
-			{
+	for (rowcount = 0; (rowcount < rows_per_strip) && (tf->image_row_cur < height);
+		 ++rowcount, ++tf->image_row_cur) {
+		switch (compression) {
 			case CMPRS_NONE:
 			case CMPRS_WNONE:
 			case CMPRS_LZW: /* unlzw done at a higher level */
@@ -165,22 +158,24 @@ static Errcode toscreen_monoplane_strip(Tiff_file *tf,
 				stripbuf += bpr;
 				break;
 			case CMPRS_PACKBITS:
-				if (NULL == (stripbuf = unpackbits(stripbuf, decompressbuf, bpr)))
+				if (NULL == (stripbuf = unpackbits(stripbuf, decompressbuf, bpr))) {
 					return Err_format;
+				}
 				toscreen_monoplane_row(tf, decompressbuf, samples2bytesbuf);
 				break;
 			case CMPRS_1DHUFFMAN:
-				if (NULL == (stripbuf = decmprs2(stripbuf, decompressbuf, width)))
+				if (NULL == (stripbuf = decmprs2(stripbuf, decompressbuf, width))) {
 					return Err_format;
+				}
 				toscreen_monoplane_row(tf, decompressbuf, samples2bytesbuf);
 				break;
-			}
 		}
+	}
 
 	return Success;
 }
 
-Errcode toscreen_monoplane_image(Tiff_file *tf)
+Errcode toscreen_monoplane_image(Tiff_file* tf)
 /*****************************************************************************
  * process and output each of the strips in an image.
  *
@@ -194,67 +189,59 @@ Errcode toscreen_monoplane_image(Tiff_file *tf)
  *
  ****************************************************************************/
 {
-	char		*stripbuf = NULL;
-	char		*wrkbuf1  = NULL;
-	char		*wrkbuf2  = NULL;
-	UBYTE		asciitab[256];
-	Strip_data	*curstrip = tf->strip_data;
-	Errcode 	err;
-	int 		counter;
-	int 		lzwbuflen;
+	char* stripbuf = NULL;
+	char* wrkbuf1 = NULL;
+	char* wrkbuf2 = NULL;
+	UBYTE asciitab[256];
+	Strip_data* curstrip = tf->strip_data;
+	Errcode err;
+	int counter;
+	int lzwbuflen;
 
 	/*------------------------------------------------------------------------
 	 * allocate i/o, decompression, and line buffers...
 	 *----------------------------------------------------------------------*/
 
-	if (NULL == (stripbuf = malloc(tf->longest_strip)))
-		{
+	if (NULL == (stripbuf = malloc(tf->longest_strip))) {
 		err = Err_no_memory;
 		goto ERROR_EXIT;
-		}
+	}
 
-	if (NULL == (wrkbuf1 = malloc(2*tf->width+2)))
-		{
+	if (NULL == (wrkbuf1 = malloc(2 * tf->width + 2))) {
 		err = Err_no_memory;
 		goto ERROR_EXIT;
-		}
-	wrkbuf2 = wrkbuf1 + tf->width+1;
+	}
+	wrkbuf2 = wrkbuf1 + tf->width + 1;
 
 
 	/*------------------------------------------------------------------------
 	 * set the pj color palette based on the type of tiff we're reading...
 	 *----------------------------------------------------------------------*/
 
-	if (tf->photometric == PHMET_PALETTE_COLOR)
-		{
-		memcpy(tf->screen_rcel->cmap->ctab, tf->color_table,3*COLORS);
+	if (tf->photometric == PHMET_PALETTE_COLOR) {
+		memcpy(tf->screen_rcel->cmap->ctab, tf->color_table, 3 * COLORS);
 		pj_cmap_load(tf->screen_rcel, tf->screen_rcel->cmap);
-		}
-	else
-		{
+	} else {
 		toscreen_monochrome_palette(tf);
-		}
+	}
 
 	/*------------------------------------------------------------------------
 	 * if the compression type if lzw, allocate the extra buffers and data
 	 * structures we need to cope with it.
 	 *----------------------------------------------------------------------*/
 
-	if (tf->compression == CMPRS_LZW)
-		{
+	if (tf->compression == CMPRS_LZW) {
 		lzwbuflen = calc_maxdata(tf);
-		if (NULL == (tf->lzwbuf = malloc(lzwbuflen)))
-			{
+		if (NULL == (tf->lzwbuf = malloc(lzwbuflen))) {
 			err = Err_no_memory;
 			goto ERROR_EXIT;
-			}
-		if (NULL == (tf->unlzwtable = malloc(UNLZW_TABLE_SIZE)))
-			{
-			err = Err_no_memory;
-			goto ERROR_EXIT;
-			}
-		unlzw_init(tf->unlzwtable);
 		}
+		if (NULL == (tf->unlzwtable = malloc(UNLZW_TABLE_SIZE))) {
+			err = Err_no_memory;
+			goto ERROR_EXIT;
+		}
+		unlzw_init(tf->unlzwtable);
+	}
 
 	/*------------------------------------------------------------------------
 	 * loop to process strips in the file...
@@ -268,37 +255,39 @@ Errcode toscreen_monoplane_image(Tiff_file *tf)
 	 *----------------------------------------------------------------------*/
 
 	tf->image_row_cur = 0;
-	if (tf->compression == CMPRS_LZW)
-		{
-		for (counter = 0; counter < tf->strips_per_image; ++counter, ++curstrip)
-			{
-			if (Success != (err = read_strip(tf, stripbuf, curstrip)))
+	if (tf->compression == CMPRS_LZW) {
+		for (counter = 0; counter < tf->strips_per_image; ++counter, ++curstrip) {
+			if (Success != (err = read_strip(tf, stripbuf, curstrip))) {
 				goto ERROR_EXIT;
-			if (Success != (err = unlzw(stripbuf, tf->lzwbuf, tf->unlzwtable, lzwbuflen)))
+			}
+			if (Success != (err = unlzw(stripbuf, tf->lzwbuf, tf->unlzwtable, lzwbuflen))) {
 				goto ERROR_EXIT;
-			if (Success != (err = toscreen_monoplane_strip(tf, tf->lzwbuf, wrkbuf1, wrkbuf2)))
+			}
+			if (Success != (err = toscreen_monoplane_strip(tf, tf->lzwbuf, wrkbuf1, wrkbuf2))) {
 				goto ERROR_EXIT;
 			}
 		}
-	else
-		{
-		for (counter = 0; counter < tf->strips_per_image; ++counter, ++curstrip)
-			{
-			if (Success != (err = read_strip(tf, stripbuf, curstrip)))
+	} else {
+		for (counter = 0; counter < tf->strips_per_image; ++counter, ++curstrip) {
+			if (Success != (err = read_strip(tf, stripbuf, curstrip))) {
 				goto ERROR_EXIT;
-			if (Success != (err = toscreen_monoplane_strip(tf, stripbuf, wrkbuf1, wrkbuf2)))
+			}
+			if (Success != (err = toscreen_monoplane_strip(tf, stripbuf, wrkbuf1, wrkbuf2))) {
 				goto ERROR_EXIT;
 			}
 		}
+	}
 
 	err = Success;
 
 ERROR_EXIT:
 
-	if (stripbuf != NULL)
+	if (stripbuf != NULL) {
 		free(stripbuf);
-	if (wrkbuf1 != NULL)
+	}
+	if (wrkbuf1 != NULL) {
 		free(wrkbuf1);
+	}
 
 	return err;
 }

@@ -1,0 +1,6 @@
+#pragma poco use "cycle_b.poc"
+
+int main(void)
+{
+	return 0;
+}

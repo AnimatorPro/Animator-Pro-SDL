@@ -31,12 +31,12 @@ typedef struct tween_cb {
 	short last_made;
 	bool renderable;
 	Minitime_data oflxdata;
-	Pentool *optool;
+	Pentool* optool;
 	Pixel s_color;
 	Pixel e_color;
 } Tween_cb;
 
-static Tween_cb *twcb;
+static Tween_cb* twcb;
 
 typedef void (*tti_func)(void);
 
@@ -50,7 +50,7 @@ static bool tween_got_both(void)
 }
 
 /* Get color from poly - blue if it's the start, red if the end */
-static Pixel get_pcolor(Poly *p)
+static Pixel get_pcolor(Poly* p)
 {
 	return p == &twcb->cur.p0 ? twcb->s_color : twcb->e_color;
 }
@@ -58,7 +58,7 @@ static Pixel get_pcolor(Poly *p)
 /* get the polygons for either end of the tween.  If one is not defined
    then use the same poly for both ends.  If neither defined return
    FALSE */
-static bool get_p1_p2(Poly **pp1, Poly **pp2)
+static bool get_p1_p2(Poly** pp1, Poly** pp2)
 {
 	if (!tween_got_both()) {
 		return false;
@@ -70,7 +70,7 @@ static bool get_p1_p2(Poly **pp1, Poly **pp2)
 }
 
 /* Return closest point in selectable polygon */
-static bool closest_in_tween(Poly **pp, LLpoint **pl, long *pdist, int x, int y, int end_mode)
+static bool closest_in_tween(Poly** pp, LLpoint** pl, long* pdist, int x, int y, int end_mode)
 {
 	Poly *p1, *p2;
 	LLpoint *lp1, *lp2;
@@ -107,7 +107,7 @@ OUT:
 }
 
 /* Draw the link lines in grey */
-static void see_links(Dlheader *llist, Poly *p0, Poly *p1)
+static void see_links(Dlheader* llist, Poly* p0, Poly* p1)
 {
 	Tween_link *link, *next;
 	LLpoint *cl0, *cl1;
@@ -119,10 +119,10 @@ static void see_links(Dlheader *llist, Poly *p0, Poly *p1)
 	cinit_marqihdr(&mh, color, color, true);
 	cl0 = p0->clipped_list;
 	cl1 = p1->clipped_list;
-	for (link = (Tween_link *)(llist->tails_prev); NULL != (next = (Tween_link *)(link->node.prev));
+	for (link = (Tween_link*)(llist->tails_prev); NULL != (next = (Tween_link*)(link->node.prev));
 		 link = next) {
-		pt0 = slist_el((Slnode *)cl0, link->start);
-		pt1 = slist_el((Slnode *)cl1, link->end);
+		pt0 = slist_el((Slnode*)cl0, link->start);
+		pt1 = slist_el((Slnode*)cl1, link->end);
 		pj_cline(pt0->x, pt0->y, pt1->x, pt1->y, mh.pdot, &mh);
 	}
 }
@@ -174,7 +174,7 @@ static void tween_undraw(void)
 	zoom_unundo();
 }
 
-static void tween_undraw_with_data(void *dat)
+static void tween_undraw_with_data(void* dat)
 {
 	(void)dat;
 	tween_undraw();
@@ -186,7 +186,7 @@ static void tween_redraw(void)
 	twe_see_both_ends();
 }
 
-static void tween_redraw_with_data(void *dat)
+static void tween_redraw_with_data(void* dat)
 {
 	(void)dat;
 	tween_redraw();
@@ -245,9 +245,9 @@ static void wireloop_tween(void)
 }
 
 /* Select active poly.  If both poly select different one from last time */
-static Poly *sel_poly(void)
+static Poly* sel_poly(void)
 {
-	Poly *res;
+	Poly* res;
 
 	switch (vs.tween_end) {
 		case TWEEN_BOTH:
@@ -279,7 +279,7 @@ static void set_last_made(void)
 	}
 }
 
-static int contrary_mode(Poly *p)
+static int contrary_mode(Poly* p)
 {
 	if (p == &twcb->cur.p0) {
 		return (TWEEN_END);
@@ -289,7 +289,7 @@ static int contrary_mode(Poly *p)
 }
 
 /* Given poly at one end find poly at other */
-static Poly *other_poly(Poly *p)
+static Poly* other_poly(Poly* p)
 {
 	if (p == &twcb->cur.p0) {
 		return (&twcb->cur.p1);
@@ -300,9 +300,9 @@ static Poly *other_poly(Poly *p)
 
 /* Make sure other poly exists, forcing it to be a clone of this one if
    necessary .  Free up any old links. */
-static Errcode force_other(Poly *p)
+static Errcode force_other(Poly* p)
 {
-	Poly *other;
+	Poly* other;
 	Errcode err = Success;
 
 	set_last_made();
@@ -366,8 +366,8 @@ static int rev_ix(int ix, int pcount, bool closed)
 static void tween_reverse_poly(void)
 {
 	Tween_link *link, *next;
-	Dlheader *llist;
-	Poly *p;
+	Dlheader* llist;
+	Poly* p;
 	int pcount;
 
 	llist = &twcb->cur.links;
@@ -377,7 +377,7 @@ static void tween_reverse_poly(void)
 		p->clipped_list = p->clipped_list->next;
 	}
 	pcount = p->pt_count;
-	for (link = (Tween_link *)(llist->tails_prev); NULL != (next = (Tween_link *)(link->node.prev));
+	for (link = (Tween_link*)(llist->tails_prev); NULL != (next = (Tween_link*)(link->node.prev));
 		 link = next) {
 		if (p == &twcb->cur.p0) {
 			link->start = rev_ix(link->start, pcount, vs.closed_curve);
@@ -391,7 +391,7 @@ static void tween_reverse_poly(void)
 
 /* Rubberband out some star class poly and replace active end with
    result if successful */
-static void tween_do_star(Poly *p, int startype)
+static void tween_do_star(Poly* p, int startype)
 {
 	int theta, rad, rad2;
 	Poly rp;
@@ -413,9 +413,9 @@ static void tween_do_star(Poly *p, int startype)
 }
 
 /* Ask user which end of the tween he's referring to. */
-static Poly *query_end(bool saveit)
+static Poly* query_end(bool saveit)
 {
-	static char *keys[] = {NULL, "st", "end", "esc", NULL};
+	static char* keys[] = {NULL, "st", "end", "esc", NULL};
 
 	if (saveit) {
 		keys[0] = "save";
@@ -437,14 +437,13 @@ static Poly *query_end(bool saveit)
 static void save_cur_shape(void)
 {
 	static char last_path[PATH_MAX] = "";
-	Poly *p = query_end(true);
+	Poly* p = query_end(true);
 
 	if (p == NULL) {
 		return;
 	}
 
-	char* file_path =
-		pj_dialog_file_save("Load Tween", "ply", last_path);
+	char* file_path = pj_dialog_file_save("Load Tween", "ply", last_path);
 
 	if (file_path != NULL) {
 		save_poly(file_path, p);
@@ -456,14 +455,13 @@ static void save_cur_shape(void)
 static void load_cur_shape(void)
 {
 	static char last_path[PATH_MAX] = "";
-	Poly *p = query_end(false);
+	Poly* p = query_end(false);
 
 	if (p == NULL) {
 		return;
 	}
 
-	char* file_path =
-		pj_dialog_file_open("Load Tween", "ply", last_path);
+	char* file_path = pj_dialog_file_open("Load Tween", "ply", last_path);
 
 	if (file_path != NULL) {
 		if (tween_save_undo() >= Success) {
@@ -488,7 +486,7 @@ static void render_tween(void)
 
 static void render_trails(void)
 {
-	static char *keys[] = {"ask", "kp", "vu", "esc", NULL};
+	static char* keys[] = {"ask", "kp", "vu", "esc", NULL};
 	short steps = 16;
 
 	if (!soft_qreq_number(&steps, 2, 100, "twe_trsteps")) {
@@ -521,8 +519,8 @@ done:
 /* create poly a click at a time */
 static void tti_polygon(void)
 {
-	Poly *p;
-	LLpoint *this;
+	Poly* p;
+	LLpoint* this;
 
 	p = sel_poly();
 	free_polypoints(p);
@@ -536,7 +534,7 @@ static void tti_polygon(void)
 
 static void tti_shape(void)
 {
-	Poly *p;
+	Poly* p;
 	Pixel color;
 
 	p = sel_poly();
@@ -573,8 +571,8 @@ static void tti_oval(void)
 /* move a shape end */
 static void tti_mshape(void)
 {
-	Poly *poly;
-	LLpoint *point;
+	Poly* poly;
+	LLpoint* point;
 	long dist;
 	int dx, dy;
 
@@ -587,7 +585,7 @@ static void tti_mshape(void)
 
 /* make up data structure to feed polygon rub-mover/sizer out of
    our tween polys... */
-static bool init_2p_mpl(Mpl_2p *mp)
+static bool init_2p_mpl(Mpl_2p* mp)
 {
 	if (!get_p1_p2(&mp->polys[0], &mp->polys[1])) {
 		return false;
@@ -623,7 +621,7 @@ static void tti_mtween(void)
 }
 
 /* Let user resize a polygon list. */
-static Errcode tween_size_polys(Mpl_data *mpl, int *pp, int *pq)
+static Errcode tween_size_polys(Mpl_data* mpl, int* pp, int* pq)
 {
 	Errcode err;
 	Rcel_save oundo;
@@ -645,8 +643,8 @@ static void tti_sshape(void)
 {
 	Mpl_data mpl;
 	Pixel color;
-	Poly *poly;
-	LLpoint *point;
+	Poly* poly;
+	LLpoint* point;
 	long dist;
 	int p, q;
 
@@ -675,8 +673,8 @@ static void tti_stween(void)
 /* move point tween tool */
 static void tti_mpoint(void)
 {
-	Poly *poly;
-	LLpoint *point;
+	Poly* poly;
+	LLpoint* point;
 	LLpoint *prev, *next;
 	long dist;
 
@@ -684,7 +682,7 @@ static void tti_mpoint(void)
 		return;
 	}
 	pp_find_next_prev(poly, point, &next, &prev);
-	get_rub_vertex((Short_xy *)&(prev->x), (Short_xy *)&(point->x), (Short_xy *)&(next->x),
+	get_rub_vertex((Short_xy*)&(prev->x), (Short_xy*)&(point->x), (Short_xy*)&(next->x),
 				   get_pcolor(poly));
 	redraw_both_ends();
 }
@@ -694,8 +692,8 @@ static void tti_mpoint(void)
 static void tw_mag(int mag_mode)
 {
 	Rcel_save oundo;
-	Poly *poly;
-	LLpoint *pl;
+	Poly* poly;
+	LLpoint* pl;
 	long distance;
 
 	if (report_temp_save_rcel(&oundo, undof) < Success) {
@@ -731,21 +729,21 @@ static void tti_link(void)
 	LLpoint *ps, *pe;
 	long distance;
 	Short_xy pt;
-	Tween_link *newl;
+	Tween_link* newl;
 	Errcode err = Success;
 	int startix, endix;
 
 	if (closest_in_tween(&spoly, &ps, &distance, icb.mx, icb.my, vs.tween_end)) {
-		if ((err = rubba_vertex((Short_xy *)(&ps->x), &pt, (Short_xy *)(&ps->x), NULL, PTCOL)) >=
+		if ((err = rubba_vertex((Short_xy*)(&ps->x), &pt, (Short_xy*)(&ps->x), NULL, PTCOL)) >=
 			Success) {
 			if (closest_in_tween(&epoly, &pe, &distance, icb.mx, icb.my, contrary_mode(spoly))) {
 				/* Figure out which point is the start and which the end. */
 				if (spoly == &twcb->cur.p0) {
-					startix = slist_ix((Slnode *)spoly->clipped_list, (Slnode *)ps);
-					endix = slist_ix((Slnode *)epoly->clipped_list, (Slnode *)pe);
+					startix = slist_ix((Slnode*)spoly->clipped_list, (Slnode*)ps);
+					endix = slist_ix((Slnode*)epoly->clipped_list, (Slnode*)pe);
 				} else {
-					endix = slist_ix((Slnode *)spoly->clipped_list, (Slnode *)ps);
-					startix = slist_ix((Slnode *)epoly->clipped_list, (Slnode *)pe);
+					endix = slist_ix((Slnode*)spoly->clipped_list, (Slnode*)ps);
+					startix = slist_ix((Slnode*)epoly->clipped_list, (Slnode*)pe);
 				}
 				if ((err = tween_add_a_link(&twcb->cur, startix, endix, vs.closed_curve, &newl)) <
 					Success) {
@@ -812,9 +810,9 @@ static Errcode load_tween_state(void)
 }
 
 /* Pull-down interpreter for tween system */
-static void tween_selit(Menuhdr *mh, SHORT hitid)
+static void tween_selit(Menuhdr* mh, SHORT hitid)
 {
-	Poly *p;
+	Poly* p;
 
 	hide_mp();
 	switch (hitid) {
@@ -967,7 +965,7 @@ static void tween_selit(Menuhdr *mh, SHORT hitid)
 	show_mp();
 }
 
-static Errcode twe_tool_func(Pentool *pt, Wndo *w)
+static Errcode twe_tool_func(Pentool* pt, Wndo* w)
 {
 	(void)pt;
 	(void)w;
@@ -989,7 +987,7 @@ Pentool tween_pen_tool = PTOOLINIT1(
 	NULL                                                            /* on remove */
 );
 
-void twe_go_tool(Button *b)
+void twe_go_tool(Button* b)
 {
 	(void)b;
 
@@ -1002,7 +1000,7 @@ void twe_go_tool(Button *b)
 	show_mp();
 }
 
-static void tween_pull_disables(Menuhdr *mh)
+static void tween_pull_disables(Menuhdr* mh)
 {
 	static SHORT notween_pulltab[] = {
 		TWE_ONC_PUL, TWE_LOO_PUL, TWE_END_PUL, TWE_SWA_PUL, TWE_TRA_PUL,
@@ -1016,7 +1014,7 @@ static void tween_pull_disables(Menuhdr *mh)
 	set_leaf_disable(mh, MOV_PUL, notween);
 }
 
-static void tween_pull_asterisks(Menuhdr *mh)
+static void tween_pull_asterisks(Menuhdr* mh)
 {
 	static SHORT twtool_pulltab[] = {
 		SHA_POL_PUL, SHA_SHA_PUL, SHA_STA_PUL, SHA_PET_PUL, SHA_RPO_PUL, SHA_OVA_PUL, MOV_MVP_PUL,
@@ -1041,7 +1039,7 @@ static void tween_pull_asterisks(Menuhdr *mh)
 	pul_xflag(mh, twtool_pulltab[vs.tween_tool], true);
 }
 
-static int tween_dopull(Menuhdr *mh)
+static int tween_dopull(Menuhdr* mh)
 {
 	tween_pull_asterisks(mh);
 	tween_pull_disables(mh);
@@ -1054,7 +1052,7 @@ static void twe_set_colors(void)
 	twcb->e_color = vs.inks[2];
 }
 
-static void twe_color_refresh(void *dat, USHORT why)
+static void twe_color_refresh(void* dat, USHORT why)
 {
 	Pixel os, oe;
 	(void)dat;
@@ -1114,9 +1112,9 @@ void tween_menu(bool renderable /* grey out render button? */)
 {
 	Tween_cb rtcb;
 	Menuhdr tpull;
-	void *ss = NULL;
-	void *oundo;
-	void *oredo;
+	void* ss = NULL;
+	void* oundo;
+	void* oredo;
 
 	if (MENU_ISOPEN(&twe_menu)) {
 		return;

@@ -2,14 +2,14 @@
 #include "memory.h"
 #include "util.h"
 
-char *clone_string(char *s)
+char* clone_string(char* s)
 {
 	unsigned long length = strlen(s) + 1;
-	char *d = (char *)pj_malloc(length);
+	char* d = (char*)pj_malloc(length);
 
-	if (d != NULL){
+	if (d != NULL) {
 		strncpy(d, s, length);
 	}
-	
+
 	return d;
 }

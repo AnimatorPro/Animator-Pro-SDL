@@ -50,10 +50,10 @@
  *				and detection and reporting in here.  The old 'ferr' global
  *				var was not being used at all, it's gone now.  On the host
  *				side, any fp-related err will now result in Err_float being
- *				stored in builtin_err.	If the
+ *				stored in p->builtin_error.	If the
  *				error occurs in a library routine (eg, sqrt()), the existing
  *				error detection following a function call will catch it.
- *				Additional checks of builtin_err were added following floating
+ *				Additional checks of p->builtin_error were added following floating
  *				point math calculations (OP_DMUL, OP_DDIV, etc) to catch
  *				overflow/underflow and div-by-zero conditions that happen
  *				in the inline code.
@@ -63,10 +63,11 @@
  ****************************************************************************/
 
 #include "poco.h"
+#include "activation.h"
 #include <limits.h>
 #include <string.h>
 
-#define MIN_PCALL_STACK 512	 /* we check real often, small is fine. */
+#define MIN_PCALL_STACK 512  /* we check real often, small is fine. */
 #define MIN_CCALL_STACK 4096 /* we guarantee min 2k to poe users */
 							 /* which means we really ensure 4k: safe */
 
@@ -97,30 +98,50 @@
 #define STRING_C_call(s, f) po_string_ccall(s, f)
 #endif
 
-typedef union eax
-{
+typedef union eax {
 	Func_frame* f;
 	Pt_num ret;
 	int* iptr;
 } Eax;
 
-typedef struct
+static bool po_copy_span_has_capacity(const Popot* span, size_t byte_count)
 {
+	uintptr_t current;
+	uintptr_t minimum;
+	uintptr_t maximum;
+
+	if (span == NULL || span->pt == NULL || span->min == NULL || span->max == NULL) {
+		return false;
+	}
+	current = (uintptr_t)span->pt;
+	minimum = (uintptr_t)span->min;
+	maximum = (uintptr_t)span->max;
+	if (minimum > current || current > maximum) {
+		return false;
+	}
+	return byte_count == 0 || maximum - current >= byte_count - 1;
+}
+
+static bool po_registered_pointer_access_is_valid(PocoPointerRegistry* registry,
+												  const Popot* pointer, size_t byte_count,
+												  uint32_t permissions)
+{
+	return !poco_pointer_registry_is_managed(registry, pointer) ||
+		   poco_pointer_registry_validate(registry, pointer, byte_count, permissions);
+}
+
+typedef struct {
 	long data[32];
 } Parmdata;
 
-static Poco_run_env* pe;
-
-#define RECORD_VARIADIC_TYPE(type) \
-	do { \
-		err = po_ffi_variadic_types_append(&pe->variadic, (type)); \
-		if (err != Success) \
-			goto ERR_IN_FFI; \
+#define RECORD_VARIADIC_TYPE(env, type)                                          \
+	do {                                                                         \
+		err = po_ffi_variadic_types_append((env)->vm, &(env)->variadic, (type)); \
+		if (err != Success) goto ERR_IN_FFI;                                     \
 	} while (0)
 
 #ifdef DEVELOPMENT
 /* variables for runops tracing */
-C_frame* po_run_protos;
 FILE* po_trace_file;
 bool po_trace_flag = false;
 #endif /* DEVELOPMENT */
@@ -137,11 +158,11 @@ static bool nofunc(void* d)
 /*****************************************************************************
  * interpret code stream - the heart of the runtime interpreter.
  ****************************************************************************/
-Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
-	const PocoCallbackValue* values, size_t value_count)
+static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
+								 const PocoCallbackValue* values, size_t value_count)
 {
-	int end_op		= OP_END;
-	FILE* tfile		= NULL;
+	int end_op = OP_END;
+	FILE* tfile = NULL;
 	Pt_num* ip;
 	Pt_num* globals;
 	Errcode err;
@@ -154,13 +175,15 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 	size_t argument_bytes = 0;
 	size_t value_index;
 	char* argument_data;
+	bool temporary_stack;
+	size_t saved_debug_call_depth;
+	size_t debug_depth_floor;
 
 
 #define STACK_OVERFLOW(limit) ((UBYTE*)stack < (stack_area + (limit)))
 
 
-	if (pe == NULL || code_pt == NULL || pret == NULL ||
-		(value_count != 0 && values == NULL)) {
+	if (p == NULL || code_pt == NULL || pret == NULL || (value_count != 0 && values == NULL)) {
 		return Err_null_ref;
 	}
 
@@ -188,23 +211,29 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 		}
 		argument_bytes += value_size;
 	}
-	if (pe->stack_size <= (long)sizeof(ip) ||
-		argument_bytes > (size_t)(pe->stack_size - (long)sizeof(ip))) {
+	if (p->stack_size <= (long)sizeof(ip) ||
+		argument_bytes > (size_t)(p->stack_size - (long)sizeof(ip))) {
 		return Err_stack;
 	}
 	ip = code_pt;
-	globals = (Pt_num*)(pe->data + pe->data_size);
+	globals = (Pt_num*)(p->data + p->data_size);
 
-	if (pe->stack == NULL) {
-		stack_area = pj_malloc(pe->stack_size);
+	saved_debug_call_depth = p->debug_call_depth;
+	debug_depth_floor = p->run_depth != 0 ? saved_debug_call_depth + 1 : 0;
+	p->debug_call_depth = debug_depth_floor;
+	temporary_stack = p->run_depth++ != 0 || p->stack == NULL;
+	if (temporary_stack) {
+		stack_area = pj_malloc(p->stack_size);
 		if (stack_area == NULL) {
+			--p->run_depth;
+			p->debug_call_depth = saved_debug_call_depth;
 			return Err_no_memory;
 		}
 	} else {
-		stack_area = (UBYTE*)pe->stack;
+		stack_area = (UBYTE*)p->stack;
 	}
 
-	stack = (Pt_num*)(stack_area + pe->stack_size);
+	stack = (Pt_num*)(stack_area + p->stack_size);
 
 	if (argument_bytes > 0) {
 		stack = OPTR(stack, -(long)argument_bytes);
@@ -213,22 +242,22 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 			switch (values[value_index].kind) {
 				case POCO_CALLBACK_VALUE_INT:
 					memcpy(argument_data, &values[value_index].value.int_value,
-						sizeof(values[value_index].value.int_value));
+						   sizeof(values[value_index].value.int_value));
 					argument_data += sizeof(values[value_index].value.int_value);
 					break;
 				case POCO_CALLBACK_VALUE_LONG:
 					memcpy(argument_data, &values[value_index].value.long_value,
-						sizeof(values[value_index].value.long_value));
+						   sizeof(values[value_index].value.long_value));
 					argument_data += sizeof(values[value_index].value.long_value);
 					break;
 				case POCO_CALLBACK_VALUE_DOUBLE:
 					memcpy(argument_data, &values[value_index].value.double_value,
-						sizeof(values[value_index].value.double_value));
+						   sizeof(values[value_index].value.double_value));
 					argument_data += sizeof(values[value_index].value.double_value);
 					break;
 				case POCO_CALLBACK_VALUE_POPOT:
 					memcpy(argument_data, &values[value_index].value.popot_value,
-						sizeof(values[value_index].value.popot_value));
+						   sizeof(values[value_index].value.popot_value));
 					argument_data += sizeof(values[value_index].value.popot_value);
 					break;
 				default:
@@ -239,27 +268,29 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 	/* final return address is to an end-op */
 
-	stack	 = OPTR(stack, -sizeof(ip));
+	stack = OPTR(stack, -sizeof(ip));
 	stack->p = &end_op;
-	base	 = stack;
+	base = stack;
 
 	/* assume a starting condition of success */
 
-	builtin_err = Success;
+	p->builtin_error = Success;
 
 	/* supply a default abort checker if none provided */
-	if (pe->check_abort == NULL) {
-		pe->check_abort = nofunc;
+	if (p->check_abort == NULL) {
+		p->check_abort = nofunc;
 	}
 
 	for (;;) {
+		if (p->debug_hook != NULL) {
+			p->debug_hook(p, ip, stack_area, base);
+		}
 #ifdef DEVELOPMENT
 		{
-			extern C_frame* po_run_protos;
 			extern FILE* po_trace_file;
 			extern bool po_trace_flag;
 			if (po_trace_flag) {
-				po_disasm(po_trace_file, ip, po_run_protos);
+				po_disasm(po_trace_file, ip, (C_frame*)p->code->prototypes);
 			}
 		}
 #endif /* DEVELOPMENT */
@@ -267,14 +298,13 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 		op = ip->inty;
 		ip = OPTR(ip, OPY_SIZE);
 		switch (op) {
-
 			default:
 				err = Err_bad_instruction;
-				goto DEBUG;
+				goto DEBUG_TRACE;
 
 			case OP_END: /* finished instruction stream */
 				*pret = acc.ret;
-				err	  = Success;
+				err = Success;
 				goto DEALLOC_AND_EXIT;
 
 				/*----------------------------------------------------------------------------
@@ -283,39 +313,39 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_INT_TO_LONG:
 				acc.ret.l = stack->inty;
-				stack	  = OPTR(stack, INT_SIZE - sizeof(long));
-				stack->l  = acc.ret.l;
+				stack = OPTR(stack, INT_SIZE - sizeof(long));
+				stack->l = acc.ret.l;
 				break;
 			case OP_LONG_TO_INT:
 				acc.ret.inty = (int)stack->l;
-				stack		 = OPTR(stack, sizeof(long) - INT_SIZE);
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, sizeof(long) - INT_SIZE);
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_INT_TO_DOUBLE:
 				acc.ret.d = stack->inty;
-				stack	  = OPTR(stack, INT_SIZE - sizeof(double));
-				stack->d  = acc.ret.d;
+				stack = OPTR(stack, INT_SIZE - sizeof(double));
+				stack->d = acc.ret.d;
 				break;
 			case OP_LONG_TO_DOUBLE:
 				acc.ret.d = stack->l;
-				stack	  = OPTR(stack, sizeof(long) - sizeof(double));
-				stack->d  = acc.ret.d;
+				stack = OPTR(stack, sizeof(long) - sizeof(double));
+				stack->d = acc.ret.d;
 				break;
 			case OP_DOUBLE_TO_LONG:
 				acc.ret.l = stack->d;
-				stack	  = OPTR(stack, sizeof(double) - sizeof(long));
-				stack->l  = acc.ret.l;
+				stack = OPTR(stack, sizeof(double) - sizeof(long));
+				stack->l = acc.ret.l;
 				break;
 			case OP_DOUBLE_TO_INT:
 				acc.ret.inty = stack->d;
-				stack		 = OPTR(stack, sizeof(double) - sizeof(int));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, sizeof(double) - sizeof(int));
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_PPT_TO_CPT:
 				// convert popot pointer to void*
 				acc.ret.p = stack->ppt.pt;
-				stack	  = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->ppt.pt));
-				stack->p  = acc.ret.p;
+				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->ppt.pt));
+				stack->p = acc.ret.p;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_TO_CPT:
@@ -326,12 +356,20 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 #endif /* STRING_EXPERIMENT */
 			case OP_CPT_TO_PPT:
 				// convert void* to popot pointer
+				/* Expression-tier programs cannot contain a native pointer
+				 * binding, so the compiler cannot normally emit a reachable
+				 * instance of this opcode.  Keep a runtime fence as defense in
+				 * depth for malformed or future serialized code. */
+				if (p->vm != NULL && p->vm->untrusted_expression_library_registered) {
+					err = Err_bad_instruction;
+					goto DEBUG_TRACE;
+				}
 				// NOTE: Since we don't know the size of the C-allocated memory,
 				// we set permissive bounds (min=0, max=max_addr) to allow array
 				// access. This trades safety for C interoperability.
-				acc.ret.p	   = stack->p;
-				stack		   = OPTR(stack, sizeof(stack->p) - sizeof(stack->ppt));
-				stack->ppt.pt  = acc.ret.p;
+				acc.ret.p = stack->p;
+				stack = OPTR(stack, sizeof(stack->p) - sizeof(stack->ppt));
+				stack->ppt.pt = acc.ret.p;
 				stack->ppt.min = NULL;
 				stack->ppt.max = (void*)~(size_t)0;
 				break;
@@ -340,7 +378,7 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				err = Err_bad_instruction; /* Right now we don't generate
 											* these and so it'd be hard
 											* to test the code required.... */
-				goto DEBUG;
+				goto DEBUG_TRACE;
 				break;
 #endif /* STRING_EXPERIMENT */
 
@@ -349,101 +387,104 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				acc.ret.postring = stack->postring;
 				po_sr_dec_ref(acc.ret.postring); /* dec ref count but
 												  * don't deallocate yet */
-				stack	   = OPTR(stack, sizeof(stack->postring) - sizeof(stack->ppt));
+				stack = OPTR(stack, sizeof(stack->postring) - sizeof(stack->ppt));
 				stack->ppt = acc.ret.postring->string;
 				break;
 			case OP_PPT_TO_STRING:
 				acc.ret.postring = po_sr_new_copy(stack->ppt.pt, Popot_bufsize(&stack->ppt));
-				if (builtin_err < Success)
+				if (p->builtin_error < Success) {
 					goto ERR_IN_LIBROUTINE;
-				stack			= OPTR(stack, sizeof(stack->ppt) - sizeof(stack->postring));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->postring));
 				stack->postring = acc.ret.postring;
 				break;
 #endif /* STRING_EXPERIMENT */
 
-			/*----------------------------------------------------------------------------
-			 * FUNCTION CALLS
-			 *--------------------------------------------------------------------------*/
+				/*----------------------------------------------------------------------------
+				 * FUNCTION CALLS
+				 *--------------------------------------------------------------------------*/
 
-			/*
-			 * kiki note:
-			 *
-			 * I switched how this was working a bit so that po_ffi_call
-			 * now returns a Pt_num, making it so we don't have to worry
-			 * as much on this side about the type of the return value.
-			TODO:
-				- if ((pe->check_abort)(pe->check_abort_data))
-				  goto ABORT;
-			*/
+				/*
+				 * kiki note:
+				 *
+				 * I switched how this was working a bit so that po_ffi_call
+				 * now returns a Pt_num, making it so we don't have to worry
+				 * as much on this side about the type of the return value.
+				TODO:
+					- if ((p->check_abort)(p->check_abort_data))
+					  goto ABORT;
+				*/
 
-			case OP_ICCALL:	 /* call int valued C function */
-			case OP_LCCALL:	 /* call long valued C function */
-			case OP_DCCALL:	 /* call double valued C function */
-			case OP_PCCALL:	 /* call (popot) pointer valued C function */
+			case OP_ICCALL:  /* call int valued C function */
+			case OP_LCCALL:  /* call long valued C function */
+			case OP_DCCALL:  /* call double valued C function */
+			case OP_PCCALL:  /* call (popot) pointer valued C function */
 			case OP_CPCCALL: /* call C pointer valued C function */
 			case OP_CVCCALL: /* call void valued C function */
 				if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
 					err = Err_stack;
-					goto DEBUG;
+					goto DEBUG_TRACE;
 				}
-				binding = po_ffi_find_binding(pe, ip->func);
-				if (builtin_err < Success) {
+				binding = po_ffi_find_binding(p, ip->func);
+				if (p->builtin_error < Success) {
 					goto ERR_IN_LIBROUTINE;
 				}
 
-				acc.ret = po_ffi_call(binding, stack, &pe->variadic,
-					pe->pointer_registry);
-				if (builtin_err < Success) {
+				acc.ret = po_ffi_call(binding, stack, &p->variadic, p);
+				if (p->builtin_error < Success) {
 					goto ERR_IN_LIBROUTINE;
 				}
-				ip		= OPTR(ip, sizeof(ip->func));
+				ip = OPTR(ip, sizeof(ip->func));
 				break;
 
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_CCALL: /* call string valued C function */
 				if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
 					err = Err_stack;
-					goto DEBUG;
+					goto DEBUG_TRACE;
 				}
 				STRING_C_call(stack, ip->func);
-				if (builtin_err < Success)
+				if (p->builtin_error < Success) {
 					goto ERR_IN_LIBROUTINE;
+				}
 				ip = OPTR(ip, sizeof(ip->func));
 				break;
 #endif /* STRING_EXPERIMENT */
 
 			case OP_CALLI: /* Call Indirect (via pointer) */
-				if ((acc.f = stack->ppt.pt) == NULL)
+				if ((acc.f = stack->ppt.pt) == NULL) {
 					goto ERR_NULL;
-				if (acc.f->magic != FUNC_MAGIC)
+				}
+				if (acc.f->magic != FUNC_MAGIC) {
 					goto ERR_NOTAFUNC;
+				}
 				switch (acc.f->type) {
 					case CFF_C:
 						if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
 							err = Err_stack;
-							goto DEBUG;
+							goto DEBUG_TRACE;
 						}
 						stack = OPTR(stack, sizeof(stack->ppt));
 						switch (acc.f->return_type->ido_type) {
 							// #!FIXME: This!
 							case IDO_INT:
 								//								acc.ret.i = IC_call(stack,
-								//acc.f->code_pt);
+								// acc.f->code_pt);
 								acc.ret.i = 0;
 								break;
 							case IDO_LONG:
 								//								acc.ret.l = LC_call(stack,
-								//acc.f->code_pt);
+								// acc.f->code_pt);
 								acc.ret.l = 0;
 								break;
 							case IDO_DOUBLE:
 								//								acc.ret.d = DC_call(stack,
-								//acc.f->code_pt);
+								// acc.f->code_pt);
 								acc.ret.d = 0.0;
 								break;
 							case IDO_POINTER:
 								//								acc.ret.ppt = PC_call(stack,
-								//acc.f->code_pt);
+								// acc.f->code_pt);
 								acc.ret.ppt = empty_popot;
 								break;
 							case IDO_VOID:
@@ -451,36 +492,41 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 								break;
 							default:
 								err = Err_unimpl;
-								goto DEBUG;
+								goto DEBUG_TRACE;
 						}
-						if (builtin_err < Success)
+						if (p->builtin_error < Success) {
 							goto ERR_IN_LIBROUTINE;
+						}
 						break;
 					case CFF_POCO:
 						if (STACK_OVERFLOW(MIN_PCALL_STACK)) {
 							err = Err_stack;
-							goto DEBUG;
+							goto DEBUG_TRACE;
 						}
-						stack	 = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->p));
+						stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->p));
 						stack->p = ip;
-						ip		 = (Pt_num*)acc.f->code_pt;
+						ip = (Pt_num*)acc.f->code_pt;
+						++p->debug_call_depth;
 						break;
 				}
-				if ((pe->check_abort)(pe->check_abort_data))
+				if ((p->check_abort)(p->check_abort_data)) {
 					goto ABORT;
+				}
 				break;
 			case OP_PCALL: /* Call Poco function */
 				if (STACK_OVERFLOW(MIN_PCALL_STACK)) {
 					err = Err_stack;
-					goto DEBUG;
+					goto DEBUG_TRACE;
 				}
-				acc.f	 = ip->p;
-				ip		 = OPTR(ip, sizeof(acc.f));
-				stack	 = OPTR(stack, -sizeof(ip));
+				acc.f = ip->p;
+				ip = OPTR(ip, sizeof(acc.f));
+				stack = OPTR(stack, -sizeof(ip));
 				stack->p = ip;
-				ip		 = (Pt_num*)acc.f->code_pt;
-				if ((pe->check_abort)(pe->check_abort_data))
+				ip = (Pt_num*)acc.f->code_pt;
+				++p->debug_call_depth;
+				if ((p->check_abort)(p->check_abort_data)) {
 					goto ABORT;
+				}
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -488,28 +534,31 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_RET:
-				ip	  = stack->p;
+				ip = stack->p;
 				stack = OPTR(stack, sizeof(ip));
+				if (p->debug_call_depth > debug_depth_floor) {
+					--p->debug_call_depth;
+				}
 				break;
 			case OP_ADD_STACK:
 				stack = OPTR(stack, ip->doff);
-				ip	  = OPTR(ip, sizeof(ip->doff));
+				ip = OPTR(ip, sizeof(ip->doff));
 				break;
 			case OP_ENTER:
 				if (STACK_OVERFLOW(ip->doff + MIN_PCALL_STACK)) {
 					err = Err_stack;
-					goto DEBUG;
+					goto DEBUG_TRACE;
 				}
-				stack	 = OPTR(stack, -sizeof(base));
+				stack = OPTR(stack, -sizeof(base));
 				stack->p = base;
-				base	 = stack;
-				stack	 = OPTR(stack, -ip->doff);
+				base = stack;
+				stack = OPTR(stack, -ip->doff);
 				poco_zero_bytes(stack, ip->doff);
 				ip = OPTR(ip, sizeof(ip->doff));
 				break;
 			case OP_LEAVE:
-				stack = base;					   /* clear off local vars  */
-				base  = stack->p;				   /* restore parent base	 */
+				stack = base;                      /* clear off local vars  */
+				base = stack->p;                   /* restore parent base	 */
 				stack = OPTR(stack, sizeof(base)); /* clean off parent base */
 				break;
 
@@ -518,16 +567,20 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_BRA:
-				if (ip->inty < 0)
-					if ((pe->check_abort)(pe->check_abort_data))
+				if (ip->inty < 0) {
+					if ((p->check_abort)(p->check_abort_data)) {
 						goto ABORT;
+					}
+				}
 				ip = OPTR(ip, ip->inty);
 				break;
 			case OP_BEQ:
 				if (stack->inty == 0) {
-					if (ip->inty < 0)
-						if ((pe->check_abort)(pe->check_abort_data))
+					if (ip->inty < 0) {
+						if ((p->check_abort)(p->check_abort_data)) {
 							goto ABORT;
+						}
+					}
 					ip = OPTR(ip, ip->inty);
 				} else {
 					ip = OPTR(ip, sizeof(ip->inty));
@@ -536,12 +589,15 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				break;
 			case OP_BNE:
 				if (stack->inty != 0) {
-					if (ip->inty < 0)
-						if ((pe->check_abort)(pe->check_abort_data))
+					if (ip->inty < 0) {
+						if ((p->check_abort)(p->check_abort_data)) {
 							goto ABORT;
+						}
+					}
 					ip = OPTR(ip, ip->inty);
-				} else
+				} else {
 					ip = OPTR(ip, sizeof(ip->inty));
+				}
 				stack = OPTR(stack, sizeof(stack->inty));
 				break;
 
@@ -550,24 +606,24 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_ICON: /* push int constant onto data stack */
-				stack		= OPTR(stack, -INT_SIZE);
+				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ip->inty;
-				ip			= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LCON: /* push long constant onto stack */
-				stack	 = OPTR(stack, -sizeof(long));
+				stack = OPTR(stack, -sizeof(long));
 				stack->l = ip->l;
-				ip		 = OPTR(ip, sizeof(long));
+				ip = OPTR(ip, sizeof(long));
 				break;
 			case OP_DCON: /* push floating point constant onto stack */
-				stack	 = OPTR(stack, -sizeof(double));
+				stack = OPTR(stack, -sizeof(double));
 				stack->d = ip->d;
-				ip		 = OPTR(ip, sizeof(double));
+				ip = OPTR(ip, sizeof(double));
 				break;
 			case OP_PCON: /* push pointer constant onto stack */
-				stack	   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt = ip->ppt;
-				ip		   = OPTR(ip, sizeof(ip->ppt));
+				ip = OPTR(ip, sizeof(ip->ppt));
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -575,24 +631,24 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_GLO_ADDRESS:
-				stack		   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt.min = stack->ppt.max = stack->ppt.pt = OPTR(globals, ip->inty);
-				ip												= OPTR(ip, sizeof(ip->inty));
-				stack->ppt.max									= OPTR(stack->ppt.max, ip->l);
-				ip												= OPTR(ip, sizeof(ip->l));
+				ip = OPTR(ip, sizeof(ip->inty));
+				stack->ppt.max = OPTR(stack->ppt.max, ip->l);
+				ip = OPTR(ip, sizeof(ip->l));
 				break;
 			case OP_LOC_ADDRESS:
-				stack		   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt.min = stack->ppt.max = stack->ppt.pt = OPTR(base, ip->inty);
-				ip												= OPTR(ip, sizeof(ip->inty));
-				stack->ppt.max									= OPTR(stack->ppt.max, ip->l);
-				ip												= OPTR(ip, sizeof(ip->l));
+				ip = OPTR(ip, sizeof(ip->inty));
+				stack->ppt.max = OPTR(stack->ppt.max, ip->l);
+				ip = OPTR(ip, sizeof(ip->l));
 				break;
 			case OP_CODE_ADDRESS: /* put immediate code address onto stack */
-				stack		   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt.min = stack->ppt.max = NULL;
-				stack->ppt.pt					= ip->p;
-				ip								= OPTR(ip, sizeof(void*));
+				stack->ppt.pt = poco_activation_callback_handle(p, ip->p);
+				ip = OPTR(ip, sizeof(void*));
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -600,44 +656,44 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_GLO_CVAR: /* push a global variable onto data stack */
-				stack		= OPTR(stack, -INT_SIZE);
+				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ((char*)(OPTR(globals, ip->doff)))[0];
-				ip			= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_SVAR: /* push a global variable onto data stack */
-				stack		= OPTR(stack, -INT_SIZE);
+				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ((short*)(OPTR(globals, ip->doff)))[0];
-				ip			= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_IVAR: /* push a global variable onto data stack */
-				stack		= OPTR(stack, -INT_SIZE);
+				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ((int*)(OPTR(globals, ip->doff)))[0];
-				ip			= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_LVAR: /* push a global variable onto data stack */
-				stack	 = OPTR(stack, -sizeof(long));
+				stack = OPTR(stack, -sizeof(long));
 				stack->l = ((long*)(OPTR(globals, ip->doff)))[0];
-				ip		 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_PVAR: /* push a global pointer onto data stack */
 			case OP_GLO_VVAR: /* push a global function pointer onto data stack */
-				stack	   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt = ((Popot*)(OPTR(globals, ip->doff)))[0];
-				ip		   = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_FVAR: /* push a global variable onto data stack */
-				stack	 = OPTR(stack, -sizeof(double));
+				stack = OPTR(stack, -sizeof(double));
 				stack->d = ((float*)(OPTR(globals, ip->doff)))[0];
-				ip		 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_DVAR: /* push a global variable onto data stack */
-				stack	 = OPTR(stack, -sizeof(double));
+				stack = OPTR(stack, -sizeof(double));
 				stack->d = ((double*)(OPTR(globals, ip->doff)))[0];
-				ip		 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_GLO_STRING_VAR: /* push a global string onto data stack */
-				stack			= OPTR(stack, -sizeof(PoString));
+				stack = OPTR(stack, -sizeof(PoString));
 				stack->postring = ((PoString*)(OPTR(globals, ip->doff)))[0];
 				po_sr_inc_ref(stack->postring);
 				ip = OPTR(ip, INTY_SIZE);
@@ -645,43 +701,43 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 #endif /* STRING_EXPERIMENT */
 
 			case OP_LOC_CVAR: /* push a local variable onto data stack */
-				stack		= OPTR(stack, -INT_SIZE);
+				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ((char*)(OPTR(base, ip->doff)))[0];
-				ip			= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_SVAR: /* push a local variable onto data stack */
-				stack		= OPTR(stack, -INT_SIZE);
+				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ((short*)(OPTR(base, ip->doff)))[0];
-				ip			= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_IVAR: /* push a local variable onto data stack */
-				stack		= OPTR(stack, -INT_SIZE);
+				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ((int*)(OPTR(base, ip->doff)))[0];
-				ip			= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_LVAR: /* push a local variable onto data stack */
-				stack	 = OPTR(stack, -sizeof(long));
+				stack = OPTR(stack, -sizeof(long));
 				stack->l = ((long*)(OPTR(base, ip->doff)))[0];
-				ip		 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_PVAR: /* push a local variable onto data stack */
-				stack	   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt = ((Popot*)(OPTR(base, ip->doff)))[0];
-				ip		   = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_FVAR: /* push a local variable onto data stack */
-				stack	 = OPTR(stack, -sizeof(double));
+				stack = OPTR(stack, -sizeof(double));
 				stack->d = ((float*)(OPTR(base, ip->doff)))[0];
-				ip		 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_DVAR: /* push a local variable onto data stack */
-				stack	 = OPTR(stack, -sizeof(double));
+				stack = OPTR(stack, -sizeof(double));
 				stack->d = ((double*)(OPTR(base, ip->doff)))[0];
-				ip		 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_LOC_STRING_VAR: /* push a local string onto data stack */
-				stack			= OPTR(stack, -sizeof(PoString));
+				stack = OPTR(stack, -sizeof(PoString));
 				stack->postring = ((PoString*)(OPTR(base, ip->doff)))[0];
 				po_sr_inc_ref(stack->postring);
 				ip = OPTR(ip, INTY_SIZE);
@@ -694,31 +750,31 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_GLO_CASS: /* move top of stack to global variable */
 				(((char*)OPTR(globals, ip->doff))[0]) = stack->inty;
-				ip									  = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_SASS: /* move top of stack to global variable */
 				((short*)(OPTR(globals, ip->doff)))[0] = stack->inty;
-				ip									   = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_IASS: /* move top of stack to global variable */
 				((int*)(OPTR(globals, ip->doff)))[0] = stack->inty;
-				ip									 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_LASS: /* move top of stack to global variable */
 				((long*)(OPTR(globals, ip->doff)))[0] = stack->l;
-				ip									  = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_PASS: /* move top of stack to global pointer variable */
 				((Popot*)(OPTR(globals, ip->doff)))[0] = stack->ppt;
-				ip									   = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_FASS: /* move top of stack to global variable */
 				((float*)(OPTR(globals, ip->doff)))[0] = stack->d;
-				ip									   = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_GLO_DASS: /* move top of stack to global variable */
 				((double*)(OPTR(globals, ip->doff)))[0] = stack->d;
-				ip										= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_GLO_STRING_ASS: /* top of stack to global string variable */
@@ -731,31 +787,31 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_LOC_CASS: /* move top of stack to local variable */
 				((char*)(OPTR(base, ip->doff)))[0] = stack->inty;
-				ip								   = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_SASS: /* move top of stack to local variable */
 				((short*)(OPTR(base, ip->doff)))[0] = stack->inty;
-				ip									= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_IASS: /* move top of stack to local variable */
 				((int*)(OPTR(base, ip->doff)))[0] = stack->inty;
-				ip								  = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_LASS: /* move top of stack to local variable */
 				((long*)(OPTR(base, ip->doff)))[0] = stack->l;
-				ip								   = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_PASS: /* move top of stack to local ptr variable */
 				((Popot*)(OPTR(base, ip->doff)))[0] = stack->ppt;
-				ip									= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_FASS: /* move top of stack to local variable */
 				((float*)(OPTR(base, ip->doff)))[0] = stack->d;
-				ip									= OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 			case OP_LOC_DASS: /* move top of stack to local variable */
 				((double*)(OPTR(base, ip->doff)))[0] = stack->d;
-				ip									 = OPTR(ip, INTY_SIZE);
+				ip = OPTR(ip, INTY_SIZE);
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_LOC_STRING_ASS: /* top of stack to local string variable */
@@ -772,91 +828,155 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_CI_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(char),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack		= OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
 				stack->inty = *((char*)(acc.ret.ppt.pt));
 				break;
 			case OP_SI_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(short),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack		= OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
 				stack->inty = *((short*)(acc.ret.ppt.pt));
 				break;
 			case OP_II_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(int),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack		= OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
 				stack->inty = *((int*)(acc.ret.ppt.pt));
 				break;
 			case OP_PI_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(Popot),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack	   = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.ppt));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.ppt));
 				stack->ppt = *((Popot*)(acc.ret.ppt.pt));
 				break;
 			case OP_LI_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(long),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack	 = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.l));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.l));
 				stack->l = *((long*)(acc.ret.ppt.pt));
 				break;
 			case OP_FI_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(float),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack	 = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.f));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.f));
 				stack->d = *((float*)(acc.ret.ppt.pt));
 				break;
 			case OP_DI_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(double),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack	 = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.d));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.d));
 				stack->d = *((double*)(acc.ret.ppt.pt));
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_I_VAR:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(PoString),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack			= OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.postring));
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.postring));
 				stack->postring = *((PoString*)(acc.ret.ppt.pt));
 				po_sr_inc_ref(stack->postring);
 				break;
@@ -868,90 +988,154 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_CI_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(char),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack						 = OPTR(stack, sizeof(stack->ppt));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
 				((char*)(acc.ret.ppt.pt))[0] = stack->inty;
 				break;
 			case OP_SI_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(short),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack						  = OPTR(stack, sizeof(stack->ppt));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
 				((short*)(acc.ret.ppt.pt))[0] = stack->inty;
 				break;
 			case OP_II_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(int),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack						= OPTR(stack, sizeof(stack->ppt));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
 				((int*)(acc.ret.ppt.pt))[0] = stack->inty;
 				break;
 			case OP_PI_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(Popot),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack						  = OPTR(stack, sizeof(stack->ppt));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
 				((Popot*)(acc.ret.ppt.pt))[0] = stack->ppt;
 				break;
 			case OP_LI_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(long),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack						 = OPTR(stack, sizeof(stack->ppt));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
 				((long*)(acc.ret.ppt.pt))[0] = stack->l;
 				break;
 			case OP_FI_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(float),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack						  = OPTR(stack, sizeof(stack->ppt));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
 				((float*)(acc.ret.ppt.pt))[0] = stack->d;
 				break;
 			case OP_DI_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(double),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
-				stack						   = OPTR(stack, sizeof(stack->ppt));
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
 				((double*)(acc.ret.ppt.pt))[0] = stack->d;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_I_ASS:
 				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL)
+				if (acc.ret.ppt.pt == NULL) {
 					goto ERR_NULL;
-				if (acc.ret.ppt.pt < acc.ret.ppt.min)
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(PoString),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
 					goto ERR_SMALL;
-				if (acc.ret.ppt.pt > acc.ret.ppt.max)
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
 					goto ERR_BIG;
+				}
 				stack = OPTR(stack, sizeof(stack->ppt));
 				po_sr_clean_ref(((PoString*)(acc.ret.ppt.pt))[0]);
 				((PoString*)(acc.ret.ppt.pt))[0] = stack->postring;
@@ -965,30 +1149,31 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IADD: /* replace top two elements of stack one result */
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, INT_SIZE);
+				stack = OPTR(stack, INT_SIZE);
 				stack->inty += acc.ret.inty;
 				break;
 			case OP_LADD:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(long));
+				stack = OPTR(stack, sizeof(long));
 				stack->l += acc.ret.l;
 				break;
 			case OP_DADD:
 				acc.ret.d = stack->d;
-				stack	  = OPTR(stack, sizeof(double));
+				stack = OPTR(stack, sizeof(double));
 				stack->d += acc.ret.d;
-				if (builtin_err != Success)
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PADD:
-				acc.ret.inty  = stack->inty;
-				stack		  = OPTR(stack, sizeof(stack->inty));
+				acc.ret.inty = stack->inty;
+				stack = OPTR(stack, sizeof(stack->inty));
 				stack->ppt.pt = OPTR(stack->ppt.pt, acc.ret.inty);
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_CAT: /* Concatenate top two strings */
 				acc.ret.postring = po_sr_cat_and_clean(
-				  ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
+					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
 				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->postring));
 				stack->postring = acc.ret.postring;
 				break;
@@ -1000,24 +1185,25 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_ISUB:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, INT_SIZE);
+				stack = OPTR(stack, INT_SIZE);
 				stack->inty -= acc.ret.inty;
 				break;
 			case OP_LSUB:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(long));
+				stack = OPTR(stack, sizeof(long));
 				stack->l -= acc.ret.l;
 				break;
 			case OP_DSUB:
 				acc.ret.d = stack->d;
-				stack	  = OPTR(stack, sizeof(double));
+				stack = OPTR(stack, sizeof(double));
 				stack->d -= acc.ret.d;
-				if (builtin_err != Success)
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PSUB:
-				acc.ret.inty  = stack->inty;
-				stack		  = OPTR(stack, sizeof(stack->inty));
+				acc.ret.inty = stack->inty;
+				stack = OPTR(stack, sizeof(stack->inty));
 				stack->ppt.pt = OPTR(stack->ppt.pt, -acc.ret.inty);
 				break;
 
@@ -1027,20 +1213,21 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IMUL:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, INT_SIZE);
+				stack = OPTR(stack, INT_SIZE);
 				stack->inty *= acc.ret.inty;
 				break;
 			case OP_LMUL:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(long));
+				stack = OPTR(stack, sizeof(long));
 				stack->l *= acc.ret.l;
 				break;
 			case OP_DMUL:
 				acc.ret.d = stack->d;
-				stack	  = OPTR(stack, sizeof(double));
+				stack = OPTR(stack, sizeof(double));
 				stack->d *= acc.ret.d;
-				if (builtin_err != Success)
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1049,28 +1236,29 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IDIV:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, INT_SIZE);
+				stack = OPTR(stack, INT_SIZE);
 				if (acc.ret.inty == 0) {
 					err = Err_zero_divide;
-					goto DEBUG;
+					goto DEBUG_TRACE;
 				}
 				stack->inty /= acc.ret.inty;
 				break;
 			case OP_LDIV:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(long));
+				stack = OPTR(stack, sizeof(long));
 				if (acc.ret.l == 0) {
 					err = Err_zero_divide;
-					goto DEBUG;
+					goto DEBUG_TRACE;
 				}
 				stack->l /= acc.ret.l;
 				break;
 			case OP_DDIV:
 				acc.ret.d = stack->d;
-				stack	  = OPTR(stack, sizeof(double));
+				stack = OPTR(stack, sizeof(double));
 				stack->d /= acc.ret.d;
-				if (builtin_err != Success)
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1079,36 +1267,37 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IEQ:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = (acc.ret.inty == stack->inty);
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = (acc.ret.inty == stack->inty);
 				break;
 			case OP_LEQ:
-				acc.ret.l	 = stack->l;
-				stack		 = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				stack = OPTR(stack, sizeof(stack->l));
 				acc.ret.inty = (acc.ret.l == stack->l);
-				stack		 = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_DEQ:
-				acc.ret.d	 = stack->d;
-				stack		 = OPTR(stack, sizeof(stack->d));
+				acc.ret.d = stack->d;
+				stack = OPTR(stack, sizeof(stack->d));
 				acc.ret.inty = (acc.ret.d == stack->d);
-				stack		 = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
-				if (builtin_err != Success)
+				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PEQ:
 				acc.ret.inty =
-				  (stack->ppt.pt == ((Pt_num*)OPTR(stack, sizeof(stack->ppt)))->ppt.pt);
-				stack		= OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
+					(stack->ppt.pt == ((Pt_num*)OPTR(stack, sizeof(stack->ppt)))->ppt.pt);
+				stack = OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_EQ:
 				acc.ret.inty = po_sr_eq_and_clean(
-				  stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
-				stack		= OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+					stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #endif /* STRING_EXPERIMENT */
@@ -1119,36 +1308,37 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_INE:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = (acc.ret.inty != stack->inty);
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = (acc.ret.inty != stack->inty);
 				break;
 			case OP_LNE:
-				acc.ret.l	 = stack->l;
-				stack		 = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				stack = OPTR(stack, sizeof(stack->l));
 				acc.ret.inty = (acc.ret.l != stack->l);
-				stack		 = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_DNE:
-				acc.ret.d	 = stack->d;
-				stack		 = OPTR(stack, sizeof(stack->d));
+				acc.ret.d = stack->d;
+				stack = OPTR(stack, sizeof(stack->d));
 				acc.ret.inty = (acc.ret.d != stack->d);
-				stack		 = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
-				if (builtin_err != Success)
+				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PNE:
 				acc.ret.inty =
-				  (stack->ppt.pt != ((Pt_num*)OPTR(stack, sizeof(stack->ppt)))->ppt.pt);
-				stack		= OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
+					(stack->ppt.pt != ((Pt_num*)OPTR(stack, sizeof(stack->ppt)))->ppt.pt);
+				stack = OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_NE:
 				acc.ret.inty = !po_sr_eq_and_clean(
-				  stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
-				stack		= OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+					stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #endif /* STRING_EXPERIMENT */
@@ -1159,37 +1349,38 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IGE:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = (stack->inty >= acc.ret.inty);
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = (stack->inty >= acc.ret.inty);
 				break;
 			case OP_LGE:
-				acc.ret.l	 = stack->l;
-				stack		 = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				stack = OPTR(stack, sizeof(stack->l));
 				acc.ret.inty = (stack->l >= acc.ret.l);
-				stack		 = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_DGE:
-				acc.ret.d	 = stack->d;
-				stack		 = OPTR(stack, sizeof(stack->d));
+				acc.ret.d = stack->d;
+				stack = OPTR(stack, sizeof(stack->d));
 				acc.ret.inty = (stack->d >= acc.ret.d);
-				stack		 = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
-				if (builtin_err != Success)
+				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PGE:
-				acc.ret.ppt	 = stack->ppt;
-				stack		 = OPTR(stack, sizeof(stack->ppt));
+				acc.ret.ppt = stack->ppt;
+				stack = OPTR(stack, sizeof(stack->ppt));
 				acc.ret.inty = ((char*)(stack->ppt.pt) >= ((char*)acc.ret.ppt.pt));
-				stack		 = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_GE:
 				acc.ret.inty = po_sr_ge_and_clean(
-				  ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack		= OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #endif /* STRING_EXPERIMENT */
@@ -1200,37 +1391,38 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IGT:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = (stack->inty > acc.ret.inty);
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = (stack->inty > acc.ret.inty);
 				break;
 			case OP_LGT:
-				acc.ret.l	 = stack->l;
-				stack		 = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				stack = OPTR(stack, sizeof(stack->l));
 				acc.ret.inty = (stack->l > acc.ret.l);
-				stack		 = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_DGT:
-				acc.ret.d	 = stack->d;
-				stack		 = OPTR(stack, sizeof(stack->d));
+				acc.ret.d = stack->d;
+				stack = OPTR(stack, sizeof(stack->d));
 				acc.ret.inty = (stack->d > acc.ret.d);
-				stack		 = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
-				if (builtin_err != Success)
+				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PGT:
-				acc.ret.ppt	 = stack->ppt;
-				stack		 = OPTR(stack, sizeof(stack->ppt));
+				acc.ret.ppt = stack->ppt;
+				stack = OPTR(stack, sizeof(stack->ppt));
 				acc.ret.inty = ((char*)(stack->ppt.pt) > ((char*)acc.ret.ppt.pt));
-				stack		 = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_GT:
 				acc.ret.inty = !po_sr_le_and_clean(
-				  ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack		= OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #endif /* STRING_EXPERIMENT */
@@ -1241,37 +1433,38 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_ILE:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = (stack->inty <= acc.ret.inty);
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = (stack->inty <= acc.ret.inty);
 				break;
 			case OP_LLE:
-				acc.ret.l	 = stack->l;
-				stack		 = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				stack = OPTR(stack, sizeof(stack->l));
 				acc.ret.inty = (stack->l <= acc.ret.l);
-				stack		 = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_DLE:
-				acc.ret.d	 = stack->d;
-				stack		 = OPTR(stack, sizeof(stack->d));
+				acc.ret.d = stack->d;
+				stack = OPTR(stack, sizeof(stack->d));
 				acc.ret.inty = (stack->d <= acc.ret.d);
-				stack		 = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
-				if (builtin_err != Success)
+				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PLE:
-				acc.ret.ppt	 = stack->ppt;
-				stack		 = OPTR(stack, sizeof(stack->ppt));
+				acc.ret.ppt = stack->ppt;
+				stack = OPTR(stack, sizeof(stack->ppt));
 				acc.ret.inty = ((char*)(stack->ppt.pt) <= ((char*)acc.ret.ppt.pt));
-				stack		 = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_LE:
 				acc.ret.inty = po_sr_le_and_clean(
-				  ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack		= OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #endif /* STRING_EXPERIMENT */
@@ -1282,37 +1475,38 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_ILT:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = (stack->inty < acc.ret.inty);
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = (stack->inty < acc.ret.inty);
 				break;
 			case OP_LLT:
-				acc.ret.l	 = stack->l;
-				stack		 = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				stack = OPTR(stack, sizeof(stack->l));
 				acc.ret.inty = (stack->l < acc.ret.l);
-				stack		 = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 			case OP_DLT:
-				acc.ret.d	 = stack->d;
-				stack		 = OPTR(stack, sizeof(stack->d));
+				acc.ret.d = stack->d;
+				stack = OPTR(stack, sizeof(stack->d));
 				acc.ret.inty = (stack->d < acc.ret.d);
-				stack		 = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
-				if (builtin_err != Success)
+				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
+				if (p->builtin_error != Success) {
 					goto ERR_INLINE_FPMATH;
+				}
 				break;
 			case OP_PLT:
-				acc.ret.ppt	 = stack->ppt;
-				stack		 = OPTR(stack, sizeof(stack->ppt));
+				acc.ret.ppt = stack->ppt;
+				stack = OPTR(stack, sizeof(stack->ppt));
 				acc.ret.inty = ((char*)(stack->ppt.pt) < ((char*)acc.ret.ppt.pt));
-				stack		 = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty	 = acc.ret.inty;
+				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
+				stack->inty = acc.ret.inty;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_LT:
 				acc.ret.inty = !po_sr_ge_and_clean(
-				  ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack		= OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 #endif /* STRING_EXPERIMENT */
@@ -1337,12 +1531,12 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IMOD:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
+				stack = OPTR(stack, sizeof(stack->inty));
 				stack->inty %= acc.ret.inty;
 				break;
 			case OP_LMOD:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
+				stack = OPTR(stack, sizeof(stack->l));
 				stack->l %= acc.ret.l;
 				break;
 
@@ -1352,12 +1546,12 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_ILSHIFT:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
+				stack = OPTR(stack, sizeof(stack->inty));
 				stack->inty <<= acc.ret.inty;
 				break;
 			case OP_LLSHIFT:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
+				stack = OPTR(stack, sizeof(stack->l));
 				stack->l <<= acc.ret.l;
 				break;
 
@@ -1367,12 +1561,12 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IRSHIFT:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
+				stack = OPTR(stack, sizeof(stack->inty));
 				stack->inty >>= acc.ret.inty;
 				break;
 			case OP_LRSHIFT:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
+				stack = OPTR(stack, sizeof(stack->l));
 				stack->l >>= acc.ret.l;
 				break;
 
@@ -1382,13 +1576,13 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IBAND:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = stack->inty & acc.ret.inty;
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = stack->inty & acc.ret.inty;
 				break;
 			case OP_LBAND:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
-				stack->l  = stack->l & acc.ret.l;
+				stack = OPTR(stack, sizeof(stack->l));
+				stack->l = stack->l & acc.ret.l;
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1397,13 +1591,13 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IBOR:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = stack->inty | acc.ret.inty;
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = stack->inty | acc.ret.inty;
 				break;
 			case OP_LBOR:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
-				stack->l  = stack->l | acc.ret.l;
+				stack = OPTR(stack, sizeof(stack->l));
+				stack->l = stack->l | acc.ret.l;
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1412,13 +1606,13 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IXOR:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = stack->inty ^ acc.ret.inty;
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = stack->inty ^ acc.ret.inty;
 				break;
 			case OP_LXOR:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
-				stack->l  = stack->l ^ acc.ret.l;
+				stack = OPTR(stack, sizeof(stack->l));
+				stack->l = stack->l ^ acc.ret.l;
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1427,13 +1621,13 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_ILAND:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = stack->inty && acc.ret.inty;
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = stack->inty && acc.ret.inty;
 				break;
 			case OP_LLAND:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
-				stack->l  = stack->l && acc.ret.l;
+				stack = OPTR(stack, sizeof(stack->l));
+				stack->l = stack->l && acc.ret.l;
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1442,13 +1636,13 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_ILOR:
 				acc.ret.inty = stack->inty;
-				stack		 = OPTR(stack, sizeof(stack->inty));
-				stack->inty	 = stack->inty || acc.ret.inty;
+				stack = OPTR(stack, sizeof(stack->inty));
+				stack->inty = stack->inty || acc.ret.inty;
 				break;
 			case OP_LLOR:
 				acc.ret.l = stack->l;
-				stack	  = OPTR(stack, sizeof(stack->l));
-				stack->l  = stack->l || acc.ret.l;
+				stack = OPTR(stack, sizeof(stack->l));
+				stack->l = stack->l || acc.ret.l;
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1478,25 +1672,25 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_IPUSH:
-				stack		= OPTR(stack, -sizeof(stack->inty));
+				stack = OPTR(stack, -sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
 			case OP_LPUSH:
 			case OP_CPPUSH:
-				stack	 = OPTR(stack, -sizeof(stack->l));
+				stack = OPTR(stack, -sizeof(stack->l));
 				stack->l = acc.ret.l;
 				break;
 			case OP_DPUSH:
-				stack	 = OPTR(stack, -sizeof(stack->d));
+				stack = OPTR(stack, -sizeof(stack->d));
 				stack->d = acc.ret.d;
 				break;
 			case OP_PPUSH:
-				stack	   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt = acc.ret.ppt;
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_PUSH:
-				stack			= OPTR(stack, -sizeof(stack->postring));
+				stack = OPTR(stack, -sizeof(stack->postring));
 				stack->postring = acc.ret.postring;
 				break;
 #endif /* STRING_EXPERIMENT */
@@ -1507,36 +1701,36 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 
 			case OP_IPOP:
 				acc.ret.inty = stack->inty;
-				pe->result	 = acc.ret;
-				stack		 = OPTR(stack, sizeof(stack->inty));
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->inty));
 				break;
 			case OP_LPOP:
 			case OP_CPPOP:
-				acc.ret.l  = stack->l;
-				pe->result = acc.ret;
-				stack	   = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->l));
 				break;
 			case OP_DPOP:
-				acc.ret.d  = stack->d;
-				pe->result = acc.ret;
-				stack	   = OPTR(stack, sizeof(stack->d));
+				acc.ret.d = stack->d;
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->d));
 				break;
 			case OP_PPOP:
 				acc.ret.ppt = stack->ppt;
-				pe->result	= acc.ret;
-				stack		= OPTR(stack, sizeof(stack->ppt));
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->ppt));
 				break;
 #ifdef STRING_EXPERIMENT
 			case OP_STRING_POP:
 				acc.ret.postring = stack->postring;
-				pe->result		 = acc.ret;
-				stack			 = OPTR(stack, sizeof(stack->postring));
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->postring));
 				break;
 			case OP_CLEAN_STRING: /* Pop string and dec reference count */
 				acc.ret.postring = stack->postring;
 				po_sr_clean_ref(acc.ret.postring);
-				pe->result = acc.ret;
-				stack	   = OPTR(stack, sizeof(stack->postring));
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->postring));
 				break;
 #endif /* STRING_EXPERIMENT */
 
@@ -1545,19 +1739,19 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_IDUPE:
-				stack		= OPTR(stack, -sizeof(stack->inty));
+				stack = OPTR(stack, -sizeof(stack->inty));
 				stack->inty = ((int*)(OPTR(stack, sizeof(stack->inty))))[0];
 				break;
 			case OP_LDUPE:
-				stack	 = OPTR(stack, -sizeof(stack->l));
+				stack = OPTR(stack, -sizeof(stack->l));
 				stack->l = ((long*)(OPTR(stack, sizeof(stack->l))))[0];
 				break;
 			case OP_DDUPE:
-				stack	 = OPTR(stack, -sizeof(stack->d));
+				stack = OPTR(stack, -sizeof(stack->d));
 				stack->d = ((double*)(OPTR(stack, sizeof(stack->d))))[0];
 				break;
 			case OP_PDUPE:
-				stack	   = OPTR(stack, -sizeof(stack->ppt));
+				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt = ((Popot*)(OPTR(stack, sizeof(stack->ppt))))[0];
 				break;
 
@@ -1566,22 +1760,22 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_ADD_IOFFSET:
-				acc.ret.inty  = stack->inty;
-				stack		  = OPTR(stack, sizeof(stack->inty));
+				acc.ret.inty = stack->inty;
+				stack = OPTR(stack, sizeof(stack->inty));
 				stack->ppt.pt = OPTR(stack->ppt.pt, acc.ret.inty);
 				break;
 			case OP_ADD_LOFFSET:
-				acc.ret.l	  = stack->l;
-				stack		  = OPTR(stack, sizeof(stack->l));
+				acc.ret.l = stack->l;
+				stack = OPTR(stack, sizeof(stack->l));
 				stack->ppt.pt = OPTR(stack->ppt.pt, acc.ret.l);
 				break;
 			case OP_PTRDIFF: /* subtract two pointers */
 				acc.ret.ppt.pt = stack->ppt.pt;
-				stack		   = OPTR(stack, sizeof(stack->ppt));
-				acc.ret.l	   = (char*)stack->ppt.pt - (char*)acc.ret.ppt.pt;
-				stack		   = OPTR(stack, sizeof(stack->ppt) - sizeof(long));
-				stack->l	   = acc.ret.l / ip->inty; /* scale result */
-				ip			   = OPTR(ip, sizeof(ip->inty));
+				stack = OPTR(stack, sizeof(stack->ppt));
+				acc.ret.l = (char*)stack->ppt.pt - (char*)acc.ret.ppt.pt;
+				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(long));
+				stack->l = acc.ret.l / ip->inty; /* scale result */
+				ip = OPTR(ip, sizeof(ip->inty));
 				break;
 
 				/*----------------------------------------------------------------------------
@@ -1589,15 +1783,31 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 				 *--------------------------------------------------------------------------*/
 
 			case OP_COPY:
-				poco_copy_bytes(
-				  ((Popot*)OPTR(stack, sizeof(stack->ppt)))->pt, stack->ppt.pt, ip->l);
-				ip	  = OPTR(ip, sizeof(ip->l));
+				if (ip->l < 0) {
+					goto ERR_NULL;
+				}
+				if (!po_copy_span_has_capacity(&stack->ppt, (size_t)ip->l) ||
+					!po_copy_span_has_capacity((Popot*)OPTR(stack, sizeof(stack->ppt)),
+											   (size_t)ip->l)) {
+					goto ERR_BIG;
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &stack->ppt,
+														   (size_t)ip->l,
+														   POCO_POINTER_PERMISSION_READ) ||
+					!po_registered_pointer_access_is_valid(
+						p->pointer_registry, (Popot*)OPTR(stack, sizeof(stack->ppt)), (size_t)ip->l,
+						POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				poco_copy_bytes(((Popot*)OPTR(stack, sizeof(stack->ppt)))->pt, stack->ppt.pt,
+								ip->l);
+				ip = OPTR(ip, sizeof(ip->l));
 				stack = OPTR(stack, 2 * sizeof(stack->ppt));
 				break;
 			case OP_MOVE:
-				poco_copy_bytes(
-				  stack->ppt.pt, ((Popot*)OPTR(stack, sizeof(stack->ppt)))->pt, ip->l);
-				ip	  = OPTR(ip, sizeof(ip->l));
+				poco_copy_bytes(stack->ppt.pt, ((Popot*)OPTR(stack, sizeof(stack->ppt)))->pt,
+								ip->l);
+				ip = OPTR(ip, sizeof(ip->l));
 				stack = OPTR(stack, 2 * sizeof(stack->ppt));
 				break;
 #ifdef STRING_EXPERIMENT
@@ -1611,51 +1821,51 @@ Errcode poco_invoke_callback(void* code_pt, Pt_num* pret,
 //			 * LIBFFI HELPERS
 			 *--------------------------------------------------------------------------*/
 			case OP_FFI_POP_ALL:
-				po_ffi_variadic_types_reset(&pe->variadic);
+				po_ffi_variadic_types_reset(&p->variadic);
 				break;
 
 			case OP_FFI_PUSH_POINTER:
-				RECORD_VARIADIC_TYPE(&ffi_type_pointer);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_pointer);
 				break;
 
 			case OP_FFI_PUSH_SINT32:
-				RECORD_VARIADIC_TYPE(&ffi_type_sint32);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_sint32);
 				break;
 
 			case OP_FFI_PUSH_FLOAT:
-				RECORD_VARIADIC_TYPE(&ffi_type_float);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_float);
 				break;
 
 			case OP_FFI_PUSH_DOUBLE:
-				RECORD_VARIADIC_TYPE(&ffi_type_double);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_double);
 				break;
 
 			case OP_FFI_PUSH_UINT8:
-				RECORD_VARIADIC_TYPE(&ffi_type_uint8);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_uint8);
 				break;
 
 			case OP_FFI_PUSH_SINT8:
-				RECORD_VARIADIC_TYPE(&ffi_type_sint8);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_sint8);
 				break;
 
 			case OP_FFI_PUSH_UINT16:
-				RECORD_VARIADIC_TYPE(&ffi_type_uint16);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_uint16);
 				break;
 
 			case OP_FFI_PUSH_SINT16:
-				RECORD_VARIADIC_TYPE(&ffi_type_sint16);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_sint16);
 				break;
 
 			case OP_FFI_PUSH_UINT32:
-				RECORD_VARIADIC_TYPE(&ffi_type_uint32);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_uint32);
 				break;
 
 			case OP_FFI_PUSH_UINT64:
-				RECORD_VARIADIC_TYPE(&ffi_type_uint64);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_uint64);
 				break;
 
 			case OP_FFI_PUSH_SINT64:
-				RECORD_VARIADIC_TYPE(&ffi_type_sint64);
+				RECORD_VARIADIC_TYPE(p, &ffi_type_sint64);
 				break;
 
 			case OP_FFI_PUSH_VOID:
@@ -1674,62 +1884,67 @@ ABORT:
 
 ERR_NOTAFUNC:
 	err = Err_function_not_found;
-	goto DEBUG;
+	goto DEBUG_TRACE;
 
 ERR_NULL:
 	err = Err_null_ref;
-	goto DEBUG;
+	goto DEBUG_TRACE;
 
 ERR_SMALL:
 	err = Err_index_small;
-	goto DEBUG;
+	goto DEBUG_TRACE;
 
 ERR_BIG:
 	err = Err_index_big;
-	goto DEBUG;
+	goto DEBUG_TRACE;
 
-ERR_INLINE_FPMATH:			   // the host has indicated an 80x87 math err happened
-							   // while interpreting poco instructions.  we remember
-	err			= builtin_err; // the status and clear the global status in builtin_err.
-	builtin_err = Success;	   // this causes the DEBUG tracing to report the error
-	goto DEBUG;				   // as occurring in the poco code, not a lib routine.
+ERR_POINTER_ACCESS:
+	p->builtin_error = err = Err_poco_ffi_bounds;
+	goto DEBUG_TRACE;
+
+ERR_INLINE_FPMATH:               // the host has indicated an 80x87 math err happened
+								 // while interpreting poco instructions.  we remember
+	err = p->builtin_error;      // the status and clear the global status in p->builtin_error.
+	p->builtin_error = Success;  // this causes the DEBUG tracing to report the error
+	goto DEBUG_TRACE;            // as occurring in the poco code, not a lib routine.
 
 ERR_IN_LIBROUTINE:
-	err = builtin_err;
-	if (err == Err_poco_exit)		 // the ONLY thing that can set this
-	{								 // is poco's builtin exit() function,
-		builtin_err = err = Success; // invoked with a code >= Success.
-		goto DEALLOC_AND_EXIT;		 // this gets us out with a good status.
+	err = p->builtin_error;
+	if (err == Err_poco_exit)              // the ONLY thing that can set this
+	{                                      // is poco's builtin exit() function,
+		p->builtin_error = err = Success;  // invoked with a code >= Success.
+		goto DEALLOC_AND_EXIT;             // this gets us out with a good status.
 	}
 
 	if (err == Err_early_exit || err == Err_abort) {
 		goto DEALLOC_AND_EXIT;
 	}
 
-	goto DEBUG;
+	goto DEBUG_TRACE;
 
 ERR_IN_FFI:
 	// ##!TODO: handle error situations
 
-	goto DEBUG;
+	goto DEBUG_TRACE;
 
-DEBUG:
-	if (!pe->enable_debug_trace)
+DEBUG_TRACE:
+	if (!p->enable_debug_trace) {
 		goto DEALLOC_AND_EXIT;
+	}
 
 	if (err != Err_in_err_file) {
 		char buf[128];
 
-		if (pe->trace_file == NULL) {
+		if (p->trace_file == NULL) {
 			tfile = stdout;
-		} else if ((tfile = fopen(pe->trace_file, "w")) == NULL) {
+		} else if ((tfile = fopen(p->trace_file, "w")) == NULL) {
 			goto DEALLOC_AND_EXIT;
 		}
 
 		if (tfile != NULL) {
 			get_errtext(err, buf);
 			fprintf(tfile, "%s ", buf);
-			po_print_trace(pe, tfile, stack, base, globals, ip, builtin_err);
+			po_print_trace(p, tfile, stack, base, globals, ip, p->builtin_error);
 			if (tfile != stdout) {
 				fclose(tfile);
 			}
@@ -1739,11 +1954,25 @@ DEBUG:
 	}
 
 DEALLOC_AND_EXIT:
-	if (pe->stack == NULL) {
+	if (temporary_stack) {
 		pj_free(stack_area);
 	}
+	--p->run_depth;
+	p->debug_call_depth = saved_debug_call_depth;
 
 	return err;
+}
+
+Errcode poco_invoke_callback(void* code_pt, Pt_num* pret, const PocoCallbackValue* values,
+							 size_t value_count)
+{
+	Func_frame* function = code_pt;
+
+	if (function == NULL || function->magic != FUNC_MAGIC || function->code_pt == NULL ||
+		function->activation == NULL) {
+		return Err_function_not_found;
+	}
+	return poco_run_callback(function->activation, function->code_pt, pret, values, value_count);
 }
 
 /*****************************************************************************
@@ -1753,13 +1982,24 @@ DEALLOC_AND_EXIT:
  * to call from a lib/poe routine back into poco via a pointer passed to
  * you from a Poco program you must enter through poco_invoke_callback().
  ****************************************************************************/
-Errcode po_run_ops(Poco_run_env* p, Code* code_pt, Pt_num* pret)
+Errcode po_run_ops(PocoActivation* p, Code* code_pt, Pt_num* pret)
 {
 	Pt_num dummy_ret;
 
-	pe = p;
-	if (pret == NULL)
+	if (pret == NULL) {
 		pret = &dummy_ret;
+	}
 
-	return poco_invoke_callback(code_pt, pret, NULL, 0);
+	return poco_run_callback(p, code_pt, pret, NULL, 0);
+}
+
+Errcode po_run_ops_values(PocoActivation* p, Code* code_pt, Pt_num* pret,
+						  const PocoCallbackValue* values, size_t value_count)
+{
+	Pt_num dummy_ret;
+
+	if (pret == NULL) {
+		pret = &dummy_ret;
+	}
+	return poco_run_callback(p, code_pt, pret, values, value_count);
 }

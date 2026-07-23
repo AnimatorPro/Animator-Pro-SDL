@@ -126,16 +126,16 @@ get_next_hosthead:
 /* load a rex code library into ram
  * handshake, load data, check for errors and pre-initialize
  * host libraries for rex code and return pointer to header. */
-Errcode pj_rexlib_load(char* name,      /* path to find rex library file */
-					   USHORT type,     /* Rexlib code type seeking to find */
-					   Rexlib** prl,    /* Rexlib structure to load */
+Errcode pj_rexlib_load(char* name,         /* path to find rex library file */
+					   USHORT type,        /* Rexlib code type seeking to find */
+					   Rexlib** prl,       /* Rexlib structure to load */
 					   Libhead** hostlibs, /* null terminated list of
-										 * of Libheads for REX code
-										 * NULL == no list */
-					   char* id_string) /* id_string checked against
-										 * id_string in library if type
-										 * is REX_USERTYPE this value
-										 * must be non NULL */
+											* of Libheads for REX code
+											* NULL == no list */
+					   char* id_string)    /* id_string checked against
+											* id_string in library if type
+											* is REX_USERTYPE this value
+											* must be non NULL */
 {
 	Errcode err;
 	Rexlib* rl;

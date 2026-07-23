@@ -1,0 +1,6 @@
+#pragma poco use "use_cycle_a.poc"
+
+int cycle_b(void)
+{
+	return 2;
+}

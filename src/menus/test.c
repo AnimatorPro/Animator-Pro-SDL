@@ -1,7 +1,7 @@
 #include "jimk.h" /* to get globals */
 #include "menus.h"
 
-char *rex_name = "\\paa\\aadisp.drv";
+char* rex_name = "\\paa\\aadisp.drv";
 char goodconf;
 
 
@@ -11,99 +11,104 @@ void test_selit();
 extern sys_pull;
 
 static Menuhdr test_pull = {
-	320, 8, 0, 30,
+	320,
+	8,
+	0,
+	30,
 	0,
 	PULLMENU,
 	&sys_pull,
-	SCREEN_FONT,	/* font */
+	SCREEN_FONT, /* font */
 	seebg_ulwhite,
 	test_selit,
 	menu_dopull,
-	(KEYHIT|MMOVE|MBRIGHT),
+	(KEYHIT | MMOVE | MBRIGHT),
 };
-
 
 static void do_testpull()
 {
-	do_menuloop(vl.screen,NULL,NULL,&test_pull,NULL);
+	do_menuloop(vl.screen, NULL, NULL, &test_pull, NULL);
 }
-static void test_selit(SHORT *ixs)
+
+static void test_selit(SHORT* ixs)
 {
 	boxf("test selit %d %d", ixs[0], ixs[1]);
 }
 
-
-
 static do_qnumber()
 {
-Menuhdr *mh;
-SHORT val = 50;
-Errcode err;
+	Menuhdr* mh;
+	SHORT val = 50;
+	Errcode err;
 
-	err = new_qreq_number(&val,0,111,"the top line of text");
-  	boxf("ecode %d, val = %d", err, val ); 
+	err = new_qreq_number(&val, 0, 111, "the top line of text");
+	boxf("ecode %d, val = %d", err, val);
 }
+
 static test_uscale()
 {
-SHORT i, j, oc;
-Vscoor vc;
-SHORT badhits = 0;
+	SHORT i, j, oc;
+	Vscoor vc;
+	SHORT badhits = 0;
 
-	for( j = 100; j < 16000; ++j)
-	{
+	for (j = 100; j < 16000; ++j) {
 		printf("%d to %d bh %d\n", -j, j, badhits);
 
 
-		for(i = -j;i < j+1; ++i)
-		{
-			vc = scale_vscoor(i,j);
-			oc = uscale_vscoor(vc,j);
+		for (i = -j; i < j + 1; ++i) {
+			vc = scale_vscoor(i, j);
+			oc = uscale_vscoor(vc, j);
 
-			if(oc != i)
-			{
+			if (oc != i) {
 				++badhits;
-				printf("j %d i %d, in %d out %d\n", j, i, i, oc); 
+				printf("j %d i %d, in %d out %d\n", j, i, i, oc);
 			}
 		}
 
-		if(!yes_no_line("continue ??"))
+		if (!yes_no_line("continue ??")) {
 			break;
+		}
 	}
 }
-void main(int argc, char **argv)
+
+void main(int argc, char** argv)
 {
-Errcode err;
-int i;
+	Errcode err;
+	int i;
 
 
-	if(argc > 1)
+	if (argc > 1) {
 		rex_name = argv[1];
-	if(init_sys() < 0)
+	}
+	if (init_sys() < 0) {
 		exit(-1);
+	}
 
-	pj_set_rast(vl.screen,4);
+	pj_set_rast(vl.screen, 4);
 
-test_uscale();
+	test_uscale();
 
-/*	do_testpull(); */
+	/*	do_testpull(); */
 
-	if(!yes_no_line("continue ??"))
+	if (!yes_no_line("continue ??")) {
 		goto exitit;
+	}
 
 	do_qnumber();
 
-	if(!yes_no_line("continue ??"))
+	if (!yes_no_line("continue ??")) {
 		goto exitit;
-{
-char *choices[] = {
-	"choice 1",
-	"choice 2",
-	"a very very big choice",
-};
+	}
+	{
+		char* choices[] = {
+			"choice 1",
+			"choice 2",
+			"a very very big choice",
+		};
 
-	err = qchoice(NULL, "header", choices, sizeof(choices)/sizeof(char *));
-	boxf("choice %d", err);
-}
+		err = qchoice(NULL, "header", choices, sizeof(choices) / sizeof(char*));
+		boxf("choice %d", err);
+	}
 
 	goto exitit;
 

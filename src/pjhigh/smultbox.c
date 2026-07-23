@@ -11,14 +11,14 @@
  *
  * returns (index of choice button) + 1  Err_abort if canceled < Success
  * if other error */
-Errcode soft_multi_box(char **keys, char *symbol, ...)
+Errcode soft_multi_box(char** keys, char* symbol, ...)
 {
 	Errcode err;
 	va_list args;
-	char *formats;
-	char *choices[TBOX_MAXCHOICES + 2];
+	char* formats;
+	char* choices[TBOX_MAXCHOICES + 2];
 	Smu_name_scats scts[TBOX_MAXCHOICES + 1];
-	void *ss;
+	void* ss;
 	unsigned int count;
 
 	for (count = 0; count < (TBOX_MAXCHOICES + 1); ++count) {

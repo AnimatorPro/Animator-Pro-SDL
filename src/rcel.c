@@ -82,10 +82,12 @@ Errcode clip_celrect(Rcel* src, Rectangle* rect, Rcel** clip)
 	Rcel clipcel;
 
 	*clip = NULL;
-	if (!pj_rcel_make_virtual(&clipcel, src, rect))
+	if (!pj_rcel_make_virtual(&clipcel, src, rect)) {
 		return (Err_clipped);
-	if ((*clip = clone_rcel(&clipcel)) == NULL)
+	}
+	if ((*clip = clone_rcel(&clipcel)) == NULL) {
 		return (Err_no_memory);
+	}
 	return 0;
 }
 
@@ -95,15 +97,16 @@ static void delta_move_rcel(Rcel* c, SHORT dx, SHORT dy, Tcolxldat* txl, bool fi
 	Celblit blit = get_celmove(fit_cel);
 	SHORT ox, oy;
 
-	ox	 = c->x;
-	oy	 = c->y;
+	ox = c->x;
+	oy = c->y;
 	c->x = ox + dx;
 	c->y = oy + dy;
 	do_leftbehind(ox, oy, c->x, c->y, c->width, c->height, (do_leftbehind_func)undo_rect_lbh, NULL);
 	(*blit)(c, 0, 0, vb.pencel, c->x, c->y, c->width, c->height, txl);
 	if (vs.zoom_open) /* a few nanoseconds here ... */
 	{
-		do_leftbehind(ox, oy, c->x, c->y, c->width, c->height, (do_leftbehind_func)rect_zoom_it_lbh, NULL);
+		do_leftbehind(ox, oy, c->x, c->y, c->width, c->height, (do_leftbehind_func)rect_zoom_it_lbh,
+					  NULL);
 		zoom_cel(c);
 	}
 }
@@ -117,7 +120,7 @@ Errcode move_rcel(Rcel* rc, bool fit_cel, bool one_color)
 	Tcolxldat xld;
 	Pixel fitab[256];
 	bool need_remap = fit_cel || one_color;
-	Celblit blit	   = get_celblit(need_remap);
+	Celblit blit = get_celblit(need_remap);
 
 	xld.tcolor = vs.inks[0];
 	if (fit_cel) {
@@ -134,8 +137,9 @@ Errcode move_rcel(Rcel* rc, bool fit_cel, bool one_color)
 
 	(*blit)(rc, 0, 0, vb.pencel, rc->x, rc->y, rc->width, rc->height, &xld);
 	zoom_cel(rc);
-	if ((err = rub_rect_in_place((Rectangle*)(&rc->RECTSTART))) < 0)
+	if ((err = rub_rect_in_place((Rectangle*)(&rc->RECTSTART))) < 0) {
 		goto out;
+	}
 
 	for (;;) {
 		box_coors(rc->x, rc->y, firstx, firsty);
@@ -143,17 +147,20 @@ Errcode move_rcel(Rcel* rc, bool fit_cel, bool one_color)
 		ly = icb.my;
 		wait_input(MMOVE | ANY_CLICK);
 
-		if (JSTHIT(MMOVE))
+		if (JSTHIT(MMOVE)) {
 			delta_move_rcel(rc, icb.mx - lx, icb.my - ly, &xld, need_remap);
+		}
 
-		if (JSTHIT(ANY_CLICK))
+		if (JSTHIT(ANY_CLICK)) {
 			break;
+		}
 	}
 
-	if (JSTHIT(KEYHIT | MBRIGHT))
+	if (JSTHIT(KEYHIT | MBRIGHT)) {
 		err = Err_abort;
-	else
+	} else {
 		err = 0;
+	}
 
 out:
 	cleanup_toptext();
@@ -170,14 +177,7 @@ out:
  * get_celmove() */
 
 /* blits a rectangle fron source to dest */
-static void celblit(Rcel* src,
-					SHORT sx,
-					SHORT sy,
-					Rcel* dest,
-					SHORT dx,
-					SHORT dy,
-					SHORT w,
-					SHORT h,
+static void celblit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w, SHORT h,
 					Tcolxldat* xld)
 {
 	(void)xld;
@@ -185,177 +185,122 @@ static void celblit(Rcel* src,
 }
 
 /* xlate blits a rectangle from source to dest */
-static void celblitxl(Rcel* src,
-					  SHORT sx,
-					  SHORT sy,
-					  Rcel* dest,
-					  SHORT dx,
-					  SHORT dy,
-					  SHORT w,
-					  SHORT h,
-					  Tcolxldat* xld)
+static void celblitxl(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					  SHORT h, Tcolxldat* xld)
 {
 	xlatblit((Rcel*)src, sx, sy, (Rcel*)dest, dx, dy, w, h, xld->xlat);
 }
 
 /* "T" blits a rectangle from source to dest */
-static void celtblit(Rcel* src,
-					 SHORT sx,
-					 SHORT sy,
-					 Rcel* dest,
-					 SHORT dx,
-					 SHORT dy,
-					 SHORT w,
-					 SHORT h,
-					 Tcolxldat* xld)
+static void celtblit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					 SHORT h, Tcolxldat* xld)
 {
 	pj_tblitrect((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, xld->tcolor);
 }
 
 /* xlate "T" blits a rectangle from source to dest */
-static void celtblitxl(Rcel* src,
-					   SHORT sx,
-					   SHORT sy,
-					   Rcel* dest,
-					   SHORT dx,
-					   SHORT dy,
-					   SHORT w,
-					   SHORT h,
-					   Tcolxldat* xld)
+static void celtblitxl(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					   SHORT h, Tcolxldat* xld)
 {
 	procblit((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, tbli_xlatline, xld);
 }
 
 /* "U" blits a rectangle from source to dest */
-static void celublit(Rcel* src,
-					 SHORT sx,
-					 SHORT sy,
-					 Rcel* dest,
-					 SHORT dx,
-					 SHORT dy,
-					 SHORT w,
-					 SHORT h,
-					 Tcolxldat* xld)
+static void celublit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					 SHORT h, Tcolxldat* xld)
 {
 	ublitrect((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, xld->tcolor);
 }
 
 /* xlate "U" blits a rectangle from source to dest */
-static void celublitxl(Rcel* src,
-					   SHORT sx,
-					   SHORT sy,
-					   Rcel* dest,
-					   SHORT dx,
-					   SHORT dy,
-					   SHORT w,
-					   SHORT h,
-					   Tcolxldat* xld)
+static void celublitxl(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					   SHORT h, Tcolxldat* xld)
 {
 	procblit((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, ubli_xlatline, xld);
 }
 
-static void celabtblit(Rcel* src,
-					   SHORT sx,
-					   SHORT sy,
-					   Rcel* dest,
-					   SHORT dx,
-					   SHORT dy,
-					   SHORT w,
-					   SHORT h,
-					   Tcolxldat* xld)
+static void celabtblit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					   SHORT h, Tcolxldat* xld)
 {
 	Raster* src_b = (Raster*)undof;
 	abprocblit((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, src_b, dx, dy, pj_tbli_line, xld);
 }
 
-static void celabtxlblit(Rcel* src,
-						 SHORT sx,
-						 SHORT sy,
-						 Rcel* dest,
-						 SHORT dx,
-						 SHORT dy,
-						 SHORT w,
-						 SHORT h,
-						 Tcolxldat* xld)
+static void celabtxlblit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+						 SHORT h, Tcolxldat* xld)
 {
 	Raster* src_b = (Raster*)undof;
-	abprocblit(
-	  (Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, src_b, dx, dy, tbli_xlatline, xld);
+	abprocblit((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, src_b, dx, dy, tbli_xlatline,
+			   xld);
 }
 
-static void celabublit(Rcel* src,
-					   SHORT sx,
-					   SHORT sy,
-					   Rcel* dest,
-					   SHORT dx,
-					   SHORT dy,
-					   SHORT w,
-					   SHORT h,
-					   Tcolxldat* xld)
+static void celabublit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					   SHORT h, Tcolxldat* xld)
 {
 	Raster* src_b = (Raster*)undof;
 	abprocblit((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, src_b, dx, dy, ubli_line, xld);
 }
 
-static void celabuxlblit(Rcel* src,
-						 SHORT sx,
-						 SHORT sy,
-						 Rcel* dest,
-						 SHORT dx,
-						 SHORT dy,
-						 SHORT w,
-						 SHORT h,
-						 Tcolxldat* xld)
+static void celabuxlblit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+						 SHORT h, Tcolxldat* xld)
 {
 	Raster* src_b = (Raster*)undof;
-	abprocblit(
-	  (Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, src_b, dx, dy, ubli_xlatline, xld);
+	abprocblit((Raster*)src, sx, sy, (Raster*)dest, dx, dy, w, h, src_b, dx, dy, ubli_xlatline,
+			   xld);
 }
 
 Celblit get_celmove(bool cfit)
 {
 	if (vs.render_under) {
-		if (cfit)
+		if (cfit) {
 			return celabuxlblit;
+		}
 		return celabublit;
 	}
 	if (vs.zero_clear) {
-		if (cfit)
+		if (cfit) {
 			return celabtxlblit;
+		}
 		return celabtblit;
 	}
-	if (cfit)
+	if (cfit) {
 		return celblitxl;
+	}
 	return celblit;
 }
 
 Celblit get_celblit(bool cfit)
 {
 	if (vs.render_under) {
-		if (cfit)
+		if (cfit) {
 			return celublitxl;
+		}
 		return celublit;
 	}
 	if (vs.zero_clear) {
-		if (cfit)
+		if (cfit) {
 			return celtblitxl;
+		}
 		return celtblit;
 	}
-	if (cfit)
+	if (cfit) {
 		return celblitxl;
+	}
 	return celblit;
 }
 
 Procline get_celprocline(bool cfit)
 {
 	if (vs.render_under) {
-		if (cfit)
+		if (cfit) {
 			return (ubli_xlatline);
+		}
 		return (ubli_line);
 	}
 	if (vs.zero_clear) {
-		if (cfit)
+		if (cfit) {
 			return (tbli_xlatline);
+		}
 		return (pj_tbli_line);
 	}
 	return NULL; /* straight blit no processing required (may need cfit) */

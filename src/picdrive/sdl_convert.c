@@ -9,7 +9,7 @@
 #include "cmap.h"
 #include "sdl_pdr.h"
 
-void sdlpdr_cmap_to_palette(const Cmap *cmap, SDL_Palette *palette)
+void sdlpdr_cmap_to_palette(const Cmap* cmap, SDL_Palette* palette)
 {
 	assert(palette);
 	assert(cmap);
@@ -23,7 +23,7 @@ void sdlpdr_cmap_to_palette(const Cmap *cmap, SDL_Palette *palette)
 	}
 }
 
-void sdlpdr_palette_to_cmap(const SDL_Palette *palette, Cmap *cmap)
+void sdlpdr_palette_to_cmap(const SDL_Palette* palette, Cmap* cmap)
 {
 	assert(palette);
 	assert(cmap);
@@ -45,7 +45,7 @@ void sdlpdr_palette_to_cmap(const SDL_Palette *palette, Cmap *cmap)
  * @param num_colors Maximum number of colors to use (between 2 and 256)
  * @return A new SDL_Surface in INDEX8 format or NULL on error
  */
-SDL_Surface *sdlpdr_convert_colors(SDL_Surface *surface, size_t num_colors)
+SDL_Surface* sdlpdr_convert_colors(SDL_Surface* surface, size_t num_colors)
 {
 	if (surface == NULL || num_colors < 2 || num_colors > 256) {
 		SDL_SetError("Invalid parameters for color conversion");
@@ -53,27 +53,27 @@ SDL_Surface *sdlpdr_convert_colors(SDL_Surface *surface, size_t num_colors)
 	}
 
 	// Create histogram and related structures for color quantization
-	Uint8 *histogram = NULL;
-	Uint8 *rgb_bufs[3] = {NULL, NULL, NULL};
-	Uint8 *linebuf = NULL;
+	Uint8* histogram = NULL;
+	Uint8* rgb_bufs[3] = {NULL, NULL, NULL};
+	Uint8* linebuf = NULL;
 	int width = surface->w;
 	int height = surface->h;
-	SDL_Surface *new_surface = NULL;
-	SDL_Palette *palette = NULL;
+	SDL_Surface* new_surface = NULL;
+	SDL_Palette* palette = NULL;
 
 	// Allocate histogram for color analysis
 	size_t hist_size = (256 * 256 * 256) / 8;  // Same as HIST256_SIZE in convrgb.c
-	histogram = (Uint8 *)calloc(1, hist_size);
+	histogram = (Uint8*)calloc(1, hist_size);
 	if (!histogram) {
 		SDL_SetError("Out of memory for histogram");
 		goto cleanup;
 	}
 
 	// Allocate RGB buffers for processing
-	rgb_bufs[0] = (Uint8 *)malloc(width);  // R
-	rgb_bufs[1] = (Uint8 *)malloc(width);  // G
-	rgb_bufs[2] = (Uint8 *)malloc(width);  // B
-	linebuf = (Uint8 *)malloc(width * 3);  // RGB triplets
+	rgb_bufs[0] = (Uint8*)malloc(width);  // R
+	rgb_bufs[1] = (Uint8*)malloc(width);  // G
+	rgb_bufs[2] = (Uint8*)malloc(width);  // B
+	linebuf = (Uint8*)malloc(width * 3);  // RGB triplets
 
 	if (!rgb_bufs[0] || !rgb_bufs[1] || !rgb_bufs[2] || !linebuf) {
 		SDL_SetError("Out of memory for RGB buffers");
@@ -140,7 +140,7 @@ SDL_Surface *sdlpdr_convert_colors(SDL_Surface *surface, size_t num_colors)
 	}
 
 	// Build color table from histogram
-	Uint8 *color_table = (Uint8 *)malloc(unique_colors * 3);
+	Uint8* color_table = (Uint8*)malloc(unique_colors * 3);
 	if (!color_table) {
 		SDL_SetError("Out of memory for color table");
 		goto cleanup;
@@ -233,7 +233,7 @@ SDL_Surface *sdlpdr_convert_colors(SDL_Surface *surface, size_t num_colors)
 		goto cleanup;
 	}
 
-	Uint8 *dst_pixels = (Uint8 *)new_surface->pixels;
+	Uint8* dst_pixels = (Uint8*)new_surface->pixels;
 
 	for (y = 0; y < height; y++) {
 		for (x = 0; x < width; x++) {
@@ -304,13 +304,14 @@ cleanup:
 	return NULL;
 }
 
-SDL_Surface *sdlpdr_convert_surface_to_palette(const SDL_Surface *surface, const SDL_Palette *palette)
+SDL_Surface* sdlpdr_convert_surface_to_palette(const SDL_Surface* surface,
+											   const SDL_Palette* palette)
 {
 	assert(surface);
 	assert(palette);
 
 	// Convert the surface to 8-bit indexed format with the specified palette
-	SDL_Surface *indexedSurface = SDL_CreateSurface(surface->w, surface->h, SDL_PIXELFORMAT_INDEX8);
+	SDL_Surface* indexedSurface = SDL_CreateSurface(surface->w, surface->h, SDL_PIXELFORMAT_INDEX8);
 	if (!indexedSurface) {
 		SDL_SetError("Indexed surface allocation failed.");
 		return NULL;
@@ -351,7 +352,7 @@ SDL_Surface *sdlpdr_convert_surface_to_palette(const SDL_Surface *surface, const
 				}
 			}
 
-			uint8_t *surface_buf = (uint8_t *)indexedSurface->pixels;
+			uint8_t* surface_buf = (uint8_t*)indexedSurface->pixels;
 			surface_buf[y * indexedSurface->pitch + x] = best_index;
 		}
 	}
@@ -359,7 +360,6 @@ SDL_Surface *sdlpdr_convert_surface_to_palette(const SDL_Surface *surface, const
 	SDL_UnlockSurface(indexedSurface);
 	return indexedSurface;
 }
-
 
 /*
  * kiki note:

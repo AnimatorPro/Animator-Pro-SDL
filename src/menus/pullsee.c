@@ -4,11 +4,11 @@
 #include "memory.h"
 #include "menus.h"
 
-static void see_pullist(int x, int y, Pull *p, Pullwork *pw);
+static void see_pullist(int x, int y, Pull* p, Pullwork* pw);
 
 /* used only for drawing top level in pull menu window called by draw_menu()
  * draws first list of pulls into menu window */
-void draw_menupull(Menuhdr *mh)
+void draw_menupull(Menuhdr* mh)
 {
 	Pullwork pw;
 
@@ -16,11 +16,11 @@ void draw_menupull(Menuhdr *mh)
 		return;
 	}
 	init_pullwork(&pw, mh);
-	pw.port = (Rcel *)(&(mh->mw->w));
+	pw.port = (Rcel*)(&(mh->mw->w));
 	see_pullist(0, 0, mh->mbs, &pw);
 }
 
-static void see_pullist(int x, int y, Pull *p, Pullwork *pw)
+static void see_pullist(int x, int y, Pull* p, Pullwork* pw)
 {
 	while (p != NULL) {
 		if (p->see != NULL) {
@@ -31,10 +31,10 @@ static void see_pullist(int x, int y, Pull *p, Pullwork *pw)
 	}
 }
 
-static void get_pull_key(Pull *p, char *buf)
+static void get_pull_key(Pull* p, char* buf)
 {
 	UBYTE key;
-	char *str;
+	char* str;
 
 	key = p->key_equiv;
 
@@ -67,18 +67,18 @@ static void get_pull_key(Pull *p, char *buf)
 
 /* Will display left justified text.  If the first character is a space ' '
  * it will make that space the size of an asterisk for alignment */
-void pull_leftext(int x, int y, Pull *p, Pullwork *pw)
+void pull_leftext(int x, int y, Pull* p, Pullwork* pw)
 {
 	char buf[32];
-	char *ptxt;
+	char* ptxt;
 	int txtx;
 	int txty;
 	Pixel color;
 	char k, k2;
-	struct vfont *font = pw->font;
+	struct vfont* font = pw->font;
 
 
-	ptxt = (char *)(p->data);
+	ptxt = (char*)(p->data);
 	txty = y + font_ycent_oset(font, p->height);
 	if (p->flags & PULL_HILIT) {
 		color = pw->screen->SRED;
@@ -130,32 +130,32 @@ void pull_leftext(int x, int y, Pull *p, Pullwork *pw)
 }
 
 /* Adjust text by one line depending on resolution of screen arrr */
-void pull_toptext(int x, int y, Pull *p, Pullwork *pw)
+void pull_toptext(int x, int y, Pull* p, Pullwork* pw)
 {
-	void *oport;
+	void* oport;
 
 	if (p->height == 8) { /* it's lo res unscaled  */
 		y -= 1;
 	}
 	/* draw text in window, not on screen because text is not erased */
 	oport = pw->port;
-	pw->port = (Rcel *)(pw->root->mw);
+	pw->port = (Rcel*)(pw->root->mw);
 	pull_leftext(x, y, p, pw);
 	pw->port = oport;
 }
 
-void pull_oblock(int x, int y, Pull *p, Pullwork *pw)
+void pull_oblock(int x, int y, Pull* p, Pullwork* pw)
 {
 	pj_set_rect(pw->port, pw->screen->SWHITE, x + 1, y + 1, p->width - 2, p->height - 2);
-	draw_quad((Raster *)pw->port, pw->screen->SGREY, x, y, p->width, p->height);
+	draw_quad((Raster*)pw->port, pw->screen->SGREY, x, y, p->width, p->height);
 }
 
-void pull_midline(int x, int y, Pull *p, Pullwork *pw)
+void pull_midline(int x, int y, Pull* p, Pullwork* pw)
 {
 	pj_set_hline(pw->port, pw->screen->SGREY, x, y + (p->height >> 1), p->width);
 }
 
-void see_pull(int x, int y, Pull *p, Pullwork *pw)
+void see_pull(int x, int y, Pull* p, Pullwork* pw)
 {
 	(*p->see)(x, y, p, pw);
 	p = p->children;

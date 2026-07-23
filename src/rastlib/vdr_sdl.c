@@ -20,14 +20,14 @@
 #define REX_VDRIVER 0x0101U
 #define VDEV_VERSION 0
 
-static Errcode sdl_detect(Vdevice *vd);
-static Errcode sdl_get_modes(Vdevice *vd, USHORT mode, Vmode_info *pvm);
-static char *sdl_mode_text(Vdevice *vd, USHORT mode);
+static Errcode sdl_detect(Vdevice* vd);
+static Errcode sdl_get_modes(Vdevice* vd, USHORT mode, Vmode_info* pvm);
+static char* sdl_mode_text(Vdevice* vd, USHORT mode);
 
-static Errcode sdl_open_graphics(Vdevice *vd, LibRast *r, LONG w, LONG h, USHORT mode);
+static Errcode sdl_open_graphics(Vdevice* vd, LibRast* r, LONG w, LONG h, USHORT mode);
 
-static Errcode sdl_close_graphics(Vdevice *vd);
-static Rastlib *get_sdl_lib(void);
+static Errcode sdl_close_graphics(Vdevice* vd);
+static Rastlib* get_sdl_lib(void);
 
 static struct vdevice_lib sdl_device_library = {
 	sdl_detect,
@@ -40,29 +40,32 @@ static struct vdevice_lib sdl_device_library = {
 	NOFUNC, /* show_rast */
 };
 
-#define MAKE_VMODE_INFO(MODE_IX, WIDTH, HEIGHT)                                                    \
-	{                                                                                              \
-		sizeof(Vmode_info), MODE_IX, "SDL", 8,                           /* bits */                \
-			1,                                                           /* planes */              \
-			{WIDTH, WIDTH, WIDTH, 1}, {HEIGHT, HEIGHT, HEIGHT, 1}, true, /* readable */            \
-			true,                                                        /* writeable */           \
-			true,                                                        /* displayable */         \
-			0,                                                           /* fields_per_frame */    \
-			1,                                                           /* display_pages */       \
-			1,                                                           /* store_pages */         \
-			WIDTH *HEIGHT, WIDTH *HEIGHT, true,                          /* palette_vblank_only */ \
-			0,  /* screen_swap_vblank_only */                                                      \
-			70, /* field_rate */                                                                   \
-			0   /* vblank_period */                                                                \
+#define MAKE_VMODE_INFO(MODE_IX, WIDTH, HEIGHT) \
+	{                                           \
+		sizeof(Vmode_info),                     \
+		MODE_IX,                                \
+		"SDL",                                  \
+		8, /* bits */                           \
+		1, /* planes */                         \
+		{WIDTH, WIDTH, WIDTH, 1},               \
+		{HEIGHT, HEIGHT, HEIGHT, 1},            \
+		true, /* readable */                    \
+		true, /* writeable */                   \
+		true, /* displayable */                 \
+		0,    /* fields_per_frame */            \
+		1,    /* display_pages */               \
+		1,    /* store_pages */                 \
+		WIDTH * HEIGHT,                         \
+		WIDTH * HEIGHT,                         \
+		true, /* palette_vblank_only */         \
+		0,    /* screen_swap_vblank_only */     \
+		70,   /* field_rate */                  \
+		0     /* vblank_period */               \
 	}
 
 static Vmode_info sdl_infos[] = {
-	MAKE_VMODE_INFO(0, 320, 200),
-	MAKE_VMODE_INFO(1, 640, 480),
-	MAKE_VMODE_INFO(2, 800, 600),
-	MAKE_VMODE_INFO(3, 1024, 768),
-	MAKE_VMODE_INFO(4, 1280, 800),
-	MAKE_VMODE_INFO(5, 1920, 1080),
+	MAKE_VMODE_INFO(0, 320, 200),  MAKE_VMODE_INFO(1, 640, 480),  MAKE_VMODE_INFO(2, 800, 600),
+	MAKE_VMODE_INFO(3, 1024, 768), MAKE_VMODE_INFO(4, 1280, 800), MAKE_VMODE_INFO(5, 1920, 1080),
 };
 
 #undef MAKE_VMODE_INFO
@@ -96,13 +99,13 @@ void pj_wait_vsync(void)
 /* SDL Vdevice library.                                         */
 /*--------------------------------------------------------------*/
 
-static Errcode sdl_detect(Vdevice *vd)
+static Errcode sdl_detect(Vdevice* vd)
 {
 	(void)vd;
 	return Success;
 }
 
-static Errcode sdl_get_modes(Vdevice *vd, USHORT mode, Vmode_info *pvm)
+static Errcode sdl_get_modes(Vdevice* vd, USHORT mode, Vmode_info* pvm)
 {
 	(void)vd;
 
@@ -114,7 +117,7 @@ static Errcode sdl_get_modes(Vdevice *vd, USHORT mode, Vmode_info *pvm)
 	return Success;
 }
 
-static char *sdl_mode_text(Vdevice *vd, USHORT mode)
+static char* sdl_mode_text(Vdevice* vd, USHORT mode)
 {
 	(void)vd;
 	(void)mode;
@@ -122,7 +125,7 @@ static char *sdl_mode_text(Vdevice *vd, USHORT mode)
 	return "";
 }
 
-static void sdl_open_raster(Raster *r, LONG w, LONG h)
+static void sdl_open_raster(Raster* r, LONG w, LONG h)
 {
 	static const Rasthdr defaults = {
 		RT_MCGA,           /* type */
@@ -140,7 +143,7 @@ static void sdl_open_raster(Raster *r, LONG w, LONG h)
 		{NULL},                   /* at least one plane, the pixelated data */
 	};
 
-	*((Rasthdr *)r) = defaults;
+	*((Rasthdr*)r) = defaults;
 	r->lib = get_sdl_lib();
 	r->width = w;
 	r->height = h;
@@ -150,19 +153,19 @@ static void sdl_open_raster(Raster *r, LONG w, LONG h)
 	r->hw.bm.psize = w * h;
 }
 
-static Errcode sdl_open_graphics(Vdevice *vd, Raster *r, LONG w, LONG h, USHORT mode)
+static Errcode sdl_open_graphics(Vdevice* vd, Raster* r, LONG w, LONG h, USHORT mode)
 {
 	(void)mode;
 
 	const LONG video_scale = pj_sdl_get_display_scale();
 
-//	/* kiki note: on video resize, the app calls open_graphics
-//	 * again-- need to make sure this window is dead and all
-//	 * other parts of the graphics system are deallocated. */
-//	if (window) {
-//		SDL_DestroyWindow(window);
-//		window = NULL;
-//	}
+	//	/* kiki note: on video resize, the app calls open_graphics
+	//	 * again-- need to make sure this window is dead and all
+	//	 * other parts of the graphics system are deallocated. */
+	//	if (window) {
+	//		SDL_DestroyWindow(window);
+	//		window = NULL;
+	//	}
 
 	if (!window) {
 		window = SDL_CreateWindow("PJ Paint", w * video_scale, h * video_scale, 0);
@@ -172,6 +175,7 @@ static Errcode sdl_open_graphics(Vdevice *vd, Raster *r, LONG w, LONG h, USHORT 
 		}
 
 		SDL_SetWindowResizable(window, true);
+		SDL_RaiseWindow(window);
 	}
 
 	renderer = SDL_CreateRenderer(window, NULL);
@@ -209,8 +213,7 @@ static Errcode sdl_open_graphics(Vdevice *vd, Raster *r, LONG w, LONG h, USHORT 
 	return Success;
 }
 
-
-static Errcode sdl_close_graphics(Vdevice *vd)
+static Errcode sdl_close_graphics(Vdevice* vd)
 {
 	(void)vd;
 
@@ -237,22 +240,21 @@ static Errcode sdl_close_graphics(Vdevice *vd)
 	return Success;
 }
 
-
 /*--------------------------------------------------------------*/
 /* SDL Rastlib.                                                 */
 /*--------------------------------------------------------------*/
 
-static Errcode sdl_close_rast(Raster *r)
+static Errcode sdl_close_rast(Raster* r)
 {
 	(void)r;
 	return Success;
 }
 
-static void sdl_set_colors(Raster *r, LONG start, LONG count, void *cbuf)
+static void sdl_set_colors(Raster* r, LONG start, LONG count, void* cbuf)
 {
 	(void)r;
 
-	const uint8_t *cmap = cbuf;
+	const uint8_t* cmap = cbuf;
 	SDL_Color colors[256];
 	int c;
 
@@ -276,13 +278,13 @@ static void sdl_set_colors(Raster *r, LONG start, LONG count, void *cbuf)
 	}
 }
 
-static void sdl_wait_vsync(Raster *r)
+static void sdl_wait_vsync(Raster* r)
 {
 	(void)r;
 	pj_sdl_flip_window_surface();
 }
 
-static Rastlib *get_sdl_lib(void)
+static Rastlib* get_sdl_lib(void)
 {
 	static Rastlib sdl_lib;
 	static bool loaded = false;
@@ -312,9 +314,9 @@ static Rastlib *get_sdl_lib(void)
  *
  *  Based on pj_open_mcga_vdriver, pj__vdr_init_open, mcga_get_driver.
  */
-static Errcode sdl_open_vdriver(Vdevice **pvd)
+static Errcode sdl_open_vdriver(Vdevice** pvd)
 {
-	Vdevice *vd = &sdl_driver;
+	Vdevice* vd = &sdl_driver;
 
 	sdl_driver.hdr.init = pj_errdo_success;
 	*pvd = vd;
@@ -333,7 +335,7 @@ static Errcode sdl_open_vdriver(Vdevice **pvd)
 /**
  * Function: pj_open_ddriver
  */
-Errcode pj_open_ddriver(Vdevice **pvd, char *name)
+Errcode pj_open_ddriver(Vdevice** pvd, char* name)
 {
 	(void)name;
 	return sdl_open_vdriver(pvd);

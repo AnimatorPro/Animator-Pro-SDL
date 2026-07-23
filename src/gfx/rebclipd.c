@@ -1,17 +1,18 @@
 #include "rectang.h"
 
-void bclip_dim(SHORT *pos,USHORT *len, SHORT minpos, SHORT maxlen)
+void bclip_dim(SHORT* pos, USHORT* len, SHORT minpos, SHORT maxlen)
 {
-SHORT overedge;
+	SHORT overedge;
 
-	if(*len > maxlen)
+	if (*len > maxlen) {
 		*len = maxlen;
+	}
 
-	if(*pos < minpos)
+	if (*pos < minpos) {
 		*pos = minpos;
-	else
-	{
-		if(0 < (overedge = (*pos + *len) - (minpos + maxlen)))
+	} else {
+		if (0 < (overedge = (*pos + *len) - (minpos + maxlen))) {
 			*pos -= overedge;
+		}
 	}
 }

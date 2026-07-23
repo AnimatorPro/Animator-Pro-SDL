@@ -1,8 +1,7 @@
 #include "rastcall.ih"
 
-void pj_set_rect(Raster *r, Pixel color,
-			  Coor x, Coor y, Ucoor w, Ucoor h )
-/************************************************************************* 
+void pj_set_rect(Raster* r, Pixel color, Coor x, Coor y, Ucoor w, Ucoor h)
+/*************************************************************************
  * Draw a solid color rectangle.  Rectangle is clipped to fit raster.
  *
  * Parameters:
@@ -14,6 +13,6 @@ void pj_set_rect(Raster *r, Pixel color,
  *		Ucoor	y;		Height
  *************************************************************************/
 {
-	cliprect(r,x,y,w,h);
-	SET_RECT(r,color,x,y,w,h);
+	cliprect(r, x, y, w, h);
+	SET_RECT(r, color, x, y, w, h);
 }

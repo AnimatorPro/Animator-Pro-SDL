@@ -1,0 +1,17 @@
+/* debugger breakpoint fixture */
+
+main()
+{
+	int i;
+	int value;
+	record(10);
+	value = 3;
+	for (i = 0; i < 2; ++i)
+	{
+		value += 2;
+	}
+	record(value);
+	value *= 2;
+	record(value);
+	return value;
+}

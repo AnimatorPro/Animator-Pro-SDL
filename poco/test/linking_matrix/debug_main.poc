@@ -1,0 +1,8 @@
+#include "debug_library.h"
+
+int main(void)
+{
+	int value = 5;
+	value = debug_library(value);
+	return value;
+}

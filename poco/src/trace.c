@@ -43,6 +43,7 @@
 #include <string.h>
 
 #include "poco.h"
+#include "activation.h"
 #include "pocoface.h"
 
 #define i86_ptr_to_long(a) (a)
@@ -50,10 +51,10 @@
 /*****************************************************************************
  * alloc and init a new line_data structure.
  ****************************************************************************/
-Line_data *po_new_line_data(Poco_cb *pcb)
+Line_data* po_new_line_data(Poco_cb* pcb)
 {
 #define DSIZE SMALLBLK_CACHE_SIZE / (2 * sizeof(long))
-	Line_data *new;
+	Line_data* new;
 
 	new = po_memzalloc(pcb, sizeof(*new));
 	new->offsets = po_cache_malloc(pcb, &pcb->smallblk_cache);
@@ -65,7 +66,7 @@ Line_data *po_new_line_data(Poco_cb *pcb)
 /*****************************************************************************
  * resize line data offsets & line numbers areas to hold given # of elements.
  ****************************************************************************/
-static bool resize_line_data(Poco_cb *pcb, Line_data *ld, int nalloc)
+static bool resize_line_data(Poco_cb* pcb, Line_data* ld, int nalloc)
 {
 	long *no, *nl;
 	int count = ld->count;
@@ -84,13 +85,13 @@ static bool resize_line_data(Poco_cb *pcb, Line_data *ld, int nalloc)
 /*****************************************************************************
  * shrink the line data offsets/lines area to the right size.
  ****************************************************************************/
-bool po_compress_line_data(Poco_cb *pcb, Line_data *ld)
+bool po_compress_line_data(Poco_cb* pcb, Line_data* ld)
 {
 #ifdef DEVELOPMENT
 	if (ld == NULL) /* added to watch out for trouble with the new concept of */
 	{               /* not tying line_data structs to FTY_STRUCT poco_frames. */
 		po_say_internal(pcb, "NULL line-data pointer in po_compress_line_data");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 	}
 #endif
 
@@ -106,7 +107,7 @@ bool po_compress_line_data(Poco_cb *pcb, Line_data *ld)
 /*****************************************************************************
  * free a line_data struct, and its associated offsets/line data area.
  ****************************************************************************/
-void po_free_line_data(Line_data *ld)
+void po_free_line_data(Line_data* ld)
 {
 	if (ld != NULL) {
 		poc_gentle_freemem(ld->offsets);
@@ -118,7 +119,7 @@ void po_free_line_data(Line_data *ld)
  * add a new line number/code offset pair to a line_data struct.
  * if we are out of room, we resize the data area to twice its current size.
  ****************************************************************************/
-bool po_add_line_data(Poco_cb *pcb, Line_data *ld, long offset, long line)
+bool po_add_line_data(Poco_cb* pcb, Line_data* ld, long offset, long line)
 {
 	int count;
 
@@ -126,7 +127,7 @@ bool po_add_line_data(Poco_cb *pcb, Line_data *ld, long offset, long line)
 	if (ld == NULL) /* added to watch out for trouble with the new concept of */
 	{               /* not tying line_data structs to FTY_STRUCT poco_frames. */
 		po_say_internal(pcb, "trying to add using NULL ptr in po_add_line_data");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 		return false;
 	}
 #endif
@@ -145,11 +146,11 @@ bool po_add_line_data(Poco_cb *pcb, Line_data *ld, long offset, long line)
 /*****************************************************************************
  * find the source code line number for a given code offset.
  ****************************************************************************/
-long find_line(Line_data *ld, long offset)
+long find_line(Line_data* ld, long offset)
 {
 	int i = ld->count;
-	long *offsets = ld->offsets;
-	long *lines = ld->lines;
+	long* offsets = ld->offsets;
+	long* lines = ld->lines;
 
 	while (i--) {
 		++lines;
@@ -163,11 +164,11 @@ long find_line(Line_data *ld, long offset)
 /*****************************************************************************
  * find the name of a library function.
  ****************************************************************************/
-static char *find_builtin_name(Poco_run_env *pe, void *val)
+static char* find_builtin_name(PocoActivation* pe, void* val)
 {
-	Func_frame *fuf;
+	Func_frame* fuf;
 
-	for (fuf = pe->fff; fuf != NULL; fuf = fuf->mlink) {
+	for (fuf = (Func_frame*)pe->code->functions; fuf != NULL; fuf = fuf->mlink) {
 		if (fuf->code_pt == val) {
 			return fuf->name;
 		}
@@ -178,10 +179,10 @@ static char *find_builtin_name(Poco_run_env *pe, void *val)
 /*****************************************************************************
  * locate the parent fuf of a given location in the program's code buffer.
  ****************************************************************************/
-static Func_frame *which_frame(Poco_run_env *pe, void *ipin)
+static Func_frame* which_frame(PocoActivation* pe, void* ipin)
 {
-	Code *ip = ipin;
-	Func_frame *fuf = pe->fff;
+	Code* ip = ipin;
+	Func_frame* fuf = (Func_frame*)pe->code->functions;
 
 	while (fuf != NULL) {
 		if (i86_ptr_to_long(ip) >= i86_ptr_to_long(fuf->code_pt) &&
@@ -196,7 +197,7 @@ static Func_frame *which_frame(Poco_run_env *pe, void *ipin)
 /*****************************************************************************
  * indicate whether symbol is an array of or pointer to char (ie, a string).
  ****************************************************************************/
-static bool is_char_string_type(Type_info *ti)
+static bool is_char_string_type(Type_info* ti)
 {
 	return (ti->comp_count == 2 && ti->comp[0] == TYPE_CHAR);
 }
@@ -204,7 +205,7 @@ static bool is_char_string_type(Type_info *ti)
 /*****************************************************************************
  * make a guess as to whether a string is printable ascii or not.
  ****************************************************************************/
-bool po_seems_ascii(char *s)
+bool po_seems_ascii(char* s)
 {
 	int count = 0;
 	char c;
@@ -227,26 +228,26 @@ bool po_seems_ascii(char *s)
 /*****************************************************************************
  * print values that were passed as parameters, part of stack trace output.
  ****************************************************************************/
-static void print_param(FILE *f, void *param, int offset, Type_info *ti)
+static void print_param(FILE* f, void* param, int offset, Type_info* ti)
 {
-	char *s;
+	char* s;
 
 	param = OPTR(param, offset);
 	switch (ti->ido_type) {
 		case IDO_INT:
-			fprintf(f, "%d", ((int *)param)[0]);
+			fprintf(f, "%d", ((int*)param)[0]);
 			break;
 		case IDO_LONG:
-			fprintf(f, "%ld", ((long *)param)[0]);
+			fprintf(f, "%ld", ((long*)param)[0]);
 			break;
 		case IDO_POINTER:
-			s = ((Popot *)param)->pt;
+			s = ((Popot*)param)->pt;
 			if (s == NULL) {
 				fprintf(f, "(NULL)");
 				break;
 			}
 			if (ti->comp[ti->comp_count - 2] == TYPE_FUNCTION) {
-				fprintf(f, "%s", ((Func_frame *)s)->name);
+				fprintf(f, "%s", ((Func_frame*)s)->name);
 			} else if (is_char_string_type(ti) && po_seems_ascii(s)) {
 				fprintf(f, "\"%s\"", s);
 			} else {
@@ -254,7 +255,7 @@ static void print_param(FILE *f, void *param, int offset, Type_info *ti)
 			}
 			break;
 		case IDO_CPT:
-			s = ((char **)param)[0];
+			s = ((char**)param)[0];
 			if (is_char_string_type(ti) && po_seems_ascii(s)) {
 				fprintf(f, "\"%s\"", s);
 			} else {
@@ -262,11 +263,14 @@ static void print_param(FILE *f, void *param, int offset, Type_info *ti)
 			}
 			break;
 		case IDO_DOUBLE:
-			fprintf(f, "%f", ((double *)param)[0]);
+			fprintf(f, "%f", ((double*)param)[0]);
+			break;
+		case IDO_STRUCT:
+			fprintf(f, "<struct>");
 			break;
 #ifdef STRING_EXPERIMENT
 		case IDO_STRING:
-			s = PoStringBuf((PoString *)param);
+			s = PoStringBuf((PoString*)param);
 			fprintf(f, "\"%s\"", s);
 #endif /* STRING_EXPERIMENT */
 	}
@@ -275,17 +279,17 @@ static void print_param(FILE *f, void *param, int offset, Type_info *ti)
 /*****************************************************************************
  * format error message & stack trace for a runtime error in a poco program.
  ****************************************************************************/
-void po_print_trace(Poco_run_env *pe, FILE *tfile, Pt_num *stack, Pt_num *base, Pt_num *globals,
-					Pt_num *ip, Errcode cerr)
+void po_print_trace(PocoActivation* pe, FILE* tfile, Pt_num* stack, Pt_num* base, Pt_num* globals,
+					Pt_num* ip, Errcode cerr)
 {
-	Func_frame *fuf;
+	Func_frame* fuf;
 	int i, j, pcount;
-	Symbol *param;
+	Symbol* param;
 	long line = 0;
 
 	if ((fuf = which_frame(pe, ip)) != NULL) {
-		line = find_line(fuf->ld, (Code *)ip - fuf->code_pt);
-		fprintf(tfile, "near line %ld of %s\n", line, pe->fff->name);
+		line = find_line(fuf->ld, (Code*)ip - fuf->code_pt);
+		fprintf(tfile, "near line %ld of %s\n", line, pe->code->functions->name);
 	}
 
 	if (pe->err_line != NULL) {
@@ -315,8 +319,8 @@ void po_print_trace(Poco_run_env *pe, FILE *tfile, Pt_num *stack, Pt_num *base, 
 			print_param(tfile, base, param->symval.doff, param->ti);
 		}
 		fprintf(tfile, ")\n");
-		ip = ((void **)base)[1];
-		base = ((void **)base)[0];
+		ip = ((void**)base)[1];
+		base = ((void**)base)[0];
 	}
 	fprintf(tfile, "\n");
 }

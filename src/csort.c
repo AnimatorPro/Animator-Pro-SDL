@@ -20,215 +20,201 @@ typedef struct occ_map {
 
 typedef struct csort_dat {
 	SHORT pnum;
-	Rgb3 *ssctable;
+	Rgb3* ssctable;
 	int scolors;
 	int inertia;
-	Cmap *tcmap;
-	Rgb3 *p;
-	Occ_map *c; 
-	Rgb3 *p2;
+	Cmap* tcmap;
+	Rgb3* p;
+	Occ_map* c;
+	Rgb3* p2;
 } Csort_dat;
 
 
-
-static int find_ssctable(Csort_dat *cpd)
+static int find_ssctable(Csort_dat* cpd)
 /* make ssctable point to a linear array of rgb triples that we want
    to effect.  (Will take care of cluster complications) */
 {
-	if (vs.pal_to == 1)	/* to all colors */
+	if (vs.pal_to == 1) /* to all colors */
 	{
 		cpd->ssctable = vb.pencel->cmap->ctab;
 		cpd->scolors = COLORS;
-	}
-	else
-	{
-		if ((cpd->ssctable = cluster_to_ctable()) == NULL)
-			return(Err_no_memory);
+	} else {
+		if ((cpd->ssctable = cluster_to_ctable()) == NULL) {
+			return (Err_no_memory);
+		}
 		cpd->scolors = cluster_count();
 	}
-	return(Success);
+	return (Success);
 }
 
-static void free_ssctable(Csort_dat *cpd)
+static void free_ssctable(Csort_dat* cpd)
 {
-	if (vs.pal_to == 0)
+	if (vs.pal_to == 0) {
 		pj_freez(&cpd->ssctable);
+	}
 }
 
-static int occ_cmp(void *a, void *b, void *data)
+static int occ_cmp(void* a, void* b, void* data)
 /* Comparison routine so can sort histogram by how frequently used a
    color is. */
 {
 	(void)data;
-	return ((Occ_map *)a)->count - ((Occ_map *)b)->count;
+	return ((Occ_map*)a)->count - ((Occ_map*)b)->count;
 }
 
-static void cluster_to_cflags(UBYTE *cflags)
+static void cluster_to_cflags(UBYTE* cflags)
 /* Make up a boolean array that reflects whether a particular color is
    present in cluster. */
 {
-int i;
-UBYTE *p;
+	int i;
+	UBYTE* p;
 
-zero_structure(cflags, COLORS);
-i = cluster_count();
-p = vs.buns[vs.use_bun].bundle;
-while (--i >= 0)
-	{
-	cflags[*p++] = 1;
+	zero_structure(cflags, COLORS);
+	i = cluster_count();
+	p = vs.buns[vs.use_bun].bundle;
+	while (--i >= 0) {
+		cflags[*p++] = 1;
 	}
 }
 
 
-static void delete_not_in_cluster(Occ_map *sbuf)
+static void delete_not_in_cluster(Occ_map* sbuf)
 
-/* If in cluster mode simplify remove colors not in cluster from 
+/* If in cluster mode simplify remove colors not in cluster from
    further consideration by making their count in the histogram 0 */
 {
-UBYTE cflags[COLORS];
-UBYTE *p;
-int i;
+	UBYTE cflags[COLORS];
+	UBYTE* p;
+	int i;
 
-	if (vs.pal_to == 1)		/* to all */
+	if (vs.pal_to == 1) { /* to all */
 		return;
+	}
 	cluster_to_cflags(cflags);
 
 	/* Mark colors not in bundle with count 0 */
 	p = cflags;
 	i = COLORS;
-	while (--i >= 0)
-	{
-		if (*p++ == 0)
+	while (--i >= 0) {
+		if (*p++ == 0) {
 			sbuf->count = 0;
+		}
 		sbuf++;
 	}
 }
 
 
-
-static int uniq_sort(Rcel *r, 
-	         		 Occ_map *sbuf, 
-			  		 Rgb3 *sctab, 
-			  		 Rgb3 *dctab, 
-			  		 SHORT colors)
+static int uniq_sort(Rcel* r, Occ_map* sbuf, Rgb3* sctab, Rgb3* dctab, SHORT colors)
 
 /* Sort color table by frequency of use, and remove colors that are unused
    or duplicates of other colors returns number of colors found */
 {
-Occ_map **isb;
-USHORT i;
-ULONG li;
-int dcount = 0;
-Rgb3 *rgb;
-UBYTE *pixels;
-UBYTE *lbuf;
-SHORT numpix;
-SHORT y;
+	Occ_map** isb;
+	USHORT i;
+	ULONG li;
+	int dcount = 0;
+	Rgb3* rgb;
+	UBYTE* pixels;
+	UBYTE* lbuf;
+	SHORT numpix;
+	SHORT y;
 
 	/* make color occurence histogram */
-	clear_mem(sbuf, colors*sizeof(*sbuf) );
+	clear_mem(sbuf, colors * sizeof(*sbuf));
 
-	if(r->type == RT_BYTEMAP)
-	{
-		pixels = ((Bytemap *)r)->bm.bp[0];
-		li = ((Bytemap *)r)->bm.psize;
+	if (r->type == RT_BYTEMAP) {
+		pixels = ((Bytemap*)r)->bm.bp[0];
+		li = ((Bytemap*)r)->bm.psize;
 
-		while(li--)
+		while (li--) {
 			sbuf[*pixels++].count++;
-	}
-	else
-	{
-		if((lbuf = pj_malloc(r->width)) == NULL)
-			return(Err_no_memory);
+		}
+	} else {
+		if ((lbuf = pj_malloc(r->width)) == NULL) {
+			return (Err_no_memory);
+		}
 
-		for(y = 0;y < r->height;++y)
-		{
+		for (y = 0; y < r->height; ++y) {
 			numpix = r->width;
-			pj__get_hseg(r,lbuf,0,y,numpix);
+			pj__get_hseg(r, lbuf, 0, y, numpix);
 			pixels = lbuf;
-			while(numpix--)
+			while (numpix--) {
 				sbuf[*pixels++].count++;
+			}
 		}
 		pj_free(lbuf);
 	}
 	delete_not_in_cluster(sbuf);
-	if ((isb = pj_malloc(colors*sizeof(Occ_map *))) == NULL)
-		return(Err_no_memory);
+	if ((isb = pj_malloc(colors * sizeof(Occ_map*))) == NULL) {
+		return (Err_no_memory);
+	}
 
-	for (i=0; i<colors; i++)
-	{
-		isb[i] = sbuf+i;
+	for (i = 0; i < colors; i++) {
+		isb[i] = sbuf + i;
 		sbuf[i].rgb = sctab[i];
 	}
 
-	sort_indarray((void **)isb, colors, occ_cmp, NULL);
+	sort_indarray((void**)isb, colors, occ_cmp, NULL);
 	dcount = 0;
-	for (i=0; i<colors; i++)
-	{
-		if (isb[i]->count > 0)
-		{
+	for (i = 0; i < colors; i++) {
+		if (isb[i]->count > 0) {
 			rgb = &(isb[i]->rgb);
-			if (!in_ctable(rgb,dctab,dcount) )
-			{
+			if (!in_ctable(rgb, dctab, dcount)) {
 				dctab[dcount] = *rgb;
 				dcount++;
 			}
 		}
 	}
 	pj_free(isb);
-	return(dcount);
+	return (dcount);
 }
 
 
-static void fold_over_ctable(Rgb3 *new,
-						     Rgb3 *old,
-						     Rgb3 *dest,
-						     int newsz, int oldsz)
+static void fold_over_ctable(Rgb3* new, Rgb3* old, Rgb3* dest, int newsz, int oldsz)
 
 /* make new ctable conform to order of old ctable as much as possible.
    (Things get pretty scambled up by the histogram sort... */
 {
-int dcount;
-int i;
+	int dcount;
+	int i;
 
-	if (newsz > oldsz)
+	if (newsz > oldsz) {
 		newsz = oldsz;
-	clear_mem(dest, oldsz*sizeof(Rgb3));
+	}
+	clear_mem(dest, oldsz * sizeof(Rgb3));
 	dcount = 0;
-	for (i=0; i<oldsz; i++)
-	{
-		if (in_ctable(old,new,newsz)) /* see if this color in new color map */
+	for (i = 0; i < oldsz; i++) {
+		if (in_ctable(old, new, newsz)) /* see if this color in new color map */
 		{
-			if (!in_ctable(old, dest, dcount))	/* see if in dest already */
+			if (!in_ctable(old, dest, dcount)) /* see if in dest already */
 			{
 				dest[dcount] = *old;
 				dcount++;
-				if (dcount >= newsz)
-					break;	/* just for safeties sake */
+				if (dcount >= newsz) {
+					break; /* just for safeties sake */
+				}
 			}
 		}
 		++old;
 	}
 }
 
-static int fold_in_cluster(Rgb3 *ncl, int clcount)
+static int fold_in_cluster(Rgb3* ncl, int clcount)
 
 /* Put result of our color squeezing/packing etc back into
    the current palette in case of 'to cluster'. */
 {
-int osize;
-Rgb3 *ocl, *dcl;
-Errcode err;
+	int osize;
+	Rgb3 *ocl, *dcl;
+	Errcode err;
 
 	err = Err_no_memory;
 	osize = cluster_count();
-	if ((ocl = cluster_to_ctable()) != NULL)
-	{
-		if ((dcl = begmem(3*osize)) != NULL)
-		{
-		   fold_over_ctable(ncl, ocl, dcl, clcount, osize);
+	if ((ocl = cluster_to_ctable()) != NULL) {
+		if ((dcl = begmem(3 * osize)) != NULL) {
+			fold_over_ctable(ncl, ocl, dcl, clcount, osize);
 #ifdef OLD
-			pj_copy_bytes(dcl, ocl, 3*osize);
+			pj_copy_bytes(dcl, ocl, 3 * osize);
 			ctable_to_cluster(ocl, osize);
 #endif
 			ctable_to_cluster(dcl, osize);
@@ -237,96 +223,86 @@ Errcode err;
 		}
 		pj_free(ocl);
 	}
-	return(err);
+	return (err);
 }
 
-static Errcode
-cpack1(void *csort_dat, int ix, int intween, int scale, Autoarg *aa)
+static Errcode cpack1(void* csort_dat, int ix, int intween, int scale, Autoarg* aa)
 /* color pack one frame */
 {
-Csort_dat *cpd = csort_dat;
-SHORT ccount;
-SHORT max;
-Errcode err;
-(void)ix;
-(void)intween;
-(void)scale;
-(void)aa;
+	Csort_dat* cpd = csort_dat;
+	SHORT ccount;
+	SHORT max;
+	Errcode err;
+	(void)ix;
+	(void)intween;
+	(void)scale;
+	(void)aa;
 
 	pj_cmap_copy(vb.pencel->cmap, cpd->tcmap);
 
-	max = uniq_sort(vb.pencel, cpd->c, 
-					vb.pencel->cmap->ctab, cpd->p2, COLORS);
+	max = uniq_sort(vb.pencel, cpd->c, vb.pencel->cmap->ctab, cpd->p2, COLORS);
 
 	ccount = cpd->pnum;
-	if (ccount > max)
+	if (ccount > max) {
 		ccount = max;
-	pack_ctable(cpd->p2,(long)max,cpd->p,ccount);
-	if (vs.pal_to == 1)	/* to all colors */
-	{
-		fold_over_ctable(cpd->p,cpd->tcmap->ctab,
-						  vb.pencel->cmap->ctab, ccount, COLORS);
 	}
-	else	/* to cluster */
+	pack_ctable(cpd->p2, (long)max, cpd->p, ccount);
+	if (vs.pal_to == 1) /* to all colors */
 	{
-		if((err = fold_in_cluster(cpd->p, ccount)) < 0)
-			return(err);
+		fold_over_ctable(cpd->p, cpd->tcmap->ctab, vb.pencel->cmap->ctab, ccount, COLORS);
+	} else /* to cluster */
+	{
+		if ((err = fold_in_cluster(cpd->p, ccount)) < 0) {
+			return (err);
+		}
 		ccount = COLORS;
 	}
 
 	refit_rcel(vb.pencel, vb.pencel->cmap, cpd->tcmap);
-	fold_in_mucolors(vb.pencel->cmap,ccount,vb.screen);
-	return(Success);
+	fold_in_mucolors(vb.pencel->cmap, ccount, vb.screen);
+	return (Success);
 }
 
-static void do_cpack(Csort_dat *cpd)
+static void do_cpack(Csort_dat* cpd)
 /* Presuming we got all the buffers we need, query user as to how
    many colors he wants in destination and then pack that baby */
 {
-Errcode err;
+	Errcode err;
 
-	cpd->pnum = uniq_sort(vb.pencel, cpd->c, 
-						  vb.pencel->cmap->ctab, cpd->p2, COLORS);
+	cpd->pnum = uniq_sort(vb.pencel, cpd->c, vb.pencel->cmap->ctab, cpd->p2, COLORS);
 
-	if(cpd->pnum < 0)
-	{
+	if (cpd->pnum < 0) {
 		err = cpd->pnum;
 		goto error;
 	}
 
-	if (soft_qreq_number(&cpd->pnum,1,Max(cpd->pnum,1),"squeeze_to"))
-	{
-		if( cpd->pnum > 0
-			|| (cpd->pnum == 0 && vs.pal_to != 1))
-		{
-			if (cpd->pnum > COLORS)
+	if (soft_qreq_number(&cpd->pnum, 1, Max(cpd->pnum, 1), "squeeze_to")) {
+		if (cpd->pnum > 0 || (cpd->pnum == 0 && vs.pal_to != 1)) {
+			if (cpd->pnum > COLORS) {
 				cpd->pnum = COLORS;
-			err = do_autodraw(cpack1,cpd);
-		}
-		else
+			}
+			err = do_autodraw(cpack1, cpd);
+		} else {
 			return;
+		}
 	}
 error:
-	softerr(err,"cant_cpack");
+	softerr(err, "cant_cpack");
 }
 
 void cpack(void)
 /* "Squeeze" down # of colors in palette eventually winding down
    into the threshold streaming algorithm in cpack.c   */
 {
-Csort_dat cpd;
+	Csort_dat cpd;
 
 	hide_mp();
 	push_most();
 
-	if (pj_cmap_alloc(&cpd.tcmap,COLORS) >= Success)
-	{
-		if ((cpd.p = begmem(COLORS*3)) != NULL)
-		{
-			if ((cpd.p2 = begmem(COLORS*3)) != NULL)
-			{
-				if ((cpd.c = begmem(COLORS*sizeof(Occ_map))) != NULL)
-				{
+	if (pj_cmap_alloc(&cpd.tcmap, COLORS) >= Success) {
+		if ((cpd.p = begmem(COLORS * 3)) != NULL) {
+			if ((cpd.p2 = begmem(COLORS * 3)) != NULL) {
+				if ((cpd.c = begmem(COLORS * sizeof(Occ_map))) != NULL) {
 					do_cpack(&cpd);
 					pj_free(cpd.c);
 				}
@@ -340,7 +316,7 @@ Csort_dat cpd;
 	show_mp();
 }
 
-static int rccmp(void *a, void *b, void *data)
+static int rccmp(void* a, void* b, void* data)
 /* Comparison routine for luminance sort */
 {
 	PLANEPTR cm = data;
@@ -348,58 +324,52 @@ static int rccmp(void *a, void *b, void *data)
 	int i;
 	int acc;
 
-	p1 = cm + 3* ((UBYTE *)a)[0];
-	p2 = cm + 3* ((UBYTE *)b)[0];
+	p1 = cm + 3 * ((UBYTE*)a)[0];
+	p2 = cm + 3 * ((UBYTE*)b)[0];
 	i = 3;
 	acc = 0;
-	while (--i >= 0)
-	{
+	while (--i >= 0) {
 		acc += *p1++;
 		acc -= *p2++;
 	}
-	return(acc);
+	return (acc);
 }
 
-static Errcode
-csort1(void *csort_dat, int ix, int intween, int scale, Autoarg *aa)
+static Errcode csort1(void* csort_dat, int ix, int intween, int scale, Autoarg* aa)
 /* luminance sort one frame */
 {
-Csort_dat *cpd = csort_dat;
-UBYTE *p, **pp;
-Rgb3 *ncmap, *old_ctab;
-int i;
-Errcode err;
-unsigned char c;
-(void)ix;
-(void)intween;
-(void)scale;
-(void)aa;
+	Csort_dat* cpd = csort_dat;
+	UBYTE *p, **pp;
+	Rgb3 *ncmap, *old_ctab;
+	int i;
+	Errcode err;
+	unsigned char c;
+	(void)ix;
+	(void)intween;
+	(void)scale;
+	(void)aa;
 
-	if((err = find_ssctable(cpd)) < 0)
-		return(err);
+	if ((err = find_ssctable(cpd)) < 0) {
+		return (err);
+	}
 
 	err = Err_no_memory;
 
 	ncmap = cpd->ssctable;
-	if ((p = begmem(cpd->scolors)) != NULL)
-	{
-		if ((pp = begmem(cpd->scolors*sizeof(*pp) )) != NULL)
-		{
-			if ((old_ctab = begmem(cpd->scolors*3)) != NULL)
-			{
-				pj_copy_bytes(ncmap, old_ctab, 3*cpd->scolors);
-				for (i=0; i<cpd->scolors; i++)
-				{
-					pp[i] = p+i;
+	if ((p = begmem(cpd->scolors)) != NULL) {
+		if ((pp = begmem(cpd->scolors * sizeof(*pp))) != NULL) {
+			if ((old_ctab = begmem(cpd->scolors * 3)) != NULL) {
+				pj_copy_bytes(ncmap, old_ctab, 3 * cpd->scolors);
+				for (i = 0; i < cpd->scolors; i++) {
+					pp[i] = p + i;
 					p[i] = i;
 				}
-				sort_indarray((void **)pp, cpd->scolors, rccmp, ncmap);
-				for (i=0; i<cpd->scolors;i++)
-				{
+				sort_indarray((void**)pp, cpd->scolors, rccmp, ncmap);
+				for (i = 0; i < cpd->scolors; i++) {
 					c = *(pp[i]);
 					pj_copy_bytes(old_ctab + c, ncmap + i, 3);
 				}
-				if (vs.pal_to == 0)	/* to cluster */
+				if (vs.pal_to == 0) /* to cluster */
 				{
 					ctable_to_cluster(cpd->ssctable, cpd->scolors);
 				}
@@ -412,43 +382,42 @@ unsigned char c;
 		pj_free(p);
 	}
 	free_ssctable(cpd);
-	return(err);
+	return (err);
 }
 
 void csort(void)
 /* Go sort by luminance */
 {
-Csort_dat cpd;
+	Csort_dat cpd;
 
-	hmpauto(csort1,&cpd);
+	hmpauto(csort1, &cpd);
 }
 
 /* say is this a thread (aka gradient) or a spectrum? */
 
-static Errcode
-cthread1(void *csort_dat, int ix, int intween, int scale, Autoarg *aa)
+static Errcode cthread1(void* csort_dat, int ix, int intween, int scale, Autoarg* aa)
 /* Thread out one frame */
 {
-Csort_dat *cpd = csort_dat;
-Errcode err;
-UBYTE gotit[COLORS];
-Rgb3 *tctable;
-(void)ix;
-(void)intween;
-(void)scale;
-(void)aa;
+	Csort_dat* cpd = csort_dat;
+	Errcode err;
+	UBYTE gotit[COLORS];
+	Rgb3* tctable;
+	(void)ix;
+	(void)intween;
+	(void)scale;
+	(void)aa;
 
-	if((err = find_ssctable(cpd)) < 0)
-		return(err);
+	if ((err = find_ssctable(cpd)) < 0) {
+		return (err);
+	}
 	err = Err_no_memory;
 
 	clear_mem(gotit, COLORS);
-	if ((tctable = begmem(cpd->scolors*3)) != NULL)
-	{
-		pj_copy_bytes(cpd->ssctable, tctable, cpd->scolors*3);
+	if ((tctable = begmem(cpd->scolors * 3)) != NULL) {
+		pj_copy_bytes(cpd->ssctable, tctable, cpd->scolors * 3);
 		rthread_cmap(gotit, tctable, cpd->ssctable, cpd->inertia, cpd->scolors);
 		pj_free(tctable);
-		if (vs.pal_to == 0)	/* to cluster */
+		if (vs.pal_to == 0) /* to cluster */
 		{
 			ctable_to_cluster(cpd->ssctable, cpd->scolors);
 		}
@@ -456,24 +425,23 @@ Rgb3 *tctable;
 		err = 0;
 	}
 	free_ssctable(cpd);
-	return(err);
+	return (err);
 }
 
 void cthread(void)
 /* Do a 'gradients' color rearrangement */
 {
-Csort_dat cpd;
+	Csort_dat cpd;
 
 	cpd.inertia = 0;
-	hmpauto(cthread1,&cpd);
+	hmpauto(cthread1, &cpd);
 }
 
 void cspec(void)
 /* Do a 'spectrums' color rearrangement */
 {
-Csort_dat cpd;
+	Csort_dat cpd;
 
 	cpd.inertia = 1;
-	hmpauto(cthread1,&cpd);
+	hmpauto(cthread1, &cpd);
 }
-

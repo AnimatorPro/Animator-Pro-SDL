@@ -3,33 +3,35 @@
 #include "errcodes.h"
 #include "flx.h"
 
-static Flx_overlay **flx_olaytail(int frame)
+static Flx_overlay** flx_olaytail(int frame)
 
 /* gets pointer to "tail" next pointer of a frame's overlay list */
 {
-Flx_overlay **ptail;
+	Flx_overlay** ptail;
 
 	ptail = flix.overlays + frame;
-	while(*ptail != NULL)
+	while (*ptail != NULL) {
 		ptail = &((*ptail)->next);
-	return(ptail);
+	}
+	return (ptail);
 }
-Errcode add_flx_olayrec(Short_xy *cpos, SHORT cframe,
-						  Rectangle *fpos, Fli_frame *rec, int frame_ix)
+Errcode add_flx_olayrec(Short_xy* cpos, SHORT cframe, Rectangle* fpos, Fli_frame* rec, int frame_ix)
 
-/* allocates and adds an overlay fli_frame record to a frame of the flix 
+/* allocates and adds an overlay fli_frame record to a frame of the flix
  * frame must be within flix.overlays_in_table or BOOM */
 {
-LONG size;
-Flx_overlay *olay;
+	LONG size;
+	Flx_overlay* olay;
 
-	if(pj_i_is_empty_rec(rec)) /* no fli frame in emptys */
-		size = POSTOSET(Flx_overlay,cpos);
-	else
-		size = OFFSET(Flx_overlay,overlay) + rec->size;
+	if (pj_i_is_empty_rec(rec)) { /* no fli frame in emptys */
+		size = POSTOSET(Flx_overlay, cpos);
+	} else {
+		size = OFFSET(Flx_overlay, overlay) + rec->size;
+	}
 
-	if(NULL == (olay = pj_malloc(size)))
-		return(Err_no_memory);
+	if (NULL == (olay = pj_malloc(size))) {
+		return (Err_no_memory);
+	}
 
 	olay->next = NULL;
 
@@ -38,16 +40,19 @@ Flx_overlay *olay;
 	olay->ccolor = vs.ccolor;
 	olay->ink0 = vs.inks[0];
 	olay->flags = 0;
-	if(vs.render_under)
+	if (vs.render_under) {
 		olay->flags |= FOVL_UNDER;
-	if(vs.zero_clear)
+	}
+	if (vs.zero_clear) {
 		olay->flags |= FOVL_ZCLEAR;
-	if(vs.fit_colors)
+	}
+	if (vs.fit_colors) {
 		olay->flags |= FOVL_CFIT;
-	if(vs.render_one_color)
+	}
+	if (vs.render_one_color) {
 		olay->flags |= FOVL_ONECOL;
-	if(cpos)
-	{
+	}
+	if (cpos) {
 		olay->cpos = *cpos;
 		olay->cframe = cframe;
 		olay->flags |= FOVL_CEL;
@@ -55,23 +60,23 @@ Flx_overlay *olay;
 
 	*flx_olaytail(frame_ix) = olay;
 
-	if(pj_i_is_empty_rec(rec)) /* no fli frame in emptys */
-		return(Success);
+	if (pj_i_is_empty_rec(rec)) { /* no fli frame in emptys */
+		return (Success);
+	}
 
 	olay->flags |= FOVL_FLIF;
 	olay->pos = *fpos;
-	copy_mem(rec,&olay->overlay,rec->size);
-	return(Success);
+	copy_mem(rec, &olay->overlay, rec->size);
+	return (Success);
 }
 
-static void free_flx_overlay(Flx_overlay **polay)
+static void free_flx_overlay(Flx_overlay** polay)
 /* frees a list of overlay records */
 {
-Flx_overlay *olay = *polay;
-Flx_overlay *next;
+	Flx_overlay* olay = *polay;
+	Flx_overlay* next;
 
-	while(olay)
-	{
+	while (olay) {
 		next = olay->next;
 		pj_free(olay);
 		olay = next;
@@ -79,32 +84,37 @@ Flx_overlay *next;
 	*polay = NULL;
 }
 
-void free_flx_overlays(Flxfile *flx)
+void free_flx_overlays(Flxfile* flx)
 {
-Flx_overlay **polay;
-Flx_overlay **max_polay;
+	Flx_overlay** polay;
+	Flx_overlay** max_polay;
 
-	if(flx->overlays == NULL)
+	if (flx->overlays == NULL) {
 		return;
+	}
 
 	polay = flx->overlays;
 	max_polay = polay + flx->overlays_in_table;
-	while(polay < max_polay)
+	while (polay < max_polay) {
 		free_flx_overlay(polay++);
+	}
 
 	pj_freez(&flx->overlays);
 	flx->overlays_in_table = 0;
 	return;
 }
-Errcode alloc_flx_olaytab(Flxfile *flx, int tablesize)
-{
-	if(flx->overlays)
-		free_flx_overlays(flx);
 
-	if(NULL == (flx->overlays = pj_zalloc(tablesize * sizeof(Flx_overlay *)))) 
-		return(Err_no_memory);
+Errcode alloc_flx_olaytab(Flxfile* flx, int tablesize)
+{
+	if (flx->overlays) {
+		free_flx_overlays(flx);
+	}
+
+	if (NULL == (flx->overlays = pj_zalloc(tablesize * sizeof(Flx_overlay*)))) {
+		return (Err_no_memory);
+	}
 	flx->overlays_in_table = tablesize;
-	return(Success);
+	return (Success);
 }
 
 /* Function: write_olaylist
@@ -112,27 +122,29 @@ Errcode alloc_flx_olaytab(Flxfile *flx, int tablesize)
  *  Writes a list of overlays for a frame out to a file with ring
  *  frame as first frame 0.
  */
-static Errcode
-write_olaylist(XFILE *xf, int frame)
+static Errcode write_olaylist(XFILE* xf, int frame)
 {
 	Errcode err;
 	LONG size;
-	Flx_overlay *olay;
+	Flx_overlay* olay;
 
-	if (frame == 0)
+	if (frame == 0) {
 		olay = flix.overlays[flix.hdr.frame_count];
-	else
+	} else {
 		olay = flix.overlays[frame];
+	}
 
 	while (olay != NULL) {
-		if (olay->flags & FOVL_FLIF)
-			size = OFFSET(Flx_overlay,overlay) + olay->overlay.size;
-		else
-			size = POSTOSET(Flx_overlay,cpos);
+		if (olay->flags & FOVL_FLIF) {
+			size = OFFSET(Flx_overlay, overlay) + olay->overlay.size;
+		} else {
+			size = POSTOSET(Flx_overlay, cpos);
+		}
 
 		err = jwrite_chunk(xf, olay, size, frame);
-		if (err < Success)
+		if (err < Success) {
 			return err;
+		}
 
 		olay = olay->next;
 	}
@@ -146,12 +158,11 @@ write_olaylist(XFILE *xf, int frame)
  *  is the the frame number for the overlay.  They are stored in
  *  sequential order.
  */
-Errcode
-push_flx_overlays(void)
+Errcode push_flx_overlays(void)
 {
 	Errcode err;
 	Chunk_id fc;
-	XFILE *xf;
+	XFILE* xf;
 	SHORT frame;
 
 	if (!flix.overlays) {
@@ -160,25 +171,29 @@ push_flx_overlays(void)
 	}
 
 	err = xffopen(flxolayname, &xf, XREADWRITE_CLOBBER);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	err = xffwrite(xf, &fc, sizeof(fc));
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	for (frame = 0; frame < flix.hdr.frame_count; frame++) {
 		err = write_olaylist(xf, frame);
-		if (err < Success)
+		if (err < Success) {
 			goto error;
+		}
 	}
 
 	fc.size = xfftell(xf);
 	fc.type = FOVL_MAGIC;
 
 	err = xffwriteoset(xf, &fc, 0, sizeof(fc));
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	free_flx_overlays(&flix);
 	xffclose(&xf);
@@ -194,28 +209,30 @@ error:
  *
  *  Pop the flx overlays back into ram.
  */
-Errcode
-pop_flx_overlays(void)
+Errcode pop_flx_overlays(void)
 {
 	Errcode err;
 	Chunk_id fc;
-	XFILE *xf;
+	XFILE* xf;
 	LONG size_left;
-	Flx_overlay *olay = NULL;
+	Flx_overlay* olay = NULL;
 
 	free_flx_overlays(&flix);
 
 	err = xffopen(flxolayname, &xf, XREADONLY);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	err = alloc_flx_olaytab(&flix, flix.hdr.frames_in_table);
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	err = xffread(xf, &fc, sizeof(fc));
-	if (err < Success)
+	if (err < Success) {
 		goto error;
+	}
 
 	if (fc.type != FOVL_MAGIC) {
 		err = Err_bad_magic;
@@ -225,8 +242,9 @@ pop_flx_overlays(void)
 	size_left = fc.size - sizeof(fc);
 	while (size_left > 0) {
 		err = xffread(xf, &fc, sizeof(fc));
-		if (err < Success)
+		if (err < Success) {
 			goto error;
+		}
 
 		size_left -= fc.size;
 		fc.size -= sizeof(fc);
@@ -237,8 +255,9 @@ pop_flx_overlays(void)
 		}
 
 		err = xffread(xf, olay, fc.size);
-		if (err < Success)
+		if (err < Success) {
 			goto error;
+		}
 
 		if (fc.type > flix.overlays_in_table) {
 			err = Err_corrupted;
@@ -247,10 +266,11 @@ pop_flx_overlays(void)
 
 		olay->next = NULL;
 
-		if (fc.type == 0)
+		if (fc.type == 0) {
 			*flx_olaytail(flix.hdr.frame_count) = olay;
-		else
+		} else {
 			*flx_olaytail(fc.type) = olay;
+		}
 
 		olay = NULL;
 	}
@@ -268,21 +288,23 @@ done:
 }
 
 
-void unfli_flx_overlay(Flxfile *flx, Rcel *screen, int frame)
+void unfli_flx_overlay(Flxfile* flx, Rcel* screen, int frame)
 
 /* overlay drawer to add overlay to screen with pre overlay image */
 {
-Flx_overlay *olay;
+	Flx_overlay* olay;
 
-	if(!flx->overlays)
+	if (!flx->overlays) {
 		return;
-	if(((unsigned)frame) >= flx->overlays_in_table)
+	}
+	if (((unsigned)frame) >= flx->overlays_in_table) {
 		return;
+	}
 	olay = flx->overlays[frame];
-	while(olay)
-	{
-		if(olay->flags & FOVL_FLIF)
-			pj_fli_uncomp_rect(screen,&olay->overlay,&olay->pos,0); 
+	while (olay) {
+		if (olay->flags & FOVL_FLIF) {
+			pj_fli_uncomp_rect(screen, &olay->overlay, &olay->pos, 0);
+		}
 		olay = olay->next;
 	}
 	return;

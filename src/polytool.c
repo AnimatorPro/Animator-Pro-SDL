@@ -75,6 +75,7 @@ static void cpoly(Poly* poly, dotout_func dotout, void* data, bool closeit)
 		this = next;
 	}
 }
+
 /* used in make poly draws all but rubba vectors */
 static void marqi_open_poly(Marqihdr* mh, Poly* poly)
 {
@@ -191,7 +192,6 @@ void free_polypoints(Poly* poly)
 	poly->clipped_list = NULL;
 }
 
-
 LLpoint* poly_last_point(Poly* p)
 {
 	return slist_el((Slnode*)p->clipped_list, p->pt_count - 1);
@@ -247,8 +247,8 @@ void poly_grad_dims(Poly* p, bool filled)
 Errcode render_fill_poly(Poly* p)
 {
 	start_abort_atom();
-	return errend_abort_atom(filled_polygon(p,poll_render_hline,
-					vb.pencel, poly_cline_with_render_dot, NULL));
+	return errend_abort_atom(
+		filled_polygon(p, poll_render_hline, vb.pencel, poly_cline_with_render_dot, NULL));
 }
 
 static Errcode render_a_poly_or_spline(Poly* poly, bool filled, bool closed, bool curved)
@@ -385,8 +385,7 @@ void make_poly_loop(Poly* poly, bool curved, bool closed, LLpoint* this, int col
 			if (curved) {
 				/* draw the bits that won't change as they move around a point */
 				partial_spline(poly, mh.pdot, &mh, pj_cline, closed, 16, cur_point_ix, 1);
-			}
-			else if (poly->pt_count >= 2) /* should always happen */
+			} else if (poly->pt_count >= 2) /* should always happen */
 			{
 				prev = slist_el((Slnode*)poly->clipped_list, poly->pt_count - 2);
 			}

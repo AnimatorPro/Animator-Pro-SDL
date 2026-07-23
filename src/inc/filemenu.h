@@ -20,6 +20,6 @@ enum file_types {
 };
 
 extern void go_files(int file_type);
-extern void mb_go_files(struct button *b);
+extern void mb_go_files(struct button* b);
 
 #endif

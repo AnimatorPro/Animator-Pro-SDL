@@ -5,5 +5,5 @@
 
 #ifndef LOSTDIO_H
 #define LOSTDIO_H
-	#include "lstdio.h"
+#include "lstdio.h"
 #endif /* LOSTDIO_H */

@@ -1,0 +1,11 @@
+int first_global;
+
+int first(void)
+{
+	return 7;
+}
+
+int spare(void)
+{
+	return 8;
+}

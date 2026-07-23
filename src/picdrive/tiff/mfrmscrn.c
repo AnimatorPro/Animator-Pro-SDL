@@ -4,23 +4,21 @@
 
 #include "tiff.h"
 
-static void fromscreen_monochrome_palette(Tiff_file *tf)
+static void fromscreen_monochrome_palette(Tiff_file* tf)
 /*****************************************************************************
  * make a color-to-greyscale translation table.
  ****************************************************************************/
 {
-	int 	counter;
-	UBYTE	*xltab = tf->color_table;
-	Rgb3	*ctab  = tf->screen_rcel->cmap->ctab;
+	int counter;
+	UBYTE* xltab = tf->color_table;
+	Rgb3* ctab = tf->screen_rcel->cmap->ctab;
 
-	for (counter = 0; counter < COLORS; ++counter, ++xltab, ++ctab)
+	for (counter = 0; counter < COLORS; ++counter, ++xltab, ++ctab) {
 		*xltab = (ctab->r + ctab->g + ctab->b) / 3;
+	}
 }
 
-static int fromscreen_monoplane_row(Tiff_file *tf,
-									 char *destp,
-									 char *linebuf,
-									 char *rgbbuf)
+static int fromscreen_monoplane_row(Tiff_file* tf, char* destp, char* linebuf, char* rgbbuf)
 /*****************************************************************************
  * get current line from the screen, xlate & pack it, store in strip buffer.
  *
@@ -38,8 +36,8 @@ static int fromscreen_monoplane_row(Tiff_file *tf,
  *	 bogus line length of '1' we return for lzw is basically ignored.
  ****************************************************************************/
 {
-	int 	width = tf->width;
-	int 	packed_length;
+	int width = tf->width;
+	int packed_length;
 
 	/*------------------------------------------------------------------------
 	 * get the line of data from the screen...
@@ -56,8 +54,7 @@ static int fromscreen_monoplane_row(Tiff_file *tf,
 	 *	- any other value indicates we've gone insane.
 	 *----------------------------------------------------------------------*/
 
-	switch (tf->photometric)
-		{
+	switch (tf->photometric) {
 		case PHMET_PALETTE_COLOR:
 			break;
 
@@ -67,22 +64,21 @@ static int fromscreen_monoplane_row(Tiff_file *tf,
 
 		case PHMET_RGB:
 			xlate2rgb(tf->screen_rcel->cmap->ctab, linebuf, rgbbuf, width);
-			width *= 3; 		/* we tripled the size of the data */
-			linebuf = rgbbuf;	/* adjust pointer for compressor routine */
+			width *= 3;       /* we tripled the size of the data */
+			linebuf = rgbbuf; /* adjust pointer for compressor routine */
 			break;
 
 		default:
 			return Err_driver_protocol;
-		}
+	}
 
 	/*------------------------------------------------------------------------
 	 * do compression processing on the line...
 	 *----------------------------------------------------------------------*/
 
-	switch (tf->compression)
-		{
+	switch (tf->compression) {
 		case CMPRS_NONE:
-		case CMPRS_LZW: 	/* lzw compression done at higher level */
+		case CMPRS_LZW: /* lzw compression done at higher level */
 			memcpy(destp, linebuf, width);
 			packed_length = width;
 			break;
@@ -93,43 +89,37 @@ static int fromscreen_monoplane_row(Tiff_file *tf,
 
 		default:
 			return Err_driver_protocol; /* we're lost */
-		}
+	}
 
 	return packed_length;
 }
 
-static int fromscreen_monoplane_strip(Tiff_file *tf,
-										char *destp,
-										char *linebuf,
-										char *rgbbuf)
+static int fromscreen_monoplane_strip(Tiff_file* tf, char* destp, char* linebuf, char* rgbbuf)
 /*****************************************************************************
  * process each of the rows in a strip, return total number bytes in strip.
  *	returns zero if a sanity check fails (eg, packed data length < 0)
  ****************************************************************************/
 {
-	int 	rowcount;
-	int 	rowlen;
-	int 	striplen = 0;
-	int 	height	 = tf->height;
-	int 	rows_per_strip = tf->rows_per_strip;
+	int rowcount;
+	int rowlen;
+	int striplen = 0;
+	int height = tf->height;
+	int rows_per_strip = tf->rows_per_strip;
 
-	for (rowcount = 0;
-		  (rowcount < rows_per_strip) && (tf->image_row_cur < height);
-		  ++rowcount, ++tf->image_row_cur)
-		{
+	for (rowcount = 0; (rowcount < rows_per_strip) && (tf->image_row_cur < height);
+		 ++rowcount, ++tf->image_row_cur) {
 		rowlen = fromscreen_monoplane_row(tf, destp, linebuf, rgbbuf);
 		striplen += rowlen;
 		destp += rowlen;
-		if (rowlen <= 0 || striplen <= 0 || striplen > tf->longest_strip)
-			{
+		if (rowlen <= 0 || striplen <= 0 || striplen > tf->longest_strip) {
 			return Err_driver_protocol; /* oops, better bail out...should never happen */
-			}
 		}
+	}
 
 	return striplen;
 }
 
-Errcode fromscreen_monoplane_image(Tiff_file *tf, int photometric, int compression)
+Errcode fromscreen_monoplane_image(Tiff_file* tf, int photometric, int compression)
 /*****************************************************************************
  * drive the process of writing a monoplane image to a file.
  *
@@ -150,13 +140,13 @@ Errcode fromscreen_monoplane_image(Tiff_file *tf, int photometric, int compressi
  ****************************************************************************/
 {
 	Errcode err;
-	int 	strip_counter;
-	int 	striplen;
-	int 	rps;
-	char	*stripbuf = NULL;
-	char	*linebuf  = NULL;
-	char	*rgbbuf   = NULL;
-	int 	width = tf->width;
+	int strip_counter;
+	int striplen;
+	int rps;
+	char* stripbuf = NULL;
+	char* linebuf = NULL;
+	char* rgbbuf = NULL;
+	int width = tf->width;
 
 	/*------------------------------------------------------------------------
 	 * fill in tiff data values we'll need later when dumping the tags...
@@ -165,22 +155,19 @@ Errcode fromscreen_monoplane_image(Tiff_file *tf, int photometric, int compressi
 	tf->compression = compression;
 	tf->photometric = photometric;
 	tf->planar_configuration = 1;
-	tf->min_sample_value	 = 0;
-	tf->max_sample_value	 = 255;
+	tf->min_sample_value = 0;
+	tf->max_sample_value = 255;
 
-	if (photometric == PHMET_RGB)
-		{
-		width *= 3; 	/* adjust width used in calculating buffer sizes */
-		tf->samples_per_pixel	 = 3;
-		tf->bits_per_sample[0]	 = 8;
-		tf->bits_per_sample[1]	 = 8;
-		tf->bits_per_sample[2]	 = 8;
-		}
-	else
-		{
-		tf->samples_per_pixel	 = 1;
-		tf->bits_per_sample[0]	 = 8;
-		}
+	if (photometric == PHMET_RGB) {
+		width *= 3; /* adjust width used in calculating buffer sizes */
+		tf->samples_per_pixel = 3;
+		tf->bits_per_sample[0] = 8;
+		tf->bits_per_sample[1] = 8;
+		tf->bits_per_sample[2] = 8;
+	} else {
+		tf->samples_per_pixel = 1;
+		tf->bits_per_sample[0] = 8;
+	}
 
 	/*------------------------------------------------------------------------
 	 * calc rows-per-strip, strips-per-image, and strip buffer size.
@@ -192,53 +179,58 @@ Errcode fromscreen_monoplane_image(Tiff_file *tf, int photometric, int compressi
 	 * separate buffer, which is allocated later as 2*longest_strip).
 	 *----------------------------------------------------------------------*/
 
-	tf->rows_per_strip	 = (rps = OUTPUT_IDEAL_STRIPSZ / width);
+	tf->rows_per_strip = (rps = OUTPUT_IDEAL_STRIPSZ / width);
 	tf->strips_per_image = (tf->height + rps - 1) / rps;
-	tf->longest_strip	 = ((rps + 1) * width) + (rps * ((width + 127) / 128));
-	tf->image_row_cur	 = 0;
+	tf->longest_strip = ((rps + 1) * width) + (rps * ((width + 127) / 128));
+	tf->image_row_cur = 0;
 
 	/*-----------------------------------------------------------------------
 	 * aquire local-use buffers...
 	 *	these buffers will get free'd before this function exits.
 	 *----------------------------------------------------------------------*/
 
-	err = Err_no_memory;	/* if anything fails, it will be this... */
+	err = Err_no_memory; /* if anything fails, it will be this... */
 
-	if (NULL == (stripbuf = malloc(tf->longest_strip)))
+	if (NULL == (stripbuf = malloc(tf->longest_strip))) {
 		goto ERROR_EXIT;
+	}
 
-	if (NULL == (linebuf = malloc(width)))
+	if (NULL == (linebuf = malloc(width))) {
 		goto ERROR_EXIT;
+	}
 
-	if (photometric == PHMET_RGB)
-		if (NULL == (rgbbuf = malloc(width)))
+	if (photometric == PHMET_RGB) {
+		if (NULL == (rgbbuf = malloc(width))) {
 			goto ERROR_EXIT;
+		}
+	}
 
 	/*------------------------------------------------------------------------
 	 * aquire global-use buffers...
 	 * these buffers will get free'd by the close_file() function.
 	 *----------------------------------------------------------------------*/
 
-	if (NULL == (tf->strip_data = malloc(tf->strips_per_image * sizeof(Strip_data))))
+	if (NULL == (tf->strip_data = malloc(tf->strips_per_image * sizeof(Strip_data)))) {
 		goto ERROR_EXIT;
+	}
 
-	if (compression == CMPRS_LZW)
-		{
-		if (NULL == (tf->lzwbuf = malloc(2*tf->longest_strip)))
+	if (compression == CMPRS_LZW) {
+		if (NULL == (tf->lzwbuf = malloc(2 * tf->longest_strip))) {
 			goto ERROR_EXIT;
-		lzw_init(2*tf->longest_strip);
 		}
+		lzw_init(2 * tf->longest_strip);
+	}
 
 	/*-----------------------------------------------------------------------
 	 * go make the color->monochrome translation table if output is greyscale
 	 *----------------------------------------------------------------------*/
 
-	if (photometric == PHMET_GREY_0ISBLACK)
-		{
-		if (NULL == (tf->color_table = malloc(COLORS)))
+	if (photometric == PHMET_GREY_0ISBLACK) {
+		if (NULL == (tf->color_table = malloc(COLORS))) {
 			goto ERROR_EXIT;
-		fromscreen_monochrome_palette(tf);
 		}
+		fromscreen_monochrome_palette(tf);
+	}
 
 	/*------------------------------------------------------------------------
 	 * loop once for each strip until the entire file is written.
@@ -249,46 +241,52 @@ Errcode fromscreen_monoplane_image(Tiff_file *tf, int photometric, int compressi
 	 *	strips_per_image inaccurate.
 	 *----------------------------------------------------------------------*/
 
-	for (strip_counter = 0; tf->image_row_cur < tf->height; ++strip_counter)
-		{
-		if (0 >= (err = striplen = fromscreen_monoplane_strip(tf, stripbuf, linebuf, rgbbuf)))
+	for (strip_counter = 0; tf->image_row_cur < tf->height; ++strip_counter) {
+		if (0 >= (err = striplen = fromscreen_monoplane_strip(tf, stripbuf, linebuf, rgbbuf))) {
 			goto ERROR_EXIT;
+		}
 
-		if (compression == CMPRS_LZW)
-			{
-			if (Success > (err = striplen = lzw_compress(stripbuf, tf->lzwbuf, striplen)))
-				goto ERROR_EXIT;
-			if (Success != (err = write_strip(tf, tf->lzwbuf, striplen, strip_counter)))
+		if (compression == CMPRS_LZW) {
+			if (Success > (err = striplen = lzw_compress(stripbuf, tf->lzwbuf, striplen))) {
 				goto ERROR_EXIT;
 			}
-		else
-			{
-			if (Success != (err = write_strip(tf, stripbuf, striplen, strip_counter)))
+			if (Success != (err = write_strip(tf, tf->lzwbuf, striplen, strip_counter))) {
+				goto ERROR_EXIT;
+			}
+		} else {
+			if (Success != (err = write_strip(tf, stripbuf, striplen, strip_counter))) {
 				goto ERROR_EXIT;
 			}
 		}
+	}
 
 	/*
 	 * go dump the tif tags (ifd) and the associated strip offsets & sizes,
 	 * then rewrite the file header to update the ifd offset field in it.
 	 */
 
-	if (Success != (err = write_tiftags(tf, stripbuf)))
+	if (Success != (err = write_tiftags(tf, stripbuf))) {
 		goto ERROR_EXIT;
-	if (Success != (err = write_filehdr(tf)))
+	}
+	if (Success != (err = write_filehdr(tf))) {
 		goto ERROR_EXIT;
+	}
 	err = Success;
 
 ERROR_EXIT:
 
-	if (stripbuf != NULL)
+	if (stripbuf != NULL) {
 		free(stripbuf);
-	if (linebuf !=NULL)
+	}
+	if (linebuf != NULL) {
 		free(linebuf);
-	if (rgbbuf != NULL)
+	}
+	if (rgbbuf != NULL) {
 		free(rgbbuf);
-	if (compression == CMPRS_LZW)
+	}
+	if (compression == CMPRS_LZW) {
 		lzw_cleanup();
+	}
 
 	return err;
 }

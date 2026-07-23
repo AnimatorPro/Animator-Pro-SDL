@@ -1,15 +1,15 @@
 #include "rastlib.h"
 #include "makehdr.c"
 
-main(int argc, char **argv)
+main(int argc, char** argv)
 {
-#define rloset(name,field) soset(Rastlib,name,field)
+#define rloset(name, field) soset(Rastlib, name, field)
 
-	openit(argc,argv);
-	outf("RL_TO_SAME equ %d\n", 4*RL_TO_SAME );
-	outf("RL_TO_BMAP equ %d\n", 4*RL_TO_BYTEMAP );
-	outf("RL_FROM_BMAP equ %d\n", 4*RL_FROM_BYTEMAP );
-	outf("RL_TO_OTHER equ %d\n", 4*RL_TO_OTHER );
+	openit(argc, argv);
+	outf("RL_TO_SAME equ %d\n", 4 * RL_TO_SAME);
+	outf("RL_TO_BMAP equ %d\n", 4 * RL_TO_BYTEMAP);
+	outf("RL_FROM_BMAP equ %d\n", 4 * RL_FROM_BYTEMAP);
+	outf("RL_TO_OTHER equ %d\n", 4 * RL_TO_OTHER);
 	outf("\n");
 	outf("RL_NUM_LIB_CALLS equ %d\n", NUM_LIB_CALLS);
 	outf("\n");

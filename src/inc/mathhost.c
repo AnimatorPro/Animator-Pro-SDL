@@ -5,11 +5,11 @@
 
 char fmt1[] = "math_%s equ +0%xH\n";
 
-#define moset(f) outf(fmt1,#f,OFFSET(Mathhost_lib,f))
+#define moset(f) outf(fmt1, #f, OFFSET(Mathhost_lib, f))
 
-main(int argc,char **argv)
+main(int argc, char** argv)
 {
-	openit(argc,argv);
+	openit(argc, argv);
 	moset(acos);
 	moset(asin);
 	moset(atan);

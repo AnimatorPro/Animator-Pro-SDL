@@ -21,17 +21,17 @@
 
 Rendata rdta;
 
-static Errcode render_blit(Rcel *src, SHORT sx, SHORT sy, Rcel *dest, SHORT dx, SHORT dy, SHORT w,
-						   SHORT h, Tcolxldat *txd, Cmap *scmap);
+static Errcode render_blit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+						   SHORT h, Tcolxldat* txd, Cmap* scmap);
 
-static Errcode tblit(Rcel *src, SHORT sx, SHORT sy, Rcel *dest, SHORT dx, SHORT dy, SHORT w,
-					 SHORT h, Pixel tcolor, int clear, int tinting, SHORT dither, Cmap *scmap,
-					 Pixel *xlat);
+static Errcode tblit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+					 SHORT h, Pixel tcolor, int clear, int tinting, SHORT dither, Cmap* scmap,
+					 Pixel* xlat);
 
-static Errcode r_box(Raster *r, SHORT x, SHORT y, SHORT xx, SHORT yy);
+static Errcode r_box(Raster* r, SHORT x, SHORT y, SHORT xx, SHORT yy);
 
 /* sets render clip to box specified in rectangle x,y,width,height */
-void set_render_clip(Rectangle *rect)
+void set_render_clip(Rectangle* rect)
 {
 	if (rect == NULL) {
 		rdta.cr.x = rdta.cr.y = 0;
@@ -71,7 +71,7 @@ void set_render_clip(Rectangle *rect)
 /*************************************************/
 /* functions for setting the gradient boundaries */
 
-void set_gradrect(Rectangle *rect)
+void set_gradrect(Rectangle* rect)
 {
 	rdta.rdx0 = rect->x;
 	rdta.rdy0 = rect->y;
@@ -96,7 +96,7 @@ void set_xy_gradrect(SHORT x0, SHORT y0, SHORT x1, SHORT y1)
 	rdta.rheight = y1 - y0 + 1;
 }
 
-static void set_centrad_gradrect(Raster *r, SHORT cenx, SHORT ceny, SHORT rad)
+static void set_centrad_gradrect(Raster* r, SHORT cenx, SHORT ceny, SHORT rad)
 {
 	int xrad = rad;
 	int yrad = rad * r->aspect_dy / r->aspect_dx;
@@ -122,8 +122,8 @@ void set_full_gradrect(void)
 /* end gradient rectangle setting functions */
 
 /* it does not look at cel->cmap and can take a raster input */
-static Errcode inkblit(Rcel *src, SHORT sx, SHORT sy, /* beware, ignores sx, and sy */
-					   Rcel *dst, SHORT dx, SHORT dy, SHORT w, SHORT h, Pixel tcolor, Pixel *xlat)
+static Errcode inkblit(Rcel* src, SHORT sx, SHORT sy, /* beware, ignores sx, and sy */
+					   Rcel* dst, SHORT dx, SHORT dy, SHORT w, SHORT h, Pixel tcolor, Pixel* xlat)
 {
 	PLANEPTR s;
 	register SHORT sbpr;
@@ -137,8 +137,8 @@ static Errcode inkblit(Rcel *src, SHORT sx, SHORT sy, /* beware, ignores sx, and
 	(void)dst;
 
 	if (src->type == RT_BYTEMAP) {
-		sbpr = ((Bytemap *)src)->bm.bpr;
-		s = ((Bytemap *)src)->bm.bp[0];
+		sbpr = ((Bytemap*)src)->bm.bpr;
+		s = ((Bytemap*)src)->bm.bp[0];
 	} else {
 		sbpr = 0;
 		srcy = -1; /* note ++srcy in outer for loop */
@@ -204,14 +204,14 @@ static Errcode inkblit(Rcel *src, SHORT sx, SHORT sy, /* beware, ignores sx, and
 }
 
 /* this applies a transparent (glass) source onto the destination */
-static Errcode tblit(Rcel *src, SHORT sx, SHORT sy, /* ignored! always assumed 0,0 */
-					 Rcel *dest,                    /* warning! ignored! always vb.pencel */
+static Errcode tblit(Rcel* src, SHORT sx, SHORT sy, /* ignored! always assumed 0,0 */
+					 Rcel* dest,                    /* warning! ignored! always vb.pencel */
 					 SHORT dx, SHORT dy, SHORT w, SHORT h, Pixel tcolor, int clear, int tinting,
-					 SHORT dither, Cmap *scmap, Pixel *xlat)
+					 SHORT dither, Cmap* scmap, Pixel* xlat)
 {
 	SHORT sbpr; /* bytes per row and flag if source is a bytemap array */
 	PLANEPTR s;
-	UBYTE *spt;
+	UBYTE* spt;
 	UBYTE make_mask, use_mask;
 	SHORT x, y, scol, srow;
 	Rgb3 rgb;
@@ -229,8 +229,8 @@ static Errcode tblit(Rcel *src, SHORT sx, SHORT sy, /* ignored! always assumed 0
 	make_mask = (vs.make_mask && mask_rast);
 
 	if (src->type == RT_BYTEMAP) {
-		s = ((Bytemap *)src)->bm.bp[0];
-		sbpr = ((Bytemap *)src)->bm.bpr;
+		s = ((Bytemap*)src)->bm.bp[0];
+		sbpr = ((Bytemap*)src)->bm.bpr;
 	} else {
 		sbpr = 0;
 	}
@@ -290,7 +290,7 @@ static Errcode tblit(Rcel *src, SHORT sx, SHORT sy, /* ignored! always assumed 0
 	return err;
 }
 
-Errcode transpblit(Rcel *tcel, int clearcolor, int clear, int tinting)
+Errcode transpblit(Rcel* tcel, int clearcolor, int clear, int tinting)
 {
 	Errcode err;
 
@@ -327,12 +327,12 @@ static void free_brender_cashes(void)
 	}
 }
 
-Errcode rblit_cel(Rcel *c, Tcolxldat *txd)
+Errcode rblit_cel(Rcel* c, Tcolxldat* txd)
 {
 	Errcode err = make_brender_cashes();
 
 	if (err >= 0) {
-		set_gradrect((Rectangle *)&(c->RECTSTART));
+		set_gradrect((Rectangle*)&(c->RECTSTART));
 		err = render_blit(c, 0, 0, vb.pencel, c->x, c->y, c->width, c->height, txd, c->cmap);
 		free_brender_cashes();
 	}
@@ -341,13 +341,13 @@ Errcode rblit_cel(Rcel *c, Tcolxldat *txd)
 
 /* this render blits an rcel, It is one of the "Celblit" function family
  * it does not look at cel->cmap and can take a raster input */
-static Errcode render_blit(Rcel *src, SHORT sx, SHORT sy, Rcel *dest, SHORT dx, SHORT dy, SHORT w,
-						   SHORT h, Tcolxldat *txd, Cmap *scmap)
+static Errcode render_blit(Rcel* src, SHORT sx, SHORT sy, Rcel* dest, SHORT dx, SHORT dy, SHORT w,
+						   SHORT h, Tcolxldat* txd, Cmap* scmap)
 {
 	Errcode err;
 	Celblit cblit;
 	Pixel tcolor = txd->tcolor;
-	Pixel *xlat;
+	Pixel* xlat;
 
 	start_abort_atom();
 
@@ -391,11 +391,11 @@ static Errcode render_blit(Rcel *src, SHORT sx, SHORT sy, Rcel *dest, SHORT dx, 
  *
  *  drast - currently ignored uses vb.pencel.
  */
-void render_mask_blit(UBYTE *mplane, SHORT mbpr, SHORT mx, SHORT my, void *drast, SHORT rx,
+void render_mask_blit(UBYTE* mplane, SHORT mbpr, SHORT mx, SHORT my, void* drast, SHORT rx,
 					  SHORT ry, USHORT width, USHORT height)
 {
 	UBYTE mbit_mx;
-	UBYTE *mbyte;
+	UBYTE* mbyte;
 	UBYTE mbits;
 	UBYTE mbit;
 	int x, y, MaxX, MaxY;
@@ -428,7 +428,7 @@ void render_mask_blit(UBYTE *mplane, SHORT mbpr, SHORT mx, SHORT my, void *drast
 /*****************************************************************************
  * Blend source1 and source2 into dest using alpha.
  ****************************************************************************/
-static void alpha_blend(Rgb3 *source1, Rgb3 *source2, Rgb3 *dest, int alpha)
+static void alpha_blend(Rgb3* source1, Rgb3* source2, Rgb3* dest, int alpha)
 {
 	int valpha = 255 - alpha; /* Inverse alpha */
 
@@ -440,7 +440,7 @@ static void alpha_blend(Rgb3 *source1, Rgb3 *source2, Rgb3 *dest, int alpha)
 /*****************************************************************************
  * Render color transparently through alpha channel data onto a raster...
  ****************************************************************************/
-void render_mask_alpha_blit(UBYTE *alpha, int abpr, int dx, int dy, int width, int height, Rcel *r,
+void render_mask_alpha_blit(UBYTE* alpha, int abpr, int dx, int dy, int width, int height, Rcel* r,
 							Pixel oncolor)
 {
 	int x = dx, y = dy;
@@ -448,10 +448,10 @@ void render_mask_alpha_blit(UBYTE *alpha, int abpr, int dx, int dy, int width, i
 	int curx;
 	int endx;
 	UBYTE curalpha;
-	UBYTE *palpha;
+	UBYTE* palpha;
 	Rgb3 dest;
-	Cmap *cmap = r->cmap;
-	Rgb3 *ctab = cmap->ctab;
+	Cmap* cmap = r->cmap;
+	Rgb3* ctab = cmap->ctab;
 	Rgb3 *s1, *s2;
 	(void)oncolor;
 
@@ -481,7 +481,7 @@ void render_mask_alpha_blit(UBYTE *alpha, int abpr, int dx, int dy, int width, i
 	rect_zoom_it(dx, dy, width, height);
 }
 
-Errcode render_disk(Raster *r, SHORT cenx, SHORT ceny, SHORT diam)
+Errcode render_disk(Raster* r, SHORT cenx, SHORT ceny, SHORT diam)
 {
 	Errcode err;
 
@@ -504,12 +504,12 @@ Errcode render_box(SHORT x, SHORT y, SHORT xx, SHORT yy)
 		return (Err_no_memory);
 	}
 	set_xy_gradrect(x, y, xx, yy);
-	err = r_box((Raster *)vb.pencel, x, y, xx, yy);
+	err = r_box((Raster*)vb.pencel, x, y, xx, yy);
 	free_render_cashes();
 	return err;
 }
 
-Errcode render_beveled_box(Rectangle *r, int bevel, bool filled)
+Errcode render_beveled_box(Rectangle* r, int bevel, bool filled)
 {
 	Poly poly;
 	LLpoint pts[8];
@@ -554,7 +554,7 @@ Errcode render_beveled_box(Rectangle *r, int bevel, bool filled)
 	return Success;
 }
 
-static Errcode r_box(Raster *r, SHORT x, SHORT y, SHORT xx, SHORT yy)
+static Errcode r_box(Raster* r, SHORT x, SHORT y, SHORT xx, SHORT yy)
 {
 	int i;
 	int swap;
@@ -580,9 +580,9 @@ static Errcode r_box(Raster *r, SHORT x, SHORT y, SHORT xx, SHORT yy)
 	return err;
 }
 
-void render_outline(Short_xy *pt, int count)
+void render_outline(Short_xy* pt, int count)
 {
-	Short_xy *last;
+	Short_xy* last;
 
 	last = pt + count - 1;
 	while (--count >= 0) {
@@ -595,11 +595,11 @@ void render_outline(Short_xy *pt, int count)
 /* takes a brush "mask" and does a render dot for each non 0 dot in brush */
 void render_brush(SHORT x, SHORT y)
 {
-	Pixel *plane;
-	register Pixel *dot;
+	Pixel* plane;
+	register Pixel* dot;
 	int bpr;
 	SHORT MaxX, MaxY, xstart;
-	Rbrush *rb = vl.brush;
+	Rbrush* rb = vl.brush;
 
 	if (!vs.use_brush) {
 		render_dot(x, y, NULL);
@@ -633,21 +633,21 @@ void render_brush(SHORT x, SHORT y)
 	enable_lsp_ink();
 }
 
-static void render_brush_with_data(SHORT x, SHORT y, void *data)
+static void render_brush_with_data(SHORT x, SHORT y, void* data)
 {
 	(void)data;
 	render_brush(x, y);
 }
 
-static void render_line_with_data(SHORT x1, SHORT y1, SHORT x2, SHORT y2, void *data)
+static void render_line_with_data(SHORT x1, SHORT y1, SHORT x2, SHORT y2, void* data)
 {
 	(void)data;
 	render_line(x1, y1, x2, y2);
 }
 
-Errcode render_opoly(Poly *p, bool closed)
+Errcode render_opoly(Poly* p, bool closed)
 {
-	LLpoint *this;
+	LLpoint* this;
 
 	this = p->clipped_list;
 	render_brush(this->x, this->y); /* round off the 1st end */
@@ -655,7 +655,7 @@ Errcode render_opoly(Poly *p, bool closed)
 	return Success;
 }
 
-Errcode render_circle(Raster *r, SHORT cenx, SHORT ceny, SHORT diam)
+Errcode render_circle(Raster* r, SHORT cenx, SHORT ceny, SHORT diam)
 {
 	Errcode err;
 	SHORT gradrad;
@@ -675,15 +675,15 @@ Errcode render_circle(Raster *r, SHORT cenx, SHORT ceny, SHORT diam)
 	return Success;
 }
 
-Errcode render_separate(PLANEPTR ctable, int ccount, Rectangle *rect)
+Errcode render_separate(PLANEPTR ctable, int ccount, Rectangle* rect)
 {
 	Errcode err;
 	register PLANEPTR maptable = NULL;
 	SHORT x, y, maxx, maxy;
 	SHORT xstart;
 	SHORT in;
-	UBYTE *pixbuf = NULL;
-	UBYTE *pixpt;
+	UBYTE* pixbuf = NULL;
+	UBYTE* pixpt;
 
 	if ((err = make_render_cashes()) < 0) {
 		return err;
@@ -713,7 +713,7 @@ Errcode render_separate(PLANEPTR ctable, int ccount, Rectangle *rect)
 		for (x = rect->x; x < maxx; ++x) {
 			if (in) {
 				if (!maptable[*pixpt++]) {
-					if ((err = render_hline(y, xstart, x - 1, (Raster *)vb.pencel)) < Success) {
+					if ((err = render_hline(y, xstart, x - 1, (Raster*)vb.pencel)) < Success) {
 						goto end_abort_error;
 					}
 					in = false;
@@ -727,7 +727,7 @@ Errcode render_separate(PLANEPTR ctable, int ccount, Rectangle *rect)
 		}
 
 		if (in) {
-			if ((err = render_hline(y, xstart, x - 1, (Raster *)vb.pencel)) < Success) {
+			if ((err = render_hline(y, xstart, x - 1, (Raster*)vb.pencel)) < Success) {
 				goto end_abort_error;
 			}
 		}
@@ -746,13 +746,13 @@ ERROR:
 }
 
 typedef struct rldat {
-	Cmap *scmap;
-	Tcolxldat *txd;
+	Cmap* scmap;
+	Tcolxldat* txd;
 } Rldat;
 
-static Errcode rblit_line(void *rldat, Pixel *line, Coor x, Coor y, Ucoor width)
+static Errcode rblit_line(void* rldat, Pixel* line, Coor x, Coor y, Ucoor width)
 {
-	Rldat *rld = rldat;
+	Rldat* rld = rldat;
 	Raster linerast;
 	Rasthdr spec;
 
@@ -761,11 +761,11 @@ static Errcode rblit_line(void *rldat, Pixel *line, Coor x, Coor y, Ucoor width)
 	spec.aspect_dx = spec.aspect_dy = 1;
 	spec.pdepth = 8;
 
-	pj_build_bytemap(&spec, &linerast, (UBYTE *)line);
-	return render_blit((Rcel *)&linerast, 0, 0, vb.pencel, x, y, width, 1, rld->txd, rld->scmap);
+	pj_build_bytemap(&spec, &linerast, (UBYTE*)line);
+	return render_blit((Rcel*)&linerast, 0, 0, vb.pencel, x, y, width, 1, rld->txd, rld->scmap);
 }
 
-Errcode render_transform(Rcel *cel, Xformspec *xf, Tcolxldat *txd)
+Errcode render_transform(Rcel* cel, Xformspec* xf, Tcolxldat* txd)
 {
 	Errcode err;
 	Rldat rld;

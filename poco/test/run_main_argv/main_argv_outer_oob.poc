@@ -1,0 +1,9 @@
+run_main_outer_oob_probe()
+{
+	return 0;
+}
+
+main(int argc, char **argv)
+{
+	return argv[argc][0];
+}

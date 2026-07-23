@@ -118,6 +118,7 @@ static void init_binding(C_frame* frame, const char* name, void* function, Type_
 
 static void test_descriptor_rejections(void)
 {
+	PocoVm* vm = NULL;
 	Type_info int_type = {0};
 	Type_info function_type = {0};
 	Symbol unsupported_parameter = {0};
@@ -126,12 +127,18 @@ static void test_descriptor_rejections(void)
 	Poco_run_env environment;
 	Po_FFI_Variadic_Descriptor variadic = {0};
 
+	CHECK(poco_vm_create(NULL, &vm) == POCO_STATUS_OK, "descriptor rejection VM must be created");
+	if (vm == NULL) {
+		return;
+	}
+
 	int_type.ido_type = IDO_INT;
 	function_type.ido_type = IDO_VPT;
 	unsupported_parameter.ti = &function_type;
 
 	init_binding(&first, "null_binding", NULL, &int_type, NULL, 0);
 	init_environment(&environment, &first);
+	environment.vm = vm;
 	CHECK(po_ffi_build_structures(&environment) == Err_poco_ffi_invalid_binding,
 		  "null native binding must be rejected");
 	CHECK(environment.func_map == NULL, "null native binding must not leave descriptors behind");
@@ -140,9 +147,10 @@ static void test_descriptor_rejections(void)
 	init_binding(&first, "unsupported_binding", (void*)fixed_int, &int_type, &unsupported_parameter,
 				 1);
 	init_environment(&environment, &first);
+	environment.vm = vm;
 	CHECK(po_ffi_build_structures(&environment) == Err_poco_ffi_invalid_binding,
 		  "unsupported binding type must be rejected");
-	CHECK(strstr(poco_get_error(), "unsupported parameter") != NULL,
+	CHECK(strstr(poco_get_last_error(vm), "unsupported parameter") != NULL,
 		  "unsupported binding must report a diagnostic");
 	CHECK(environment.func_map == NULL, "unsupported binding must not leave descriptors behind");
 	po_ffi_free_structures(&environment);
@@ -151,18 +159,22 @@ static void test_descriptor_rejections(void)
 	init_binding(&second, "duplicate_binding", (void*)fixed_long, &int_type, NULL, 0);
 	first.mlink = &second;
 	init_environment(&environment, &first);
+	environment.vm = vm;
 	CHECK(po_ffi_build_structures(&environment) == Err_poco_ffi_invalid_binding,
 		  "duplicate binding name must be rejected");
 	CHECK(environment.func_map == NULL, "duplicate binding name must clean up descriptors");
 	po_ffi_free_structures(&environment);
 
-	CHECK(po_ffi_variadic_types_append(&variadic, &ffi_type_float) == Err_poco_ffi_invalid_binding,
+	CHECK(po_ffi_variadic_types_append(vm, &variadic, &ffi_type_float) ==
+			  Err_poco_ffi_invalid_binding,
 		  "unpromoted float variadic argument must be rejected");
-	CHECK(strstr(poco_get_error(), "Unsupported variadic") != NULL,
+	CHECK(strstr(poco_get_last_error(vm), "Unsupported variadic") != NULL,
 		  "unsupported variadic type must report a diagnostic");
-	CHECK(po_ffi_variadic_types_append(&variadic, &ffi_type_void) == Err_poco_ffi_invalid_binding,
-		  "void variadic argument must be rejected");
+	CHECK(
+		po_ffi_variadic_types_append(vm, &variadic, &ffi_type_void) == Err_poco_ffi_invalid_binding,
+		"void variadic argument must be rejected");
 	po_ffi_variadic_types_release(&variadic);
+	poco_vm_destroy(vm);
 }
 
 static int raw_pointer_payload;
@@ -196,9 +208,9 @@ static void test_raw_pointer_abi(void)
 		  "raw pointer return descriptor must build");
 	ffi_binding = po_ffi_find_binding_by_name(&environment, "raw_pointer_result");
 	if (ffi_binding != NULL) {
-		builtin_err = Success;
-		result = po_ffi_call(ffi_binding, NULL, NULL, NULL);
-		CHECK(builtin_err == Success, "raw pointer return must not set an FFI error");
+		environment.builtin_error = Success;
+		result = po_ffi_call(ffi_binding, NULL, NULL, &environment);
+		CHECK(environment.builtin_error == Success, "raw pointer return must not set an FFI error");
 		CHECK(result.p == raw_pointer_result(), "raw pointer return mapping");
 	}
 	po_ffi_free_structures(&environment);
@@ -212,9 +224,10 @@ static void test_raw_pointer_abi(void)
 	ffi_binding = po_ffi_find_binding_by_name(&environment, "raw_pointer_argument");
 	if (ffi_binding != NULL) {
 		argument.p = &raw_pointer_payload;
-		builtin_err = Success;
-		result = po_ffi_call(ffi_binding, &argument, NULL, NULL);
-		CHECK(builtin_err == Success, "raw pointer argument must not set an FFI error");
+		environment.builtin_error = Success;
+		result = po_ffi_call(ffi_binding, &argument, NULL, &environment);
+		CHECK(environment.builtin_error == Success,
+			  "raw pointer argument must not set an FFI error");
 		CHECK(result.i == 1, "raw pointer argument mapping");
 	}
 	po_ffi_free_structures(&environment);

@@ -39,7 +39,7 @@ int pj_get_devices(UBYTE* devices)
 Errcode current_device(char* dstr)
 {
 	*dstr++ = 'C';
-	*dstr	= '\0';
+	*dstr = '\0';
 
 	return Success;
 }
@@ -70,18 +70,17 @@ Errcode get_full_path(const char* path, char* fullpath)
 	if (is_tdrive(path)) {
 		path += 2;
 		snprintf(resolved_path, PATH_SIZE, "%s%s%s", vconfg.temp_path, SEP, path);
-	}
-	else {
+	} else {
 		strncpy(resolved_path, path, PATH_SIZE);
 	}
 
-	//!TODO: fix this with a proper abspath function
-//	if (realpath(resolved_path, resolved_path) == NULL) {
-//		char* errStr = strerror(errno);
-//		printf("%s >> %s\n", fullpath, resolved_path);
-//		printf("error string: %s\n", errStr);
-//		return Err_no_path;
-//	}
+	//! TODO: fix this with a proper abspath function
+	//	if (realpath(resolved_path, resolved_path) == NULL) {
+	//		char* errStr = strerror(errno);
+	//		printf("%s >> %s\n", fullpath, resolved_path);
+	//		printf("error string: %s\n", errStr);
+	//		return Err_no_path;
+	//	}
 
 	strncpy(fullpath, resolved_path, PATH_SIZE);
 	return Success;
@@ -89,11 +88,13 @@ Errcode get_full_path(const char* path, char* fullpath)
 
 Errcode make_good_dir(char* path)
 {
-	if (get_full_path(path, path) >= Success)
+	if (get_full_path(path, path) >= Success) {
 		return Success;
+	}
 
-	if (get_full_path(".", path) >= Success)
+	if (get_full_path(".", path) >= Success) {
 		return Success;
+	}
 
 	return Err_no_path;
 }
@@ -116,36 +117,38 @@ static Errcode add_wild(Names** pwild_list, const char* path, bool is_directory)
 	}
 
 	/* Filter out '.' and '..' */
-	if (strncmp(name, ".", 2) == 0 || strncmp(name, "..", 3) == 0)
+	if (strncmp(name, ".", 2) == 0 || strncmp(name, "..", 3) == 0) {
 		return Success;
+	}
 
 	/* Note: Wild_entry contains space for a \0. */
 	len = strlen(prefix) + strlen(name);
-	if ((next = pj_malloc(sizeof(Wild_entry) + len)) == NULL)
+	if ((next = pj_malloc(sizeof(Wild_entry) + len)) == NULL) {
 		return Err_no_memory;
+	}
 
 	snprintf(next->name_buf, len + 1, "%s%s", prefix, name);
 
 	next->hdr.name = next->name_buf;
 	next->hdr.next = *pwild_list;
-	*pwild_list	   = &(next->hdr);
+	*pwild_list = &(next->hdr);
 	return Success;
 }
 
-
-static Errcode alloc_wild_list(Names** pwild_list,
-							   const char* search_folder,
-							   const char* wild,
+static Errcode alloc_wild_list(Names** pwild_list, const char* search_folder, const char* wild,
 							   bool get_dirs)
 {
 	Errcode err;
 
-	if (!pj_assert(pwild_list != NULL))
+	if (!pj_assert(pwild_list != NULL)) {
 		return Err_bad_input;
-	if (!pj_assert(search_folder != NULL))
+	}
+	if (!pj_assert(search_folder != NULL)) {
 		return Err_bad_input;
-	if (!pj_assert(wild != NULL))
+	}
+	if (!pj_assert(wild != NULL)) {
 		return Err_bad_input;
+	}
 
 	if (wild[0] == '#' && wild[1] == ':') {
 		return Err_nogood;
@@ -173,7 +176,8 @@ static Errcode alloc_wild_list(Names** pwild_list,
 	for (i = 0; i < count; i++) {
 		snprintf(full_path, 1024, "%s/%s", search_folder, files[i]);
 		if (!SDL_GetPathInfo(full_path, &info)) {
-			fprintf(stderr, "-- Error attempting to get path info for %s: %s\n", files[i], SDL_GetError());
+			fprintf(stderr, "-- Error attempting to get path info for %s: %s\n", files[i],
+					SDL_GetError());
 			continue;
 		}
 
@@ -186,8 +190,7 @@ static Errcode alloc_wild_list(Names** pwild_list,
 			continue;
 		}
 
-		err = add_wild(pwild_list, files[i],
-					   info.type == SDL_PATHTYPE_DIRECTORY);
+		err = add_wild(pwild_list, files[i], info.type == SDL_PATHTYPE_DIRECTORY);
 		if (err < Success) {
 			free_wild_list(pwild_list);
 			return err;
@@ -198,18 +201,19 @@ static Errcode alloc_wild_list(Names** pwild_list,
 	return Success;
 }
 
-
-Errcode build_wild_list(Names** pwild_list, const char* drawer, const char* pat,
-						bool get_dirs)
+Errcode build_wild_list(Names** pwild_list, const char* drawer, const char* pat, bool get_dirs)
 {
 	Errcode err;
 
-	if (!pj_assert(pwild_list != NULL))
+	if (!pj_assert(pwild_list != NULL)) {
 		return Err_bad_input;
-	if (!pj_assert(drawer != NULL))
+	}
+	if (!pj_assert(drawer != NULL)) {
 		return Err_bad_input;
-	if (!pj_assert(pat != NULL))
+	}
+	if (!pj_assert(pat != NULL)) {
 		return Err_bad_input;
+	}
 
 	*pwild_list = NULL;
 
@@ -235,8 +239,7 @@ Errcode build_wild_list(Names** pwild_list, const char* drawer, const char* pat,
 	return Success;
 }
 
-
-bool pj_is_directory(const char *path)
+bool pj_is_directory(const char* path)
 {
 	SDL_PathInfo info;
 
@@ -246,4 +249,3 @@ bool pj_is_directory(const char *path)
 
 	return info.type == SDL_PATHTYPE_DIRECTORY;
 }
-

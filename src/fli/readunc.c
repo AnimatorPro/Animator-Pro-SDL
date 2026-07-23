@@ -3,8 +3,7 @@
 #include "fli.h"
 #include "rcel.h"
 
-Errcode pj_fli_read_uncomp(char *fname, Flifile *flif, Rcel *fscreen,
-					   Fli_frame *ff, int colors)
+Errcode pj_fli_read_uncomp(char* fname, Flifile* flif, Rcel* fscreen, Fli_frame* ff, int colors)
 /*************************************************************************
  * Read in next frame from a fli onto a Rcel.  See also the related but
  * simpler pj_fli_read_next().
@@ -36,35 +35,36 @@ Errcode pj_fli_read_uncomp(char *fname, Flifile *flif, Rcel *fscreen,
 	long size_left;
 
 	err = xffread(flif->xf, ff, sizeof(*ff));
-	if (err != Success)
+	if (err != Success) {
 		goto error;
+	}
 
-	if (ff->type != FCID_FRAME)
-	{
+	if (ff->type != FCID_FRAME) {
 		err = Err_bad_magic;
 		goto error;
 	}
-	if (ff->size >=  pj_fli_cbuf_size(flif->hdr.width,flif->hdr.height,COLORS))
-	{
+	if (ff->size >= pj_fli_cbuf_size(flif->hdr.width, flif->hdr.height, COLORS)) {
 		err = Err_corrupted;
 		goto error;
 	}
 	size_left = ff->size - sizeof(*ff);
 
-	err = xffread(flif->xf, ff+1, size_left);
-	if (err < Success)
+	err = xffread(flif->xf, ff + 1, size_left);
+	if (err < Success) {
 		goto error;
-
-	if(fscreen)
-	{
-		pj_fli_uncomp_frame(fscreen,ff,colors);
 	}
-	return(Success);
+
+	if (fscreen) {
+		pj_fli_uncomp_frame(fscreen, ff, colors);
+	}
+	return (Success);
 
 error:
-	if(err == Err_eof)
+	if (err == Err_eof) {
 		err = Err_truncated;
-	if(fname)
-		err = pj_fli_error_report(err,"Bad frame in \"%s\"",fname);
-	return(err);
+	}
+	if (fname) {
+		err = pj_fli_error_report(err, "Bad frame in \"%s\"", fname);
+	}
+	return (err);
 }

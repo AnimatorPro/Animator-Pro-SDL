@@ -54,18 +54,18 @@
 
 #include "tiff.h"
 
-#define LARGEST_CODE	4095
-#define TABLE_SIZE		(8*1024)
+#define LARGEST_CODE 4095
+#define TABLE_SIZE (8 * 1024)
 
 typedef unsigned int UINT;
 
-static USHORT *prior_codes = NULL;
-static USHORT *code_ids    = NULL;
-static UBYTE  *added_chars = NULL;
+static USHORT* prior_codes = NULL;
+static USHORT* code_ids = NULL;
+static UBYTE* added_chars = NULL;
 
-static int	 output_maxlen;
-static UBYTE *output_buffer;
-static int	 bit_offset;
+static int output_maxlen;
+static UBYTE* output_buffer;
+static int bit_offset;
 
 static int code_size;
 static int clear_code;
@@ -73,16 +73,15 @@ static int eof_code;
 static int max_code;
 static int next_code;
 
-static void gfreez(void **ptr)
+static void gfreez(void** ptr)
 /*****************************************************************************
  *
  ****************************************************************************/
 {
-	if (ptr != NULL && *ptr != NULL)
-		{
+	if (ptr != NULL && *ptr != NULL) {
 		free(*ptr);
 		*ptr = NULL;
-		}
+	}
 }
 
 static void init_table()
@@ -92,13 +91,13 @@ static void init_table()
 {
 	int min_code_size = 8;
 
-	code_size  = min_code_size + 1;
+	code_size = min_code_size + 1;
 	clear_code = 1 << min_code_size;
-	eof_code   = clear_code + 1;
-	next_code  = clear_code + 2;
-	max_code   = (1 << code_size) - 1;
+	eof_code = clear_code + 1;
+	next_code = clear_code + 2;
+	max_code = (1 << code_size) - 1;
 
-	memset(code_ids,0,TABLE_SIZE*sizeof(*code_ids));
+	memset(code_ids, 0, TABLE_SIZE * sizeof(*code_ids));
 }
 
 static Errcode output_a_code(unsigned int code)
@@ -106,18 +105,19 @@ static Errcode output_a_code(unsigned int code)
  * bit-pack a code into the output buffer.
  *****************************************************************************/
 {
-	ULONG	temp;
-	UBYTE	*buf;
-	int 	byte_offset;
-	int 	bits_used;
-	int 	bits_left;
+	ULONG temp;
+	UBYTE* buf;
+	int byte_offset;
+	int bits_used;
+	int bits_left;
 
 	byte_offset = bit_offset >> 3;
 	bits_used = bit_offset & 7;
 	bits_left = 8 - bits_used;
 
-	if (byte_offset >= output_maxlen)
+	if (byte_offset >= output_maxlen) {
 		return Err_overflow;
+	}
 
 	buf = &output_buffer[byte_offset];
 
@@ -138,76 +138,71 @@ static Errcode output_a_code(unsigned int code)
 	return Success;
 }
 
-Errcode lzw_compress(UBYTE *inbuf, UBYTE *outbuf, int count)
+Errcode lzw_compress(UBYTE* inbuf, UBYTE* outbuf, int count)
 /*****************************************************************************
  *	Compress a line of data bytes using the LZW algorithm.
  *****************************************************************************/
 {
 	Errcode err;
-	USHORT	prefix_code;
-	UINT	d;
-	UINT	hx;
-	UINT	suffix_char;
+	USHORT prefix_code;
+	UINT d;
+	UINT hx;
+	UINT suffix_char;
 
 	output_buffer = outbuf;
 	bit_offset = 0;
 	init_table();
-	output_a_code(clear_code);				/* must be after init_table()! */
+	output_a_code(clear_code); /* must be after init_table()! */
 
 	suffix_char = *inbuf++;
 	prefix_code = suffix_char;
-	while (--count)
-		{
+	while (--count) {
 		suffix_char = *inbuf++;
 		hx = prefix_code ^ suffix_char << 5;
 		d = 1;
-		for (;;)
-			{
-			if (code_ids[hx] == 0)
-				{
-				if (Success != (err = output_a_code(prefix_code)))
+		for (;;) {
+			if (code_ids[hx] == 0) {
+				if (Success != (err = output_a_code(prefix_code))) {
 					return err;
+				}
 				d = next_code;
-				if (next_code < LARGEST_CODE)
-					{
+				if (next_code < LARGEST_CODE) {
 					prior_codes[hx] = prefix_code;
 					added_chars[hx] = suffix_char;
 					code_ids[hx] = next_code;
 					next_code++;
-					}
-				if (d == LARGEST_CODE-1)
-					{
-					if (Success != (err = output_a_code(clear_code)))
+				}
+				if (d == LARGEST_CODE - 1) {
+					if (Success != (err = output_a_code(clear_code))) {
 						return err;
+					}
 					init_table();
-					}
-				if (d == max_code)
-					{
-					if (code_size < 12)
-						{
+				}
+				if (d == max_code) {
+					if (code_size < 12) {
 						code_size++;
-						max_code = (1<<code_size)-1; //max_code <<= 1;
-						}
+						max_code = (1 << code_size) - 1;  // max_code <<= 1;
 					}
+				}
 
 				prefix_code = suffix_char;
 				break;
-				}
-			if (prior_codes[hx] == prefix_code &&
-				added_chars[hx] == suffix_char)
-				{
+			}
+			if (prior_codes[hx] == prefix_code && added_chars[hx] == suffix_char) {
 				prefix_code = code_ids[hx];
 				break;
-				}
+			}
 			hx += d;
 			d += 2;
-			if (hx >= TABLE_SIZE)
+			if (hx >= TABLE_SIZE) {
 				hx -= TABLE_SIZE;
 			}
 		}
+	}
 
-	if (Success != (err = output_a_code(prefix_code)))
+	if (Success != (err = output_a_code(prefix_code))) {
 		return err;
+	}
 
 	/*------------------------------------------------------------------------
 	 * endcase city...if we just output the max_code, we need to bump up
@@ -217,16 +212,18 @@ Errcode lzw_compress(UBYTE *inbuf, UBYTE *outbuf, int count)
 	if (next_code == max_code) {
 		if (code_size < 12) {
 			++code_size;
-			max_code = (1<<code_size)-1;
+			max_code = (1 << code_size) - 1;
 		} else {
-			if (Success != (err = output_a_code(clear_code)))
+			if (Success != (err = output_a_code(clear_code))) {
 				return err;
+			}
 			init_table();
 		}
 	}
 
-	if (Success != (err = output_a_code(eof_code)))
+	if (Success != (err = output_a_code(eof_code))) {
 		return err;
+	}
 
 	return (bit_offset >> 3) + ((bit_offset & 7) ? 1 : 0);
 }
@@ -246,15 +243,17 @@ Errcode lzw_init(int bufmaxlen)
  *
  ****************************************************************************/
 {
-
 	output_maxlen = bufmaxlen;
 
-	if (NULL == (prior_codes = malloc(TABLE_SIZE*sizeof(*prior_codes))))
+	if (NULL == (prior_codes = malloc(TABLE_SIZE * sizeof(*prior_codes)))) {
 		goto ERROR_EXIT;
-	if (NULL == (code_ids = malloc(TABLE_SIZE*sizeof(*code_ids))))
+	}
+	if (NULL == (code_ids = malloc(TABLE_SIZE * sizeof(*code_ids)))) {
 		goto ERROR_EXIT;
-	if (NULL == (added_chars = malloc(TABLE_SIZE)))
+	}
+	if (NULL == (added_chars = malloc(TABLE_SIZE))) {
 		goto ERROR_EXIT;
+	}
 
 	return Success;
 

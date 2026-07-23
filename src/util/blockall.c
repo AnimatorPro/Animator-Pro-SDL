@@ -1,8 +1,8 @@
 /* Blockall.c - The block-allocator.  This is useful if
  * you are in a situation that requires a lot of allocations that will
- * all be released at once.    
+ * all be released at once.
  *
- * You need to call construct_block_allocator() first,  and 
+ * You need to call construct_block_allocator() first,  and
  * destroy_block_allocator() when you want to free everything up.
  * In between call alloc_from_block().
  *
@@ -22,9 +22,9 @@
 #include "memory.h"
 #include "blockall.h"
 
-void construct_block_allocator(Block_allocator *b, long block_size,
-	void *(*get_ram)(unsigned), void (free_ram)(void *pt))
-/* Set up a block_allocator for use. 
+void construct_block_allocator(Block_allocator* b, long block_size, void* (*get_ram)(unsigned),
+							   void(free_ram)(void* pt))
+/* Set up a block_allocator for use.
  * A typical call might be:
  *		construct_block_allocator(&b, 512, malloc, free);
  */
@@ -38,49 +38,50 @@ void construct_block_allocator(Block_allocator *b, long block_size,
 }
 
 
-void destroy_block_allocator(Block_allocator *b)
+void destroy_block_allocator(Block_allocator* b)
 /* Free up the mem_block's associated with allocator. */
 {
-	struct mem_block *list;
-	struct mem_block *next;
+	struct mem_block* list;
+	struct mem_block* next;
 
 	next = b->list;
-	while ((list = next) != NULL)
-		{
+	while ((list = next) != NULL) {
 		next = list->next;
 		b->free_ram(list);
-		}
-	clear_struct(b);		/* Just so we die quickly if still in use after
-							 * being destroyed. */
+	}
+	clear_struct(b); /* Just so we die quickly if still in use after
+					  * being destroyed. */
 }
 
-static void *alloc_another_block(Block_allocator *b, unsigned size)
+static void* alloc_another_block(Block_allocator* b, unsigned size)
 /* Helper function that allocates a new block and puts it on the list
  * (but DOESN'T update the current block in free_pt and free_left). */
 {
-	Mem_block *mb;
+	Mem_block* mb;
 
-	if ((mb = b->get_ram(size + sizeof(*mb))) == NULL)
+	if ((mb = b->get_ram(size + sizeof(*mb))) == NULL) {
 		return NULL;
+	}
 	mb->next = b->list;
 	b->list = mb;
-	return (mb+1);
+	return (mb + 1);
 }
 
-void *alloc_from_block(Block_allocator *b, unsigned size)
+void* alloc_from_block(Block_allocator* b, unsigned size)
 /* This guy actually does the allocation, out of the current block if
  * possible, otherwise out of a new one. */
 {
-	void *pt;
+	void* pt;
 
-	if (size > b->block_size)	/* Big blocks serviced directly */
-		return alloc_another_block(b,size);
-	if (b->free_left < size)
-		{
-		if ((b->free_pt = alloc_another_block(b, b->block_size)) == NULL)
+	if (size > b->block_size) { /* Big blocks serviced directly */
+		return alloc_another_block(b, size);
+	}
+	if (b->free_left < size) {
+		if ((b->free_pt = alloc_another_block(b, b->block_size)) == NULL) {
 			return NULL;
-		b->free_left = b->block_size;
 		}
+		b->free_left = b->block_size;
+	}
 	b->free_left -= size;
 	pt = b->free_pt;
 	b->free_pt += size;

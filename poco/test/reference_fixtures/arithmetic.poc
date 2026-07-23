@@ -1,0 +1,9 @@
+main()
+{
+	int result;
+
+	result = 3 * 7;
+	result -= 8 / 2;
+	result = reference_identity(result);
+	return result;
+}

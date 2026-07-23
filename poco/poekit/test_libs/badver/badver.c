@@ -12,29 +12,27 @@ static void dummy_func(void)
 }
 
 static Lib_proto poe_calls[] = {
-	{ dummy_func, "void DummyFunc(void);" },
+	{dummy_func, "void DummyFunc(void);"},
 };
 
 /* Manually create structure with wrong version */
-static Pocorex badver_pocorex = {
-	{
-		100,        /* WRONG VERSION - should be POCOREX_VERSION (200) */
-		NOFUNC,     /* init */
-		NOFUNC,     /* cleanup */
-		"BadVer POE"  /* id_string */
-	},
-	{
-		NULL,       /* next */
-		NULL,       /* name */
-		poe_calls,  /* lib */
-		sizeof(poe_calls)/sizeof(Lib_proto),  /* count */
-		NULL,       /* init */
-		NULL,       /* cleanup */
-		NULL,       /* local_data */
-		{NULL, NULL},  /* resources */
-		NULL        /* rexhead */
-	}
-};
+static Pocorex badver_pocorex = {{
+									 100,    /* WRONG VERSION - should be POCOREX_VERSION (200) */
+									 NOFUNC, /* init */
+									 NOFUNC, /* cleanup */
+									 "BadVer POE" /* id_string */
+								 },
+								 {
+									 NULL,                                  /* next */
+									 NULL,                                  /* name */
+									 poe_calls,                             /* lib */
+									 sizeof(poe_calls) / sizeof(Lib_proto), /* count */
+									 NULL,                                  /* init */
+									 NULL,                                  /* cleanup */
+									 NULL,                                  /* local_data */
+									 {NULL, NULL},                          /* resources */
+									 NULL                                   /* rexhead */
+								 }};
 
 // deliberately not using Setup_Pocorex to trigger the error
 
@@ -45,4 +43,3 @@ Pocorex* poco_rexlib_get(void)
 {
 	return &badver_pocorex;
 }
-

@@ -1,0 +1,5 @@
+/* PHASE10_SOURCE_BYTES_MUST_NOT_APPEAR */
+int main(void)
+{
+	return 23;
+}

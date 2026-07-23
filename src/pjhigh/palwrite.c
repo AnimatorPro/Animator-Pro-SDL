@@ -6,8 +6,7 @@
  *
  *  Writes a palette chunk to the file.
  */
-Errcode
-pj_write_palchunk(XFILE *xf, Cmap *cmap, SHORT id_type)
+Errcode pj_write_palchunk(XFILE* xf, Cmap* cmap, SHORT id_type)
 {
 	Errcode err;
 	LONG csize;
@@ -19,8 +18,9 @@ pj_write_palchunk(XFILE *xf, Cmap *cmap, SHORT id_type)
 	id.size = sizeof(id) + csize;
 
 	err = xffwrite(xf, &id, sizeof(id));
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	return xffwrite(xf, cmap->ctab, csize);
 }

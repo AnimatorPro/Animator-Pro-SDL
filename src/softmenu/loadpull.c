@@ -30,7 +30,7 @@
 #include "softmenu.h"
 
 /* recursively free a pull and all it's siblings and children. */
-static void rfree_pull(Pull *p)
+static void rfree_pull(Pull* p)
 {
 	if (p == NULL) {
 		return;
@@ -44,16 +44,16 @@ static void rfree_pull(Pull *p)
  * If the string inits is non-NULL, then
  * allocate extra space at end of pull for
  * string, and set the Pull data pointer. */
-Errcode new_pull(Pull **ppull, char *inits)
+Errcode new_pull(Pull** ppull, char* inits)
 {
 	int slen = 0;
 	Errcode err;
-	Pull *p = NULL;
+	Pull* p = NULL;
 
 	if (inits != NULL) {
 		slen = strlen(inits) + 1;
 	}
-	if ((err = ealloc((void **)&p, sizeof(Pull) + slen)) < Success) {
+	if ((err = ealloc((void**)&p, sizeof(Pull) + slen)) < Success) {
 		goto OUT;
 	}
 	if (inits != NULL) {
@@ -66,7 +66,7 @@ OUT:
 
 /* Check to see if next token is a number, and if so read it and put it
  * into *pt  */
-static void smu_read_opt_short(Swork *swork, SHORT *pt)
+static void smu_read_opt_short(Swork* swork, SHORT* pt)
 {
 	if (swork_topt(swork) == TOK_LONG) /* if got number it's 2 key equiv */
 	{
@@ -77,9 +77,9 @@ static void smu_read_opt_short(Swork *swork, SHORT *pt)
 
 /* initialize a pull from the next string in input.  Look for optional
  * numbers after the string. */
-static Errcode sp_pull_from_tops(Swork *swork, Pull **pp)
+static Errcode sp_pull_from_tops(Swork* swork, Pull** pp)
 {
-	Pull *p;
+	Pull* p;
 	Errcode err = Success;
 
 	if (swork_topt(swork) != TOK_QUO) {
@@ -94,10 +94,10 @@ static Errcode sp_pull_from_tops(Swork *swork, Pull **pp)
 		return (Err_expecting_id);
 	}
 	p->id = swork_top(swork)->longval;
-	swork_advance_over(swork, ',');   /* skip over id & a comma if it's there */
-	p->key2 = ((char *)(p->data))[0]; /* set up default 2 key equiv */
+	swork_advance_over(swork, ',');  /* skip over id & a comma if it's there */
+	p->key2 = ((char*)(p->data))[0]; /* set up default 2 key equiv */
 	if (p->key2 == '*' || p->key2 == ' ') {
-		p->key2 = ((char *)(p->data))[1];
+		p->key2 = ((char*)(p->data))[1];
 	}
 	smu_read_opt_short(swork, &p->key2);
 	smu_read_opt_short(swork, &p->key_equiv);
@@ -107,7 +107,7 @@ OUT:
 
 /* Read in successive Pull's until closing brace.
  * Put result in singly linked list *pitem */
-static Errcode sp_items(Swork *swork, Pull **pitem)
+static Errcode sp_items(Swork* swork, Pull** pitem)
 {
 	Errcode err = Success;
 
@@ -126,11 +126,11 @@ OUT:
 
 /* Read in the leaf title pull.  Make up the dummy pull that draws the
  * solid box behind all the items, and then read in the items. */
-static Errcode sp_get_leaf(Swork *swork, Pull **leaf)
+static Errcode sp_get_leaf(Swork* swork, Pull** leaf)
 {
 	Errcode err = Success;
-	Pull *rootp;
-	Pull *boxp;
+	Pull* rootp;
+	Pull* boxp;
 
 	/* get the struct for the word on the menu bar, and the box behind
 	   all the items */
@@ -160,7 +160,7 @@ OUT:
 }
 
 
-static Errcode sp_parse(Swork *swork, Pull **pitem)
+static Errcode sp_parse(Swork* swork, Pull** pitem)
 /* Read a list of Pull-leafs until closing brace.  Put result in
  * *pitem */
 {
@@ -187,20 +187,20 @@ static Errcode sp_parse(Swork *swork, Pull **pitem)
 /* Allocates and reads in a pull-down from a file.  Does just about
  * everything except calculate the pixel coordinates (see pullfmt.c)
  * and install the dodata and domenu functions */
-Errcode smu_load_pull(struct softmenu *sm,     /* read in a pulldown */
-					  char *symname,           /* name of symbol */
-					  struct menuhdr *pullhdr) /* place to put loaded pulldown */
+Errcode smu_load_pull(struct softmenu* sm,     /* read in a pulldown */
+					  char* symname,           /* name of symbol */
+					  struct menuhdr* pullhdr) /* place to put loaded pulldown */
 {
 	Errcode err = Success;
 	Swork rswork;
-	Smu_symbol *sym;
+	Smu_symbol* sym;
 
 	if ((err = smu_lookup(sm, &sym, SMU_PULL_CLASS, symname)) < Success) {
 		return (err);
 	}
 	swork_init(&rswork, sm->xf, sym->foff, sym->fline);
 	clear_struct(pullhdr);
-	if ((err = sp_parse(&rswork, (Pull **)&pullhdr->mbs)) < Success) {
+	if ((err = sp_parse(&rswork, (Pull**)&pullhdr->mbs)) < Success) {
 		goto OUT;
 	}
 	pullhdr->type = PULLMENU;
@@ -217,7 +217,7 @@ OUT:
 	return (err);
 }
 
-void smu_free_pull(struct menuhdr *pullhdr)
+void smu_free_pull(struct menuhdr* pullhdr)
 {
 	rfree_pull(pullhdr->mbs);
 	pullhdr->mbs = NULL;

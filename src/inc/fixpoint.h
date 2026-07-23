@@ -9,32 +9,32 @@
 typedef long fixpoint;
 
 #define FIXPOINT_SHIFT 8
-#define FIXPOINT_ONE (1<<8)
+#define FIXPOINT_ONE (1 << 8)
 
-	/* Plus */
-#define FP(a,b) ((a)+(b))
-	/* Minus */
-#define FM(a,b) ((a)-(b))
-	/* Times */
-#define FT(a,b) (((a)*(b))>>FIXPOINT_SHIFT)
-	/* Divide */
+/* Plus */
+#define FP(a, b) ((a) + (b))
+/* Minus */
+#define FM(a, b) ((a) - (b))
+/* Times */
+#define FT(a, b) (((a) * (b)) >> FIXPOINT_SHIFT)
+/* Divide */
 /* #define FD(a,b) (((a)<<FIXPOINT_SHIFT)/(b)) */
-#define FD(a,b) fixpoint_div(a,b)
+#define FD(a, b) fixpoint_div(a, b)
 
 fixpoint fixpoint_div(fixpoint a, fixpoint b);
 
-	/* Convert from int to fixpoint */
-#define FVAL(a) ((long)(a)<<FIXPOINT_SHIFT)
-	/* Convert from fixpoint to int. */
-#define FINT(a) ((int)((a)>>FIXPOINT_SHIFT))
+/* Convert from int to fixpoint */
+#define FVAL(a) ((long)(a) << FIXPOINT_SHIFT)
+/* Convert from fixpoint to int. */
+#define FINT(a) ((int)((a) >> FIXPOINT_SHIFT))
 
 #ifdef LATER
 /* Use these if want to revert to floating point. */
 typedef float fixpoint;
-#define FP(a,b) ((a)+(b))
-#define FM(a,b) ((a)-(b))
-#define FT(a,b) ((a)*(b))
-#define FD(a,b) ((a)/(b))
+#define FP(a, b) ((a) + (b))
+#define FM(a, b) ((a) - (b))
+#define FT(a, b) ((a) * (b))
+#define FD(a, b) ((a) / (b))
 #define FVAL(a) ((float)(a))
 #define FINT(a) ((int)(a))
 #endif /* LATER */

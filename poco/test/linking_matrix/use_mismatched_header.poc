@@ -1,0 +1,7 @@
+#pragma poco use "library.poc"
+#include "use_mismatched.h"
+
+int main(void)
+{
+	return library_add(35);
+}

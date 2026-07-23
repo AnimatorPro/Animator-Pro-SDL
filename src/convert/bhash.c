@@ -8,7 +8,7 @@
  * closest color and stores it in the table.  The typical hit rates
  * for this are about 58%, but it varies a lot depending on the picture.
  * In particular on all grey pictures this does not do as well as the
- * simpler 'ghash' algorithm.   
+ * simpler 'ghash' algorithm.
  *
  * This is much slower than the bbhash64.c method,  but consumes
  * less memory, and preserves all 8 bits of the RGB components.
@@ -18,47 +18,44 @@
 #include "bhash.h"
 #include "ccache.h"
 
-#define BSIZ (1024*4*sizeof(struct bhash) )
+#define BSIZ (1024 * 4 * sizeof(struct bhash))
 
-static Errcode c_make(Ccache *cc)
+static Errcode c_make(Ccache* cc)
 {
-if((cc->data = pj_zalloc(BSIZ)) == NULL)
-	return(Err_no_memory);
-return(Success);
+	if ((cc->data = pj_zalloc(BSIZ)) == NULL) {
+		return (Err_no_memory);
+	}
+	return (Success);
 }
 
-static void c_free(Ccache *cc)
+static void c_free(Ccache* cc)
 {
-pj_freez(&cc->data);
+	pj_freez(&cc->data);
 }
 
 
-static int c_closest(Ccache *cc, Rgb3 *rgb, Cmap *cmap)
+static int c_closest(Ccache* cc, Rgb3* rgb, Cmap* cmap)
 /* find closest color in color map to a true color value,
    using a cashe.  Has some problems with sign extension on Microsoft
    C.  */
 {
-#define c_hash ((struct bhash *)(cc->data))
-register struct bhash *h;
+#define c_hash ((struct bhash*)(cc->data))
+	register struct bhash* h;
 
-/* first look for a hash hit */
-h = c_hash+((((rgb->r&0xf)<<8) + ((rgb->g&0xf)<<4) + ((rgb->b&0xf))));
-if (!h->valid || h->rgb.r != rgb->r  || h->rgb.g != rgb->g 
-			 || h->rgb.b != rgb->b )
-	{
-	++(cc->misses);
-	h->closest = closestc(rgb,cmap->ctab,cmap->num_colors);
-	h->rgb = *rgb;
-	h->valid = 1;
+	/* first look for a hash hit */
+	h = c_hash + ((((rgb->r & 0xf) << 8) + ((rgb->g & 0xf) << 4) + ((rgb->b & 0xf))));
+	if (!h->valid || h->rgb.r != rgb->r || h->rgb.g != rgb->g || h->rgb.b != rgb->b) {
+		++(cc->misses);
+		h->closest = closestc(rgb, cmap->ctab, cmap->num_colors);
+		h->rgb = *rgb;
+		h->valid = 1;
 	}
-return(h->closest);
+	return (h->closest);
 }
 
-Ccache cc_bhash =
-	{
+Ccache cc_bhash = {
 	"bhash",
 	c_make,
 	c_free,
 	c_closest,
-	};
-
+};

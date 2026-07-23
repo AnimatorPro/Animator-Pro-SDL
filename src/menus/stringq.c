@@ -15,9 +15,9 @@
 #define SBLOCK SWHITE
 
 typedef struct sqwork {
-	Button *sqb;        /* the button */
-	Stringq *sq;        /* the buttons stringq */
-	Vfont *f;           /* font */
+	Button* sqb;        /* the button */
+	Stringq* sq;        /* the buttons stringq */
+	Vfont* f;           /* font */
 	Pixel sblock;       /* block color */
 	Pixel sdetail;      /* detail color */
 	SHORT textx, texty; /* buttton relative text x and y values */
@@ -26,10 +26,10 @@ typedef struct sqwork {
 	Clipbox cb;
 } Sqwork;
 
-static void init_sqwork(Button *sqb, Sqwork *sw)
+static void init_sqwork(Button* sqb, Sqwork* sw)
 {
-	Wscreen *s = sqb->root->w.W_screen;
-	Stringq *sq;
+	Wscreen* s = sqb->root->w.W_screen;
+	Stringq* sq;
 
 	sw->sqb = sqb;
 	sw->sq = sq = sqb->datme;
@@ -44,11 +44,11 @@ static void init_sqwork(Button *sqb, Sqwork *sw)
 }
 
 /* erases last part or drawn part of stringq should handle proportional text */
-static void erase_tail(Sqwork *qw)
+static void erase_tail(Sqwork* qw)
 {
-	Stringq *sq = qw->sq;
+	Stringq* sq = qw->sq;
 	SHORT len;
-	char *strend;
+	char* strend;
 	SHORT tailwidth, textend;
 
 	tailwidth = widest_char(qw->f) * 2;
@@ -66,10 +66,10 @@ static void erase_tail(Sqwork *qw)
 	pj_set_rect(&qw->cb, qw->sblock, textend, qw->texty, tailwidth, tallest_char(qw->f));
 }
 
-static void draw_stringq(Sqwork *qw)
+static void draw_stringq(Sqwork* qw)
 {
-	char *string;
-	Stringq *sq = qw->sq;
+	char* string;
+	Stringq* sq = qw->sq;
 
 	string = sq->string + sq->dpos;
 	pj_set_rast(&qw->cb, qw->sblock);
@@ -77,25 +77,25 @@ static void draw_stringq(Sqwork *qw)
 	qw->curson = 0;
 }
 
-static void inactive_cursor(Sqwork *qw, Pixel color)
+static void inactive_cursor(Sqwork* qw, Pixel color)
 {
-	register Stringq *sq = qw->sq;
+	register Stringq* sq = qw->sq;
 
 	pj_set_vline(&qw->cb, color,
 				 qw->textx + fnstring_width(qw->f, sq->string + sq->dpos, sq->cpos - sq->dpos),
 				 qw->texty, tallest_char(qw->f));
 }
 
-static void see_stringq(Sqwork *qw, Pixel textcol)
+static void see_stringq(Sqwork* qw, Pixel textcol)
 {
 	draw_stringq(qw);
 	inactive_cursor(qw, textcol);
 }
 
-static int stringq_xor_cursor(Sqwork *qw)
+static int stringq_xor_cursor(Sqwork* qw)
 {
-	Button *m = qw->sqb;
-	Stringq *sq = qw->sq;
+	Button* m = qw->sqb;
+	Stringq* sq = qw->sq;
 	SHORT cwidth;
 
 	if (sq->string[sq->cpos]) {
@@ -113,16 +113,16 @@ static int stringq_xor_cursor(Sqwork *qw)
 	return (0);
 }
 
-static void stringq_cursor_off(Sqwork *qw)
+static void stringq_cursor_off(Sqwork* qw)
 {
 	if (qw->curson) {
 		stringq_xor_cursor(qw);
 	}
 }
 
-static void cpos_to_cursor(Sqwork *qw)
+static void cpos_to_cursor(Sqwork* qw)
 {
-	Stringq *sq;
+	Stringq* sq;
 	int textx;
 
 	sq = qw->sq;
@@ -147,10 +147,10 @@ static void cpos_to_cursor(Sqwork *qw)
 	}
 }
 
-static bool right_scroll(Sqwork *qw)
+static bool right_scroll(Sqwork* qw)
 {
-	Stringq *sq = qw->sq;
-	Button *b = qw->sqb;
+	Stringq* sq = qw->sq;
+	Button* b = qw->sqb;
 	bool ret = false;
 
 	/* Might have to do this more than once if character scrolling off left edge
@@ -367,22 +367,23 @@ EXIT_STRING:
 	rest_wiostate(&ios);
 	return(ret);
 }
+
 // clang-format on
 
 /********* external calls ******/
 
 /* returns 0 if unaltered and non enter key hit
  * STQ_ENTER is set if enter is exit key, STQ_ALTERED is set if altered */
-int feel_string_req(Button *b)
+int feel_string_req(Button* b)
 {
 	Sqwork qw;
-	Wscreen *s = b->root->w.W_screen;
+	Wscreen* s = b->root->w.W_screen;
 
 	init_sqwork(b, &qw);
 	return (feel_stringq(&qw, s->SDETAIL, s->SBLOCK));
 }
 
-void see_string_req(Button *b)
+void see_string_req(Button* b)
 {
 	Sqwork qw;
 
@@ -392,7 +393,7 @@ void see_string_req(Button *b)
 	see_stringq(&qw, qw.sdetail);
 }
 
-void init_stq_string(Stringq *stq)
+void init_stq_string(Stringq* stq)
 {
 	stq->ccount = stq->cpos = strlen(stq->string);
 	stq->dpos = 0;
@@ -401,23 +402,23 @@ void init_stq_string(Stringq *stq)
 	}
 }
 
-void set_stq_string(Stringq *stq, char *buf)
+void set_stq_string(Stringq* stq, char* buf)
 {
 	stq->string = buf;
 	init_stq_string(stq);
 }
 
-void stringq_revert_to_undo(Stringq *stq)
+void stringq_revert_to_undo(Stringq* stq)
 {
 	strcpy(stq->string, stq->undo);
 	init_stq_string(stq);
 }
 
-void undo_stringq(Button *m, Button *stq_item)
+void undo_stringq(Button* m, Button* stq_item)
 {
-	Stringq *stq;
+	Stringq* stq;
 
-	stq = (Stringq *)stq_item->datme;
+	stq = (Stringq*)stq_item->datme;
 	hilight(m);
 	stringq_revert_to_undo(stq);
 	draw_buttontop(stq_item);
@@ -427,10 +428,10 @@ void undo_stringq(Button *m, Button *stq_item)
 
 /* Sets a stringq button buffer with value in fmt and args like sprintf
  * puts old value in undo buffer also clips string to length in stq->bcount */
-void setf_stringq(Button *sqb, int drawit, char *fmt, ...)
+void setf_stringq(Button* sqb, int drawit, char* fmt, ...)
 {
 	Formatarg fa;
-	Stringq *stq = sqb->datme;
+	Stringq* stq = sqb->datme;
 
 	/*
 	 * kiki note:
@@ -464,7 +465,7 @@ void setf_stringq(Button *sqb, int drawit, char *fmt, ...)
 
 /***** some stuff for a numq *****/
 
-static void init_numq_stq(Numq *nq, Stringq *sq)
+static void init_numq_stq(Numq* nq, Stringq* sq)
 {
 	(void)nq;
 
@@ -473,14 +474,14 @@ static void init_numq_stq(Numq *nq, Stringq *sq)
 	sq->bcount = 30;
 }
 
-static void set_nqbuf(Button *b, SHORT val)
+static void set_nqbuf(Button* b, SHORT val)
 {
 	setf_stringq(b, false, "%d", val);
 }
 
-void see_numq(Button *b)
+void see_numq(Button* b)
 {
-	Numq *nq;
+	Numq* nq;
 	char cbuf[32];
 	Stringq sq;
 
@@ -488,14 +489,14 @@ void see_numq(Button *b)
 	init_numq_stq(nq, &sq);
 	sq.string = cbuf;
 	b->datme = &sq;
-	set_nqbuf(b, *((SHORT *)nq->val));
+	set_nqbuf(b, *((SHORT*)nq->val));
 	see_string_req(b);
 	b->datme = nq;
 }
 
-bool feel_numq(Button *b)
+bool feel_numq(Button* b)
 {
-	Numq *nq;
+	Numq* nq;
 	bool hit_enter;
 	Stringq sq;
 	char cbuf_b[32];
@@ -506,7 +507,7 @@ bool feel_numq(Button *b)
 	init_numq_stq(nq, &sq);
 	sq.string = cbuf_a;
 	b->datme = &sq;
-	set_nqbuf(b, *((SHORT *)nq->val));
+	set_nqbuf(b, *((SHORT*)nq->val));
 	hit_enter = feel_string_req(b);
 
 	lval = atol(cbuf_a);
@@ -520,7 +521,7 @@ bool feel_numq(Button *b)
 		hit_enter = 0;
 		lval = atol(cbuf_b);
 	}
-	*((SHORT *)nq->val) = lval;
+	*((SHORT*)nq->val) = lval;
 	see_string_req(b);
 	b->datme = nq;
 	return (hit_enter);

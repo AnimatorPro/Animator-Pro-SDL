@@ -12,50 +12,44 @@
 #include "memory.h"
 #include "ccache.h"
 
-
-typedef struct ghash
-	{
+typedef struct ghash {
 	UBYTE valid;
 	UBYTE ix;
 	Rgb3 rgb;
-	} Ghash;
+} Ghash;
 
-
-static Errcode c_make(Ccache *cc)
+static Errcode c_make(Ccache* cc)
 {
-if ((cc->data = pj_zalloc(RGB_MAX*sizeof(Ghash))) == NULL)
-	return(Err_no_memory);
-return(Success);
-}
-
-static void c_free(Ccache *cc)
-{
-pj_freez(&cc->data);
-}
-
-
-static int c_closest(Ccache *cc, Rgb3 *rgb, Cmap *cmap)
-{
-Ghash *gh;
-#define c_hash ((Ghash *)(cc->data))
-
-/* first look for a hash hit */
-gh = c_hash+rgb->g;
-if (!gh->valid || rgb->r != gh->rgb.r || rgb->b != gh->rgb.b)
-	{
-	++(cc->misses);
-	gh->valid = TRUE;
-	gh->ix = closestc(rgb,cmap->ctab,cmap->num_colors);
-	gh->rgb = *rgb;
+	if ((cc->data = pj_zalloc(RGB_MAX * sizeof(Ghash))) == NULL) {
+		return (Err_no_memory);
 	}
-return(gh->ix);
+	return (Success);
 }
 
+static void c_free(Ccache* cc)
+{
+	pj_freez(&cc->data);
+}
 
-Ccache cc_ghash =
-	{
+static int c_closest(Ccache* cc, Rgb3* rgb, Cmap* cmap)
+{
+	Ghash* gh;
+#define c_hash ((Ghash*)(cc->data))
+
+	/* first look for a hash hit */
+	gh = c_hash + rgb->g;
+	if (!gh->valid || rgb->r != gh->rgb.r || rgb->b != gh->rgb.b) {
+		++(cc->misses);
+		gh->valid = TRUE;
+		gh->ix = closestc(rgb, cmap->ctab, cmap->num_colors);
+		gh->rgb = *rgb;
+	}
+	return (gh->ix);
+}
+
+Ccache cc_ghash = {
 	"ghash",
 	c_make,
 	c_free,
 	c_closest,
-	};
+};

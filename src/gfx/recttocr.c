@@ -1,6 +1,6 @@
 #include "rectang.h"
 
-void rect_tocrect(register Rectangle *r,register Cliprect *cr)
+void rect_tocrect(register Rectangle* r, register Cliprect* cr)
 
 /* copys and converts a cliprect to a rectangle */
 {

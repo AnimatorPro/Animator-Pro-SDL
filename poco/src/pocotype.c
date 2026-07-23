@@ -47,8 +47,7 @@
 #include "poco.h"
 #include <string.h>
 
-struct type_table
-{
+struct type_table {
 	char* name;
 	SHORT val;
 	long size;
@@ -59,144 +58,144 @@ static struct type_table base_type_names[] = {
 	/*		 name			  val			  size			is_int */
 	/*	-----------------	-------------	-------------	-------*/
 	{
-	  "TYPE_END",
-	  TYPE_END,
-	  0,
-	  false,
+		"TYPE_END",
+		TYPE_END,
+		0,
+		false,
 	},
 	{
-	  "TYPE_CHAR",
-	  TYPE_CHAR,
-	  sizeof(char),
-	  true,
+		"TYPE_CHAR",
+		TYPE_CHAR,
+		sizeof(char),
+		true,
 	},
 	{
-	  "TYPE_UCHAR",
-	  TYPE_UCHAR,
-	  sizeof(char),
-	  true,
+		"TYPE_UCHAR",
+		TYPE_UCHAR,
+		sizeof(char),
+		true,
 	},
 	{
-	  "TYPE_SHORT",
-	  TYPE_SHORT,
-	  sizeof(short),
-	  true,
+		"TYPE_SHORT",
+		TYPE_SHORT,
+		sizeof(short),
+		true,
 	},
 	{
-	  "TYPE_USHORT",
-	  TYPE_USHORT,
-	  sizeof(short),
-	  true,
+		"TYPE_USHORT",
+		TYPE_USHORT,
+		sizeof(short),
+		true,
 	},
 	{
-	  "TYPE_INT",
-	  TYPE_INT,
-	  sizeof(int),
-	  true,
+		"TYPE_INT",
+		TYPE_INT,
+		sizeof(int),
+		true,
 	},
 	{
-	  "TYPE_UINT",
-	  TYPE_UINT,
-	  sizeof(int),
-	  true,
+		"TYPE_UINT",
+		TYPE_UINT,
+		sizeof(int),
+		true,
 	},
 	{
-	  "TYPE_LONG",
-	  TYPE_LONG,
-	  sizeof(long),
-	  true,
+		"TYPE_LONG",
+		TYPE_LONG,
+		sizeof(long),
+		true,
 	},
 	{
-	  "TYPE_ULONG",
-	  TYPE_ULONG,
-	  sizeof(long),
-	  true,
+		"TYPE_ULONG",
+		TYPE_ULONG,
+		sizeof(long),
+		true,
 	},
 	{
-	  "TYPE_FLOAT",
-	  TYPE_FLOAT,
-	  sizeof(float),
-	  false,
+		"TYPE_FLOAT",
+		TYPE_FLOAT,
+		sizeof(float),
+		false,
 	},
 	{
-	  "TYPE_DOUBLE",
-	  TYPE_DOUBLE,
-	  sizeof(double),
-	  false,
+		"TYPE_DOUBLE",
+		TYPE_DOUBLE,
+		sizeof(double),
+		false,
 	},
 	{
-	  "TYPE_POINTER",
-	  TYPE_POINTER,
-	  sizeof(Popot),
-	  false,
+		"TYPE_POINTER",
+		TYPE_POINTER,
+		sizeof(Popot),
+		false,
 	},
 	{
-	  "TYPE_FUNCTION",
-	  TYPE_FUNCTION,
-	  0,
-	  false,
+		"TYPE_FUNCTION",
+		TYPE_FUNCTION,
+		0,
+		false,
 	},
 	{
-	  "TYPE_VOID",
-	  TYPE_VOID,
-	  0,
-	  false,
+		"TYPE_VOID",
+		TYPE_VOID,
+		0,
+		false,
 	},
 	{
-	  "TYPE_ARRAY",
-	  TYPE_ARRAY,
-	  0,
-	  false,
+		"TYPE_ARRAY",
+		TYPE_ARRAY,
+		0,
+		false,
 	},
 	{
-	  "TYPE_ELLIPSIS",
-	  TYPE_ELLIPSIS,
-	  0,
-	  false,
+		"TYPE_ELLIPSIS",
+		TYPE_ELLIPSIS,
+		0,
+		false,
 	},
 	{
-	  "TYPE_SCREEN",
-	  TYPE_SCREEN,
-	  sizeof(Popot),
-	  false,
+		"TYPE_SCREEN",
+		TYPE_SCREEN,
+		sizeof(Popot),
+		false,
 	},
 #ifdef STRING_EXPERIMENT
 	{
-	  "TYPE_STRING",
-	  TYPE_STRING,
-	  sizeof(PoString),
-	  FALSE,
+		"TYPE_STRING",
+		TYPE_STRING,
+		sizeof(PoString),
+		FALSE,
 	},
 #endif /* STRING_EXPERIMENT */
 	{
-	  "TYPE_FILE",
-	  TYPE_FILE,
-	  0,
-	  false,
+		"TYPE_FILE",
+		TYPE_FILE,
+		0,
+		false,
 	},
 	{
-	  "TYPE_UNUSED0",
-	  TYPE_UNUSED0,
-	  0,
-	  false,
+		"TYPE_UNUSED0",
+		TYPE_UNUSED0,
+		0,
+		false,
 	},
 	{
-	  "TYPE_CPT",
-	  TYPE_CPT,
-	  sizeof(void*),
-	  false,
+		"TYPE_CPT",
+		TYPE_CPT,
+		sizeof(void*),
+		false,
 	},
 	{
-	  "TYPE_UNUSED1",
-	  TYPE_UNUSED1,
-	  0,
-	  false,
+		"TYPE_UNUSED1",
+		TYPE_UNUSED1,
+		0,
+		false,
 	},
 	{
-	  "TYPE_STRUCT",
-	  TYPE_STRUCT,
-	  0,
-	  false,
+		"TYPE_STRUCT",
+		TYPE_STRUCT,
+		0,
+		false,
 	},
 };
 
@@ -210,13 +209,10 @@ bool po_check_type_names(Poco_cb* pcb)
 
 	for (i = 0; i < Array_els(base_type_names); i++) {
 		if (i != base_type_names[i].val) {
-			fprintf(pcb->t.err_file,
-					"%d != %d at %s\n",
-					i,
-					base_type_names[i].val,
+			fprintf(pcb->t.err_file, "%d != %d at %s\n", i, base_type_names[i].val,
 					base_type_names[i].name);
 			po_say_internal(pcb, "base_type_names doesn't check");
-   PO_CHECK_ABORT(pcb, false);
+			PO_CHECK_ABORT(pcb, false);
 			return (false);
 		}
 	}
@@ -236,15 +232,15 @@ Type_info* po_new_type_info(Poco_cb* pcb, Type_info* old, int extras)
 	int noff;
 	int ocount;
 
-	ocount		    	 = old->comp_count + extras;
-	lsize		    	 = ocount * sizeof(Pt_long);
-	csize		    	 = ocount * sizeof(TypeComp);
-	new_type			 = po_memzalloc(pcb, sizeof(*new_type) + lsize + csize);
-	*new_type			 = *old;
+	ocount = old->comp_count + extras;
+	lsize = ocount * sizeof(Pt_long);
+	csize = ocount * sizeof(TypeComp);
+	new_type = po_memzalloc(pcb, sizeof(*new_type) + lsize + csize);
+	*new_type = *old;
 	new_type->comp_count = old->comp_count;
 	new_type->comp_alloc = ocount;
-	noff				 = sizeof(*new_type);
-	new_type->sdims		 = OPTR(new_type, noff);
+	noff = sizeof(*new_type);
+	new_type->sdims = OPTR(new_type, noff);
 	poco_copy_bytes(old->sdims, new_type->sdims, lsize);
 	noff += lsize;
 	new_type->comp = OPTR(new_type, noff);
@@ -280,8 +276,9 @@ Boolean po_is_string(Type_info* ti)
  ****************************************************************************/
 bool po_is_pointer(Type_info* ti)
 {
-	if (ti->comp_count < 2)
+	if (ti->comp_count < 2) {
 		return (false);
+	}
 	return (ti->comp[ti->comp_count - 1] == TYPE_POINTER);
 }
 
@@ -290,8 +287,9 @@ bool po_is_pointer(Type_info* ti)
  ****************************************************************************/
 bool po_is_array(Type_info* ti)
 {
-	if (ti->comp_count < 2)
+	if (ti->comp_count < 2) {
 		return (false);
+	}
 	return (ti->comp[ti->comp_count - 1] == TYPE_ARRAY);
 }
 
@@ -308,8 +306,9 @@ bool po_is_struct(Type_info* ti)
  ****************************************************************************/
 bool po_is_func(Type_info* ti)
 {
-	if (ti->comp_count < 2)
+	if (ti->comp_count < 2) {
 		return (false);
+	}
 	return (ti->comp[ti->comp_count - 1] == TYPE_FUNCTION);
 }
 
@@ -344,6 +343,9 @@ void po_set_ido_type(Type_info* ti)
 			case TYPE_VOID:
 				ti->ido_type = IDO_VOID;
 				break;
+			case TYPE_STRUCT:
+				ti->ido_type = IDO_STRUCT;
+				break;
 		}
 	} else {
 		t = ti->comp[ti->comp_count - 1];
@@ -369,14 +371,15 @@ bool po_append_type(Poco_cb* pcb, Type_info* ti, TypeComp tc, long dim, void* si
 {
 	if (ti->comp_count >= ti->comp_alloc) {
 		po_say_fatal(pcb, "variable type too complex");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 		return (false);
 	}
 	ti->comp[ti->comp_count] = tc;
-	if (tc == TYPE_STRUCT || tc == TYPE_FUNCTION)
+	if (tc == TYPE_STRUCT || tc == TYPE_FUNCTION) {
 		ti->sdims[ti->comp_count].pt = sif;
-	else
+	} else {
 		ti->sdims[ti->comp_count].l = dim;
+	}
 	ti->comp_count++;
 	po_set_ido_type(ti);
 	return (true);
@@ -399,14 +402,14 @@ bool po_copy_type(Poco_cb* pcb, Type_info* s, Type_info* d)
 #ifdef DEVELOPMENT
 	if (s->comp_count > d->comp_alloc) {
 		po_say_internal(pcb, "variable type too complex in po_copy_type");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 		return (false);
 	}
 #endif
 
 	poco_copy_bytes(s->comp, d->comp, s->comp_count * sizeof(*(d->comp)));
 	poco_copy_bytes(s->sdims, d->sdims, s->comp_count * sizeof(*(d->sdims)));
-	d->ido_type	  = s->ido_type;
+	d->ido_type = s->ido_type;
 	d->comp_count = s->comp_count;
 	return (true);
 }
@@ -418,7 +421,7 @@ bool po_cat_type(Poco_cb* pcb, Type_info* d, Type_info* s)
 {
 	if (d->comp_count + s->comp_count > d->comp_alloc) {
 		po_say_fatal(pcb, "variable type too complex");
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 		return (false);
 	}
 	poco_copy_bytes(s->comp, d->comp + d->comp_count, s->comp_count * sizeof(*(s->comp)));
@@ -452,25 +455,30 @@ bool po_fuf_types_same(Func_frame* sf, Func_frame* df)
 		if (!po_types_same(st = ss->ti, dt = ds->ti, 0)) {
 			sc = st->comp[0];
 			dc = dt->comp[0];
-			if (sc == TYPE_ELLIPSIS || dc == TYPE_ELLIPSIS)
+			if (sc == TYPE_ELLIPSIS || dc == TYPE_ELLIPSIS) {
 				return (true); /* ... will match anything */
-			if (!(po_is_void_ptr(st) || po_is_void_ptr(dt)))
+			}
+			if (!(po_is_void_ptr(st) || po_is_void_ptr(dt))) {
 				return (false);
+			}
 		}
 		ss = ss->link;
 		ds = ds->link;
 	}
 	/* if have come to end of both parameter lists at same time then
 	   the comparison is simply true */
-	if (ss == NULL && ds == NULL)
+	if (ss == NULL && ds == NULL) {
 		return (true);
+	}
 	/* check if the remaining paremeter is an ellipsis. If so return TRUE */
-	if (ss == NULL)
+	if (ss == NULL) {
 		dc = ds->ti->comp[0];
-	else
+	} else {
 		dc = ss->ti->comp[0];
-	if (dc == TYPE_ELLIPSIS)
+	}
+	if (dc == TYPE_ELLIPSIS) {
 		return (true);
+	}
 	return (false);
 }
 
@@ -499,23 +507,29 @@ bool po_types_same(Type_info* s, Type_info* d, int start)
 	TypeComp dtc;
 
 	count = s->comp_count;
-	if (count != d->comp_count)
+	if (count != d->comp_count) {
 		return (false);
+	}
 	for (i = start; i < count; i++) {
 		if ((stc = s->comp[i]) != (dtc = d->comp[i])) {
 			if (!((stc == TYPE_POINTER && dtc == TYPE_ARRAY) ||
-				  (stc == TYPE_ARRAY && dtc == TYPE_POINTER)))
+				  (stc == TYPE_ARRAY && dtc == TYPE_POINTER))) {
 				return false; /* not array/ptr intermixing, just a plain mismatch */
+			}
 		}
 
-		if (stc == TYPE_POINTER || dtc == TYPE_POINTER)
-			if (i > start) /* should never be <=, but hate to hit -1 element */
-				if (s->comp[i - 1] != d->comp[i - 1])
+		if (stc == TYPE_POINTER || dtc == TYPE_POINTER) {
+			if (i > start) { /* should never be <=, but hate to hit -1 element */
+				if (s->comp[i - 1] != d->comp[i - 1]) {
 					return false;
+				}
+			}
+		}
 
 		if (stc == TYPE_FUNCTION) {
-			if (!po_fuf_types_same(s->sdims[i].pt, d->sdims[i].pt))
+			if (!po_fuf_types_same(s->sdims[i].pt, d->sdims[i].pt)) {
 				return (false);
+			}
 		}
 	}
 	return (true);
@@ -540,13 +554,14 @@ void po_print_type(Poco_cb* pcb, FILE* f, Type_info* ti)
 				break;
 			case TYPE_FUNCTION:
 				fprintf(f, "%s(", base_type_names[tc].name);
-				fuf	  = ti->sdims[i].pt;
+				fuf = ti->sdims[i].pt;
 				param = fuf->parameters;
 				while (param != NULL) {
 					po_print_type(pcb, f, param->ti);
 					param = param->link;
-					if (param != NULL)
+					if (param != NULL) {
 						fprintf(f, ",");
+					}
 				}
 				fprintf(f, ") ");
 				break;
@@ -568,7 +583,7 @@ long po_get_type_size(Type_info* ti)
 	long elsize;
 
 	for (i = 0; i < ti->comp_count; i++) {
-		tc	   = ti->comp[i];
+		tc = ti->comp[i];
 		elsize = base_type_names[tc].size;
 		if (elsize == 0) {
 			switch (tc) {
@@ -607,14 +622,14 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 {
 	PO_CHECK_ABORT(pcb, false);
 	static char signed_and_unsigned[] = "cannot specify both signed and unsigned.";
-	static char long_and_short[]	  = "cannot specify both long and short";
+	static char long_and_short[] = "cannot specify both long and short";
 	SHORT type_token;
 	Struct_info* sif;
 	UBYTE flags = 0;
 	UBYTE comp;
 
 	ti->comp_count = 1;
-	comp		   = TYPE_BAD;
+	comp = TYPE_BAD;
 
 	for (;;) {
 		PO_CHECK_ABORT(pcb, false);
@@ -630,9 +645,11 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 			switch (type_token) {
 				case TYPE_REGISTER: /* We ignore all these... */
 				case TYPE_AUTO:
-				case TYPE_EXTERN:
 				case TYPE_CONST:
 				case TYPE_VOLATILE:
+					break;
+				case TYPE_EXTERN:
+					flags |= TFL_EXTERN;
 					break;
 
 				case TYPE_STATIC: /* set static flag for later */
@@ -640,30 +657,34 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 					break;
 
 				case TYPE_SIGNED: /* set signed flag if not unsigned */
-					if (flags & TFL_UNSIGNED)
+					if (flags & TFL_UNSIGNED) {
 						po_say_fatal(pcb, signed_and_unsigned);
-      PO_CHECK_ABORT(pcb, false);
+					}
+					PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_SIGNED;
 					break;
 
 				case TYPE_UNSIGNED: /* set unsigned flag if not signed */
-					if (flags & TFL_SIGNED)
+					if (flags & TFL_SIGNED) {
 						po_say_fatal(pcb, signed_and_unsigned);
-      PO_CHECK_ABORT(pcb, false);
+					}
+					PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_UNSIGNED;
 					break;
 
 				case TYPE_LONG: /* set long flag if not short	*/
-					if (flags & TFL_SHORT)
+					if (flags & TFL_SHORT) {
 						po_say_fatal(pcb, long_and_short);
-      PO_CHECK_ABORT(pcb, false);
+					}
+					PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_LONG;
 					break;
 
 				case TYPE_SHORT: /* set short flag if not long	*/
-					if (flags & TFL_SHORT)
+					if (flags & TFL_SHORT) {
 						po_say_fatal(pcb, long_and_short);
-      PO_CHECK_ABORT(pcb, false);
+					}
+					PO_CHECK_ABORT(pcb, false);
 					flags |= TFL_SHORT;
 					break;
 
@@ -675,7 +696,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 						comp = TYPE_INT;
 					} else {
 						ti->sdims[0].pt = sif;
-						comp			= TYPE_STRUCT;
+						comp = TYPE_STRUCT;
 					}
 					break;
 
@@ -704,7 +725,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 				break;
 			default:
 				po_say_fatal(pcb, "long cannot be specified for this type");
-    PO_CHECK_ABORT(pcb, false);
+				PO_CHECK_ABORT(pcb, false);
 				break;
 		}
 	} else {
@@ -721,7 +742,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 					break;
 				default:
 					po_say_fatal(pcb, "short cannot be specified for this type");
-     PO_CHECK_ABORT(pcb, false);
+					PO_CHECK_ABORT(pcb, false);
 					break;
 			}
 		}
@@ -746,13 +767,13 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 				break;
 			default:
 				po_say_fatal(pcb, "signed/unsigned cannot be specified for this type");
-    PO_CHECK_ABORT(pcb, false);
+				PO_CHECK_ABORT(pcb, false);
 				break;
 		}
 	}
 
-	ti->flags					 = flags & TFL_STATIC; /* we export only the static flag */
-	ti->comp[ti->comp_count - 1] = comp;			   /* save any mods to the base type */
+	ti->flags = flags & (TFL_STATIC | TFL_EXTERN); /* retain unit linkage */
+	ti->comp[ti->comp_count - 1] = comp;           /* save any mods to the base type */
 
 	if (comp != TYPE_BAD) {
 		po_set_ido_type(ti);
@@ -780,8 +801,9 @@ Symbol* po_need_local_symbol(Poco_cb* pcb)
 				if (pcb->curtoken->val.symbol->scope < pcb->rframe->scope)
 				/* make new sybol */
 				{
-					if ((var = po_new_symbol(pcb, pcb->curtoken->val.symbol->name)) == NULL)
+					if ((var = po_new_symbol(pcb, pcb->curtoken->val.symbol->name)) == NULL) {
 						return (NULL);
+					}
 					return (var);
 				} else {
 					po_redefined(pcb, pcb->curtoken->val.symbol->name);
@@ -789,11 +811,13 @@ Symbol* po_need_local_symbol(Poco_cb* pcb)
 				}
 			case PTOK_UNDEF:
 				if (pcb->curtoken->val.symbol->scope < pcb->rframe->scope) {
-					if ((var = po_new_symbol(pcb, pcb->curtoken->val.symbol->name)) == NULL)
+					if ((var = po_new_symbol(pcb, pcb->curtoken->val.symbol->name)) == NULL) {
 						return (NULL);
+					}
 					return (var);
-				} else
+				} else {
 					return (pcb->curtoken->val.symbol);
+				}
 			default:
 				po_expecting_got(pcb, "label name");
 		}
@@ -806,10 +830,10 @@ Symbol* po_need_local_symbol(Poco_cb* pcb)
  ****************************************************************************/
 Type_info* po_typi_type(Itypi* tip)
 {
-	tip->iti.comp		= tip->typec;
-	tip->iti.sdims		= tip->dimc;
+	tip->iti.comp = tip->typec;
+	tip->iti.sdims = tip->dimc;
 	tip->iti.comp_count = 0;
 	tip->iti.comp_alloc = MAX_TYPE_COMPS;
-	tip->iti.flags		= 0;
+	tip->iti.flags = 0;
 	return (&tip->iti);
 }

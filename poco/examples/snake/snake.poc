@@ -1,0 +1,318 @@
+/*
+ * Poco Snake
+ *
+ * The host owns only the window, frame pacing, and these small primitives.
+ * All persistent state, input handling, game rules, and drawing live here.
+ */
+
+#define SCREEN_TITLE 0
+#define SCREEN_PLAYING 1
+#define SCREEN_DEAD 2
+
+#define EVENT_NONE 0
+#define EVENT_KEYDOWN 1
+#define EVENT_QUIT 3
+
+#define KEY_RIGHT 1073741903
+#define KEY_LEFT 1073741904
+#define KEY_DOWN 1073741905
+#define KEY_UP 1073741906
+
+#define GRID_W 32
+#define GRID_H 24
+#define CELL_SIZE 10
+#define MAX_CELLS (GRID_W * GRID_H)
+#define TICK_MS 100
+#define MAX_FRAME_MS 1000
+
+int screen;
+int quit_requested;
+int snake_x[MAX_CELLS];
+int snake_y[MAX_CELLS];
+int snake_length;
+int direction_x;
+int direction_y;
+int next_direction_x;
+int next_direction_y;
+int food_x;
+int food_y;
+int won_game;
+long last_tick;
+long tick_accumulator;
+
+int snake_contains(int x, int y, int count)
+{
+	int i;
+
+	for (i = 0; i < count; ++i) {
+		if (snake_x[i] == x && snake_y[i] == y) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void place_food(void)
+{
+	int attempts;
+	int x;
+	int y;
+
+	/* Random placement is the usual path. The scan guarantees termination
+	 * when a nearly full board makes repeated random hits likely. */
+	for (attempts = 0; attempts < MAX_CELLS * 2; ++attempts) {
+		x = random(GRID_W);
+		y = random(GRID_H);
+		if (!snake_contains(x, y, snake_length)) {
+			food_x = x;
+			food_y = y;
+			return;
+		}
+	}
+
+	for (y = 0; y < GRID_H; ++y) {
+		for (x = 0; x < GRID_W; ++x) {
+			if (!snake_contains(x, y, snake_length)) {
+				food_x = x;
+				food_y = y;
+				return;
+			}
+		}
+	}
+}
+
+void reset_game(void)
+{
+	snake_length = 4;
+	snake_x[0] = 16;
+	snake_y[0] = 12;
+	snake_x[1] = 15;
+	snake_y[1] = 12;
+	snake_x[2] = 14;
+	snake_y[2] = 12;
+	snake_x[3] = 13;
+	snake_y[3] = 12;
+	direction_x = 1;
+	direction_y = 0;
+	next_direction_x = 1;
+	next_direction_y = 0;
+	won_game = 0;
+	place_food();
+	last_tick = ticks_ms();
+	tick_accumulator = 0;
+}
+
+void choose_direction(int x, int y)
+{
+	/* Compare with the direction of travel, not the previously queued turn.
+	 * This prevents two events in one frame from reversing into the neck. */
+	if (x != -direction_x || y != -direction_y) {
+		next_direction_x = x;
+		next_direction_y = y;
+	}
+}
+
+void handle_playing_key(int code)
+{
+	if (code == KEY_UP || code == 'w' || code == 'W') {
+		choose_direction(0, -1);
+	} else if (code == KEY_DOWN || code == 's' || code == 'S') {
+		choose_direction(0, 1);
+	} else if (code == KEY_LEFT || code == 'a' || code == 'A') {
+		choose_direction(-1, 0);
+	} else if (code == KEY_RIGHT || code == 'd' || code == 'D') {
+		choose_direction(1, 0);
+	}
+}
+
+void advance_snake(void)
+{
+	int new_x;
+	int new_y;
+	int growing;
+	int collision_count;
+	int new_length;
+	int i;
+
+	direction_x = next_direction_x;
+	direction_y = next_direction_y;
+	new_x = snake_x[0] + direction_x;
+	new_y = snake_y[0] + direction_y;
+	growing = new_x == food_x && new_y == food_y;
+
+	if (new_x < 0 || new_x >= GRID_W || new_y < 0 || new_y >= GRID_H) {
+		screen = SCREEN_DEAD;
+		return;
+	}
+
+	/* The tail moves away on an ordinary step, so it is safe to enter its old
+	 * cell. It remains occupied on a growing step. */
+	if (growing) {
+		collision_count = snake_length;
+	} else {
+		collision_count = snake_length - 1;
+	}
+	if (snake_contains(new_x, new_y, collision_count)) {
+		screen = SCREEN_DEAD;
+		return;
+	}
+
+	new_length = snake_length;
+	if (growing) {
+		if (snake_length == MAX_CELLS) {
+			won_game = 1;
+			screen = SCREEN_DEAD;
+			return;
+		}
+		new_length = snake_length + 1;
+	}
+
+	for (i = new_length - 1; i > 0; --i) {
+		snake_x[i] = snake_x[i - 1];
+		snake_y[i] = snake_y[i - 1];
+	}
+	snake_x[0] = new_x;
+	snake_y[0] = new_y;
+	snake_length = new_length;
+
+	if (growing) {
+		if (snake_length == MAX_CELLS) {
+			won_game = 1;
+			screen = SCREEN_DEAD;
+		} else {
+			place_food();
+		}
+	}
+}
+
+void init(void)
+{
+	screen = SCREEN_TITLE;
+	quit_requested = 0;
+	won_game = 0;
+	last_tick = ticks_ms();
+	tick_accumulator = 0;
+}
+
+void load_assets(void)
+{
+	/* The host's bitmap font is embedded; this example needs no files. */
+}
+
+int update(void)
+{
+	struct SnakeEvent event;
+	int transition_locked;
+	long now;
+	long elapsed;
+
+	transition_locked = 0;
+	event = poll_event();
+	while (event.type != EVENT_NONE) {
+		if (event.type == EVENT_QUIT) {
+			quit_requested = 1;
+		} else if (event.type == EVENT_KEYDOWN && !transition_locked) {
+			if (screen == SCREEN_TITLE) {
+				reset_game();
+				screen = SCREEN_PLAYING;
+				transition_locked = 1;
+			} else if (screen == SCREEN_DEAD) {
+				screen = SCREEN_TITLE;
+				last_tick = ticks_ms();
+				tick_accumulator = 0;
+				transition_locked = 1;
+			} else {
+				handle_playing_key(event.code);
+			}
+		}
+		event = poll_event();
+	}
+
+	if (quit_requested) {
+		return 1;
+	}
+
+	now = ticks_ms();
+	elapsed = now - last_tick;
+	last_tick = now;
+	if (elapsed < 0) {
+		elapsed = 0;
+	} else if (elapsed > MAX_FRAME_MS) {
+		elapsed = MAX_FRAME_MS;
+	}
+
+	if (screen == SCREEN_PLAYING) {
+		tick_accumulator += elapsed;
+		while (tick_accumulator >= TICK_MS && screen == SCREEN_PLAYING) {
+			tick_accumulator -= TICK_MS;
+			advance_snake();
+		}
+	} else {
+		tick_accumulator = 0;
+	}
+
+	return 0;
+}
+
+void draw_title(void)
+{
+	clear(5, 10, 20);
+	fill_rect(36, 58, 248, 124, 14, 45, 55);
+	fill_rect(42, 64, 236, 112, 5, 10, 20);
+	draw_text(127, 84, "SNAKE");
+	draw_text(73, 116, "PRESS ANY KEY TO START");
+	draw_text(97, 140, "ARROWS OR WASD");
+	present();
+}
+
+void draw_playing(void)
+{
+	int i;
+
+	clear(3, 8, 12);
+	fill_rect(food_x * CELL_SIZE + 2, food_y * CELL_SIZE + 2,
+			  CELL_SIZE - 4, CELL_SIZE - 4, 240, 78, 68);
+	for (i = snake_length - 1; i >= 0; --i) {
+		if (i == 0) {
+			fill_rect(snake_x[i] * CELL_SIZE + 1, snake_y[i] * CELL_SIZE + 1,
+					  CELL_SIZE - 2, CELL_SIZE - 2, 170, 255, 120);
+		} else {
+			fill_rect(snake_x[i] * CELL_SIZE + 1, snake_y[i] * CELL_SIZE + 1,
+					  CELL_SIZE - 2, CELL_SIZE - 2, 65, 185, 90);
+		}
+	}
+	draw_text(4, 4, "SNAKE");
+	present();
+}
+
+void draw_dead(void)
+{
+	clear(22, 5, 8);
+	fill_rect(42, 58, 236, 124, 68, 18, 24);
+	fill_rect(48, 64, 224, 112, 22, 5, 8);
+	if (won_game) {
+		draw_text(127, 84, "YOU WIN");
+	} else {
+		draw_text(127, 84, "GAME OVER");
+	}
+	draw_text(73, 120, "PRESS ANY KEY");
+	draw_text(91, 140, "BACK TO TITLE");
+	present();
+}
+
+void draw(void)
+{
+	if (screen == SCREEN_TITLE) {
+		draw_title();
+	} else if (screen == SCREEN_PLAYING) {
+		draw_playing();
+	} else {
+		draw_dead();
+	}
+}
+
+void shutdown(void)
+{
+	quit_requested = 1;
+	screen = SCREEN_TITLE;
+}

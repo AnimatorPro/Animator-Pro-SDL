@@ -1,0 +1,4 @@
+int broken(void)
+{
+	return missing_name;
+}

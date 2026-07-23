@@ -115,15 +115,17 @@ static void dcl(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, Symbol** name, Symb
 	for (;;) /* count stars */
 	{
 		lookup_token(pcb);
-		if (pcb->t.toktype == '*')
+		if (pcb->t.toktype == '*') {
 			ns += 1;
-		else
+		} else {
 			break;
+		}
 	}
 	dirdcl(pcb, pf, ti, name, osym);
 	PO_CHECK_ABORT_VOID(pcb);
-	while (ns-- > 0)
+	while (ns-- > 0) {
 		po_append_type(pcb, ti, TYPE_POINTER, 0, NULL);
+	}
 }
 
 /*****************************************************************************
@@ -142,7 +144,7 @@ static Symbol* force_local_symbol(Poco_cb* pcb, Symbol* s, Symbol** osym)
 	} else {
 		if (s->tok_type != PTOK_UNDEF) {
 			*osym = s;
-			s	  = po_new_symbol(pcb, s->name);
+			s = po_new_symbol(pcb, s->name);
 		}
 	}
 	if (s != NULL) {
@@ -167,42 +169,46 @@ static void dirdcl(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, Symbol** name, S
 	if (pcb->t.toktype == TOK_LPAREN) /* ( dcl ) */
 	{
 		dcl(pcb, pf, ti, name, osym);
-		if (pcb->t.toktype == TOK_RPAREN) /* ( dcl ) */
-			pcb->t.reuse = false;		  /* for typenames: eat it if a reuse is pending. */
-		else
+		if (pcb->t.toktype == TOK_RPAREN) { /* ( dcl ) */
+			pcb->t.reuse = false;           /* for typenames: eat it if a reuse is pending. */
+		} else {
 			po_unmatched_paren(pcb);
+		}
 	} else if (pcb->curtoken->is_symbol) {
-		if (name == NULL) /* for typenames... */
-			po_say_fatal(pcb,
-						 "declaration of '%s' not allowed in this expression",
+		if (name == NULL) { /* for typenames... */
+			po_say_fatal(pcb, "declaration of '%s' not allowed in this expression",
 						 pcb->curtoken->val.symbol->name);
-		else /* for regular declarations... */
+		} else { /* for regular declarations... */
 			*name = force_local_symbol(pcb, pcb->curtoken->val.symbol, osym);
+		}
 	} else {
-		if (name == NULL) /* for typenames... */
+		if (name == NULL) { /* for typenames... */
 			pushback_token(&pcb->t);
-		else if (pcb->rframe->is_proto_frame) /* for prototypes...*/
+		} else if (pcb->rframe->is_proto_frame) /* for prototypes...*/
 		{
 			pushback_token(&pcb->t);
-			*name			  = po_new_symbol(pcb, "");
+			*name = po_new_symbol(pcb, "");
 			(*name)->tok_type = PTOK_VAR;
-			*osym			  = NULL;
-		} else /* for regular declarations... */
+			*osym = NULL;
+		} else { /* for regular declarations... */
 			po_expecting_got(pcb, "name in declaration");
+		}
 	}
 
 	for (;;) {
 		lookup_token(pcb);
 		if (pcb->t.toktype == TOK_LPAREN) {
-			if (name == NULL) /* for typenames, we just eat the prototype */
+			if (name == NULL) { /* for typenames, we just eat the prototype */
 				func_proto(pcb, pf, ti, "noname");
-			else /* for regular declarations, we build a prototype... */
+			} else { /* for regular declarations, we build a prototype... */
 				func_proto(pcb, pf, ti, (*name)->name);
-		} else if (pcb->t.toktype == '[')
+			}
+		} else if (pcb->t.toktype == '[') {
 			array_decl(pcb, ti);
-		else {
-			if (name == NULL) /* for typenames...*/
+		} else {
+			if (name == NULL) { /* for typenames...*/
 				pushback_token(&pcb->t);
+			}
 			break;
 		}
 	}
@@ -219,21 +225,24 @@ static void array_decl(Poco_cb* pcb, Type_info* ti)
 
 	lookup_token(pcb);
 	if (pcb->t.toktype == ']') {
-		if (pcb->rframe->is_proto_frame)
+		if (pcb->rframe->is_proto_frame) {
 			datatype = TYPE_POINTER;
-		else if (!po_is_next_token(pcb, '='))
+		} else if (!po_is_next_token(pcb, '=')) {
 			po_say_fatal(pcb, "size of array cannot be zero");
-   PO_CHECK_ABORT_VOID(pcb);
+		}
+		PO_CHECK_ABORT_VOID(pcb);
 		dim = 0;
 	} else {
-		if (pcb->rframe->is_proto_frame)
+		if (pcb->rframe->is_proto_frame) {
 			datatype = TYPE_POINTER;
+		}
 		pushback_token(&pcb->t);
 		po_init_expframe(pcb, &ef);
 		po_get_expression(pcb, &ef);
-		if (!ef.pure_const)
+		if (!ef.pure_const) {
 			po_say_fatal(pcb, "expecting constant expression for array dimension.");
-   PO_CHECK_ABORT_VOID(pcb);
+		}
+		PO_CHECK_ABORT_VOID(pcb);
 		po_force_num_exp(pcb, &ef.ctc);
 		po_coerce_numeric_exp(pcb, &ef, IDO_INT);
 		po_eat_rbracket(pcb);
@@ -256,13 +265,15 @@ static Symbol* get_param(Poco_cb* pcb, Poco_frame* pf, SHORT pcount, long* poff)
 
 	ti = po_typi_type(&tip);
 	if (pcb->t.toktype == PTOK_ELLIPSIS) {
-		if ((var = po_new_symbol(pcb, "...")) == NULL)
+		if ((var = po_new_symbol(pcb, "...")) == NULL) {
 			return (NULL);
+		}
 		var->tok_type = PTOK_VAR;
 		var->flags |= SFL_ELLIP;
 		po_append_type(pcb, ti, TYPE_ELLIPSIS, 0L, NULL);
-		if ((var->ti = po_new_type_info(pcb, ti, 0)) == NULL)
+		if ((var->ti = po_new_type_info(pcb, ti, 0)) == NULL) {
 			return (NULL);
+		}
 		return (var);
 	}
 	if (po_get_base_type(pcb, pf, ti)) {
@@ -277,15 +288,17 @@ static Symbol* get_param(Poco_cb* pcb, Poco_frame* pf, SHORT pcount, long* poff)
 		 */
 		if (pcount == 0 && ti->comp_count == 1 && ti->comp[0] == TYPE_VOID) {
 			lookup_token(pcb);
-			if (pcb->t.toktype == TOK_RPAREN)
+			if (pcb->t.toktype == TOK_RPAREN) {
 				return NULL;
-			else
+			} else {
 				pushback_token(&pcb->t);
+			}
 		}
 		one_dec(pcb, pf, ti, &var);
-		var->symval.doff   = *poff;
+		var->symval.doff = *poff;
 		var->storage_scope = SCOPE_LOCAL;
-		*poff += po_get_param_size(pcb, var->ti->ido_type);
+		*poff += po_get_param_size(pcb, var->ti->ido_type,
+								   pcb->libfunc != NULL && pf->frame_type == FTY_STRUCT);
 		return (var);
 	} else {
 		po_expecting_got(pcb, "type in function parameter list");
@@ -305,11 +318,13 @@ static void gather_params(Poco_cb* pcb, Func_frame* proto)
 	long poff = HARD_FRAME_SIZE;
 	Symbol* var;
 
-	if (pcb->t.toktype == TOK_RPAREN)
+	if (pcb->t.toktype == TOK_RPAREN) {
 		return;
+	}
 	for (;;) {
-		if (NULL == (var = get_param(pcb, pcb->rframe, proto->pcount, &poff)))
+		if (NULL == (var = get_param(pcb, pcb->rframe, proto->pcount, &poff))) {
 			goto DONE; /* only param was the word 'void', ie, no params */
+		}
 
 		proto->pcount += 1;
 		if (var->ti->comp[0] == TYPE_ELLIPSIS) {
@@ -351,7 +366,7 @@ static Errcode transfer_params(Poco_cb* pcb, Poco_frame* pf, Func_frame* ff)
 	Symbol* plist = NULL; /* new pf->symbols */
 	Symbol* flist = NULL; /* new ff->parameters */
 	Symbol *pt, *link;
-	int pcount	= 0;
+	int pcount = 0;
 	Errcode err = Success;
 
 	link = pf->symbols;
@@ -359,16 +374,16 @@ static Errcode transfer_params(Poco_cb* pcb, Poco_frame* pf, Func_frame* ff)
 		link = pt->link;
 		if (pt->tok_type == PTOK_VAR) {
 			pt->link = flist;
-			flist	 = pt;
+			flist = pt;
 			pcount += 1;
 		} else {
 			pt->link = plist;
-			plist	 = pt;
+			plist = pt;
 		}
 	}
-	ff->pcount	   = pcount;
+	ff->pcount = pcount;
 	ff->parameters = flist;
-	pf->symbols	   = plist;
+	pf->symbols = plist;
 	return (err);
 }
 
@@ -407,31 +422,35 @@ static Errcode func_proto(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, char* nam
 	 */
 
 	if (pcb->libfunc != NULL && pf->frame_type == FTY_GLOBAL) {
-		proto->code_pt	= pcb->libfunc;
+		proto->code_pt = pcb->libfunc;
 		proto->binding_contract = pcb->libcontract;
+		proto->binding_flags = pcb->libflags;
 		proto->got_code = true;
-		proto->type		= CFF_C;
-		proto->magic	= FUNC_MAGIC; /* helps detect wild pointers at runtime */
+		proto->type = CFF_C;
+		proto->magic = FUNC_MAGIC; /* helps detect wild pointers at runtime */
 	} else {
-		proto->code_pt	= NULL;
+		proto->code_pt = NULL;
 		proto->got_code = false;
-		proto->type		= CFF_POCO;
+		proto->type = CFF_POCO;
 	}
 
 	if (pcb->t.toktype != TOK_RPAREN) {
 		po_new_frame(pcb, pf->scope + 1, name, FTY_STRUCT);
-		rf				   = pcb->rframe;
+		rf = pcb->rframe;
 		rf->is_proto_frame = true;
 		gather_params(pcb, proto);
 		transfer_params(pcb, rf, proto);
-		if (rf->fsif != NULL)
+		if (rf->fsif != NULL) {
 			po_move_sifs_to_parent(pcb);
+		}
 		po_old_frame(pcb);
 	}
 
 	proto->name = po_clone_string(pcb, name);
+	proto->unit_name = pcb->current_unit_name;
+	proto->unit_index = pcb->current_unit_index;
 	po_append_type(pcb, ti, TYPE_FUNCTION, 0L, proto);
-	proto->mlink	= pcb->run.protos;
+	proto->mlink = pcb->run.protos;
 	pcb->run.protos = proto;
 
 	return Success;
@@ -463,13 +482,13 @@ static Type_info* rev_type_info(Poco_cb* pcb, Type_info* old)
 	Type_info* newt;
 	int lsize, csize;
 
-	lsize			 = old->comp_count * sizeof(Pt_long);
-	csize			 = old->comp_count * sizeof(TypeComp);
-	newt			 = po_memzalloc(pcb, sizeof(*newt) + lsize + csize);
-	*newt			 = *old;
+	lsize = old->comp_count * sizeof(Pt_long);
+	csize = old->comp_count * sizeof(TypeComp);
+	newt = po_memzalloc(pcb, sizeof(*newt) + lsize + csize);
+	*newt = *old;
 	newt->comp_count = newt->comp_alloc = old->comp_count;
-	newt->sdims							= OPTR(newt, (sizeof(*newt)));
-	newt->comp							= OPTR(newt, (sizeof(*newt) + lsize));
+	newt->sdims = OPTR(newt, (sizeof(*newt)));
+	newt->comp = OPTR(newt, (sizeof(*newt) + lsize));
 	reverse_comps(old->comp, newt->comp, old->sdims, newt->sdims, old->comp_count);
 	po_set_ido_type(newt);
 	return (newt);
@@ -502,14 +521,14 @@ static Errcode check_params_same(Poco_cb* pcb, Func_frame* f1, Func_frame* f2)
 
 	if ((count = f1->pcount) != f2->pcount) {
 		po_say_fatal(pcb, "argument count disagrees in redeclaration of %s", f1->name);
-  PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, false);
 	} else {
 		p1 = f1->parameters;
 		p2 = f2->parameters;
 		for (i = 0; i < count; i++) {
 			if (!po_types_same(p1->ti, p2->ti, 0)) {
-				po_say_fatal(
-				  pcb, "type mismatch for argument %d in redeclaration of %s", i + 1, f1->name);
+				po_say_fatal(pcb, "type mismatch for argument %d in redeclaration of %s", i + 1,
+							 f1->name);
 			}
 			p1 = p1->link;
 			p2 = p2->link;
@@ -546,7 +565,7 @@ static void check_dupe_proto(Poco_cb* pcb, Symbol* osym, Symbol* nsym)
 	if (check_params_same(pcb, ofuf, nfuf) >= Success) {
 		if (!po_types_same(osym->ti, nsym->ti, 0)) {
 			po_say_fatal(pcb, "return type mismatch in redeclaration of %s", osym->name);
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 		} else if (ofuf->got_code && (ofuf->type == CFF_C || pcb->t.toktype == TOK_LBRACE)) {
 			po_redefined(pcb, nsym->name);
 		} else {
@@ -572,20 +591,23 @@ static void one_dec(Poco_cb* pcb, Poco_frame* pf, Type_info* base_ti, Symbol** p
 	dcl(pcb, pf, ti, &var, &osym);
 	PO_CHECK_ABORT_VOID(pcb);
 
-	if (!po_cat_type(pcb, ti, base_ti))
+	if (!po_cat_type(pcb, ti, base_ti)) {
 		return;
+	}
 	ti->flags = base_ti->flags;
 
 	ti = var->ti = rev_type_info(pcb, ti);
 	if ((po_is_func = (ti->comp[ti->comp_count - 1] == TYPE_FUNCTION)) == true) {
 		if (pf->frame_type != FTY_GLOBAL) {
 			po_say_fatal(pcb, "function prototypes only allowed outside function declarations.");
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 		}
 	}
 	if (osym != NULL) {
 		if (!po_is_func) {
-			po_redefined(pcb, var->name);
+			if (!((osym->ti->flags | var->ti->flags) & TFL_EXTERN)) {
+				po_redefined(pcb, var->name);
+			}
 		} else /* check prototypes the same... */
 		{
 			check_dupe_proto(pcb, osym, var);
@@ -618,8 +640,8 @@ static void get_body(Poco_cb* pcb, Poco_frame* pf, Symbol* fvar)
 #endif /* STRING_EXPERIMENT */
 
 	if (po_new_frame(pcb, pf->scope + 1, fvar->name, FTY_FUNC)) {
-		proto		   = po_get_proto(fvar->ti);
-		rf			   = pcb->rframe;
+		proto = po_get_proto(fvar->ti);
+		rf = pcb->rframe;
 		rf->parameters = proto->parameters;
 		/* Put parameter strings in list to clean up on function exit.
 		 * (This doesn't handle parameters past the ... in variable
@@ -631,12 +653,13 @@ static void get_body(Poco_cb* pcb, Poco_frame* pf, Symbol* fvar)
 			params = params->link;
 		}
 #endif /* STRING_EXPERIMENT */
-		rf->pcount		= proto->pcount;
+		rf->pcount = proto->pcount;
 		rf->return_type = proto->return_type;
 		/* Transfer parameters to local symbol table */
-		if (0 != (errparm = po_rehash(pcb, proto->parameters)))
+		if (0 != (errparm = po_rehash(pcb, proto->parameters))) {
 			po_say_fatal(pcb, "missing name for parameter %d of function %s", errparm, fvar->name);
-   PO_CHECK_ABORT_VOID(pcb);
+		}
+		PO_CHECK_ABORT_VOID(pcb);
 		enter_fixup = po_code_int(pcb, &rf->fcd, OP_ENTER, 0);
 		po_get_block(pcb, rf);
 		local_space = -rf->doff;
@@ -648,7 +671,7 @@ static void get_body(Poco_cb* pcb, Poco_frame* pf, Symbol* fvar)
 		po_code_op(pcb, &rf->fcd, OP_RET);
 		po_compress_func(pcb, rf, proto);
 		proto->got_code = true;
-		proto->magic	= FUNC_MAGIC; /* helps detect wild pointers at runtime */
+		proto->magic = FUNC_MAGIC; /* helps detect wild pointers at runtime */
 		po_old_frame(pcb);
 	}
 }
@@ -658,8 +681,9 @@ static void get_body(Poco_cb* pcb, Poco_frame* pf, Symbol* fvar)
  ****************************************************************************/
 void po_pop_off_result(Poco_cb* pcb, Exp_frame* e)
 {
-	if (e->ctc.ido_type != IDO_VOID)
+	if (e->ctc.ido_type != IDO_VOID) {
 		po_code_pop(pcb, &e->ecd, po_find_clean_op(pcb, &e->ctc), po_find_push_op(pcb, &e->ctc));
+	}
 }
 
 /*****************************************************************************
@@ -676,14 +700,15 @@ void po_get_typedef(Poco_cb* pcb, Poco_frame* pf)
 	ti = po_typi_type(&tip);
 	if (!po_get_base_type(pcb, pf, ti)) {
 		po_say_fatal(pcb, "no type in typedef");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
 	one_dec(pcb, pf, ti, &var);
 	var->tok_type = PTOK_USER_TYPE;
 	/* reverse type info so it will read as if it were being parsed */
-	if ((rti = rev_type_info(pcb, var->ti)) == NULL)
+	if ((rti = rev_type_info(pcb, var->ti)) == NULL) {
 		goto OUT;
+	}
 	po_freemem(var->ti);
 	var->ti = rti;
 OUT:
@@ -698,8 +723,9 @@ static void fill_in_return_type(Poco_cb* pcb, Symbol* var)
 	Type_info* ti;
 	Func_frame* fuf;
 
-	ti	= var->ti;
+	ti = var->ti;
 	fuf = ti->sdims[ti->comp_count -= 1].pt;
+	fuf->is_static = (ti->flags & TFL_STATIC) != 0;
 	/* A contracted raw native pointer returns as a bounded Poco pointer.  The
 	 * legacy compiler normally marks C-library pointer returns TYPE_CPT and
 	 * later expands them to an unbounded Popot; retain the contract's Popot
@@ -728,7 +754,7 @@ static void based_decs(Poco_cb* pcb, Poco_frame* pf, Type_info* base_ti)
 	SHORT frame_type;
 	bool is_fu;
 
-loop : {
+loop: {
 	one_dec(pcb, pf, base_ti, &var);
 	PO_CHECK_ABORT_VOID(pcb);
 	if ((is_fu = po_is_func(var->ti)) == true) {
@@ -736,21 +762,25 @@ loop : {
 	} else {
 		po_new_var_space(pcb, var);
 #ifdef STRING_EXPERIMENT
-		if (pf->frame_type == FTY_FUNC)
+		if (pf->frame_type == FTY_FUNC) {
 			po_add_local_string(pcb, pf, var);
+		}
 #endif /* STRING_EXPERIMENT */
 	}
 	if (pcb->t.toktype == '=') /* it's an assignment, whoopie */
 	{
+		/* In C, an extern declaration with an initializer is a definition. */
+		var->ti->flags &= ~TFL_EXTERN;
 		if ((frame_type = pf->frame_type) == FTY_STRUCT) {
 			po_say_fatal(pcb, "= not allowed inside structure definitions");
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 			goto end;
 		}
 		rf = pf;
 		if (var->storage_scope == SCOPE_GLOBAL) {
-			while (rf->frame_type != FTY_GLOBAL)
+			while (rf->frame_type != FTY_GLOBAL) {
 				rf = rf->next;
+			}
 			frame_type = FTY_GLOBAL;
 		}
 		po_init_expframe(pcb, &eee);
@@ -773,7 +803,7 @@ loop : {
 			get_body(pcb, pf, var);
 			goto end;
 		default:
-		wanna:
+wanna:
 			po_expecting_got(pcb, ", or ;");
 			goto end;
 	}
@@ -795,9 +825,10 @@ void po_get_typename(Poco_cb* pcb, Type_info* ti)
 	po_need_token(pcb);
 
 #ifdef DEVELOPMENT
-	if (false == po_get_base_type(pcb, pf, ti))
+	if (false == po_get_base_type(pcb, pf, ti)) {
 		po_say_internal(pcb, "bad return from po_get_base_type detected in po_get_typename");
-  PO_CHECK_ABORT_VOID(pcb);
+	}
+	PO_CHECK_ABORT_VOID(pcb);
 #else
 	po_get_base_type(pcb, pf, ti);
 #endif

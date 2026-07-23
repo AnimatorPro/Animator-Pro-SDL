@@ -11,18 +11,18 @@
 #include <string.h>
 #include <memory.h>
 
-#include "picdrive.h"   /* required header file */
-#include "errcodes.h"   /* most PDR modules will need error codes info  */
-#include "animinfo.h"   /* need gfx to access the screen */
-#include "gfx.h"        /* need gfx to access the screen */
-#include "cmap.h"       /* need gfx to access the screen */
+#include "picdrive.h" /* required header file */
+#include "errcodes.h" /* most PDR modules will need error codes info  */
+#include "animinfo.h" /* need gfx to access the screen */
+#include "gfx.h"      /* need gfx to access the screen */
+#include "cmap.h"     /* need gfx to access the screen */
 
 /*----------------------------------------------------------------------------
  * forward declarations
  *--------------------------------------------------------------------------*/
 
-extern Errcode pdr_boxfmt(char *fmt, ...);
-extern char   *stristr(char *string, char *pattern);
+extern Errcode pdr_boxfmt(char* fmt, ...);
+extern char* stristr(char* string, char* pattern);
 
 
 /*----------------------------------------------------------------------------
@@ -32,7 +32,7 @@ extern char   *stristr(char *string, char *pattern);
 
 #undef debug
 #if 1
-#define debug(...)    pdr_boxfmt(__VA_ARGS__)
+#define debug(...) pdr_boxfmt(__VA_ARGS__)
 #else
 #define debug(...)
 #endif
@@ -41,23 +41,23 @@ extern char   *stristr(char *string, char *pattern);
 /*----------------------------------------------------------------------------
  * set up the host libraries we need...
  *--------------------------------------------------------------------------*/
-//#define HLIB_TYPE_1 AA_GFXLIB
-//#define HLIB_TYPE_2 AA_STDIOLIB
-//#define HLIB_TYPE_3 AA_SYSLIB
+// #define HLIB_TYPE_1 AA_GFXLIB
+// #define HLIB_TYPE_2 AA_STDIOLIB
+// #define HLIB_TYPE_3 AA_SYSLIB
 //
-//#include "../../inc/rexlib.h"
-//#include <hliblist.h>			/* autobuild host library list */
+// #include "../../inc/rexlib.h"
+// #include <hliblist.h>			/* autobuild host library list */
 
 
 /*----------------------------------------------------------------------------
  * driver description strings.
  *--------------------------------------------------------------------------*/
-char long_description[]  = "This driver doesn't actually process "
-						   "any picture file format.\n\n"
-						   "It just demonstrates the major features "
-						   "of coding a picture driver, and can be "
-						   "cloned as a starting point for a new driver."
-						   ;
+char long_description[] =
+	"This driver doesn't actually process "
+	"any picture file format.\n\n"
+	"It just demonstrates the major features "
+	"of coding a picture driver, and can be "
+	"cloned as a starting point for a new driver.";
 
 /*----------------------------------------------------------------------------
  * options data.
@@ -69,25 +69,25 @@ char long_description[]  = "This driver doesn't actually process "
  *	create_ifile() function gets called, we'll notice that and use the
  *	requested options instead of the inbuilt defaults.
  *--------------------------------------------------------------------------*/
-char style_selections[] =	 "Select output format:\n"
-							 "Old Style\n"
-							 "New Style\n"
-							 "New Improved Style\n"
-							 "Cancel\n"
-							 ;
+char style_selections[] =
+	"Select output format:\n"
+	"Old Style\n"
+	"New Style\n"
+	"New Improved Style\n"
+	"Cancel\n";
 
-char compress_selections[] = "Select compression method:\n"
-							 "No compression\n"
-							 "Method 1\n"
-							 "Method X\n"
-							 "Method Y\n"
-							 "Method Z\n"
-							 "Cancel\n"
-							 ;
+char compress_selections[] =
+	"Select compression method:\n"
+	"No compression\n"
+	"Method 1\n"
+	"Method X\n"
+	"Method Y\n"
+	"Method Z\n"
+	"Cancel\n";
 
 Pdroptions output_options = {
-	style_selections,				/* option 1 qchoice selection list */
-	compress_selections,			/* option 2 qchoice selection list */
+	style_selections,    /* option 1 qchoice selection list */
+	compress_selections, /* option 2 qchoice selection list */
 	NULL,
 	NULL,
 	0,
@@ -98,21 +98,19 @@ Pdroptions output_options = {
 	/* two more strings could appear here */
 };
 
-#define OUTPUT_STYLE_DEFAULT	2	/* default style = New Improved Style */
-#define OUTPUT_COMPRESS_DEFAULT 0	/* default compression = None		  */
-
+#define OUTPUT_STYLE_DEFAULT 2    /* default style = New Improved Style */
+#define OUTPUT_COMPRESS_DEFAULT 0 /* default compression = None		  */
 
 /*----------------------------------------------------------------------------
  * Skel_file structure, our extension to host's Image_file.
  *--------------------------------------------------------------------------*/
 typedef struct skel_file {
-	Image_file	hdr;			 /* PJ Image_file, must be first in struct! */
-	FILE		*file;
-	int 		width;
-	int 		height;
-	int 		pdepth;
-	} Skel_file;
-
+	Image_file hdr; /* PJ Image_file, must be first in struct! */
+	FILE* file;
+	int width;
+	int height;
+	int pdepth;
+} Skel_file;
 
 /*----------------------------------------------------------------------------
  * code...
@@ -124,7 +122,7 @@ typedef struct skel_file {
  * if the host has asked for anything else, force the data in the Anim_info
  * to match what we can do, and return FALSE to indicate we tweaked it.
  ****************************************************************************/
-static bool spec_best_fit(Anim_info *ainfo)
+static bool spec_best_fit(Anim_info* ainfo)
 {
 	debug("In spec_best_fit()...\n");
 
@@ -137,42 +135,38 @@ static bool spec_best_fit(Anim_info *ainfo)
 	return false;
 }
 
-
 /*****************************************************************************
  * Clean up resources used by picture driver.
  ****************************************************************************/
-static void close_file(Image_file **psf)
+static void close_file(Image_file** psf)
 {
-	Skel_file *sf;
+	Skel_file* sf;
 
 	debug("In close_file()...\n");
 
-	if(psf == NULL || *psf == NULL) { /* these could be NULL if we get   */
-		return; 					/* called by our own error cleanup.*/
-	}
-	else {
-		sf = (Skel_file *)*psf; 	/* retrieve and recast to our type */
-	}
-
-	if (sf->file != NULL) {			/* if file is open, 			   */
-		fclose(sf->file);			/* close it.					   */
+	if (psf == NULL || *psf == NULL) { /* these could be NULL if we get   */
+		return;                        /* called by our own error cleanup.*/
+	} else {
+		sf = (Skel_file*)*psf; /* retrieve and recast to our type */
 	}
 
-	free(sf);						/* free our control structure	   */
-	*psf = NULL;					/* indicate it's now free          */
+	if (sf->file != NULL) { /* if file is open, 			   */
+		fclose(sf->file);   /* close it.					   */
+	}
+
+	free(sf);    /* free our control structure	   */
+	*psf = NULL; /* indicate it's now free          */
 	return;
-
 }
-
 
 /*****************************************************************************
  * allocate main data structure, open file.
  ****************************************************************************/
-static Errcode alloc_and_open(Skel_file **psf, char *path, char *openmode)
+static Errcode alloc_and_open(Skel_file** psf, char* path, char* openmode)
 {
 	(void)path;
 	(void)openmode;
-	Skel_file	*sf = (Skel_file *)malloc(sizeof(Skel_file));
+	Skel_file* sf = (Skel_file*)malloc(sizeof(Skel_file));
 
 	/*------------------------------------------------------------------------
 	 * obtain some storage for our control structure, punt on error.
@@ -191,22 +185,18 @@ static Errcode alloc_and_open(Skel_file **psf, char *path, char *openmode)
 	return Success;
 }
 
-
 /*****************************************************************************
  * Open up the file, verify file header.
  ****************************************************************************/
-static Errcode open_file(Pdr *pd,
-				  char		 *path,
-				  Image_file **pif,
-				  Anim_info  *ainfo)
+static Errcode open_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 {
-	Errcode 	err;
-	Skel_file	*sf;
+	Errcode err;
+	Skel_file* sf;
 
 	debug("In open_file()...\nFile=%s\n", path);
 
-	sf	 = NULL;			/* preset these to NULL in case we take our 	*/
-	*pif = NULL;			/* error exit path before everything's alloc'd. */
+	sf = NULL;   /* preset these to NULL in case we take our 	*/
+	*pif = NULL; /* error exit path before everything's alloc'd. */
 
 	/*------------------------------------------------------------------------
 	 * allocate main data structure, open file.
@@ -214,7 +204,7 @@ static Errcode open_file(Pdr *pd,
 
 	err = alloc_and_open(&sf, path, "rb");
 	if (err != Success) {
-		close_file((Image_file **)&sf);
+		close_file((Image_file**)&sf);
 		return err;
 	}
 
@@ -235,15 +225,15 @@ static Errcode open_file(Pdr *pd,
 	 *----------------------------------------------------------------------*/
 
 	if (strcasestr(path, "dmyrgb")) {
-		sf->width  = 640;
+		sf->width = 640;
 		sf->height = 3;
 		sf->pdepth = 24;
 	} else if (strcasestr(path, "dmy")) {
-		sf->width  = 640;
+		sf->width = 640;
 		sf->height = 480;
 		sf->pdepth = 8;
 	} else {
-		close_file((Image_file **)&sf);
+		close_file((Image_file**)&sf);
 		return Err_pic_unknown;
 	}
 
@@ -252,47 +242,44 @@ static Errcode open_file(Pdr *pd,
 	 *----------------------------------------------------------------------*/
 
 	memset(ainfo, 0, sizeof(*ainfo));
-	ainfo->width  = sf->width;
+	ainfo->width = sf->width;
 	ainfo->height = sf->height;
-	ainfo->depth  = sf->pdepth;
+	ainfo->depth = sf->pdepth;
 	ainfo->num_frames = 1;
 	ainfo->millisec_per_frame = DEFAULT_AINFO_SPEED;
 
-	*pif = (Image_file *)sf;
+	*pif = (Image_file*)sf;
 	return Success;
 }
-
 
 /*****************************************************************************
  * read in 1st (er, only) image.
  ****************************************************************************/
-static Errcode read_first(Image_file *ifile, Rcel *screen)
+static Errcode read_first(Image_file* ifile, Rcel* screen)
 {
 	Errcode err;
-	Skel_file *sf = (Skel_file *)ifile;
+	Skel_file* sf = (Skel_file*)ifile;
 
 	debug("In read_first()...\n");
 
-	if (sf->pdepth > 8) {				/* we don't do rgb via this routine */
+	if (sf->pdepth > 8) { /* we don't do rgb via this routine */
 		return Err_rgb_convert;
 	}
 
-/*	pj_set_rast(screen, 0); 			*/		/* clear the screen */
-/*	err = read_the_picture(sf, screen); */		/* load the picture */
+	/*	pj_set_rast(screen, 0); 			*/ /* clear the screen */
+	/*	err = read_the_picture(sf, screen); */ /* load the picture */
 
 	return err;
 }
 
-
 /*****************************************************************************
  * Since we only have one frame this routine is pretty trivial.
  ****************************************************************************/
-static Errcode read_next(Image_file *ifile, Rcel *screen)
+static Errcode read_next(Image_file* ifile, Rcel* screen)
 {
 	debug("In read_next()...\n");
-	return(Success);
+	return (Success);
 }
-
 
 /*****************************************************************************
  * this routine sets internal control information such that the next call
@@ -305,17 +292,16 @@ static Errcode read_next(Image_file *ifile, Rcel *screen)
  * completely process the image data.  (first pass builds color map, second
  * pass loads data to screen while fitting it to the map.)
  ****************************************************************************/
-Errcode rgb_seekstart(Image_file *pif)
+Errcode rgb_seekstart(Image_file* pif)
 {
-	Skel_file *sf = (Skel_file *)pif;
+	Skel_file* sf = (Skel_file*)pif;
 
 	debug("In rgb_seekstart()...\n");
 
-/*	fseek(sf->file, sf->data_offset, SEEK_SET); */ /* seek to data in file */
+	/*	fseek(sf->file, sf->data_offset, SEEK_SET); */ /* seek to data in file */
 
 	return Success;
 }
-
 
 /*****************************************************************************
  * read the next line of rgb data and return status of read.
@@ -325,32 +311,28 @@ Errcode rgb_seekstart(Image_file *pif)
  * routine).  It's best, of course, to check for EOF explicitly in your reader
  * and return Err_truncated if the host attempts to read too many lines.
  ****************************************************************************/
-static Errcode rgb_readline(Image_file *pif, Rgb3 *linebuf)
+static Errcode rgb_readline(Image_file* pif, Rgb3* linebuf)
 {
-	Skel_file *sf = (Skel_file *)pif;
+	Skel_file* sf = (Skel_file*)pif;
 
 	debug("In rgb_readline()...\n");
 
-/*	return read_some_rgb_data(sf, linebuf); */
+	/*	return read_some_rgb_data(sf, linebuf); */
 
 	return Success;
 }
 
-
 /*****************************************************************************
  * create an output file (alloc, open, and write file header).
  ****************************************************************************/
-static Errcode create_file(Pdr 		 *pd,
-					char		 *path,
-					Image_file	 **pif,
-					Anim_info	 *ainfo)
+static Errcode create_file(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 {
-	Errcode 	err;
-	Skel_file	*sf;
+	Errcode err;
+	Skel_file* sf;
 
 	debug("In create_file()...\nFile=%s", path);
 
-	sf	 = NULL;
+	sf = NULL;
 	*pif = NULL;
 
 	/*------------------------------------------------------------------------
@@ -359,7 +341,7 @@ static Errcode create_file(Pdr 		 *pd,
 
 	err = alloc_and_open(&sf, path, "wb");
 	if (err != Success) {
-		close_file((Image_file **)&sf);
+		close_file((Image_file**)&sf);
 		return err;
 	}
 
@@ -367,26 +349,23 @@ static Errcode create_file(Pdr 		 *pd,
 	 * save what we need out of anim_info, and return success...
 	 *----------------------------------------------------------------------*/
 
-	 sf->width	= ainfo->width;
-	 sf->height = ainfo->height;
+	sf->width = ainfo->width;
+	sf->height = ainfo->height;
 
-	 *pif = (Image_file *)sf;
-	 return Success;
+	*pif = (Image_file*)sf;
+	return Success;
 }
 
 /*****************************************************************************
  * save screen image.
  ****************************************************************************/
 
-static Errcode save_frames(Image_file	 *ifile,
-					Rcel		 *screen,
-					int 		 num_frames,
-					Errcode 	 (*seek_frame)(int ix,void *seek_data),
-					void		 *seek_data,
-					Rcel		 *work_screen )
+static Errcode save_frames(Image_file* ifile, Rcel* screen, int num_frames,
+						   Errcode (*seek_frame)(int ix, void* seek_data), void* seek_data,
+						   Rcel* work_screen)
 {
-	Errcode 	err = Success;
-	Skel_file	*sf = (Skel_file *)ifile;
+	Errcode err = Success;
+	Skel_file* sf = (Skel_file*)ifile;
 
 	debug("In save_frames()...\n");
 
@@ -404,11 +383,10 @@ static Errcode save_frames(Image_file	 *ifile,
 	 * write the picture file from the input screen, using output options.
 	 *----------------------------------------------------------------------*/
 
-/*	  err = write_the_picture(sf, screen, output_options); */
+	/*	  err = write_the_picture(sf, screen, output_options); */
 
 	return err;
 }
-
 
 /*----------------------------------------------------------------------------
  * Setup rex & pdr interface structures...
@@ -431,8 +409,8 @@ Pdr skeleton_header = {
 	 * stuff past the memory of the config file.
 	 */
 
-	"Skeleton (Dummy) format",   /* title_info */
-	long_description,                    /* long_info */
+	"Skeleton (Dummy) format", /* title_info */
+	long_description,          /* long_info */
 
 	/*
 	 * Suffixes in SDL use a specific format:
@@ -441,18 +419,19 @@ Pdr skeleton_header = {
 	 * - separate multiple extensions with ';'
 	 */
 
-	"dmy;dm1",                /* default_suffi */
-	1,1,   /* max_write_frames, max_read_frames */
-	spec_best_fit,                       /* (*spec_best_fit)() */
-	create_file,                         /* (*create_image_file)() */
-	open_file,                           /* (*open_image_file)() */
-	close_file,                          /* (*close_image_file)() */
-	read_first,                          /* (*read_first_frame)() */
-	read_next,                           /* (*read_delta_next)() */
-	save_frames,                         /* (*save_frames)() */
-	&output_options,             /* pointer to options structure */
-	rgb_seekstart,                       /* (*rgb_seekstart)() */
-	rgb_readline,                        /* (*rgb_readline() */
+	"dmy;dm1", /* default_suffi */
+	1,
+	1,               /* max_write_frames, max_read_frames */
+	spec_best_fit,   /* (*spec_best_fit)() */
+	create_file,     /* (*create_image_file)() */
+	open_file,       /* (*open_image_file)() */
+	close_file,      /* (*close_image_file)() */
+	read_first,      /* (*read_first_frame)() */
+	read_next,       /* (*read_delta_next)() */
+	save_frames,     /* (*save_frames)() */
+	&output_options, /* pointer to options structure */
+	rgb_seekstart,   /* (*rgb_seekstart)() */
+	rgb_readline,    /* (*rgb_readline() */
 };
 
 

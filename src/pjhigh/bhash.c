@@ -118,8 +118,10 @@ typedef union bhash_slot {
 		int b : 6;
 		unsigned x : 6;
 	} s;
+
 	uint32_t all;
 } BhashSlot;
+
 STATIC_ASSERT(bhash, sizeof(BhashSlot) == 4);
 
 typedef struct bhash_domain {
@@ -127,23 +129,22 @@ typedef struct bhash_domain {
 } BhashDomain;
 
 typedef struct bhash_control {
-	BhashDomain *cachedata;
-	Rgb3   *ctab;
-	int    rederr;
-	int    grnerr;
-	int    bluerr;
+	BhashDomain* cachedata;
+	Rgb3* ctab;
+	int rederr;
+	int grnerr;
+	int bluerr;
 #ifdef SHOW_STATS
 	int calls, hits1, hits2, fhits, misses;
 #endif
 } BhashCtl;
 
 /* 32kb hash table: 4096 domains of 2 slots of 4 bytes */
-#define BSIZ (16*16*16*sizeof(BhashDomain))
+#define BSIZ (16 * 16 * 16 * sizeof(BhashDomain))
 
 static BhashCtl bhashctl;
 
-static int
-clamp(int a, int b, int c)
+static int clamp(int a, int b, int c)
 {
 	return Max(a, Min(b, c));
 }
@@ -156,14 +157,14 @@ void free_bhash(void)
 	if (bhashctl.cachedata != NULL) {
 		pj_freez(&bhashctl.cachedata);
 #ifdef SHOW_STATS
-		continu_box("Hash stats:\n"
-					"  Calls:      %d\n"
-					"  Hits 1:     %d\n"
-					"  Hits 2:     %d\n"
-					"  False hits: %d\n"
-					"  Misses:     %d\n"
-						bhashctl.calls, bhashctl.hits1, bhashctl.hits2,
-						bhashctl.fhits, bhashctl.misses);
+		continu_box(
+			"Hash stats:\n"
+			"  Calls:      %d\n"
+			"  Hits 1:     %d\n"
+			"  Hits 2:     %d\n"
+			"  False hits: %d\n"
+			"  Misses:     %d\n" bhashctl.calls,
+			bhashctl.hits1, bhashctl.hits2, bhashctl.fhits, bhashctl.misses);
 #endif
 	}
 }
@@ -173,24 +174,25 @@ Errcode make_bhash(void)
  *
  ****************************************************************************/
 {
-	free_bhash();							// make sure it's gone.
-	clear_mem(&bhashctl, sizeof(bhashctl)); // clean out dithering, etc.
+	free_bhash();                            // make sure it's gone.
+	clear_mem(&bhashctl, sizeof(bhashctl));  // clean out dithering, etc.
 
-	if(NULL == (bhashctl.cachedata = pj_malloc(BSIZ)))
-		return(Err_no_memory);
+	if (NULL == (bhashctl.cachedata = pj_malloc(BSIZ))) {
+		return (Err_no_memory);
+	}
 
-	clear_mem(bhashctl.cachedata, BSIZ);	// init cache area to zeros.
+	clear_mem(bhashctl.cachedata, BSIZ);  // init cache area to zeros.
 
 	/* Init the first two slots in the cache to a special value. */
 	bhashctl.cachedata[0].slot[0].all = SPECIAL_CASE_INIT_VALUE;
 	bhashctl.cachedata[0].slot[1].all = SPECIAL_CASE_INIT_VALUE;
 
-	bhashctl.ctab = vb.pencel->cmap->ctab;	// do all the dereferencing once.
+	bhashctl.ctab = vb.pencel->cmap->ctab;  // do all the dereferencing once.
 
-	return(Success);
+	return (Success);
 }
 
-bool is_bhash(void)	/* used by GEL tool to see if bhash already in place */
+bool is_bhash(void) /* used by GEL tool to see if bhash already in place */
 /*****************************************************************************
  *
  ****************************************************************************/
@@ -198,7 +200,7 @@ bool is_bhash(void)	/* used by GEL tool to see if bhash already in place */
 	return (bhashctl.cachedata != NULL);
 }
 
-int bclosest_col(const Rgb3 *rgb, int count, SHORT dither)
+int bclosest_col(const Rgb3* rgb, int count, SHORT dither)
 /*****************************************************************************
  * find closest color in color map to a true color value,
  * using a cache.  This for speed will truncate the RGB values
@@ -208,16 +210,15 @@ int bclosest_col(const Rgb3 *rgb, int count, SHORT dither)
  * flag in the device driver to tell us how to do this.  (<-Yeah!)
  ****************************************************************************/
 {
-BhashDomain *h;
-int i;
-int r,g,b;
-int closest;
-Rgb3 drgb;	/* rgb after dither adjustments */
-BhashSlot srgb;
+	BhashDomain* h;
+	int i;
+	int r, g, b;
+	int closest;
+	Rgb3 drgb; /* rgb after dither adjustments */
+	BhashSlot srgb;
 
 	/* Add the dithering error from the last call into the current call. */
-	if (dither)
-	{
+	if (dither) {
 		r = clamp(0, rgb->r + bhashctl.rederr, RGB_MAX - 1);
 		g = clamp(0, rgb->g + bhashctl.grnerr, RGB_MAX - 1);
 		b = clamp(0, rgb->b + bhashctl.bluerr, RGB_MAX - 1);
@@ -231,22 +232,24 @@ BhashSlot srgb;
 
 	/* Look for a cache hit. */
 	srgb.all = 0;
-	srgb.s.r = rgb->r>>2;
-	srgb.s.g = rgb->g>>2;
-	srgb.s.b = rgb->b>>2;
+	srgb.s.r = rgb->r >> 2;
+	srgb.s.g = rgb->g >> 2;
+	srgb.s.b = rgb->b >> 2;
 
-	i = ((((srgb.s.r&0xf)<<8) + ((srgb.s.g&0xf)<<4) + ((srgb.s.b&0xf))));
+	i = ((((srgb.s.r & 0xf) << 8) + ((srgb.s.g & 0xf) << 4) + ((srgb.s.b & 0xf))));
 	h = bhashctl.cachedata + i;
 
 	/* Check first slot. */
 	srgb.s.index = h->slot[0].s.index;
-	if (srgb.all == h->slot[0].all)
+	if (srgb.all == h->slot[0].all) {
 		goto GOTIT;
+	}
 
 	/* Check second slot. */
 	srgb.s.index = h->slot[1].s.index;
-	if (srgb.all == h->slot[1].all)
+	if (srgb.all == h->slot[1].all) {
 		goto GOTIT;
+	}
 
 	/* Total cache miss. */
 	srgb.s.index = closestc(rgb, bhashctl.ctab, count);
@@ -257,16 +260,15 @@ GOTIT:
 
 	/* Save the dithering error for use in the next call. */
 	closest = srgb.s.index;
-	if (dither)
-	{
+	if (dither) {
 		rgb = bhashctl.ctab + closest;
 
 		/* Note: the original asm used an arithmetic shift here which
 		 * produces different results when the error is negative.
 		 */
-		bhashctl.rederr = 3*(r - rgb->r)/4;
-		bhashctl.grnerr = 3*(g - rgb->g)/4;
-		bhashctl.bluerr = 3*(b - rgb->b)/4;
+		bhashctl.rederr = 3 * (r - rgb->r) / 4;
+		bhashctl.grnerr = 3 * (g - rgb->g) / 4;
+		bhashctl.bluerr = 3 * (b - rgb->b) / 4;
 	}
-	return(closest);
+	return (closest);
 }

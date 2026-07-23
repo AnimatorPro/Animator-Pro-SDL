@@ -7,26 +7,23 @@
 #include "errcodes.h"
 #include "textutil.h"
 
-#define DIR_DELIM   '/'
-#define DIR_DELIM2  '\\'
+#define DIR_DELIM '/'
+#define DIR_DELIM2 '\\'
 
-enum TextCopyDelim {
-	TEXT_COPY_DELIM_NONE,
-	TEXT_COPY_DELIM_DIRS
-};
+enum TextCopyDelim { TEXT_COPY_DELIM_NONE, TEXT_COPY_DELIM_DIRS };
 
 /* Function: text_count_until_dir_delim
  *
  *  Count the number of bytes up to (excluding) the next directory delimiter.
  */
-size_t
-text_count_until_dir_delim(const char *s)
+size_t text_count_until_dir_delim(const char* s)
 {
 	size_t n = 0;
 
 	while (*s != '\0') {
-		if (*s == DIR_DELIM || *s == DIR_DELIM2)
+		if (*s == DIR_DELIM || *s == DIR_DELIM2) {
 			break;
+		}
 
 		n++;
 		s++;
@@ -42,23 +39,28 @@ text_count_until_dir_delim(const char *s)
  *
  *  Returns the number of bytes copied from src, or an error code.
  */
-static Errcode
-text_ncopy_delim(char *dst, const char *src, size_t n, enum TextCopyDelim delim)
+static Errcode text_ncopy_delim(char* dst, const char* src, size_t n, enum TextCopyDelim delim)
 {
 	size_t rem = n;
 
-	if (!pj_assert(dst != NULL)) return Err_bad_input;
-	if (!pj_assert(src != NULL)) return Err_bad_input;
-	if (!pj_assert(n > 0)) return Err_range;
+	if (!pj_assert(dst != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(src != NULL)) {
+		return Err_bad_input;
+	}
+	if (!pj_assert(n > 0)) {
+		return Err_range;
+	}
 
 	while (*src != '\0') {
-		if (delim == TEXT_COPY_DELIM_DIRS
-				&& (*src == DIR_DELIM || *src == DIR_DELIM2)) {
+		if (delim == TEXT_COPY_DELIM_DIRS && (*src == DIR_DELIM || *src == DIR_DELIM2)) {
 			break;
 		}
 
-		if (--rem <= 0)
+		if (--rem <= 0) {
 			break;
+		}
 
 		*dst++ = *src++;
 	}
@@ -71,8 +73,7 @@ text_ncopy_delim(char *dst, const char *src, size_t n, enum TextCopyDelim delim)
  *
  *  text_ncopy_delim with no delimiters.
  */
-Errcode
-text_ncopy(char *dst, const char *src, size_t n)
+Errcode text_ncopy(char* dst, const char* src, size_t n)
 {
 	return text_ncopy_delim(dst, src, n, TEXT_COPY_DELIM_NONE);
 }
@@ -81,8 +82,7 @@ text_ncopy(char *dst, const char *src, size_t n)
  *
  *  text_ncopy_delim with directory separator delimiters.
  */
-Errcode
-text_ncopy_dir_delim(char *dst, const char *src, size_t n)
+Errcode text_ncopy_dir_delim(char* dst, const char* src, size_t n)
 {
 	return text_ncopy_delim(dst, src, n, TEXT_COPY_DELIM_DIRS);
 }

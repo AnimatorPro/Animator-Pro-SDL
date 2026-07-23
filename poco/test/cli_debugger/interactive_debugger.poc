@@ -1,0 +1,21 @@
+/* stdin-driven interactive debugger fixture */
+
+int leaf(int input)
+{
+	int doubled = input * 2;
+	return doubled + 1;
+}
+
+int helper(int value)
+{
+	int local = value + 3;
+	local = leaf(local);
+	return local;
+}
+
+main()
+{
+	int answer = 4;
+	answer = helper(answer);
+	return answer;
+}

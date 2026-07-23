@@ -2,7 +2,7 @@
 #define A3D_H
 
 #ifndef STDTYPES_H
-	#include "stdtypes.h"
+#include "stdtypes.h"
 #endif
 
 struct button;
@@ -21,11 +21,11 @@ struct short_xyz;
 #define PATH_SAMPLED 2
 #define PATH_CLOCKED 3
 
-#define OPS_SCREEN	0
-#define OPS_THECEL	1
-#define OPS_POLY 	2
-#define OPS_SPLINE	3
-#define OPS_TWEEN   4
+#define OPS_SCREEN 0
+#define OPS_THECEL 1
+#define OPS_POLY 2
+#define OPS_SPLINE 3
+#define OPS_TWEEN 4
 
 extern struct menuhdr a3d_menu;
 
@@ -39,15 +39,15 @@ extern SHORT got_path;
 extern char inspin;
 
 /* a3d.c */
-extern void default_center(struct short_xyz *v);
+extern void default_center(struct short_xyz* v);
 extern void iscale_theta(void);
-extern void ado_xyz_slider(struct button *b);
-extern void xyz_zero_sl(struct button *m);
+extern void ado_xyz_slider(struct button* b);
+extern void xyz_zero_sl(struct button* m);
 extern void mado_loop(void);
 extern void mado_view(void);
 extern void mauto_ado(void);
 extern void ado_clear_pos(void);
-extern void move_along(struct button *m);
+extern void move_along(struct button* m);
 extern void qload_a3d(void);
 extern void qsave_a3d(void);
 extern void mview_path(void);
@@ -57,7 +57,7 @@ extern void go_ado(void);
 extern Errcode get_a3d_state(void);
 extern Errcode set_a3d_state(void);
 extern void ado_clear_all(void);
-extern void a3d_check_el(bool *no_poly, bool *no_tween);
+extern void a3d_check_el(bool* no_poly, bool* no_tween);
 
 extern void make_rot_op(void);
 extern Errcode do_move_along(void);
@@ -65,7 +65,7 @@ extern void a3d_default_centers(void);
 int a3d_get_auto_flags(void);
 
 /* a3ddat.c */
-extern Errcode load_a3d_panel(void **ss);
+extern Errcode load_a3d_panel(void** ss);
 extern void a3d_disables(void);
 extern void arrange_a3d_menu(void);
 

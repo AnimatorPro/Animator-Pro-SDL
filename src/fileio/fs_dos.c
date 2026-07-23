@@ -18,11 +18,11 @@ typedef struct fndata {
 	USHORT time, date;
 	long size;
 	char name[13];
-	char fordos[128-43];
+	char fordos[128 - 43];
 } Fndata;
 
 typedef struct wild_data {
-	Names **plist; /* pointer to name list start */
+	Names** plist; /* pointer to name list start */
 	char prefix[4];
 	int min_name_size;
 	Nameload load_name;
@@ -36,8 +36,7 @@ typedef struct wild_data {
  *  Expands a path to the fully expanded path from device down for the
  *  path.
  */
-Errcode
-get_full_path(const char *path, char *fullpath)
+Errcode get_full_path(const char* path, char* fullpath)
 {
 	Errcode err;
 	char pbuf[PATH_SIZE];
@@ -50,8 +49,9 @@ get_full_path(const char *path, char *fullpath)
 	}
 
 	if ((len = _fp_get_path_devlen(path)) != 0) {
-		if (len < 0)
+		if (len < 0) {
 			return len;
+		}
 
 		switch (*path) {
 			case TDEV_MED:
@@ -60,12 +60,12 @@ get_full_path(const char *path, char *fullpath)
 				strcpy(fullpath, path);
 				return Success;
 		}
-		strncpy(fullpath,path,len);
+		strncpy(fullpath, path, len);
 		path += len;
-	}
-	else {
-		if ((len = current_device(fullpath)) < 0)
+	} else {
+		if ((len = current_device(fullpath)) < 0) {
 			return len;
+		}
 		fullpath[len] = DEV_DELIM; /* install device delimitor */
 		++len;
 	}
@@ -76,19 +76,22 @@ get_full_path(const char *path, char *fullpath)
 
 	fullpath += len;
 
-	if (*path == DIR_DELIM) /* ms dos land */
+	if (*path == DIR_DELIM) { /* ms dos land */
 		goto done;
+	}
 
 	*fullpath++ = DIR_DELIM;
-	if ((err = pj_dget_dir(1 + devnum, fullpath)) != Success)
+	if ((err = pj_dget_dir(1 + devnum, fullpath)) != Success) {
 		return pj_mserror(err);
+	}
 
 	if ((len = strlen(fullpath)) > 0) {
 		fullpath += len;
 		*fullpath++ = DIR_DELIM;
 	}
-	if (len + strlen(path) >= PATH_SIZE)
+	if (len + strlen(path) >= PATH_SIZE) {
 		return Err_dir_too_long;
+	}
 
 done:
 	strcpy(fullpath, path);
@@ -99,10 +102,9 @@ done:
 /* Wild list.                                                   */
 /*--------------------------------------------------------------*/
 
-static Errcode
-add_wild(Wild_data *wd)
+static Errcode add_wild(Wild_data* wd)
 {
-	Wild_entry *next;
+	Wild_entry* next;
 	char buf[16];
 	int c2;
 	int len;
@@ -110,12 +112,14 @@ add_wild(Wild_data *wd)
 	/* Filter out '.' and '..' */
 	if (wd->fn.name[0] == '.') {
 		c2 = wd->fn.name[1];
-		if (c2 == '.' || c2 == 0)
+		if (c2 == '.' || c2 == 0) {
 			return Success;
+		}
 	}
 	len = sizeof(Wild_entry) + sprintf(buf, "%s%s", wd->prefix, wd->fn.name);
-	if ((next = pj_malloc(Max(len, wd->min_name_size))) == NULL)
+	if ((next = pj_malloc(Max(len, wd->min_name_size))) == NULL) {
 		return Err_no_memory;
+	}
 	next->hdr.name = next->name_buf;
 	(*(wd->load_name))(next, buf);
 	next->hdr.next = *(wd->plist);
@@ -128,8 +132,7 @@ add_wild(Wild_data *wd)
  *
  *  Will return Success if nothing is found.
  */
-static Errcode
-attr_wild_list(int attr, const char *pat, Wild_data *wd)
+static Errcode attr_wild_list(int attr, const char* pat, Wild_data* wd)
 {
 	Errcode err;
 
@@ -139,11 +142,14 @@ attr_wild_list(int attr, const char *pat, Wild_data *wd)
 	/* now do the find first... */
 	if (pj_dfirst(pat, attr)) {
 		for (;;) {
-			if ((wd->fn.attribute&16) == attr)
-				if ((err = add_wild(wd)) < Success)
+			if ((wd->fn.attribute & 16) == attr) {
+				if ((err = add_wild(wd)) < Success) {
 					return err;
-			if (!pj_dnext())
+				}
+			}
+			if (!pj_dnext()) {
 				break;
+			}
 		}
 	}
 
@@ -156,9 +162,8 @@ attr_wild_list(int attr, const char *pat, Wild_data *wd)
  *  buffer is the size requested and copying in name with input
  *  function.  Does not sort list.
  */
-static Errcode
-alloc_wild_list(Names **pwild_list, char *pat, Boolean get_dirs,
-		int min_name_size, Nameload load_name)
+static Errcode alloc_wild_list(Names** pwild_list, char* pat, Boolean get_dirs, int min_name_size,
+							   Nameload load_name)
 {
 	Errcode err;
 	Wild_data wd;
@@ -174,19 +179,20 @@ alloc_wild_list(Names **pwild_list, char *pat, Boolean get_dirs,
 #ifdef WONT_LINK
 		rget_dir(pwild_list);
 #endif
-	}
-	else {
+	} else {
 		/* get all directories */
 		if (get_dirs) {
 			wd.prefix[0] = DIR_DELIM;
 			wd.prefix[1] = 0;
-			if ((err = attr_wild_list(16, "*.*",&wd)) < Success)
+			if ((err = attr_wild_list(16, "*.*", &wd)) < Success) {
 				goto error;
+			}
 		}
 		/* and other files matching wild */
 		wd.prefix[0] = 0;
-		if ((err = attr_wild_list(0,pat,&wd)) < Success)
+		if ((err = attr_wild_list(0, pat, &wd)) < Success) {
 			goto error;
+		}
 	}
 	return Success;
 error:
@@ -194,24 +200,22 @@ error:
 	return err;
 }
 
-static void
-load_wild_name(Wild_entry *entry, const char *name)
+static void load_wild_name(Wild_entry* entry, const char* name)
 {
 	entry->hdr.name = entry->name_buf;
 	strcpy(entry->name_buf, name);
 }
 
-Errcode
-build_wild_list(Names **pwild_list,
-		const char *drawer, const char *pat, Boolean get_dirs)
+Errcode build_wild_list(Names** pwild_list, const char* drawer, const char* pat, Boolean get_dirs)
 {
 	Errcode err;
 	char odir[PATH_SIZE];
 
 	get_dir(odir);
 	err = change_dir(drawer);
-	if (err < Success)
+	if (err < Success) {
 		return err;
+	}
 
 	*pwild_list = NULL;
 

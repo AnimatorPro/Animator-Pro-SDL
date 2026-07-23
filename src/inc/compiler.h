@@ -29,14 +29,15 @@
  *	a flat address space it's unnecessary.
  ****************************************************************************/
 
-#define norm_pointer(c)  ((void *)(c))
+#define norm_pointer(c) ((void*)(c))
 
 /* Compile time assertions. */
-#define ASSERT_CONCAT_(a, b)    a##b
-#define ASSERT_CONCAT(a, b)     ASSERT_CONCAT_(a, b)
-#define STATIC_ASSERT(module, e) \
-	struct ASSERT_CONCAT(static_assert_##module##_line_, __LINE__) \
-		{ unsigned int bf : !!(e); }
+#define ASSERT_CONCAT_(a, b) a##b
+#define ASSERT_CONCAT(a, b) ASSERT_CONCAT_(a, b)
+#define STATIC_ASSERT(module, e)                                     \
+	struct ASSERT_CONCAT(static_assert_##module##_line_, __LINE__) { \
+		unsigned int bf : !!(e);                                     \
+	}
 
 /*****************************************************************************
  * Watcom C/386 v8.0
@@ -49,18 +50,18 @@
  *	put pragmas for options and performance tuning, etc, here.
  *--------------------------------------------------------------------------*/
 
-#pragma off(unreferenced);					/* don't whine about unused     */
-											/* function parameters. 		*/
+#pragma off(unreferenced); /* don't whine about unused     */
+						   /* function parameters. 		*/
 
-#define PROTECTED							/* not sure what this is for.	*/
+#define PROTECTED /* not sure what this is for.	*/
 
 #ifndef _toupper
-  #define _toupper(c)	((c) + 'A' - 'a')   /* these are missing from       */
-  #define _tolower(c)	((c) + 'a' - 'A')   /* Watcom's current ctype.h     */
+#define _toupper(c) ((c) + 'A' - 'a') /* these are missing from       */
+#define _tolower(c) ((c) + 'a' - 'A') /* Watcom's current ctype.h     */
 #endif
 
-extern char *_STACKTOP; 					/* Watcom stack goodies...		*/
-extern char *_STACKLOW; 					/* not sure what these are for, */
+extern char* _STACKTOP; /* Watcom stack goodies...		*/
+extern char* _STACKLOW; /* not sure what these are for, */
 
 /*----------------------------------------------------------------------------
  * PJ-specific items...
@@ -71,8 +72,11 @@ extern char *_STACKLOW; 					/* not sure what these are for, */
  *	macro to copy a va_list value assumes that va list is a char *va_list[1].
  *--------------------------------------------------------------------------*/
 
-#define NOFUNC					((void*)0)
-#define copy_va_list(src,dest)	{dest[0]=src[0];}
+#define NOFUNC ((void*)0)
+#define copy_va_list(src, dest) \
+	{                           \
+		dest[0] = src[0];       \
+	}
 
 #ifndef PJINLINE_H
 #include "pjinline.h" /* we can write better inlines than Watcom, include them */
@@ -89,12 +93,12 @@ extern char *_STACKLOW; 					/* not sure what these are for, */
  *	put pragmas for options and performance tuning, etc, here.
  *--------------------------------------------------------------------------*/
 
-#pragma on(387);			/* ok to generate 80387 instructions			*/
+#pragma on(387); /* ok to generate 80387 instructions			*/
 
 #pragma on(floating_point); /* BUT, do not use non emulated 80387			*/
-							/* instructions. If you KNOW this code will 	*/
-							/* ONLY be used with an 80387 loaded machine	*/
-							/* change this to 'on'.                         */
+/* instructions. If you KNOW this code will 	*/
+/* ONLY be used with an 80387 loaded machine	*/
+/* change this to 'on'.                         */
 
 /*----------------------------------------------------------------------------
  * PJ-specific items...
@@ -105,8 +109,8 @@ extern char *_STACKLOW; 					/* not sure what these are for, */
  *	macro to copy a va_list value assumes that va list is a char *va_list.
  *--------------------------------------------------------------------------*/
 
-#define NOFUNC					0L
-#define copy_va_list(src,dest)	{dest=src}
+#define NOFUNC 0L
+#define copy_va_list(src, dest) {dest = src}
 
 
 /*****************************************************************************
@@ -131,22 +135,25 @@ extern char *_STACKLOW; 					/* not sure what these are for, */
  *	macro to copy a va_list value assumes that va list is a char *va_list[1].
  *--------------------------------------------------------------------------*/
 
-#define NOFUNC					((void*)0)
-#define copy_va_list(src,dest)	{dest=src;}
+#define NOFUNC ((void*)0)
+#define copy_va_list(src, dest) \
+	{                           \
+		dest = src;             \
+	}
 
 
 /* GCC, Clang. */
 #elif defined(__GNUC__) || defined(__clang__)
 
-#define NOFUNC                  ((void*)0)
-#define copy_va_list(src,dest)  va_copy(dest,src)
+#define NOFUNC ((void*)0)
+#define copy_va_list(src, dest) va_copy(dest, src)
 
 /* Visual Studio */
 #elif defined(_MSC_VER)
 
 #undef STATIC_ASSERT
 #define STATIC_ASSERT(module, e)
-#define copy_va_list(src,dest)  va_copy(dest,src)
+#define copy_va_list(src, dest) va_copy(dest, src)
 
 
 /*****************************************************************************

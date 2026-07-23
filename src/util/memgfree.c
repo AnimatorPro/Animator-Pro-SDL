@@ -1,7 +1,8 @@
 #include "memory.h"
 
-void pj_gentle_free(void *pt)
+void pj_gentle_free(void* pt)
 {
-	if (pt != NULL)
+	if (pt != NULL) {
 		pj_free(pt);
+	}
 }

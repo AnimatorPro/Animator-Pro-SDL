@@ -1,0 +1,27 @@
+struct Pair {
+	int first;
+	int second;
+};
+
+int seeded = 5;
+int computed = -1;
+char char_value = 1;
+short short_value = 2;
+long long_value = 3;
+float float_value = 4.0;
+double double_value = 5.0;
+int *pointer_value = NULL;
+int array_value[2] = {6, 7};
+struct Pair struct_value = {8, 9};
+
+global_access_probe()
+{
+	return 0;
+}
+
+main()
+{
+	computed = seeded * 2 + *pointer_value;
+	seeded += 1;
+	return computed;
+}

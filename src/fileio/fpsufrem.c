@@ -1,6 +1,6 @@
 #include "filepath.h"
 
-void remove_suffix(char *path)
+void remove_suffix(char* path)
 
 /* "removes" any suffix from path by null terminating */
 {

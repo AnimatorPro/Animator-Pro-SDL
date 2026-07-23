@@ -6,11 +6,11 @@
 
 char fmt1[] = "siol_%s equ +0%xH\n";
 
-#define sioset(f) outf(fmt1,#f,OFFSET(Stdiolib,f))
+#define sioset(f) outf(fmt1, #f, OFFSET(Stdiolib, f))
 
-main(int argc,char **argv)
+main(int argc, char** argv)
 {
-	openit(argc,argv);
+	openit(argc, argv);
 
 	sioset(fdata);
 	sioset(pj__get_pto_errno);

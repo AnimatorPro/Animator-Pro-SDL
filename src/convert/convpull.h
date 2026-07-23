@@ -8,7 +8,7 @@
 
 #define FLI_OTH 201
 #define FLI_AMI 202
-#define FLI_ST	203
+#define FLI_ST 203
 #define FLI_FLI 204
 #define FLI_VIE 206
 #define FLI_OLD 207
@@ -17,7 +17,7 @@
 
 #define PIC_TAR 301
 #define PIC_AMI 302
-#define PIC_ST	303
+#define PIC_ST 303
 #define PIC_MAC 304
 #define PIC_PCX 305
 #define PIC_GIF 306

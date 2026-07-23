@@ -2,17 +2,18 @@
 #include <stdio.h>
 #include "makehdr.c"
 
-prtecode(char *name,Errcode val)
+prtecode(char* name, Errcode val)
 {
-	fprintf(ofile,"%c%-25s equ %d\n", tolower(*name), &name[1], val);
+	fprintf(ofile, "%c%-25s equ %d\n", tolower(*name), &name[1], val);
 }
-#define prtcode(ename)	prtecode(#ename,ename)
+
+#define prtcode(ename) prtecode(#ename, ename)
 
 #define printit outf
 
-main(int argc, char **argv)
+main(int argc, char** argv)
 {
-	openit(argc,argv);
+	openit(argc, argv);
 	prtcode(Success);
 	printit("; /* general errors */\n");
 	prtcode(Err_nogood);

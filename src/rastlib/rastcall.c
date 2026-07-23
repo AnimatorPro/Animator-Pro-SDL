@@ -6,14 +6,12 @@
  *
  *  Set dot to colour.
  */
-void
-pj_put_dot(Raster *r, Pixel col, Coor x, Coor y)
+void pj_put_dot(Raster* r, Pixel col, Coor x, Coor y)
 {
 	CPUT_DOT(r, col, x, y);
 }
 
-void
-pj__put_dot(Raster *r, Pixel col, Coor x, Coor y)
+void pj__put_dot(Raster* r, Pixel col, Coor x, Coor y)
 {
 	PUT_DOT(r, col, x, y);
 }
@@ -22,16 +20,14 @@ pj__put_dot(Raster *r, Pixel col, Coor x, Coor y)
  *
  *  Get colour of dot.
  */
-Pixel
-pj_get_dot(Raster *r, Coor x, Coor y)
+Pixel pj_get_dot(Raster* r, Coor x, Coor y)
 {
-	return(CGET_DOT(r, x, y));
+	return (CGET_DOT(r, x, y));
 }
 
-Pixel
-pj__get_dot(Raster *r, Coor x, Coor y)
+Pixel pj__get_dot(Raster* r, Coor x, Coor y)
 {
-	return(GET_DOT(r, x, y));
+	return (GET_DOT(r, x, y));
 }
 
 /*--------------------------------------------------------------*/
@@ -44,11 +40,9 @@ pj__get_dot(Raster *r, Coor x, Coor y)
  *
  *  See rcphseg.c.
  */
-void
-pj_put_hseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w);
+void pj_put_hseg(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor w);
 
-void
-pj__put_hseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w)
+void pj__put_hseg(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor w)
 {
 	PUT_HSEG(r, pixbuf, x, y, w);
 }
@@ -61,11 +55,9 @@ pj__put_hseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w)
  *
  *  See rcghseg.c.
  */
-void
-pj_get_hseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w);
+void pj_get_hseg(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor w);
 
-void
-pj__get_hseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w)
+void pj__get_hseg(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor w)
 {
 	GET_HSEG(r, pixbuf, x, y, w);
 }
@@ -77,8 +69,7 @@ pj__get_hseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w)
  *
  *  See rcpvseg.c.
  */
-void
-pj_put_vseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor h);
+void pj_put_vseg(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor h);
 
 
 /* Function: pj_get_vseg
@@ -87,8 +78,7 @@ pj_put_vseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor h);
  *  (Clipped will only get pixels where buffer overlaps source and
  *  will leave other parts of buffer unaffected.)
  */
-void
-pj_get_vseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor h);
+void pj_get_vseg(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor h);
 
 
 /* Function: _pj_put_rectpix
@@ -97,8 +87,7 @@ pj_get_vseg(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor h);
  *
  *  See rcprpix.c.
  */
-void
-_pj_put_rectpix(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w, Ucoor h);
+void _pj_put_rectpix(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor w, Ucoor h);
 
 /* Function: pj_get_rectpix
  *
@@ -109,8 +98,7 @@ _pj_put_rectpix(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w, Ucoor h);
  *
  *  See rcgrpix.c.
  */
-void
-pj_get_rectpix(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w, Ucoor h);
+void pj_get_rectpix(Raster* r, Pixel* pixbuf, Coor x, Coor y, Ucoor w, Ucoor h);
 
 /* Function: pj_set_hline
  *
@@ -125,8 +113,7 @@ pj_get_rectpix(Raster *r, Pixel *pixbuf, Coor x, Coor y, Ucoor w, Ucoor h);
  *
  *  See rcshline.c.
  */
-void
-pj_set_hline(Raster *r, Pixel col, Coor x, Coor y, Ucoor w);
+void pj_set_hline(Raster* r, Pixel col, Coor x, Coor y, Ucoor w);
 
 
 /* Function: pj_set_vline
@@ -136,8 +123,7 @@ pj_set_hline(Raster *r, Pixel col, Coor x, Coor y, Ucoor w);
  *
  *  See rcsvline.c.
  */
-void
-pj_set_vline(Raster *r, Pixel col, Coor x, Coor y, Ucoor h);
+void pj_set_vline(Raster* r, Pixel col, Coor x, Coor y, Ucoor h);
 
 /* Function: pj_set_rect
  *
@@ -152,11 +138,9 @@ pj_set_vline(Raster *r, Pixel col, Coor x, Coor y, Ucoor h);
  *
  *  See rcsetrec.c.
  */
-void
-pj_set_rect(Raster *r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h);
+void pj_set_rect(Raster* r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h);
 
-void
-pj__set_rect(Raster *r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h)
+void pj__set_rect(Raster* r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h)
 {
 	SET_RECT(r, col, x, y, w, h);
 }
@@ -165,8 +149,7 @@ pj__set_rect(Raster *r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h)
  *
  *  Sets entire raster to a colour fast.
  */
-void
-pj_set_rast(Raster *r, Pixel col)
+void pj_set_rast(Raster* r, Pixel col)
 {
 	(r->lib->set_rast)(r, col);
 }
@@ -175,8 +158,7 @@ pj_set_rast(Raster *r, Pixel col)
  *
  *  see rcxorect.c.
  */
-void
-pj_xor_rect(Raster *r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h);
+void pj_xor_rect(Raster* r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h);
 
 /* Function: pj_mask1blit
  *
@@ -185,10 +167,8 @@ pj_xor_rect(Raster *r, Pixel col, Coor x, Coor y, Ucoor w, Ucoor h);
  *
  *  See rcmsk1bl.c.
  */
-void
-pj_mask1blit(UBYTE *mbytes, Coor mbpr, Coor mx, Coor my,
-		Raster *r, Coor rx, Coor ry, Ucoor w, Ucoor h,
-		Pixel oncol);
+void pj_mask1blit(UBYTE* mbytes, Coor mbpr, Coor mx, Coor my, Raster* r, Coor rx, Coor ry, Ucoor w,
+				  Ucoor h, Pixel oncol);
 
 
 /* Function: pj_mask2blit
@@ -196,68 +176,53 @@ pj_mask1blit(UBYTE *mbytes, Coor mbpr, Coor mx, Coor my,
  *  Sets rectangle of raster rectangle of mask.
  *  (mask on = oncol, off = noaction)
  */
-void
-pj_mask2blit(UBYTE *mbytes, Coor mbpr, Coor mx, Coor my,
-		Raster *r, Coor rx, Coor ry, Ucoor w, Ucoor h,
-		Pixel oncol, Pixel offcol);
-
+void pj_mask2blit(UBYTE* mbytes, Coor mbpr, Coor mx, Coor my, Raster* r, Coor rx, Coor ry, Ucoor w,
+				  Ucoor h, Pixel oncol, Pixel offcol);
 
 /* Function: pj_unbrun_rect */
-void
-pj_unbrun_rect(Raster *r, void *ucbuf, LONG pixsize,
-		Coor x, Coor y, Ucoor w, Ucoor h)
+void pj_unbrun_rect(Raster* r, void* ucbuf, LONG pixsize, Coor x, Coor y, Ucoor w, Ucoor h)
 {
 	r->lib->unbrun_rect(r, ucbuf, pixsize, x, y, w, h);
 }
 
 /* Function: pj_unlccomp_rect */
-void
-pj_unlccomp_rect(Raster *r, void *ucbuf, LONG pixsize,
-		Coor x, Coor y, Ucoor w, Ucoor h)
+void pj_unlccomp_rect(Raster* r, void* ucbuf, LONG pixsize, Coor x, Coor y, Ucoor w, Ucoor h)
 {
 	r->lib->unlccomp_rect(r, ucbuf, pixsize, x, y, w, h);
 }
 
 /* Function: pj_unss2_rect */
-void
-pj_unss2_rect(Raster *r, void *ucbuf, LONG pixsize,
-		Coor x, Coor y, Ucoor w, Ucoor h)
+void pj_unss2_rect(Raster* r, void* ucbuf, LONG pixsize, Coor x, Coor y, Ucoor w, Ucoor h)
 {
 	r->lib->unss2_rect(r, ucbuf, pixsize, x, y, w, h);
 }
 
 /* Function: pj_diag_to_ptable */
-void
-pj_diag_to_ptable(Raster *r, Pixel *ptable, Ucoor ptsize,
-		Coor x0, Coor y0, Coor x1, Coor y1)
+void pj_diag_to_ptable(Raster* r, Pixel* ptable, Ucoor ptsize, Coor x0, Coor y0, Coor x1, Coor y1)
 {
 	r->lib->diag_to_ptable(r, ptable, ptsize, x0, y0, x1, y1);
 }
 
 /* Function: pj_set_colors */
-void
-pj_set_colors(Raster *r, LONG start, LONG count, UBYTE *table)
+void pj_set_colors(Raster* r, LONG start, LONG count, UBYTE* table)
 {
 	SET_COLORS(r, start, count, table);
 }
 
 /* Function: pj_uncc64 */
-void
-pj_uncc64(Raster *r, void *cbuf)
+void pj_uncc64(Raster* r, void* cbuf)
 {
 	UNCC64(r, cbuf);
 }
 
 /* Function: pj_uncc256 */
-void
-pj_uncc256(Raster *r, void *cbuf)
+void pj_uncc256(Raster* r, void* cbuf)
 {
 	UNCC256(r, cbuf);
 }
 
 /* Function: pj_wait_rast_vsync */
-void
-pj_wait_rast_vsync(Raster *r)
+void pj_wait_rast_vsync(Raster* r)
 {
 	WAIT_VSYNC(r);
 }

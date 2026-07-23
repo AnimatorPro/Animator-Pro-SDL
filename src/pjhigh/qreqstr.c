@@ -2,15 +2,15 @@
 #include "ftextf.h"
 #include "reqlib.h"
 
-bool qreq_string(char *strbuf,int bufsize,char *hailing,...)
+bool qreq_string(char* strbuf, int bufsize, char* hailing, ...)
 {
 	bool ret;
 	va_list args;
-	char *formats;
+	char* formats;
 
-	va_start(args,hailing);
-	formats = ftext_format_type(&hailing,&args);
-	ret = varg_qreq_string(strbuf,bufsize,formats,hailing,args);
+	va_start(args, hailing);
+	formats = ftext_format_type(&hailing, &args);
+	ret = varg_qreq_string(strbuf, bufsize, formats, hailing, args);
 	va_end(args);
 	return ret;
 }

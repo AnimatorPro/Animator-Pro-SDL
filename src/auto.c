@@ -40,12 +40,12 @@
 #include "render.h"
 #include "zoom.h"
 
-static Errcode dall(Autoarg *aa);
+static Errcode dall(Autoarg* aa);
 
 /* verify they'd like to call rendering off... */
-bool auto_abort_verify(void *autoarg)
+bool auto_abort_verify(void* autoarg)
 {
-	Autoarg *aa = autoarg;
+	Autoarg* aa = autoarg;
 
 	see_cmap(); /* some conditions may leave cmap out of sync */
 	return (soft_yes_no_box("!%u%u", "auto_abort", aa->cur_frame, aa->frames_in_seq));
@@ -53,12 +53,12 @@ bool auto_abort_verify(void *autoarg)
 
 /* Free up lots of memory by swapping out the world to disk.  Then
    doauto. */
-static void rpmuzauto(autoarg_func what, void *dat)
+static void rpmuzauto(autoarg_func what, void* dat)
 {
 	go_autodraw(what, dat, (AUTO_UNZOOM | AUTO_HIDEMP | AUTO_PUSHMOST));
 }
 
-void pmhmpauto(autoarg_func what, void *dat)
+void pmhmpauto(autoarg_func what, void* dat)
 {
 	go_autodraw(what, dat, (AUTO_UNZOOM | AUTO_HIDEMP | AUTO_PUSHMOST));
 	/*
@@ -71,19 +71,19 @@ void pmhmpauto(autoarg_func what, void *dat)
 }
 
 /* Hide menus before do auto */
-void hmpauto(autoarg_func what, void *dat)
+void hmpauto(autoarg_func what, void* dat)
 {
 	go_autodraw(what, dat, (AUTO_HIDEMP | AUTO_UNZOOM));
 }
 
 /* close zoom window before doauto */
-Errcode uzauto(autoarg_func what, void *dat)
+Errcode uzauto(autoarg_func what, void* dat)
 {
 	return go_autodraw(what, dat, AUTO_UNZOOM);
 }
 
 /* Clear screen rvec */
-static Errcode setpic1(UBYTE *color)
+static Errcode setpic1(UBYTE* color)
 {
 	pj_set_rast(vb.pencel, (Pixel)*color);
 	return (Success);
@@ -97,7 +97,7 @@ static void clear_one_frame(void)
 	dirties();
 }
 
-static Errcode auto_setpic1(void *color, int ix, int intween, int scale, Autoarg *aa)
+static Errcode auto_setpic1(void* color, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)ix;
 	(void)intween;
@@ -147,7 +147,7 @@ out:
 }
 
 /* Blue numbers rvec */
-static Errcode blue_num1(void *dat, int ix, int intween, int scale, Autoarg *aa)
+static Errcode blue_num1(void* dat, int ix, int intween, int scale, Autoarg* aa)
 {
 	char buf[16];
 	int ypos;
@@ -174,15 +174,15 @@ void auto_blue_nums(void)
 
 /* Trails stuff */
 typedef struct traildat {
-	Rcel *tscreen;
+	Rcel* tscreen;
 	SHORT ttype;
 	int tcount;
 } Traildat;
 
 /* returns Ecode */
-static Errcode trail1(void *traildat, int ix, int intween, int scale, Autoarg *aa)
+static Errcode trail1(void* traildat, int ix, int intween, int scale, Autoarg* aa)
 {
-	Traildat *td = traildat;
+	Traildat* td = traildat;
 	Errcode err;
 	int ink;
 	int percent;
@@ -245,11 +245,11 @@ int auto_trails(void)
 }
 
 /* Greys only stuff */
-static Errcode grey1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode grey1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	unsigned char ttable[COLORS];
 	int i;
-	Rgb3 *rgb;
+	Rgb3* rgb;
 	(void)data;
 	(void)ix;
 	(void)intween;
@@ -282,13 +282,13 @@ void greys_only(void)
 
 static int engrave; /* is it engrave or dither? */
 
-static Errcode dither1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode dither1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
-	SHORT *lb[2];
+	SHORT* lb[2];
 	int bix;
 	int x, y;
-	Rgb3 *color;
-	Rgb3 *ctab;
+	Rgb3* color;
+	Rgb3* ctab;
 	int c;
 	int cerr;
 	SHORT *tp, *np;
@@ -375,7 +375,7 @@ void auto_dither(void)
 }
 
 /* Put alt stuff */
-static Errcode put_alt1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode put_alt1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)data;
 	(void)ix;
@@ -395,7 +395,7 @@ void auto_put(void)
 }
 
 /* Apply ink stuff */
-static Errcode render_set1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode render_set1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)data;
 	(void)ix;
@@ -418,9 +418,9 @@ void auto_set(void)
 }
 
 /* render all but crop Cliprect */
-static Errcode crop1(void *cliprect, int ix, int intween, int scale, Autoarg *aa)
+static Errcode crop1(void* cliprect, int ix, int intween, int scale, Autoarg* aa)
 {
-	Cliprect *crop = cliprect;
+	Cliprect* crop = cliprect;
 	SHORT omode, ocolor;
 	(void)ix;
 	(void)intween;
@@ -452,7 +452,7 @@ void crop_video(void)
 }
 
 /* Shrink x2 stuff */
-static Errcode auto_shrink1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode auto_shrink1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	Errcode err;
 	int x, y;
@@ -460,7 +460,7 @@ static Errcode auto_shrink1(void *data, int ix, int intween, int scale, Autoarg 
 	unsigned rgbacc[3];
 	Rgb3 rgb;
 	register int cix;
-	register UBYTE *ctab;
+	register UBYTE* ctab;
 	SHORT dither = vl.ink->dither;
 	(void)data;
 	(void)ix;
@@ -468,7 +468,7 @@ static Errcode auto_shrink1(void *data, int ix, int intween, int scale, Autoarg 
 	(void)scale;
 	(void)aa;
 
-	ctab = (UBYTE *)(vb.pencel->cmap->ctab);
+	ctab = (UBYTE*)(vb.pencel->cmap->ctab);
 	incx = 2;
 	incy = 2;
 
@@ -526,15 +526,15 @@ void auto_shrink(void)
 }
 
 /* Pixelate stuff */
-static Errcode quant1(void *data, int ix_, int intween, int scale, Autoarg *aa)
+static Errcode quant1(void* data, int ix_, int intween, int scale, Autoarg* aa)
 {
 	Errcode err;
-	UBYTE *rc;
+	UBYTE* rc;
 	int x, y, dx, dy;
 	int ix, iy, zx, zy;
 	int r, g, b;
 	int lr, lg, lb;
-	register UBYTE *c;
+	register UBYTE* c;
 	int dx2, dy2;
 	UBYTE rgb[3];
 	(void)data;
@@ -550,7 +550,7 @@ static Errcode quant1(void *data, int ix_, int intween, int scale, Autoarg *aa)
 	if (err < 0) {
 		return err;
 	}
-	rc = (UBYTE *)(vb.pencel->cmap->ctab);
+	rc = (UBYTE*)(vb.pencel->cmap->ctab);
 	dx2 = vs.qdx >> 1;
 	dy2 = vs.qdy >> 1;
 	for (iy = 0;;) {
@@ -581,7 +581,7 @@ static Errcode quant1(void *data, int ix_, int intween, int scale, Autoarg *aa)
 			rgb[0] = (r + dy2) / dy;
 			rgb[1] = (g + dy2) / dy;
 			rgb[2] = (b + dy2) / dy;
-			pj_set_rect(vb.pencel, bclosest_col((Rgb3 *)rgb, COLORS, false), ix, iy, dx, dy);
+			pj_set_rect(vb.pencel, bclosest_col((Rgb3*)rgb, COLORS, false), ix, iy, dx, dy);
 			ix += dx;
 			if (ix >= vb.pencel->width) {
 				break;
@@ -616,29 +616,29 @@ void quantize(void)
 }
 
 /* Expand x2 stuff */
-static int halfsies(Rgb3 *a, Rgb3 *b, SHORT dither)
+static int halfsies(Rgb3* a, Rgb3* b, SHORT dither)
 {
 	UBYTE rgb[3];
 	int i;
 
 	for (i = 0; i < 3; i++) {
-		rgb[i] = (((UBYTE *)a)[i] + ((UBYTE *)b)[i]) >> 1;
+		rgb[i] = (((UBYTE*)a)[i] + ((UBYTE*)b)[i]) >> 1;
 	}
-	return bclosest_col((Rgb3 *)rgb, COLORS, dither);
+	return bclosest_col((Rgb3*)rgb, COLORS, dither);
 }
 
-static Errcode expand1(void *rectangle, int ix, int intween, int scale, Autoarg *aa_)
+static Errcode expand1(void* rectangle, int ix, int intween, int scale, Autoarg* aa_)
 {
-	Rectangle *where = rectangle;
+	Rectangle* where = rectangle;
 	Errcode err;
 	int xoff, yoff;
 	int x, y;
 	int i, j;
-	Rgb3 *ctab;
+	Rgb3* ctab;
 	Rgb3 *aa, *ab, *ba, *bb;
 	UBYTE me;
 	int x2, y2;
-	Rcel *tf;
+	Rcel* tf;
 	SHORT dither = vl.ink->dither;
 	(void)ix;
 	(void)intween;
@@ -715,7 +715,7 @@ void auto_expand(void)
 }
 
 /* undo stuff and common setup stuff before executing auto drawer */
-void auto_setup(Autoarg *aa)
+void auto_setup(Autoarg* aa)
 {
 	flx_clear_olays();
 	if (aa->flags & AUTO_HIDEMP) {
@@ -755,7 +755,7 @@ void auto_setup(Autoarg *aa)
 }
 
 /* restore stuff undone before executing auto drawer */
-Errcode auto_restores(Autoarg *aa, Errcode err)
+Errcode auto_restores(Autoarg* aa, Errcode err)
 {
 	if ((aa->flags & AUTO_USESCEL) && thecel) {
 		if (err == Err_abort || aa->in_preview) {
@@ -797,7 +797,7 @@ Errcode auto_restores(Autoarg *aa, Errcode err)
 
 /* Come here once user's confirmed they want to do something to many
    frames (or directly if not in time select mode). */
-Errcode noask_do_auto(Autoarg *aa, int frame_mode)
+Errcode noask_do_auto(Autoarg* aa, int frame_mode)
 {
 	Errcode err;
 	USHORT occolor;
@@ -856,7 +856,7 @@ done:
 }
 
 /* Do something over time on the current time mode with no menu. */
-Errcode noask_do_auto_time_mode(Autoarg *aa)
+Errcode noask_do_auto_time_mode(Autoarg* aa)
 {
 	return noask_do_auto(aa, vs.time_mode);
 }
@@ -898,18 +898,18 @@ static void tflx_emessage(Errcode err)
  * avec called to draw something on screen each frame
  * avec() returns Success if ok ecode if failure (<0) dall will return this
  * ecode */
-static Errcode dall(Autoarg *aa)
+static Errcode dall(Autoarg* aa)
 {
 	Errcode err;
-	XFILE *new_tflx = NULL;
-	Flx *new_flx = NULL;
-	void *cbuf = NULL;
+	XFILE* new_tflx = NULL;
+	Flx* new_flx = NULL;
+	void* cbuf = NULL;
 	int i;
 	long tsize;
 	long ssize;
 	long acc;
 	long cbufsz;
-	Rcel *xf;
+	Rcel* xf;
 	bool do_compress;
 	Abortbuf abuf;
 	bool abort_atom_nested;
@@ -938,7 +938,7 @@ static Errcode dall(Autoarg *aa)
 	/* allocate cbuf here to prevent fragging cause we need it later */
 
 	maybe_push_most();
-	err = pj_fli_cel_alloc_cbuf((Fli_frame **)&cbuf, vb.pencel);
+	err = pj_fli_cel_alloc_cbuf((Fli_frame**)&cbuf, vb.pencel);
 	maybe_pop_most();
 	if (err < Success) {
 		goto error;
@@ -1067,7 +1067,7 @@ static Errcode dall(Autoarg *aa)
 			if (err < 0) {
 				goto error;
 			}
-			ssize = ((Fli_frame *)cbuf)->size;
+			ssize = ((Fli_frame*)cbuf)->size;
 		} else if (i == 0) {
 			ssize = pj_fli_comp_frame1(cbuf, vb.pencel, flix.comp_type);
 		} else {
@@ -1331,7 +1331,7 @@ int calc_time_scale(int ix, int intween)
 }
 
 /* go call the guy who diddles the pixels at last! and return its Ecode */
-Errcode auto_apply(Autoarg *aa, int ix, int intween)
+Errcode auto_apply(Autoarg* aa, int ix, int intween)
 {
 	Errcode err;
 
@@ -1351,12 +1351,12 @@ Errcode auto_apply(Autoarg *aa, int ix, int intween)
    recompressing it into our flic.  Also do the drawing off-screen
    so user only sees result, not intermediate stages This is used
    for both preview and "AUTO_READONLY" render mode */
-Errcode dopreview(Autoarg *aa)
+Errcode dopreview(Autoarg* aa)
 {
 	int i;
 	int oframe_ix;
-	Rcel *tf;
-	Rcel *orender;
+	Rcel* tf;
+	Rcel* orender;
 	Rcel_save opic;
 	Errcode err;
 	bool csame;
@@ -1377,10 +1377,6 @@ Errcode dopreview(Autoarg *aa)
 	save_undo();
 	fli_tseek(undof, vs.frame_ix, tr_r1);
 	vs.frame_ix = tr_r1;
-#ifdef DEBUG
-	boxf("tr_r1 %d  tr_r2 %d  tr_rdir %d", tr_r1, tr_r2, tr_rdir);
-	boxf("tr_tix %d  tr_frames %d", tr_tix, tr_frames);
-#endif /* DEBUG */
 	aa->frames_in_seq = tr_frames;
 	for (i = 0;; i++) {
 		err = poll_abort();
@@ -1429,12 +1425,12 @@ OUT:
 	return auto_restores(aa, err);
 }
 
-Errcode do_autodraw(autoarg_func avec, void *avecdat)
+Errcode do_autodraw(autoarg_func avec, void* avecdat)
 {
 	return go_autodraw(avec, avecdat, 0);
 }
 
-Errcode go_autodraw(autoarg_func avec, void *avecdat, USHORT flags)
+Errcode go_autodraw(autoarg_func avec, void* avecdat, USHORT flags)
 {
 	Autoarg aa;
 
@@ -1446,7 +1442,7 @@ Errcode go_autodraw(autoarg_func avec, void *avecdat, USHORT flags)
 }
 
 /* possibly apply a function over many frames after bringing up multimenu */
-Errcode do_auto(Autoarg *aa)
+Errcode do_auto(Autoarg* aa)
 {
 	Errcode err;
 

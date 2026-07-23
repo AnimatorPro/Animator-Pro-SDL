@@ -1,0 +1,6 @@
+int library_bias = 7;
+
+int library_add(int value)
+{
+	return value + library_bias;
+}

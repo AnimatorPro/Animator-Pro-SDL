@@ -11,7 +11,7 @@
 #include "formatf.h"
 
 /********************************************/
-int rexlib_boxf(char *fmt, ...)
+int rexlib_boxf(char* fmt, ...)
 {
 	Errcode err;
 	va_list args;
@@ -21,7 +21,6 @@ int rexlib_boxf(char *fmt, ...)
 	va_end(args);
 	return err;
 }
-
 
 /********* shells needed for lfile **********/
 

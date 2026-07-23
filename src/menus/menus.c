@@ -8,14 +8,14 @@
 #include "memory.h"
 #include "ptrmacro.h"
 
-static void init_group(Wscreen *ws, Mugroup *mg);
-static void addto_group(Mugroup *mg, Menuhdr *mh, Menuhdr *over);
-static void remfrom_group(Menuhdr *mh);
-static void draw_menuwndo(Menuwndo *mw);
+static void init_group(Wscreen* ws, Mugroup* mg);
+static void addto_group(Mugroup* mg, Menuhdr* mh, Menuhdr* over);
+static void remfrom_group(Menuhdr* mh);
+static void draw_menuwndo(Menuwndo* mw);
 
 /* this is called on a newly opened Wscreen to initialize the menu system
  * control part */
-Errcode init_muscreen(Wscreen *s)
+Errcode init_muscreen(Wscreen* s)
 {
 	init_group(s, &(s->group0)); /* note this group is not on the stack! */
 	init_list(&(s->gstack));
@@ -24,7 +24,7 @@ Errcode init_muscreen(Wscreen *s)
 
 /* this is called on a used and open Wscreen to cleanup the menu system
  * control part and close down all the open menus */
-void cleanup_muscreen(Wscreen *s)
+void cleanup_muscreen(Wscreen* s)
 {
 	if (s == NULL) {
 		return;
@@ -33,9 +33,9 @@ void cleanup_muscreen(Wscreen *s)
 	s->group0.screen = NULL;
 }
 
-void close_all_menus(Wscreen *s, LONG code)
+void close_all_menus(Wscreen* s, LONG code)
 {
-	Mugroup *mg;
+	Mugroup* mg;
 
 	if (s == NULL || NULL == s->group0.screen) /* not initialized */
 	{
@@ -43,14 +43,14 @@ void close_all_menus(Wscreen *s, LONG code)
 	}
 
 	add_tail(&(s->gstack), &(s->group0.snode));
-	while (NULL != (mg = (Mugroup *)get_head(&(s->gstack)))) {
+	while (NULL != (mg = (Mugroup*)get_head(&(s->gstack)))) {
 		close_group_code(mg, code);
 	}
 }
 
 /* sets state of button root and button flags to reflect whether window is
  * open or not and whether the button is attached or not */
-static void set_button_roots(Button *mbs, Menuhdr *hdr)
+static void set_button_roots(Button* mbs, Menuhdr* hdr)
 {
 	while (mbs) {
 		if (mbs->children != NULL) {
@@ -64,7 +64,7 @@ static void set_button_roots(Button *mbs, Menuhdr *hdr)
 			mbs->root = hdr->mw;
 			mbs->flags |= MB_ROOTISWNDO;
 		} else {
-			mbs->root = (Menuwndo *)hdr;
+			mbs->root = (Menuwndo*)hdr;
 			mbs->flags &= ~(MB_ROOTISWNDO);
 		}
 		mbs = mbs->next;
@@ -72,7 +72,7 @@ static void set_button_roots(Button *mbs, Menuhdr *hdr)
 }
 
 /* returns header button is attached to if present using root and flags */
-Menuhdr *get_button_hdr(Button *b)
+Menuhdr* get_button_hdr(Button* b)
 {
 	if (b == NULL) {
 		return (NULL);
@@ -80,11 +80,11 @@ Menuhdr *get_button_hdr(Button *b)
 	if (b->flags & MB_ROOTISWNDO) {
 		return (b->root->hdr);
 	}
-	return ((Menuhdr *)(b->root));
+	return ((Menuhdr*)(b->root));
 }
 
 /* returns menuwndo button is directed to if present using root and flags */
-Menuwndo *get_button_wndo(Button *b)
+Menuwndo* get_button_wndo(Button* b)
 {
 	if (b == NULL) {
 		return (NULL);
@@ -92,13 +92,13 @@ Menuwndo *get_button_wndo(Button *b)
 	if (b->flags & MB_ROOTISWNDO) {
 		return (b->root);
 	}
-	return (((Menuhdr *)(b->root))->mw);
+	return (((Menuhdr*)(b->root))->mw);
 }
 
 /* function called from window io loop in do_xxxloop */
-static int wndo_domenu(void *w)
+static int wndo_domenu(void* w)
 {
-	Menuhdr *mh = ((Menuwndo *)w)->hdr;
+	Menuhdr* mh = ((Menuwndo*)w)->hdr;
 
 	if (mh->domenu != NULL) {
 		return ((*(mh->domenu))(mh));
@@ -108,9 +108,9 @@ static int wndo_domenu(void *w)
 }
 
 /* function called from window io loop in do_xxxloop */
-static int wndo_dopull(void *w)
+static int wndo_dopull(void* w)
 {
-	Menuhdr *mh = ((Menuwndo *)w)->hdr;
+	Menuhdr* mh = ((Menuwndo*)w)->hdr;
 
 	if (mh->domenu != NULL) {
 		return ((*(mh->domenu))(mh));
@@ -120,7 +120,7 @@ static int wndo_dopull(void *w)
 
 #define SCL(c, p, q) ((long)(c) * (long)(p) / (q))
 
-void scale_rect(Rscale *scale, Rectangle *in, Rectangle *out)
+void scale_rect(Rscale* scale, Rectangle* in, Rectangle* out)
 {
 	out->x = SCL(in->x, scale->xscalep, scale->xscaleq);
 	out->width = SCL(in->width, scale->xscalep, scale->xscaleq);
@@ -128,7 +128,7 @@ void scale_rect(Rscale *scale, Rectangle *in, Rectangle *out)
 	out->height = SCL(in->height, scale->yscalep, scale->yscaleq);
 }
 
-void scale_xlist(Rscale *scale, SHORT *in, SHORT *out, int dim)
+void scale_xlist(Rscale* scale, SHORT* in, SHORT* out, int dim)
 {
 	while (--dim >= 0) {
 		*out++ = SCL(*in, scale->xscalep, scale->xscaleq);
@@ -136,7 +136,7 @@ void scale_xlist(Rscale *scale, SHORT *in, SHORT *out, int dim)
 	}
 }
 
-void scale_ylist(Rscale *scale, SHORT *in, SHORT *out, int dim)
+void scale_ylist(Rscale* scale, SHORT* in, SHORT* out, int dim)
 {
 	while (--dim >= 0) {
 		*out++ = SCL(*in, scale->yscalep, scale->yscaleq);
@@ -144,7 +144,7 @@ void scale_ylist(Rscale *scale, SHORT *in, SHORT *out, int dim)
 	}
 }
 
-void scale_xylist(Rscale *scale, Short_xy *in, Short_xy *out, int dim)
+void scale_xylist(Rscale* scale, Short_xy* in, Short_xy* out, int dim)
 {
 	while (--dim >= 0) {
 		out->x = SCL(in->x, scale->xscalep, scale->xscaleq);
@@ -156,7 +156,7 @@ void scale_xylist(Rscale *scale, Short_xy *in, Short_xy *out, int dim)
 
 #undef SCL
 
-void scale_button(Button *b, Rscale *scale)
+void scale_button(Button* b, Rscale* scale)
 {
 	Rectangle rect;
 
@@ -164,7 +164,7 @@ void scale_button(Button *b, Rscale *scale)
 		return;
 	}
 	if (!(b->flags & (MB_SCALE_ABSW | MB_SCALE_ABSH))) {
-		scale_rect(scale, &b->orig_rect, (Rectangle *)(&b->RECTSTART));
+		scale_rect(scale, &b->orig_rect, (Rectangle*)(&b->RECTSTART));
 	} else {
 		rect = b->orig_rect;
 		if (b->flags & MB_SCALE_ABSW) {
@@ -173,7 +173,7 @@ void scale_button(Button *b, Rscale *scale)
 		if (b->flags & MB_SCALE_ABSH) {
 			rect.height += rect.y - 1;
 		}
-		scale_rect(scale, &rect, (Rectangle *)(&b->RECTSTART));
+		scale_rect(scale, &rect, (Rectangle*)(&b->RECTSTART));
 		if (b->flags & MB_SCALE_ABSW) {
 			b->width = b->width - b->x + 1;
 		}
@@ -184,9 +184,9 @@ void scale_button(Button *b, Rscale *scale)
 }
 
 /* closes a menus visible window and updates header for state in window */
-static void close_menuwndo(Menuhdr *mh)
+static void close_menuwndo(Menuhdr* mh)
 {
-	Menuwndo *mw;
+	Menuwndo* mw;
 
 	if ((mw = mh->mw) == NULL) {
 		return;
@@ -195,7 +195,7 @@ static void close_menuwndo(Menuhdr *mh)
 		(*(mh->on_showhide))(mh, false);
 	}
 	copy_rectfields(&(mw->w), mh);
-	close_wndo((Wndo *)(mw));
+	close_wndo((Wndo*)(mw));
 	mh->mw = NULL;
 	if (mh->type == PANELMENU) {
 		set_button_roots(mh->mbs, mh);
@@ -204,9 +204,9 @@ static void close_menuwndo(Menuhdr *mh)
 
 /* opens a menu window for a menu header reflecting the specs in the
  * mneu header */
-static Errcode open_menuwndo(Wscreen *screen, Menuhdr *mh, Wndo *over)
+static Errcode open_menuwndo(Wscreen* screen, Menuhdr* mh, Wndo* over)
 {
-	Menuwndo *mw;
+	Menuwndo* mw;
 	Errcode err;
 
 	{
@@ -223,7 +223,7 @@ static Errcode open_menuwndo(Wscreen *screen, Menuhdr *mh, Wndo *over)
 		} else {
 			wi.cursor = mh->cursor;
 		}
-		if ((err = open_wndo((Wndo **)&(mh->mw), &wi)) < 0) {
+		if ((err = open_wndo((Wndo**)&(mh->mw), &wi)) < 0) {
 			goto error;
 		}
 		mh->mw->w.procmouse = mh->procmouse;
@@ -263,7 +263,7 @@ error:
 	return (err);
 }
 
-void close_menu_code(Menuhdr *mh, LONG code)
+void close_menu_code(Menuhdr* mh, LONG code)
 {
 	if (mh == NULL) {
 		return;
@@ -284,12 +284,12 @@ void close_menu_code(Menuhdr *mh, LONG code)
 	}
 }
 
-void close_menu(Menuhdr *mh)
+void close_menu(Menuhdr* mh)
 {
 	close_menu_code(mh, 0);
 }
 
-void scale_button_list(Button *b, Rscale *scale)
+void scale_button_list(Button* b, Rscale* scale)
 {
 	while (b) {
 		scale_button(b, scale);
@@ -300,7 +300,7 @@ void scale_button_list(Button *b, Rscale *scale)
 	}
 }
 
-static void scale_menu_size(Menuhdr *mh, Rscale *scale)
+static void scale_menu_size(Menuhdr* mh, Rscale* scale)
 {
 	if (mh->flags & MENU_NORESCALE) {
 		return;
@@ -309,7 +309,7 @@ static void scale_menu_size(Menuhdr *mh, Rscale *scale)
 	mh->height = rscale_y(scale, (mh->orig_rect.height - 1)) + 1;
 }
 
-static bool is_rect_and_menu_rect_same(const Rectangle *r, const Menuhdr *m)
+static bool is_rect_and_menu_rect_same(const Rectangle* r, const Menuhdr* m)
 {
 	/* TODO: Menuhdr.RECT_FIELDS should be a Rectangle.  Don't assume
 	 * the spacing between x/y/w/h will be the same due to padding.
@@ -319,11 +319,11 @@ static bool is_rect_and_menu_rect_same(const Rectangle *r, const Menuhdr *m)
 
 /* dont open a menu thats already open if group is null open menu over
  * over if group is non null open on top */
-Errcode open_menu(Wscreen *screen, Menuhdr *mh, Mugroup *group, Wndo *over)
+Errcode open_menu(Wscreen* screen, Menuhdr* mh, Mugroup* group, Wndo* over)
 {
 	Errcode err;
-	Menuhdr *overmenu;
-	Wndo *overwndo;
+	Menuhdr* overmenu;
+	Wndo* overwndo;
 
 	mh->flags &= ~(DOMENU_DEFAULT);
 
@@ -350,7 +350,7 @@ Errcode open_menu(Wscreen *screen, Menuhdr *mh, Mugroup *group, Wndo *over)
 			mh->y -= mh->height;
 		}
 	} else {
-		bclip_rect((Rectangle *)&(mh->RECTSTART), (Rectangle *)&(screen->wndo.RECTSTART));
+		bclip_rect((Rectangle*)&(mh->RECTSTART), (Rectangle*)&(screen->wndo.RECTSTART));
 	}
 
 	if (mh->type == PANELMENU && !(mh->flags & MENU_NOMB_RESCALE)) {
@@ -399,7 +399,7 @@ error:
  *  o - Unhiding (showing) a open and visible menu (not hidden) will leave
  *		things unchanged.
  **************************/
-void hide_menu(Menuhdr *m)
+void hide_menu(Menuhdr* m)
 {
 	if ((m == NULL) || (m->mw == NULL)) {
 		return;
@@ -412,11 +412,11 @@ void hide_menu(Menuhdr *m)
 }
 
 /* note: this will not show a menu if it is not open */
-Errcode show_menu(Menuhdr *m)
+Errcode show_menu(Menuhdr* m)
 {
 	Errcode err;
-	Mugroup *mg;
-	Wndo *over;
+	Mugroup* mg;
+	Wndo* over;
 
 	if ((m == NULL) || (m->mw != NULL) /* already hidden */
 		|| (NULL == (mg = m->group)))  /* no group ?? */
@@ -427,7 +427,7 @@ Errcode show_menu(Menuhdr *m)
 	if (mg->num_menus < 2 || is_tail(&(m->node))) { /* open in same position */
 		over = NULL;
 	} else {
-		over = (Wndo *)(TOSTRUCT(Menuhdr, node, m->node.next)->mw);
+		over = (Wndo*)(TOSTRUCT(Menuhdr, node, m->node.next)->mw);
 	}
 
 	if ((err = open_menuwndo(mg->screen, m, over)) < 0) {
@@ -443,7 +443,7 @@ error:
 
 /****************** menu group calls ********************/
 
-static void init_group(Wscreen *ws, Mugroup *mg)
+static void init_group(Wscreen* ws, Mugroup* mg)
 {
 	clear_mem(mg, sizeof(*mg));
 	init_list(&mg->menuhdrs);
@@ -451,14 +451,14 @@ static void init_group(Wscreen *ws, Mugroup *mg)
 }
 
 /* opens a mugroup. Puts it on head of stack and Prepares it for menus */
-void push_group(Wscreen *ws, Mugroup *mg)
+void push_group(Wscreen* ws, Mugroup* mg)
 {
 	init_group(ws, mg);
 	add_head(&(ws->gstack), &(mg->snode));
 	++ws->glevel;
 }
 
-void pop_group(Mugroup *mg)
+void pop_group(Mugroup* mg)
 {
 	safe_rem_node(&(mg->snode));
 	if (mg->screen != NULL) {
@@ -468,9 +468,9 @@ void pop_group(Mugroup *mg)
 
 /* removes a group from the stack it is attached to this will close
  * all menus remaining in the group */
-void close_group_code(Mugroup *mg, LONG retcode)
+void close_group_code(Mugroup* mg, LONG retcode)
 {
-	Menuhdr *m;
+	Menuhdr* m;
 
 	if (mg == NULL) {
 		return;
@@ -478,20 +478,20 @@ void close_group_code(Mugroup *mg, LONG retcode)
 
 	/* close menu will remove menu from group list */
 
-	while (NULL != (m = (Menuhdr *)see_head(&(mg->menuhdrs)))) {
+	while (NULL != (m = (Menuhdr*)see_head(&(mg->menuhdrs)))) {
 		m = TOSTRUCT(Menuhdr, node, m);
 		close_menu(m);
 	}
 	mg->retcode = retcode;
 }
 
-void close_group(Mugroup *mg)
+void close_group(Mugroup* mg)
 {
 	close_group_code(mg, 0);
 }
 
 /* close menuheaders group */
-void mh_gclose_code(Menuhdr *mh, LONG code)
+void mh_gclose_code(Menuhdr* mh, LONG code)
 {
 	if (mh == NULL) {
 		return;
@@ -499,7 +499,7 @@ void mh_gclose_code(Menuhdr *mh, LONG code)
 	close_group_code(mh->group, code);
 }
 
-static void addto_group(Mugroup *mg, Menuhdr *mh, Menuhdr *over)
+static void addto_group(Mugroup* mg, Menuhdr* mh, Menuhdr* over)
 {
 	if (mh->mw->w.W_screen != mg->screen) { /* oops! window on wrong screen */
 		return;
@@ -518,9 +518,9 @@ static void addto_group(Mugroup *mg, Menuhdr *mh, Menuhdr *over)
 	++mg->num_menus;
 }
 
-static void remfrom_group(Menuhdr *mh)
+static void remfrom_group(Menuhdr* mh)
 {
-	Mugroup *mg;
+	Mugroup* mg;
 
 	if (NULL == (mg = mh->group)) {
 		return;
@@ -534,17 +534,17 @@ static void remfrom_group(Menuhdr *mh)
 }
 
 /* hides all visible menus in a group */
-void hide_group(Mugroup *mg)
+void hide_group(Mugroup* mg)
 {
-	Dlnode *next;
-	Menuhdr *m;
+	Dlnode* next;
+	Menuhdr* m;
 
 	if ((mg == NULL) || !(mg->non_hidden)) {
 		return;
 	}
 
-	for (m = (Menuhdr *)(mg->menuhdrs.head); NULL != (next = ((Dlnode *)m)->next);
-		 m = (Menuhdr *)next) {
+	for (m = (Menuhdr*)(mg->menuhdrs.head); NULL != (next = ((Dlnode*)m)->next);
+		 m = (Menuhdr*)next) {
 		m = TOSTRUCT(Menuhdr, node, m);
 		if (m->mw == NULL) {
 			continue;
@@ -557,10 +557,10 @@ void hide_group(Mugroup *mg)
 
 /* shows all menus that are currently hidden and not closed in order and
  * positions currently in the list starts with backmost and draws up */
-Errcode show_group(Mugroup *mg)
+Errcode show_group(Mugroup* mg)
 {
-	Dlnode *prev;
-	Menuhdr *m;
+	Dlnode* prev;
+	Menuhdr* m;
 	Errcode err;
 
 	if ((mg == NULL) || (mg->screen == NULL)) {
@@ -571,8 +571,8 @@ Errcode show_group(Mugroup *mg)
 		return (0);
 	}
 
-	for (m = (Menuhdr *)(mg->menuhdrs.tails_prev); NULL != (prev = ((Dlnode *)m)->prev);
-		 m = (Menuhdr *)prev) {
+	for (m = (Menuhdr*)(mg->menuhdrs.tails_prev); NULL != (prev = ((Dlnode*)m)->prev);
+		 m = (Menuhdr*)prev) {
 		m = TOSTRUCT(Menuhdr, node, m);
 		if (m->mw == NULL) {
 			if ((err = open_menuwndo(mg->screen, m, NULL)) < 0) {
@@ -588,11 +588,11 @@ error:
 	return (err);
 }
 
-bool cgroup_hidden(Wscreen *ws)
+bool cgroup_hidden(Wscreen* ws)
 {
-	Mugroup *mg;
+	Mugroup* mg;
 
-	if (NULL == (mg = (Mugroup *)see_head(&ws->gstack))) {
+	if (NULL == (mg = (Mugroup*)see_head(&ws->gstack))) {
 		return (true);
 	}
 	return (mg->hmpcnt > 0);
@@ -601,22 +601,22 @@ bool cgroup_hidden(Wscreen *ws)
 /* these use a stack oriented protocall and will only hide-show if stack
  * is at a cusp allowing recursive bracketing of things with hide-show calls.
  * note that if anything is showing it will re-hide it !!! */
-void stack_hide_cgroup(Wscreen *ws)
+void stack_hide_cgroup(Wscreen* ws)
 {
-	Mugroup *mg;
+	Mugroup* mg;
 
-	if (NULL != (mg = (Mugroup *)see_head(&ws->gstack))) {
+	if (NULL != (mg = (Mugroup*)see_head(&ws->gstack))) {
 		++mg->hmpcnt;
 		hide_group(mg);
 	}
 }
 
 /* this will only show things when stack is <= 1 */
-bool stack_show_cgroup(Wscreen *ws)
+bool stack_show_cgroup(Wscreen* ws)
 {
-	Mugroup *mg;
+	Mugroup* mg;
 
-	if (NULL != (mg = (Mugroup *)see_head(&ws->gstack))) {
+	if (NULL != (mg = (Mugroup*)see_head(&ws->gstack))) {
 		if ((--mg->hmpcnt) <= 0) {
 			show_group(mg);
 			mg->hmpcnt = 0; /* in case someone blew it */
@@ -631,7 +631,7 @@ bool stack_show_cgroup(Wscreen *ws)
 /* menu moving */
 
 /* This adds an offset to a tree of buttons */
-void offset_button_list(Button *b, SHORT x, SHORT y)
+void offset_button_list(Button* b, SHORT x, SHORT y)
 {
 	if (b == NULL) {
 		return;
@@ -642,17 +642,17 @@ void offset_button_list(Button *b, SHORT x, SHORT y)
 	b->y += y;
 }
 
-static bool marqmove_menu(Menuhdr *m, int clipit)
+static bool marqmove_menu(Menuhdr* m, int clipit)
 {
-	Menuwndo *mw;
-	Rectangle *clip;
+	Menuwndo* mw;
+	Rectangle* clip;
 
 	if (m == NULL || (mw = m->mw) == NULL) {
 		return (0);
 	}
 
 	if (clipit) {
-		clip = (Rectangle *)&(mw->w.W_screen->wndo.RECTSTART);
+		clip = (Rectangle*)&(mw->w.W_screen->wndo.RECTSTART);
 	} else {
 		clip = NULL;
 	}
@@ -665,17 +665,17 @@ static bool marqmove_menu(Menuhdr *m, int clipit)
 	return (1);
 }
 
-static bool menu_to_bottom(Menuhdr *m)
+static bool menu_to_bottom(Menuhdr* m)
 {
-	Rectangle *clip;
-	Menuwndo *mw;
+	Rectangle* clip;
+	Menuwndo* mw;
 	Rectangle newpos;
 
 
 	if (m == NULL || (mw = m->mw) == NULL) {
 		return (0);
 	}
-	clip = (Rectangle *)&(mw->w.W_screen->wndo.RECTSTART);
+	clip = (Rectangle*)&(mw->w.W_screen->wndo.RECTSTART);
 	newpos.width = m->width;
 	newpos.height = m->height;
 	newpos.x = 0;
@@ -687,17 +687,17 @@ static bool menu_to_bottom(Menuhdr *m)
 	return (1);
 }
 
-void mb_menu_to_bottom(Button *b)
+void mb_menu_to_bottom(Button* b)
 {
 	menu_to_bottom(get_button_hdr(b));
 }
 
-void mb_move_menu(Button *b)
+void mb_move_menu(Button* b)
 {
 	marqmove_menu(get_button_hdr(b), 0);
 }
 
-void mb_clipmove_menu(Button *b, void *dat)
+void mb_clipmove_menu(Button* b, void* dat)
 {
 	(void)dat;
 	marqmove_menu(get_button_hdr(b), 1);
@@ -707,7 +707,7 @@ void mb_clipmove_menu(Button *b, void *dat)
 /******* calls to do button and menu drawing *****************************/
 /* Draws top level button only, not its children and not any siblings
  * this may be called whether or not a button is attached to an open menu */
-void draw_buttontop(Button *b)
+void draw_buttontop(Button* b)
 {
 	if (b != NULL && (b->flags & MB_ROOTISWNDO) && (b->seeme != NULL)) {
 		(*b->seeme)(b);
@@ -717,7 +717,7 @@ void draw_buttontop(Button *b)
 /* draws all buttons and children starting with first one given
  * this may be called if a button is NOT attached to an open menu
  * safely  and it will not draw */
-void draw_buttonlist(register Button *b)
+void draw_buttonlist(register Button* b)
 {
 	if ((b == NULL) || !(b->flags & MB_ROOTISWNDO)) {
 		return;
@@ -739,7 +739,7 @@ void draw_buttonlist(register Button *b)
 /* draws a button and its children, children first
  * this may be called whether or not a button is attached to an open menu
  * or button is NULL */
-void draw_button(Button *b)
+void draw_button(Button* b)
 {
 	if ((b != NULL) && (b->flags & MB_ROOTISWNDO)) {
 		if (b->seeme != NULL) {
@@ -751,16 +751,16 @@ void draw_button(Button *b)
 	}
 }
 
-void draw_menu(Menuhdr *mh)
+void draw_menu(Menuhdr* mh)
 {
 	if (mh && mh->mw) {
 		redraw_wndo(&(mh->mw->w));
 	}
 }
 
-static void draw_menuwndo(Menuwndo *mw)
+static void draw_menuwndo(Menuwndo* mw)
 {
-	Menuhdr *mh;
+	Menuhdr* mh;
 
 	if (!mw) {
 		return;
@@ -788,7 +788,7 @@ static void draw_menuwndo(Menuwndo *mw)
 /************ functions to process input to menus and buttons ************/
 /* returns 1 if screen cursor is in the menu's window 0 if window is not open
  * (menu hidden or closed) or cursor is not in the window */
-bool cursin_menu(Menuhdr *m)
+bool cursin_menu(Menuhdr* m)
 {
 	if (m->mw == NULL) {
 		return (0);
@@ -797,13 +797,13 @@ bool cursin_menu(Menuhdr *m)
 }
 
 typedef struct bhitdat {
-	Button *one_hit;
+	Button* one_hit;
 	SHORT x;
 	SHORT y;
 } Bhitdat;
 
 /* recursive sub for hit_button we've got the stack for it */
-static bool check_hit(Button *b, Bhitdat *bhd)
+static bool check_hit(Button* b, Bhitdat* bhd)
 {
 	if (b) {
 		if (check_hit(b->next, bhd)) {
@@ -821,7 +821,7 @@ static bool check_hit(Button *b, Bhitdat *bhd)
 }
 
 /* returns button hit in button list for x and y if one was */
-Button *hit_button(Button *b, SHORT x, SHORT y)
+Button* hit_button(Button* b, SHORT x, SHORT y)
 {
 	Bhitdat bhd;
 
@@ -833,9 +833,9 @@ Button *hit_button(Button *b, SHORT x, SHORT y)
 }
 
 /* sub for key_button() **/
-static Button *key_butn(Button *b, SHORT key)
+static Button* key_butn(Button* b, SHORT key)
 {
-	Button *gotone;
+	Button* gotone;
 
 	while (b != NULL) {
 		if (b->children != NULL) {
@@ -852,7 +852,7 @@ static Button *key_butn(Button *b, SHORT key)
 }
 
 /* returns button in list with key equivalent equal to key */
-static Button *key_button(Button *first, SHORT iokey)
+static Button* key_button(Button* first, SHORT iokey)
 {
 	unsigned char c;
 
@@ -867,23 +867,23 @@ static Button *key_button(Button *first, SHORT iokey)
 	return (key_butn(first, iokey));
 }
 
-static void check_reqpos_cancel(Menuhdr *mh)
+static void check_reqpos_cancel(Menuhdr* mh)
 {
-	Menuwndo *mw = mh->mw;
+	Menuwndo* mw = mh->mw;
 
 	if (mw != NULL && !is_rect_and_menu_rect_same(&(mw->w.W_screen->last_req_pos), mh)) {
 		cancel_reqpos(mw->w.W_screen);
 	}
 }
 
-static void menu_set_tabnext(Menuhdr *mh, Button *b)
+static void menu_set_tabnext(Menuhdr* mh, Button* b)
 {
 	if (mh && mh->group) {
 		mh->group->tabnext = b;
 	}
 }
 
-void mb_set_tabnext(Button *b, Button *next)
+void mb_set_tabnext(Button* b, Button* next)
 {
 	menu_set_tabnext(get_button_hdr(b), next);
 }
@@ -892,12 +892,12 @@ void mb_set_tabnext(Button *b, Button *next)
  * returns 1 if we got a mouse hit 2 if a key hit 0 if no hit
  * if not calls feelme or optme for hit
  * calls prehit function before calling feelme or optme if hit */
-int button_keyhit(Menuhdr *mh, Button *mbs, VFUNC prehit)
+int button_keyhit(Menuhdr* mh, Button* mbs, VFUNC prehit)
 {
-	Button *b;
+	Button* b;
 	int ret;
 	VFUNC doit;
-	Menuwndo *mw;
+	Menuwndo* mw;
 	SHORT bflags;
 
 	if (JSTHIT(KEYHIT)) /* keys take priority */
@@ -963,9 +963,9 @@ bool is_abortkey(void)
 }
 
 /* returns 1 if ate key */
-int check_reqabort(Menuhdr *hdr)
+int check_reqabort(Menuhdr* hdr)
 {
-	Mugroup *mg;
+	Mugroup* mg;
 
 	mg = hdr->group;
 	if ((mg->flags & MUG_REQUESTOR) && (JSTHIT(KEYHIT) && is_abortkey())) {
@@ -976,7 +976,7 @@ int check_reqabort(Menuhdr *hdr)
 }
 
 /* default group menu processor returns 1 if ate mouse 2 if ate key input */
-int do_menubuttons(Menuhdr *hdr)
+int do_menubuttons(Menuhdr* hdr)
 {
 	int ret;
 
@@ -988,7 +988,7 @@ int do_menubuttons(Menuhdr *hdr)
 
 /* sets x and y of unopened or hidden menu to center it at current about a
  * position */
-void menu_to_point(Wscreen *s, Menuhdr *mh, SHORT centx, SHORT centy)
+void menu_to_point(Wscreen* s, Menuhdr* mh, SHORT centx, SHORT centy)
 {
 	if (mh->mw != NULL) { /* not if open */
 		return;
@@ -999,19 +999,19 @@ void menu_to_point(Wscreen *s, Menuhdr *mh, SHORT centx, SHORT centy)
 	mh->x = centx - mh->width / 2; /* center it about coords given */
 	mh->y = centy - mh->height / 2;
 
-	bclip_rect((Rectangle *)&(mh->RECTSTART), (Rectangle *)&(s->wndo.RECTSTART));
+	bclip_rect((Rectangle*)&(mh->RECTSTART), (Rectangle*)&(s->wndo.RECTSTART));
 }
 
 /* sets x and y of unopened menu to center it at current screen cursor
  * position */
-void menu_to_cursor(Wscreen *s, Menuhdr *mh)
+void menu_to_cursor(Wscreen* s, Menuhdr* mh)
 {
 	menu_to_point(s, mh, icb.sx, icb.sy);
 }
 
 /* sets x and y of unopened menu to center it at current screen cursor
  * position modified requestor position */
-void menu_to_reqpos(Wscreen *s, Menuhdr *mh)
+void menu_to_reqpos(Wscreen* s, Menuhdr* mh)
 {
 	if (mh->mw != NULL) { /* not if open */
 		return;
@@ -1019,12 +1019,12 @@ void menu_to_reqpos(Wscreen *s, Menuhdr *mh)
 
 	scale_menu_size(mh, &s->menu_scale);
 
-	get_requestor_position(s, mh->width, mh->height, (Rectangle *)&(mh->RECTSTART));
+	get_requestor_position(s, mh->width, mh->height, (Rectangle*)&(mh->RECTSTART));
 }
 
 /* enable and disable manipulators */
 
-bool set_button_disable(Button *b, bool disable)
+bool set_button_disable(Button* b, bool disable)
 {
 	if (disable) {
 		b->flags |= MB_DISABLED;
@@ -1035,7 +1035,7 @@ bool set_button_disable(Button *b, bool disable)
 }
 
 /* combo set disable and redraw */
-void draw_button_disable(Button *b, bool disable)
+void draw_button_disable(Button* b, bool disable)
 {
 	if (disable) {
 		b->flags |= MB_DISABLED;
@@ -1046,22 +1046,22 @@ void draw_button_disable(Button *b, bool disable)
 }
 
 /* enables and redraws button */
-void enable_button(Button *b)
+void enable_button(Button* b)
 {
 	b->flags &= ~(MB_DISABLED);
 	draw_buttontop(b);
 }
 
 /* disables and redraws button */
-void disable_button(Button *b)
+void disable_button(Button* b)
 {
 	b->flags |= MB_DISABLED;
 	draw_buttontop(b);
 }
 
-void set_mbtab_disables(Button **bt, bool disable)
+void set_mbtab_disables(Button** bt, bool disable)
 {
-	Button *b;
+	Button* b;
 
 	while ((b = *bt++) != NULL) {
 		if (disable) {
@@ -1073,7 +1073,7 @@ void set_mbtab_disables(Button **bt, bool disable)
 }
 
 /* frees a ram copy of a button list */
-static void free_blist(Button *b)
+static void free_blist(Button* b)
 {
 	if (b) {
 		free_blist(b->children);
@@ -1082,14 +1082,14 @@ static void free_blist(Button *b)
 	}
 }
 
-void free_buttonlist(Button **pb)
+void free_buttonlist(Button** pb)
 {
 	free_blist(*pb);
 	*pb = NULL;
 }
 
 /* makes a ram copy of, and links a list of buttons */
-Errcode clone_buttonlist(Button *toclone, Button **pb)
+Errcode clone_buttonlist(Button* toclone, Button** pb)
 {
 	if (!toclone) {
 		*pb = NULL;
@@ -1110,9 +1110,9 @@ Errcode clone_buttonlist(Button *toclone, Button **pb)
 }
 
 /* given root returns first occurence found of button with id value */
-Button *find_button(Button *m, SHORT id)
+Button* find_button(Button* m, SHORT id)
 {
-	Button *child;
+	Button* child;
 
 	while (m) {
 		if (m->identity == id) {

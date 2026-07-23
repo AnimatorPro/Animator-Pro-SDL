@@ -1,6 +1,6 @@
 #include "reqlib.h"
 
-bool soft_qreq_number(short *inum, short min, short max, char *key, ...)
+bool soft_qreq_number(short* inum, short min, short max, char* key, ...)
 {
 	bool ret;
 	va_list args;

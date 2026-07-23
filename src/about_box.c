@@ -3,7 +3,6 @@
 #include "jimk.h"
 #include "progids.h"
 
-
 void about(void)
 {
 	// static char date[] = __DATE__;
@@ -14,4 +13,3 @@ void about(void)
 	get_userid_string(idtext);
 	soft_continu_box("!%s", "about", relnum);
 }
-

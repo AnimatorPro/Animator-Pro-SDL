@@ -2,9 +2,7 @@
 #include "fli.h"
 #include "memory.h"
 
-Errcode pj_fli_read_next(char *fname,
-						Flifile *flif,
-						struct rcel *fscreen, bool colors)
+Errcode pj_fli_read_next(char* fname, Flifile* flif, struct rcel* fscreen, bool colors)
 /*************************************************************************
  * Read in next frame from a fli onto a Rcel (which may be displayable or
  * not).  This is the main function to use if you with to step through a
@@ -25,19 +23,22 @@ Errcode pj_fli_read_next(char *fname,
  *		(see errcodes.h)
  *************************************************************************/
 {
-Fli_frame *ff;
-Errcode err;
+	Fli_frame* ff;
+	Errcode err;
 
-	if((err = pj_fli_alloc_cbuf(&ff,flif->hdr.width,flif->hdr.height,COLORS)) < 0)
+	if ((err = pj_fli_alloc_cbuf(&ff, flif->hdr.width, flif->hdr.height, COLORS)) < 0) {
 		goto error;
-	if((err = pj_fli_read_uncomp(fname, flif, fscreen, ff, colors)) < 0)
+	}
+	if ((err = pj_fli_read_uncomp(fname, flif, fscreen, ff, colors)) < 0) {
 		goto error;
+	}
 	goto out;
 
 error:
-	if(fname)
-		err = pj_fli_error_report(err,"Bad frame in \"%s\"",fname);
+	if (fname) {
+		err = pj_fli_error_report(err, "Bad frame in \"%s\"", fname);
+	}
 out:
 	pj_gentle_free(ff);
-	return(err);
+	return (err);
 }

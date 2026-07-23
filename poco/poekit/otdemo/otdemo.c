@@ -60,14 +60,14 @@
  * include the usual header files...
  *--------------------------------------------------------------------------*/
 
-#include "errcodes.h"   /* host error codes (must precede pocorex.h)     */
-#include "pocorex.h"    /* required header file, also includes pocolib.h */
+#include "errcodes.h" /* host error codes (must precede pocorex.h)     */
+#include "pocorex.h"  /* required header file, also includes pocolib.h */
 
 /*----------------------------------------------------------------------------
  * set up the host libraries we need...
  *--------------------------------------------------------------------------*/
 
-#define HLIB_TYPE_1 AA_POCOLIB	/* this one is always required in a POE */
+#define HLIB_TYPE_1 AA_POCOLIB /* this one is always required in a POE */
 #include <hliblist.h>
 
 /*----------------------------------------------------------------------------
@@ -75,15 +75,15 @@
  *--------------------------------------------------------------------------*/
 
 #define GREEN_IX 2
-#define BLUE_IX  3
+#define BLUE_IX 3
 
 typedef struct screen_data {
 	int size;
 	int xcenter;
 	int ycenter;
-	} ScreenData;
+} ScreenData;
 
-static void render_circles(void *data, int ix, int total, int scale)
+static void render_circles(void* data, int ix, int total, int scale)
 /*****************************************************************************
  * for each frame, draw a pair of circles.
  *
@@ -96,12 +96,12 @@ static void render_circles(void *data, int ix, int total, int scale)
  *
  ****************************************************************************/
 {
-	double		scaled_radius;
-	double		unscaled_radius;
-	ScreenData	*sd = data;
+	double scaled_radius;
+	double unscaled_radius;
+	ScreenData* sd = data;
 
-	scaled_radius	= 1.0 + ((sd->size * (scale / (double)SCALE_ONE)) / 2.0);
-	unscaled_radius = 1.0 + ((sd->size * (ix	/ (double)total))	  / 2.0);
+	scaled_radius = 1.0 + ((sd->size * (scale / (double)SCALE_ONE)) / 2.0);
+	unscaled_radius = 1.0 + ((sd->size * (ix / (double)total)) / 2.0);
 
 	poeSetColor(GREEN_IX);
 	poeCircle(sd->xcenter, sd->ycenter, (int)scaled_radius);
@@ -109,10 +109,9 @@ static void render_circles(void *data, int ix, int total, int scale)
 	poeSetColor(BLUE_IX);
 	poeCircle(sd->xcenter, sd->ycenter, (int)unscaled_radius);
 
-//	poeQtext(3, 3*sizeof(int),
-//		str2ppt("In render_circles, ix=%d, total=%d, scale=%d\n"),
-//		ix, total, scale);
-
+	//	poeQtext(3, 3*sizeof(int),
+	//		str2ppt("In render_circles, ix=%d, total=%d, scale=%d\n"),
+	//		ix, total, scale);
 }
 
 void make_circle_flic(void)
@@ -130,24 +129,23 @@ void make_circle_flic(void)
  ****************************************************************************/
 
 {
-	int 	   changes;
-	int 	   width;
-	int 	   height;
+	int changes;
+	int width;
+	int height;
 	ScreenData thedata;
 
 	changes = poeGetChangeCount();
 	if (changes != 0) {
-		if (!poeQquestion(
-				"You have %d unsaved changes.\n\n"
-				"Okay to discard changes and create new flic?",
-				changes)
-			)
+		if (!poeQquestion("You have %d unsaved changes.\n\n"
+						  "Okay to discard changes and create new flic?",
+						  changes)) {
 			return;  // user said no, just punt.
+		}
 	}
 
 	poeReset();
 	poeSetColorMap(GREEN_IX, 0, 255, 0);
-	poeSetColorMap(BLUE_IX, 0, 0,	255);
+	poeSetColorMap(BLUE_IX, 0, 0, 255);
 	poePicDirtied();
 	poeSetFrameCount(10);
 
@@ -157,10 +155,11 @@ void make_circle_flic(void)
 
 	poeGetSize(var2ppt(width), var2ppt(height));
 
-	if (builtin_err < Success)	// check status of all the preceding
-		return; 				// function calls before continuing.
+	if (builtin_err < Success) {  // check status of all the preceding
+		return;                   // function calls before continuing.
+	}
 
-	thedata.size = (width < height) ? width-5 : height-5;
+	thedata.size = (width < height) ? width - 5 : height - 5;
 	thedata.xcenter = width / 2;
 	thedata.ycenter = height / 2;
 
@@ -172,7 +171,7 @@ void make_circle_flic(void)
  *--------------------------------------------------------------------------*/
 
 static Lib_proto poe_calls[] = {
-	{ make_circle_flic, "void MakeCircleFlic(void);" },
+	{make_circle_flic, "void MakeCircleFlic(void);"},
 };
 
 Setup_Pocorex(NOFUNC, NOFUNC, "OverTime Demo POE", poe_calls);

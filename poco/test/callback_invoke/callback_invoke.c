@@ -8,7 +8,7 @@
 
 static int callback_failure;
 
-static Popot callback_popot(void *pointer)
+static Popot callback_popot(void* pointer)
 {
 	Popot value;
 
@@ -18,7 +18,7 @@ static Popot callback_popot(void *pointer)
 	return value;
 }
 
-static int fail_callback(const char *message)
+static int fail_callback(const char* message)
 {
 	if (!callback_failure) {
 		fprintf(stderr, "poco_callback_invoke: %s\n", message);
@@ -27,8 +27,8 @@ static int fail_callback(const char *message)
 	return -1;
 }
 
-static int invoke_callbacks(void *abort_handler, void *update_handler,
-	void *overtime_handler, void *flic_handler)
+static int invoke_callbacks(void* abort_handler, void* update_handler, void* overtime_handler,
+							void* flic_handler)
 {
 	int abort_marker = 1;
 	int update_marker = 2;
@@ -55,27 +55,28 @@ static int invoke_callbacks(void *abort_handler, void *update_handler,
 		{POCO_CALLBACK_VALUE_LONG, {.long_value = 9}},
 	};
 	PocoCallbackValue invalid_arg = {
-		(PocoCallbackValueKind)99, {.int_value = 0},
+		(PocoCallbackValueKind)99,
+		{.int_value = 0},
 	};
 
-	if (poco_invoke_callback(po_fuf_code(abort_handler), &result,
-			abort_args, 1) != Success || result.i != 1) {
+	if (poco_invoke_callback(po_fuf_code(abort_handler), &result, abort_args, 1) != Success ||
+		result.i != 1) {
 		return fail_callback("abort callback result");
 	}
-	if (poco_invoke_callback(po_fuf_code(update_handler), &result,
-			update_args, 2) != Success || result.i != 42) {
+	if (poco_invoke_callback(po_fuf_code(update_handler), &result, update_args, 2) != Success ||
+		result.i != 42) {
 		return fail_callback("UdQnumber callback result");
 	}
-	if (poco_invoke_callback(po_fuf_code(overtime_handler), &result,
-			overtime_args, 2) != Success || result.i != 43) {
+	if (poco_invoke_callback(po_fuf_code(overtime_handler), &result, overtime_args, 2) != Success ||
+		result.i != 43) {
 		return fail_callback("OverTime callback result");
 	}
-	if (poco_invoke_callback(po_fuf_code(flic_handler), &result,
-			flic_args, 5) != Success || result.i != 1) {
+	if (poco_invoke_callback(po_fuf_code(flic_handler), &result, flic_args, 5) != Success ||
+		result.i != 1) {
 		return fail_callback("FLIC callback result");
 	}
-	if (poco_invoke_callback(po_fuf_code(abort_handler), &result,
-			&invalid_arg, 1) != Err_parameter_range) {
+	if (poco_invoke_callback(po_fuf_code(abort_handler), &result, &invalid_arg, 1) !=
+		Err_parameter_range) {
 		return fail_callback("invalid callback value must fail");
 	}
 	return 0;
@@ -85,26 +86,26 @@ int main(void)
 {
 	static const PocoBinding bindings[] = {
 		{"int InvokeCallbacks(int (*abort_handler)(void *data),"
-			" int (*update_handler)(void *data, int value),"
-			" int (*overtime_handler)(double time, void *data),"
-			" int (*flic_handler)(void *flic, void *userdata, long loop,"
-			" long frame, long count));", (PocoNativeFunction)invoke_callbacks},
+		 " int (*update_handler)(void *data, int value),"
+		 " int (*overtime_handler)(double time, void *data),"
+		 " int (*flic_handler)(void *flic, void *userdata, long loop,"
+		 " long frame, long count));",
+		 (PocoNativeFunction)invoke_callbacks},
 	};
 	static const PocoLibrary library = {
 		"callback-invoke", bindings, 1, NULL, NULL, NULL,
 	};
-	PocoVm *vm = NULL;
-	PocoProgram *program = NULL;
+	PocoVm* vm = NULL;
+	PocoProgram* program = NULL;
 	int32_t result = -1;
 	int status = 1;
 
 	if (poco_vm_create(NULL, &vm) != POCO_STATUS_OK ||
 		poco_vm_register_library(vm, &library) != POCO_STATUS_OK ||
-		poco_vm_compile_file(vm, FIXTURE_PATH("callback_invoke.poc"), &program) !=
-			POCO_STATUS_OK ||
-		poco_vm_run(vm, program, NULL, &result) != POCO_STATUS_OK ||
-		result != 0 || callback_failure) {
-		fprintf(stderr, "poco_callback_invoke: fixture failed: %s\n", poco_get_error());
+		poco_vm_compile_file(vm, FIXTURE_PATH("callback_invoke.poc"), &program) != POCO_STATUS_OK ||
+		poco_vm_run(vm, program, NULL, &result) != POCO_STATUS_OK || result != 0 ||
+		callback_failure) {
+		fprintf(stderr, "poco_callback_invoke: fixture failed: %s\n", poco_get_last_error(vm));
 		goto CLEANUP;
 	}
 	status = 0;

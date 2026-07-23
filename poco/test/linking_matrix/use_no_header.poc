@@ -1,0 +1,6 @@
+#pragma poco use "library.poc"
+
+int main(void)
+{
+	return library_add(35);
+}

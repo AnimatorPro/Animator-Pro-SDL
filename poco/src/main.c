@@ -19,12 +19,18 @@
 #include <string.h>
 
 #include "aaconfig.h"
+#include "cli_debugger.h"
 #include "commonst.h"
 #include "filepath.h"
 #include "poco_errcodes.h"
 #include "poco.h"
 #include "pocoface.h"
+#include "program_internal.h"
 #include "ptrmacro.h"
+
+/* Legacy standalone-host state.  The embeddable library keeps this status in
+ * Poco_run_env instead. */
+Errcode builtin_err;
 
 #ifdef _MSC_VER
 #include <float.h>
@@ -205,40 +211,8 @@ static Poco_lib* get_poco_libs(void)
 	return (list);
 }
 
-/*****************************************************************************
- * this routine fools the PJ lfile library into thinking it is writing to
- * stdout but the stuff really goes into a file.
- ****************************************************************************/
-FILE redirection_save;
-FILE* f;
-
-static Errcode open_redirect_stdout(char* fname)
-{
-	if (NULL == (f = fopen(fname, "w"))) { /* create the file */
-		return Err_create;
-	}
-
-	redirection_save = *stdout; /* save state of stdout */
-	*stdout = *f;               /* redirect stdout to file */
-
-	return Success;
-}
-
-/*****************************************************************************
- * this un-directs stdout from a file back to the screen.
- ****************************************************************************/
-static void close_redirect_stdout(void)
-{
-	*f = *stdout;               /* update buffer count, etc, in file */
-	fclose(f);                  /* close file */
-	*stdout = redirection_save; /* restore stdout state */
-}
-
-extern Errcode builtin_err; /* Defined by the embeddable Poco runtime. */
-
 #ifdef DEVELOPMENT
 /* variables for runops tracing */
-extern C_frame* po_run_protos;
 extern FILE* po_trace_file;
 extern bool po_trace_flag;
 #endif /* DEVELOPMENT */
@@ -262,6 +236,8 @@ char* ido_type_to_str(IdoType ido_type)
 			return "void";
 		case IDO_VPT:
 			return "void*";
+		case IDO_STRUCT:
+			return "struct";
 
 #ifdef STRING_EXPERIMENT
 		case IDO_STRING:
@@ -300,28 +276,33 @@ void dump_func_frame(const char* name, const Func_frame* frame_in)
  ***************************************************************************/
 static void print_version()
 {
-	printf("poco version %d\n", VRSN_NUM);
+	printf("poco version %u.%u.%u\n", POCO_API_VERSION_MAJOR, POCO_API_VERSION_MINOR,
+		   POCO_API_VERSION_PATCH);
 }
 
 /****************************************************************************
  *
  ***************************************************************************/
-static void usage()
+static void usage(FILE* stream)
 {
-	fprintf(stdout, "Usage: poco [options] <file.poc>\n");
-	fprintf(stdout, "\nOptions:\n");
-	fprintf(stdout, "  -c            Compile only; do not run.\n");
-	fprintf(stdout, "  -d            Dump disassembly to <file.dump>.\n");
-	fprintf(stdout, "  -o<file>      Redirect stdout to file.\n");
-	fprintf(stdout, "  -l            Disable builtin libraries.\n");
+	fprintf(stream, "Usage: poco [options] <file> [file ...]\n");
+	fprintf(stream, "\nOptions:\n");
+	fprintf(stream, "  -c, --compile        Compile only; do not run.\n");
+	fprintf(
+		stream,
+		"  -o, --output <file>  Write compiled output (.pex recommended; implies --compile).\n");
+	fprintf(stream, "      --version        Print version and exit.\n");
+	fprintf(stream, "      --verbose        Enable verbose debug output.\n");
+	fprintf(stream, "      --gui            Launch Poco GUI (not implemented).\n");
+	fprintf(stream, "  -g, --debug-info     Emit extended debug information.\n");
+	fprintf(stream, "      --debug          Launch the interactive debugger.\n");
+	fprintf(stream, "  -d                    Dump disassembly to <file.dump>.\n");
+	fprintf(stream, "  -l                    Disable builtin libraries.\n");
 #ifdef DEVELOPMENT
-	fprintf(stdout, "  -t            Enable instruction trace (development).\n");
+	fprintf(stream, "  -t                    Enable instruction trace (development).\n");
 #endif
-	fprintf(stdout, "  -v            Print version and exit.\n");
-	fprintf(stdout, "  -V            Enable verbose debug output.\n");
-	fprintf(stdout, "  -g            Launch Poco GUI (if available).\n");
 
-	fflush(stdout);
+	fflush(stream);
 }
 
 /****************************************************************************
@@ -336,10 +317,259 @@ static void replace_file_extension(char* dest, const char* buffer, size_t max_le
 		snprintf(dest, max_len, "%s.%s", buffer, new_ext);
 	} else {
 		// Dot found-- replace the extension
-		memcpy(dest, buffer, max(strlen(buffer), max_len - 1));
+		memcpy(dest, buffer, min(strlen(buffer), max_len - 1));
 		dest[(size_t)(dot - buffer)] = '\0';
 		snprintf(dest, max_len, "%s.%s", dest, new_ext);
 	}
+}
+
+/****************************************************************************
+ * Compile a source file through the embedding API and persist the resulting
+ * immutable program image.  The serializer owns the canonical source-less
+ * archive shape; the CLI only owns opening and closing the destination.
+ ***************************************************************************/
+static PocoStatus compile_to_binary(PocoVm* vm, const char* const* source_filenames,
+									size_t source_count, const char* output_filename,
+									bool with_builtin_libs, PocoDebugLevel debug_level)
+{
+	PocoActivation* activation = NULL;
+	PocoCall* main_call = NULL;
+	PocoProgram* program = NULL;
+	PocoStatus status;
+	FILE* output;
+
+	if (with_builtin_libs) {
+		status = poco_vm_register_standard_library(vm);
+		if (status != POCO_STATUS_OK) {
+			return status;
+		}
+	}
+	status = poco_vm_compile_files(vm, source_filenames, source_count, &program);
+	if (status != POCO_STATUS_OK) {
+		return status;
+	}
+	/* Writing a binary produces a runnable artifact, so reject library-only
+	 * sources here. A bare -c check takes the ordinary compile-only path below and
+	 * intentionally does not perform this check. */
+	status = poco_activation_acquire(program, &activation);
+	if (status == POCO_STATUS_OK) {
+		status = poco_call_begin(activation, "main", &main_call);
+	}
+	if (main_call != NULL) {
+		poco_call_end(main_call);
+	}
+	poco_activation_release(activation);
+	if (status == POCO_STATUS_NOT_FOUND) {
+		status = (PocoStatus)Err_no_main;
+	}
+	if (status != POCO_STATUS_OK) {
+		poco_program_destroy(program);
+		return status;
+	}
+
+	output = fopen(output_filename, "wb");
+	if (output == NULL) {
+		fprintf(stderr, "poco: unable to open output file '%s'\n", output_filename);
+		poco_program_destroy(program);
+		return POCO_STATUS_CREATE_FAILED;
+	}
+	status = poco_program_serialize_file(program, debug_level, output);
+	if (fclose(output) != 0 && status == POCO_STATUS_OK) {
+		status = POCO_STATUS_WRITE_FAILED;
+	}
+	if (status != POCO_STATUS_OK) {
+		fprintf(stderr, "poco: unable to write compiled output '%s'\n", output_filename);
+	}
+	poco_program_destroy(program);
+	return status;
+}
+
+/****************************************************************************
+ * Inspect only the canonical container magic.  A complete match is
+ * authoritative: callers must deserialize the file and report any validation
+ * error rather than falling back to the source compiler.
+ ***************************************************************************/
+static PocoStatus inspect_input_file(const char* filename, FILE** out_file, bool* out_is_binary)
+{
+	static const unsigned char bytecode_magic[8] = {'P', 'O', 'C', 'O', 'B', 'C', 0x0d, 0x0a};
+	unsigned char leading_bytes[sizeof(bytecode_magic)];
+	size_t bytes_read;
+	FILE* input;
+
+	if (filename == NULL || out_file == NULL || out_is_binary == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	*out_file = NULL;
+	*out_is_binary = false;
+	input = fopen(filename, "rb");
+	if (input == NULL) {
+		return POCO_STATUS_NO_FILE;
+	}
+	bytes_read = fread(leading_bytes, 1, sizeof(leading_bytes), input);
+	if (bytes_read < sizeof(leading_bytes) && ferror(input)) {
+		fclose(input);
+		return POCO_STATUS_READ_FAILED;
+	}
+	if (fseek(input, 0, SEEK_SET) != 0) {
+		fclose(input);
+		return POCO_STATUS_SEEK_FAILED;
+	}
+	*out_is_binary = bytes_read == sizeof(leading_bytes) &&
+					 memcmp(leading_bytes, bytecode_magic, sizeof(bytecode_magic)) == 0;
+	*out_file = input;
+	return POCO_STATUS_OK;
+}
+
+static void report_binary_load_error(PocoVm* vm, PocoStatus status)
+{
+	switch (status) {
+		case POCO_STATUS_IMAGE_TRUNCATED:
+			fprintf(stderr, "poco: compiled binary is truncated\n");
+			break;
+		case POCO_STATUS_IMAGE_CORRUPT:
+			fprintf(stderr, "poco: compiled binary is corrupt (hash or layout mismatch)\n");
+			break;
+		case POCO_STATUS_IMAGE_VERSION_MISMATCH:
+			fprintf(stderr, "poco: compiled binary version mismatch\n");
+			break;
+		case POCO_STATUS_MODULE_NOT_FOUND:
+			fprintf(stderr, "poco: required external library was not found\n");
+			break;
+		case POCO_STATUS_MODULE_LOAD_FAILED:
+			fprintf(stderr, "poco: external library load failed: %s\n", poco_get_last_error(vm));
+			break;
+		case POCO_STATUS_MODULE_NO_ENTRY:
+			fprintf(stderr, "poco: external library entry point is missing\n");
+			break;
+		case POCO_STATUS_MODULE_VERSION:
+			fprintf(stderr, "poco: external library ABI version mismatch\n");
+			break;
+		case POCO_STATUS_FFI_FUNCTION_NOT_FOUND:
+			fprintf(stderr, "poco: unknown external library binding\n");
+			break;
+		case POCO_STATUS_MODULE_INVALID:
+			fprintf(stderr, "poco: external library is invalid\n");
+			break;
+		case POCO_STATUS_MODULE_EMPTY:
+			fprintf(stderr, "poco: external library contains no bindings\n");
+			break;
+		default:
+			fprintf(stderr, "poco: unable to load compiled binary\n");
+			break;
+	}
+}
+
+/****************************************************************************
+ * Load and optionally run a validated source-less program.  Image validation
+ * statuses have CLI-specific diagnostics because they are otherwise outside
+ * the legacy compiler error domain handled by report_status below.
+ ***************************************************************************/
+static PocoStatus run_binary(PocoVm* vm, FILE* input, bool run_program, bool with_builtin_libs)
+{
+	PocoProgram* program = NULL;
+	PocoStatus status;
+	int32_t result = 0;
+
+	if (with_builtin_libs) {
+		status = poco_vm_register_standard_library(vm);
+		if (status != POCO_STATUS_OK) {
+			return status;
+		}
+	}
+	status = poco_vm_deserialize_file(vm, input, &program);
+	if (status != POCO_STATUS_OK) {
+		report_binary_load_error(vm, status);
+		return status;
+	}
+	if (run_program) {
+		status = poco_vm_run(vm, program, NULL, &result);
+		if (status == POCO_STATUS_OK) {
+			fprintf(stderr, "Return value: %d\n", (int)result);
+		}
+	}
+	poco_program_destroy(program);
+	return status;
+}
+
+/****************************************************************************
+ * Compile or load a program through the embedding API and attach the CLI
+ * debugger. Source compiles retain their physical path in memory; binaries
+ * must carry the extended path metadata emitted by -g.
+ ***************************************************************************/
+static PocoStatus run_debugger(PocoVm* vm, const char* const* filenames, size_t source_count,
+							   FILE* input, bool is_binary, bool with_builtin_libs)
+{
+	PocoProgram* program = NULL;
+	PocoStatus status;
+	int32_t result = 0;
+	int completed = 0;
+
+	if (with_builtin_libs) {
+		status = poco_vm_register_standard_library(vm);
+		if (status != POCO_STATUS_OK) {
+			return status;
+		}
+	}
+	status = is_binary ? poco_vm_deserialize_file(vm, input, &program)
+					   : poco_vm_compile_files(vm, filenames, source_count, &program);
+	if (status != POCO_STATUS_OK) {
+		if (is_binary) {
+			report_binary_load_error(vm, status);
+		} else {
+			fprintf(stderr, "poco: unable to compile debugger input '%s'\n", filenames[0]);
+		}
+		return status;
+	}
+	status =
+		poco_cli_debug_program(vm, program, is_binary ? NULL : filenames[0], &result, &completed);
+	if (status == POCO_STATUS_OK && completed) {
+		fprintf(stderr, "Return value: %d\n", (int)result);
+	}
+	poco_program_destroy(program);
+	return status;
+}
+
+static PocoStatus run_source_files(PocoVm* vm, const char* const* filenames, size_t source_count,
+								   bool run_program, bool with_builtin_libs, bool debug_dump)
+{
+	PocoProgram* program = NULL;
+	PocoStatus status;
+	int32_t result = 0;
+
+	if (with_builtin_libs) {
+		status = poco_vm_register_standard_library(vm);
+		if (status != POCO_STATUS_OK) {
+			return status;
+		}
+	}
+	status = poco_vm_compile_files(vm, filenames, source_count, &program);
+	if (status == POCO_STATUS_OK && debug_dump) {
+		char dump_file_name[FILENAME_MAX];
+		FILE* dump_file;
+
+		po_disassemble_program((Poco_run_env*)program->executable, stdout);
+		replace_file_extension(dump_file_name, filenames[0], FILENAME_MAX, "dump");
+		printf("==> Dumping to %s ...\n", dump_file_name);
+		dump_file = fopen(dump_file_name, "w");
+		if (dump_file != NULL) {
+			po_disassemble_program((Poco_run_env*)program->executable, dump_file);
+			fclose(dump_file);
+		} else {
+			fprintf(stderr, "-- Unable to open dump file for writing: %s\n", dump_file_name);
+		}
+	}
+	if (status == POCO_STATUS_OK && run_program) {
+		status = poco_vm_run(vm, program, NULL, &result);
+		if (status == POCO_STATUS_OK) {
+			fprintf(stderr, "Return value: %d\n", (int)result);
+		}
+	}
+	poco_program_destroy(program);
+	/* Preserve the legacy CLI's detailed compiler diagnostic path. */
+	if (status == POCO_STATUS_REPORTED) {
+		status = (PocoStatus)Err_in_err_file;
+	}
+	return status;
 }
 
 /****************************************************************************
@@ -347,135 +577,173 @@ static void replace_file_extension(char* dest, const char* buffer, size_t max_le
  ***************************************************************************/
 int main(int argc, char* argv[])
 {
-	char err_file[PATH_SIZE];
-	long err_line;
-	int err_char;
 	int err = Success;
 
-	void* pexe;
-	char* efname = NULL; /* Errors file name.	*/
-	char* sfname = NULL; /* Source file name.	*/
-	char* dfname = NULL; /* Dump file name.		*/
+	char* sfname = NULL; /* First input name, retained for legacy diagnostics. */
+	char** input_filenames = argv + 1;
+	size_t input_count = 0;
+	const char* output_filename = NULL;
 	bool runflag = true;
 	bool verbose = false;
-	char* argp;
+	bool emit_debug_info = false;
+	bool debug_mode = false;
+	bool parse_options = true;
+	const char* argp;
 	int counter;
 	Poco_lib* builtin_libs;
+	PocoVm* vm = NULL;
+	PocoVmOptions vm_options = {0};
 	int do_debug_dump = false;
-	int gui_mode = false;
+	FILE* input_file = NULL;
+	bool input_is_binary = false;
+	PocoStatus status;
 
 	builtin_libs = get_poco_libs();
+
+	for (counter = 1; counter < argc; counter++) {
+		argp = argv[counter];
+		if (parse_options && strcmp(argp, "--") == 0) {
+			parse_options = false;
+		} else if (parse_options && strcmp(argp, "-c") == 0) {
+			runflag = false;
+		} else if (parse_options && strcmp(argp, "--compile") == 0) {
+			runflag = false;
+		} else if (parse_options && strcmp(argp, "-o") == 0) {
+			if (++counter >= argc) {
+				fprintf(stderr, "poco: option '-o' requires an argument\n");
+				usage(stderr);
+				return EXIT_FAILURE;
+			}
+			output_filename = argv[counter];
+			runflag = false;
+		} else if (parse_options && strcmp(argp, "--output") == 0) {
+			if (++counter >= argc) {
+				fprintf(stderr, "poco: option '--output' requires an argument\n");
+				usage(stderr);
+				return EXIT_FAILURE;
+			}
+			output_filename = argv[counter];
+			runflag = false;
+		} else if (parse_options && strncmp(argp, "--output=", 9) == 0) {
+			if (argp[9] == '\0') {
+				fprintf(stderr, "poco: option '--output' requires an argument\n");
+				usage(stderr);
+				return EXIT_FAILURE;
+			}
+			output_filename = argp + 9;
+			runflag = false;
+		} else if (parse_options && strcmp(argp, "--version") == 0) {
+			print_version();
+			return EXIT_SUCCESS;
+		} else if (parse_options && strcmp(argp, "--verbose") == 0) {
+			verbose = true;
+		} else if (parse_options && strcmp(argp, "--gui") == 0) {
+			fprintf(stdout, "Poco GUI not yet implemented\n");
+			return Err_not_implemented;
+		} else if (parse_options &&
+				   (strcmp(argp, "-g") == 0 || strcmp(argp, "--debug-info") == 0)) {
+			emit_debug_info = true;
+		} else if (parse_options && strcmp(argp, "--debug") == 0) {
+			debug_mode = true;
+		} else if (parse_options && strcmp(argp, "-d") == 0) {
+			do_debug_dump = true;
+		} else if (parse_options && strcmp(argp, "-l") == 0) {
+			builtin_libs = NULL;
+#ifdef DEVELOPMENT
+		} else if (parse_options && strcmp(argp, "-t") == 0) {
+			po_trace_flag = true;
+			po_trace_file = stdout;
+#endif /* DEVELOPMENT */
+		} else if (parse_options && argp[0] == '-' && argp[1] != '\0') {
+			fprintf(stderr, "poco: unknown option '%s'\n", argp);
+			usage(stderr);
+			return EXIT_FAILURE;
+		} else {
+			/* Compact positionals into argv's already-consumed prefix. This keeps
+			 * their command-line order without allocating or mutating the strings. */
+			input_filenames[input_count++] = (char*)argp;
+		}
+	}
+
+	if (input_count == 0) {
+		usage(stdout);
+		return 0;
+	}
+	sfname = input_filenames[0];
 
 	init_stdfiles(); /* initialize PJ stdin, stdout, etc */
 
 	signal(SIGFPE, fpe_handler);  // install floating point error trapping
 
-	for (counter = 1; counter < argc; counter++) {
-		argp = argv[counter];
-		if (*argp == '-') {
-			switch (toupper(*++argp)) {
-				case 'c': /* Compile-only switch...   */
-				case 'C': /* Compile-only switch...   */
-					runflag = false;
-					break;
-#ifdef DEVELOPMENT
-				case 't': /* Trace... */
-				case 'T': /* Trace... */
-					po_trace_flag = true;
-					po_trace_file = stdout;
-					break;
-#endif                    /* DEVELOPMENT */
-				case 'd': /* Dump file name...        */
-				case 'D': /* Dump file name...        */
-					do_debug_dump = true;
-					break;
-				case 'o': /* Redirection file name... */
-				case 'O': /* Redirection file name... */
-					if (*++argp != 0) {
-						efname = argp;
-					} else {
-						efname = "stdout.txt";
-					}
-					break;
-				case 'l': /* punt builtin libs...*/
-				case 'L': /* punt builtin libs...*/
-					builtin_libs = NULL;
-					break;
-				case 'v':
-					print_version();
-					return 0;
-				case 'V':
-					verbose = true;
-					break;
-				case 'g':
-				case 'G':
-					gui_mode = true;
-					// fprintf(stdout, "Launching Poco GUI...\n");
-					fprintf(stdout, "Poco GUI not yet implemented\n");
-					return Err_not_implemented;
-				default: /* Fat-finger case...		*/
-					break;
-			}
+	vm_options.verbose = verbose;
+	if (poco_vm_create(&vm_options, &vm) != POCO_STATUS_OK) {
+		return Err_no_memory;
+	}
+	for (size_t input_index = 0; input_index < input_count; ++input_index) {
+		FILE* inspected_file = NULL;
+		bool inspected_is_binary = false;
+
+		status =
+			inspect_input_file(input_filenames[input_index], &inspected_file, &inspected_is_binary);
+		if (status != POCO_STATUS_OK) {
+			sfname = input_filenames[input_index];
+			err = (int)status;
+			goto report_status;
+		}
+		if (input_count > 1 && inspected_is_binary) {
+			fprintf(stderr,
+					"poco: compiled binary '%s' cannot be mixed with additional source inputs\n",
+					input_filenames[input_index]);
+			fclose(inspected_file);
+			err = EXIT_FAILURE;
+			goto report_status;
+		}
+		if (input_count == 1) {
+			input_file = inspected_file;
+			input_is_binary = inspected_is_binary;
 		} else {
-			sfname = argp; /* It's not a switch, must be the source file. */
+			fclose(inspected_file);
 		}
 	}
-
-	if (sfname == NULL) {
-		usage();
-		return 0;
-	}
-
-	if (strchr(sfname, '.') == NULL) {
-		/* If no '.' in name, tack on .POC */
-		strcat(sfname, ".poc");
-	}
-
-	if (efname != NULL) {
-		err = open_redirect_stdout(efname);
-		if (err != Success) {
-			fprintf(stdout, "Error attempting to redirect stdout to '%s'\n", efname);
-			exit(-1);
+	if (input_is_binary) {
+		if (output_filename != NULL) {
+			fprintf(stderr, "poco: '-o' cannot recompile an already-compiled binary '%s'\n",
+					sfname);
+			fclose(input_file);
+			input_file = NULL;
+			err = EXIT_FAILURE;
+			goto report_status;
 		}
+		err = (int)(debug_mode ? run_debugger(vm, input_filenames, 1, input_file, true,
+											  builtin_libs != NULL)
+							   : run_binary(vm, input_file, runflag, builtin_libs != NULL));
+		fclose(input_file);
+		input_file = NULL;
+		goto report_status;
 	}
-
-	//	if (gui_mode) {
-	//		poco_gui();
-	//	}
-
-	const int compile_status = compile_poco(&pexe, sfname, NULL, dfname, builtin_libs, err_file,
-											&err_line, &err_char, incdirs, verbose);
-
-	if (compile_status == Success) {
-#ifdef DEVELOPMENT
-		po_run_protos = (((Poco_run_env*)pexe)->protos); /* for trace */
-#endif                                                   /* DEVELOPMENT */
-
-		if (do_debug_dump) {
-			po_disassemble_program((Poco_run_env*)pexe, stdout);
-			char dump_file_name[FILENAME_MAX];
-			replace_file_extension(dump_file_name, sfname, FILENAME_MAX, "dump");
-			printf("==> Dumping to %s ...\n", dump_file_name);
-			FILE* fp = fopen(dump_file_name, "w");
-			if (fp) {
-				po_disassemble_program((Poco_run_env*)pexe, fp);
-				fclose(fp);
-			} else {
-				fprintf(stderr, "-- Unable to open dump file for writing: %s\n", dump_file_name);
-			}
-		}
-
-		if (runflag) {
-			err = run_poco(&pexe, NULL, check_abort, NULL, &err_line);
-		}
-
-		fprintf(stderr, "Return value: %d\n", ((Poco_run_env*)pexe)->result.i);
-		free_poco(&pexe);
-	} else {
-		/* Propagate compile error to process exit code for test harnesses */
-		err = compile_status;
+	if (input_file != NULL) {
+		fclose(input_file);
 	}
+	input_file = NULL;
+	if (debug_mode) {
+		err = (int)run_debugger(vm, (const char* const*)input_filenames, input_count, NULL, false,
+								builtin_libs != NULL);
+		goto report_status;
+	}
+	if (output_filename != NULL) {
+		err = (int)compile_to_binary(
+			vm, (const char* const*)input_filenames, input_count, output_filename,
+			builtin_libs != NULL,
+			emit_debug_info ? POCO_DEBUG_LEVEL_EXTENDED : POCO_DEBUG_LEVEL_MINIMAL);
+		goto report_status;
+	}
+	err = (int)run_source_files(vm, (const char* const*)input_filenames, input_count, runflag,
+								builtin_libs != NULL, do_debug_dump);
 
+report_status:
+	if (input_file != NULL) {
+		fclose(input_file);
+	}
 	if (err < Success) {
 		switch (err) {
 			case Err_no_memory:
@@ -494,15 +762,13 @@ int main(int argc, char* argv[])
 				fprintf(stdout, "Poco compiler failed self-check.\n");
 				break;
 			case Err_poco_ffi_invalid_binding:
-				fprintf(stdout, "%s\n", poco_get_error());
+				fprintf(stdout, "%s\n", poco_get_last_error(vm));
 				break;
 			case Err_no_main:
 				fprintf(stdout, "Program does not contain a main() routine.\n");
 				break;
 			case Err_in_err_file:
-				if (poco_get_error()[0] != '\0') {
-					fprintf(stdout, "%s", poco_get_error());
-				}
+				fprintf(stdout, "%s", poco_get_last_error(vm));
 				break;
 			case Err_abort:
 			default:
@@ -511,11 +777,8 @@ int main(int argc, char* argv[])
 		fprintf(stdout, "Error code %d\n", err);
 	}
 
-	if (efname != NULL) {
-		close_redirect_stdout();
-	}
-
 	cleanup_lfiles(); /* cleanup PJ stdin, stdout, etc */
+	poco_vm_destroy(vm);
 
 	return err;
 }

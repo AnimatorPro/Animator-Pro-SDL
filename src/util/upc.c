@@ -1,13 +1,11 @@
 #include <ctype.h>
 #include "util.h"
 
-void upc(char *s)
+void upc(char* s)
 {
-register char c;
+	register char c;
 
-while ((c = *s) != '\0')
-	{
-	*s++ = toupper(c);
+	while ((c = *s) != '\0') {
+		*s++ = toupper(c);
 	}
 }
-

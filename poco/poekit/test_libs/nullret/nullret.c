@@ -11,6 +11,5 @@ __declspec(dllexport)
 #endif
 Pocorex* poco_rexlib_get(void)
 {
-	return NULL;  /* Intentionally return NULL */
+	return NULL; /* Intentionally return NULL */
 }
-

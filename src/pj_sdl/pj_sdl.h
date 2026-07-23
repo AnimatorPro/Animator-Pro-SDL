@@ -15,12 +15,12 @@ struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_Rect;
 
-extern struct SDL_Surface*  s_surface;
-extern struct SDL_Window*   window;
-extern struct SDL_Surface*  s_window_surface;
+extern struct SDL_Surface* s_surface;
+extern struct SDL_Window* window;
+extern struct SDL_Surface* s_window_surface;
 extern struct SDL_Renderer* renderer;
-extern struct SDL_Texture*  render_target;
-extern struct SDL_Palette*  vga_palette;
+extern struct SDL_Texture* render_target;
+extern struct SDL_Palette* vga_palette;
 
 #define SDL_BITSPERPIXEL(format) (SDL_ISPIXELFORMAT_FOURCC(format) ? 0 : (((format) >> 8) & 0xFF))
 
@@ -35,7 +35,7 @@ void pj_sdl_flip_window_surface(void);
 const char* pj_sdl_resources_path();
 const char* pj_sdl_preferences_path();
 
-bool pj_is_directory(const char *path);
+bool pj_is_directory(const char* path);
 
 void pj_dialog_set_last_path(const char* path);
 char* pj_dialog_file_open(const char* type_name, const char* extensions, const char* default_path);
@@ -45,15 +45,15 @@ char* pj_dialog_file_save(const char* type_name, const char* extensions, const c
 const char* pj_sdl_mac_bundle_path();
 
 #ifndef MIN
-#define MIN(x,y) (x < y ? x : y)
+#define MIN(x, y) (x < y ? x : y)
 #endif
 
 #ifndef MAX
-#define MAX(x,y) (x > y ? x : y)
+#define MAX(x, y) (x > y ? x : y)
 #endif
 
 #ifdef _MSC_VER
-	#define PATH_MAX 1024
+#define PATH_MAX 1024
 #endif
 
-#endif // ANIMATOR_PRO_PJ_SDL_H
+#endif  // ANIMATOR_PRO_PJ_SDL_H

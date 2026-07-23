@@ -29,7 +29,7 @@ function(require_absent_literal path literal)
 endfunction()
 
 set(POCO_PUBLIC_HEADER "${POCO_SOURCE_DIR}/include/poco/poco.h")
-set(POCO_LEGACY_HEADER "${POCO_SOURCE_DIR}/include/pocolib.h")
+set(POCO_LEGACY_HEADER "${POCO_SOURCE_DIR}/src/pocolib.h")
 set(ANIMATOR_POE_HEADER "${ANIMATOR_SOURCE_DIR}/src/inc/pocolib.h")
 set(POCO_LOADER "${POCO_SOURCE_DIR}/src/pocoload.c")
 set(POCO_MODULE_HELPER "${POCO_SOURCE_DIR}/cmake/PocoModule.cmake")

@@ -1,11 +1,11 @@
 #include "memory.h"
 
-ULONG mem_crcsum(void *sbuf, LONG size)
+ULONG mem_crcsum(void* sbuf, LONG size)
 {
-register UBYTE *buf;
-register UBYTE *maxbuf;
-register ULONG crcsum;
-register ULONG op;
+	register UBYTE* buf;
+	register UBYTE* maxbuf;
+	register ULONG crcsum;
+	register ULONG op;
 
 	buf = sbuf;
 	maxbuf = buf + size;
@@ -15,11 +15,11 @@ register ULONG op;
 
 	/* add value to crcsum */
 
-    while(buf < maxbuf)
-	{
-       	crcsum += (ULONG)(*buf++) << op;
-       	if(++op == 25) 
+	while (buf < maxbuf) {
+		crcsum += (ULONG)(*buf++) << op;
+		if (++op == 25) {
 			op = 0;
+		}
 	}
-  	return(crcsum);
+	return (crcsum);
 }

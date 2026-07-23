@@ -1,0 +1,43 @@
+int base_value = 10;
+int pointer_value = 44;
+
+add_ints(int left, int right)
+{
+	return base_value + left + right;
+}
+
+double mix_values(double left, int right)
+{
+	return left + right + 0.5;
+}
+
+long add_longs(long left, long right)
+{
+	return left + right;
+}
+
+void store_value(int value)
+{
+	base_value = value;
+}
+
+int *return_pointer()
+{
+	return &pointer_value;
+}
+
+read_pointer(int *value)
+{
+	return *value;
+}
+
+outer_reentrant_call()
+{
+	return invoke_nested_call() + library_is_active();
+}
+
+main()
+{
+	base_value = 20;
+	return base_value;
+}

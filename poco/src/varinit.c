@@ -27,26 +27,25 @@
  *--------------------------------------------------------------------------*/
 
 typedef struct init_control {
-	Symbol		*var;
-	Exp_frame	*exp_head;
-	int 		frame_type;
+	Symbol* var;
+	Exp_frame* exp_head;
+	int frame_type;
 } InitControl;
 
 extern int po_scoped_address_op[2];
 
-static void anytype_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff);
+static void anytype_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff);
 
 /*----------------------------------------------------------------------------
  * code...
  *--------------------------------------------------------------------------*/
 
-static Exp_frame *new_init_expframe(Poco_cb *pcb, InitControl *ctl,
-									Type_info *ti, int doff)
+static Exp_frame* new_init_expframe(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff)
 /*****************************************************************************
  * make a new expression frame, init it, add it to the linked list.
  ****************************************************************************/
 {
-	Exp_frame	*new;
+	Exp_frame* new;
 
 	new = po_new_expframe(pcb);
 	new->doff = doff;
@@ -58,13 +57,12 @@ static Exp_frame *new_init_expframe(Poco_cb *pcb, InitControl *ctl,
 	return new;
 }
 
-static void integral_init(Poco_cb *pcb, InitControl *ctl,
-						  Type_info *ti, int doff)
+static void integral_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff)
 /*****************************************************************************
  * generate code to initialize an integral type variable/element.
  ****************************************************************************/
 {
-	Exp_frame	*exp;
+	Exp_frame* exp;
 
 	/*------------------------------------------------------------------------
 	 * add a new expression frame to the inits list
@@ -76,8 +74,8 @@ static void integral_init(Poco_cb *pcb, InitControl *ctl,
 	 * code the lval
 	 *----------------------------------------------------------------------*/
 
-	po_code_int(pcb, &exp->left,		  /* code our left value */
-		po_find_assign_op(pcb, ctl->var, &exp->ctc), doff);
+	po_code_int(pcb, &exp->left, /* code our left value */
+				po_find_assign_op(pcb, ctl->var, &exp->ctc), doff);
 
 	/*------------------------------------------------------------------------
 	 * parse the init expression and code the assign for it.
@@ -87,8 +85,7 @@ static void integral_init(Poco_cb *pcb, InitControl *ctl,
 	 *	if (var->flags & TFL_STATIC) is true.
 	 *----------------------------------------------------------------------*/
 
-	po_assign_after_equals(pcb, exp, ctl->var,
-		(ctl->var->ti->flags & TFL_STATIC));
+	po_assign_after_equals(pcb, exp, ctl->var, (ctl->var->ti->flags & TFL_STATIC));
 
 	/*------------------------------------------------------------------------
 	 * record location of data-offset in the OP_xxx_xASS for later fixup...
@@ -110,23 +107,22 @@ static void integral_init(Poco_cb *pcb, InitControl *ctl,
 	 * check for bogus init (call to func int a = b = 0; type things)
 	 *----------------------------------------------------------------------*/
 
-	if (ctl->frame_type != FTY_FUNC &&
-		(exp->includes_assignment > 1 || exp->includes_function)) {
+	if (ctl->frame_type != FTY_FUNC && (exp->includes_assignment > 1 || exp->includes_function)) {
 		po_say_fatal(pcb, "illegal initialization (code outside of function)");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 	}
 }
 
 
-static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
+static void quo_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff)
 /*****************************************************************************
  * generate code to initialize a char array from a string constant.
  *	 this is a sort of special case of an integral init.
  ****************************************************************************/
 {
-	long		dsize;
-	long		asize;
-	Exp_frame	*exp;
+	long dsize;
+	long asize;
+	Exp_frame* exp;
 
 	/*------------------------------------------------------------------------
 	 * make sure we've got array-of-char as the type to initialize
@@ -134,7 +130,7 @@ static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 
 	if (ti->comp_count != 2 && ti->comp[0] != TYPE_CHAR) {
 		po_say_fatal(pcb, "quoted string initializing non-char array");
-  PO_CHECK_ABORT_VOID(pcb);
+		PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	/*------------------------------------------------------------------------
@@ -150,8 +146,8 @@ static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 	 *	 because we need to handle strings like "ab\0cd" properly.
 	 *----------------------------------------------------------------------*/
 
-	asize = ti->sdims[1].l; 				/* array size */
-	dsize = pcb->curtoken->ctoke_size+1;	/* data size */
+	asize = ti->sdims[1].l;                /* array size */
+	dsize = pcb->curtoken->ctoke_size + 1; /* data size */
 
 	/*------------------------------------------------------------------------
 	 * if the allocated size is zero, store the init string size as the
@@ -165,9 +161,9 @@ static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 	if (asize == 0) {
 		ctl->var->ti->sdims[1].l = asize = dsize;
 	} else {
-		if (asize < dsize-1) {
+		if (asize < dsize - 1) {
 			po_say_fatal(pcb, "string too big for array");
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 			return;
 		}
 	}
@@ -183,8 +179,7 @@ static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 	 * generate an OP_xxx_ADDRESS/OP_COPY sequence to init the array.
 	 *----------------------------------------------------------------------*/
 
-	po_code_address(pcb, &exp->ecd,
-		po_scoped_address_op[ctl->var->storage_scope], doff, asize-1);
+	po_code_address(pcb, &exp->ecd, po_scoped_address_op[ctl->var->storage_scope], doff, asize - 1);
 
 	po_code_long(pcb, &exp->ecd, OP_COPY, (dsize < asize) ? dsize : asize);
 
@@ -196,27 +191,26 @@ static void quo_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 	 *	that hasn't had space allocated yet (ie, char array[] = "...").
 	 *----------------------------------------------------------------------*/
 
-	exp->doff = po_cbuf_code_size(&exp->ecd) - 2*sizeof(int) - 2*sizeof(long);
-
+	exp->doff = po_cbuf_code_size(&exp->ecd) - 2 * sizeof(int) - 2 * sizeof(long);
 }
 
-static void array_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
+static void array_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff)
 /*****************************************************************************
  * generate code to initialize an array.
  ****************************************************************************/
 {
-	int 		dim;
-	long		dsize;
-	int 		rdim;
+	int dim;
+	long dsize;
+	int rdim;
 
 	/*------------------------------------------------------------------------
 	 * back off to the next lower level of the type info
 	 *----------------------------------------------------------------------*/
 
 	ti->comp_count -= 1;
-	dim 	= ti->sdims[ti->comp_count].l;
-	rdim	= 0;
-	dsize	= po_get_type_size(ti);
+	dim = ti->sdims[ti->comp_count].l;
+	rdim = 0;
+	dsize = po_get_type_size(ti);
 	po_set_ido_type(ti);
 
 	/*------------------------------------------------------------------------
@@ -229,24 +223,25 @@ static void array_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 			break;
 		}
 
-		if (dim != 0 && rdim >= dim) {					/* if array allocated */
+		if (dim != 0 && rdim >= dim) { /* if array allocated */
 			po_say_fatal(pcb, "too many initializers.");
-   PO_CHECK_ABORT_VOID(pcb);
-		}												/* array elements, die*/
+			PO_CHECK_ABORT_VOID(pcb);
+		} /* array elements, die*/
 
-		anytype_init(pcb, ctl, ti, doff);	  /* recurse to handle expression */
-		doff += dsize;						  /* add size to current offset   */
-		++rdim; 							  /* count array element		  */
+		anytype_init(pcb, ctl, ti, doff); /* recurse to handle expression */
+		doff += dsize;                    /* add size to current offset   */
+		++rdim;                           /* count array element		  */
 
-		if (po_need_comma_or_brace(pcb) !=	',') /* must have comma or brace; */
-			break;								 /* if brace, all done. 	  */
+		if (po_need_comma_or_brace(pcb) != ',') { /* must have comma or brace; */
+			break;                                /* if brace, all done. 	  */
+		}
 	}
 
 	/*------------------------------------------------------------------------
 	 * jump back up to the current level of type info
 	 *----------------------------------------------------------------------*/
 
-	ti->comp_count+=1;
+	ti->comp_count += 1;
 	po_set_ido_type(ti);
 
 	/*------------------------------------------------------------------------
@@ -256,18 +251,17 @@ static void array_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 	 *----------------------------------------------------------------------*/
 
 	if (dim == 0) {
-		ctl->var->ti->sdims[ctl->var->ti->comp_count-1].l = rdim;
+		ctl->var->ti->sdims[ctl->var->ti->comp_count - 1].l = rdim;
 	}
-
 }
 
-static void struct_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
+static void struct_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff)
 /*****************************************************************************
  * generate code to initialize a structure or union.
  ****************************************************************************/
 {
-	Struct_info *sif;
-	Symbol		*sel;
+	Struct_info* sif;
+	Symbol* sel;
 
 	/*------------------------------------------------------------------------
 	 * eat the opening brace and get the structure info
@@ -283,24 +277,23 @@ static void struct_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
 	 *----------------------------------------------------------------------*/
 
 	while (sel != NULL) {
-
 		anytype_init(pcb, ctl, sel->ti, doff); /* recurse to handle expression*/
-		doff += po_get_type_size(sel->ti);	   /* add size to current offset  */
+		doff += po_get_type_size(sel->ti);     /* add size to current offset  */
 
-		if (sif->type == TYPE_UNION) {			/* if doing a union, we're    */
-			goto GOT_FIELDS;					/* all done.				  */
+		if (sif->type == TYPE_UNION) { /* if doing a union, we're    */
+			goto GOT_FIELDS;           /* all done.				  */
 		}
 
-		sel = sel->next;						/* move to next field.		  */
+		sel = sel->next; /* move to next field.		  */
 
-		switch (po_need_comma_or_brace(pcb)) {	/* must have comma or brace   */
-		  case TOK_RBRACE:						/* if brace, we're done, and  */
-			return; 							/* we've eaten it, just return*/
-		  case ',':                             /* if comma, look ahead to see*/
-			if (po_is_next_token(pcb, TOK_RBRACE)) {	/* if it's followed by*/
-				goto GOT_FIELDS;				/* a brace; if so we're done. */
-			}
-			break;
+		switch (po_need_comma_or_brace(pcb)) {           /* must have comma or brace   */
+			case TOK_RBRACE:                             /* if brace, we're done, and  */
+				return;                                  /* we've eaten it, just return*/
+			case ',':                                    /* if comma, look ahead to see*/
+				if (po_is_next_token(pcb, TOK_RBRACE)) { /* if it's followed by*/
+					goto GOT_FIELDS;                     /* a brace; if so we're done. */
+				}
+				break;
 		}
 	}
 
@@ -308,48 +301,46 @@ GOT_FIELDS:
 
 	po_eat_rbrace(pcb);
 	return;
-
 }
 
-static void anytype_init(Poco_cb *pcb, InitControl *ctl, Type_info *ti, int doff)
+static void anytype_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff)
 /*****************************************************************************
  * call routines to initialize an integral, array, or structure type.
  *	this is the recursion point for handling array elements and struct fields.
  ****************************************************************************/
 {
-
-	if (po_is_array(ti)) {	/* array inits come in a couple flavors... */
+	if (po_is_array(ti)) { /* array inits come in a couple flavors... */
 		lookup_token(pcb);
 		switch (pcb->t.toktype) {
-		  case PTOK_QUO:
-			quo_init(pcb, ctl, ti, doff);
-			break;
-		  case TOK_LBRACE:
-			array_init(pcb, ctl, ti, doff);
-			break;
-		  default:
-			po_expecting_lbrace(pcb);
-			break;
+			case PTOK_QUO:
+				quo_init(pcb, ctl, ti, doff);
+				break;
+			case TOK_LBRACE:
+				array_init(pcb, ctl, ti, doff);
+				break;
+			default:
+				po_expecting_lbrace(pcb);
+				break;
 		}
 	} else if (po_is_struct(ti)) {
 		struct_init(pcb, ctl, ti, doff);
-	} else	{
+	} else {
 		integral_init(pcb, ctl, ti, doff);
 	}
 }
 
-void po_var_init(Poco_cb *pcb, Exp_frame *e, Symbol *var, SHORT frame_type)
+void po_var_init(Poco_cb* pcb, Exp_frame* e, Symbol* var, SHORT frame_type)
 /*****************************************************************************
  * generate code to initialize a variable.
  *	this is the entry point from the declaration parser.
  ****************************************************************************/
 {
 	InitControl ctl;
-	Type_info	*ti = var->ti;
+	Type_info* ti = var->ti;
 	bool fixup_needed = false;
-	int 		fixup_offset = 0;
-	int 		*fixword;
-	Exp_frame	*exp, *next;
+	int fixup_offset = 0;
+	int* fixword;
+	Exp_frame *exp, *next;
 
 	/*------------------------------------------------------------------------
 	 * init our control structure that we pass around during recursion
@@ -363,7 +354,7 @@ void po_var_init(Poco_cb *pcb, Exp_frame *e, Symbol *var, SHORT frame_type)
 	 * remember whether variable is an array without a size (array[] = {...})
 	 *----------------------------------------------------------------------*/
 
-	if (po_is_array(ti) && ti->sdims[ti->comp_count-1].l == 0) {
+	if (po_is_array(ti) && ti->sdims[ti->comp_count - 1].l == 0) {
 		fixup_needed = true;
 	}
 

@@ -1,0 +1,9 @@
+run_main_no_args_probe()
+{
+	return 0;
+}
+
+main()
+{
+	return 31;
+}

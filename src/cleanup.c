@@ -20,7 +20,7 @@ void close_downto_screen(void)
 	free_buffers();
 	close_zwinmenu();
 	cleanup_toptext();
-	close_all_menus(vb.screen,0);
+	close_all_menus(vb.screen, 0);
 	close_temp_flx();
 	cleanup_wait_box();
 }
@@ -33,11 +33,11 @@ static void cleanup_low(Errcode err)
 	cleanup_cursors();
 	cleanup_inks();
 	cleanup_ptools();
- 	cleanup_resources();
-	if(smu_is_open(&smu_sm))
-		softerr(err,"fatal_exit");
+	cleanup_resources();
+	if (smu_is_open(&smu_sm)) {
+		softerr(err, "fatal_exit");
+	}
 	cleanup_startup();
-
 }
 
 void cleanup_all(Errcode err)
@@ -45,10 +45,12 @@ void cleanup_all(Errcode err)
    start-up video mode, and do other miscellanious program cleanup/termination
    stuff */
 {
-	if (vb.screen != NULL)
+	if (vb.screen != NULL) {
 		close_downto_screen();
+	}
 	cleanup_screen();
-	if(err >= Success) /* flush if exiting ok */
+	if (err >= Success) { /* flush if exiting ok */
 		rewrite_config();
+	}
 	cleanup_low(err);
 }

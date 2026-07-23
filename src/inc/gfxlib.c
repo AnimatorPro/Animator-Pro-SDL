@@ -5,11 +5,11 @@
 
 char fmt1[] = "gfxl_%s equ +0%xH\n";
 
-#define gloset(f) outf(fmt1,#f,OFFSET(Gfxlib,f))
+#define gloset(f) outf(fmt1, #f, OFFSET(Gfxlib, f))
 
-main(int argc,char **argv)
+main(int argc, char** argv)
 {
-	openit(argc,argv);
+	openit(argc, argv);
 	gloset(pj_clipbox_make);
 	gloset(close_raster);
 	gloset(pj_rast_free);

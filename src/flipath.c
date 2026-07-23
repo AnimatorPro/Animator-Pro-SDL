@@ -19,16 +19,16 @@ Errcode set_flipath(char* fliname, Fli_id* flid, Flipath* fp)
 	clear_struct(&fp->fid);
 	if (fliname && flid) {
 		err = get_full_path(fliname, pbuf);
-		if (err < 0)
+		if (err < 0) {
 			return err;
+		}
 		fp->fid = *flid;
-	}
-	else {
+	} else {
 		sprintf(pbuf, "%s.flc", unnamed_str);
 	}
 
-	fp->id.type	   = FP_FLIPATH;
-	fp->id.size	   = sizeof(Flipath);
+	fp->id.type = FP_FLIPATH;
+	fp->id.size = sizeof(Flipath);
 	fp->id.version = FLIPATH_VERSION;
 
 	return ((OFFSET(Flipath, path) + 1) + sprintf(fp->path, "%s", pbuf));

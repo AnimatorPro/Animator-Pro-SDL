@@ -1,0 +1,7 @@
+#pragma poco use "use_leaf.poc"
+#include "use_mismatch.h"
+
+int main(void)
+{
+	return used_add(1);
+}

@@ -1,0 +1,6 @@
+#pragma poco use "use_host_leaf.poc"
+
+int main(void)
+{
+	return host_used_value();
+}

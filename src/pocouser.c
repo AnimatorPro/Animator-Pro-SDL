@@ -28,8 +28,7 @@ extern void disp_line_alot(Short_xy* v);
 void cleanup_toptext();
 Errcode po_poly_to_arrays(Poly* p, Popot* x, Popot* y);
 Errcode po_arrays_to_poly(Poly* p, int ptcount, Popot* px, Popot* py);
-extern int po_UdSlider(int* inum, int min, int max, void* update,
-					   void* data, char* fmt, ...);
+extern int po_UdSlider(int* inum, int min, int max, void* update, void* data, char* fmt, ...);
 
 extern void full_screen_edit(Text_file* gf);  // from qpocoed.c
 
@@ -130,8 +129,8 @@ bool po_check_abort(void* nobody)
 					abort_control.abortable = false; /* prevent bad recursion */
 					callback_args[0].kind = POCO_CALLBACK_VALUE_POPOT;
 					callback_args[0].value.popot_value = abort_control.abort_data;
-					err = poco_invoke_callback(abort_control.abort_handler, &retval,
-						callback_args, 1);
+					err = poco_invoke_callback(abort_control.abort_handler, &retval, callback_args,
+											   1);
 					if (err < Success) {
 						return builtin_err = err;
 					}
@@ -366,7 +365,7 @@ static int po_rub_poly(int** px, int** py)
 {
 	Poly p;
 	Errcode err;
-	LLpoint *pt;
+	LLpoint* pt;
 	int *xarr, *yarr;
 	int i;
 	Popot ppt;
@@ -640,8 +639,8 @@ static bool po_FileMenu(char* suffix, char* button, char* inpath, char* outpath,
 	}
 
 	mouse_was_on = show_mouse();
-	if (NULL == pj_get_filename(prompt, suffix, button, inpath,
-								outpath, force_suffix, NULL, NULL)) {
+	if (NULL ==
+		pj_get_filename(prompt, suffix, button, inpath, outpath, force_suffix, NULL, NULL)) {
 		rv = false;
 	}
 	if (!mouse_was_on) {
@@ -922,8 +921,7 @@ static int po_Qscroll(int* choice_ix, char** items, int icount, int* ipos, char*
 	lastbtn = 0;
 	lastsel = NULL;
 	mouse_was_on = show_mouse();
-	ret = go_driver_scroller(header, nlist, cursel, remember_ok_btn, use_info_btn, NULL,
-							 usebtexts);
+	ret = go_driver_scroller(header, nlist, cursel, remember_ok_btn, use_info_btn, NULL, usebtexts);
 	if (!mouse_was_on) {
 		hide_mouse();
 	}

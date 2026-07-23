@@ -21,3 +21,11 @@ _*
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# tooling caches / scratch
+.cache/
+.serena/
+.tmp/
+
+# libffi ExternalProject build output (source lives in poco/third_party/libffi)
+thirdparty/libffi/

@@ -160,14 +160,13 @@ static Errcode sdl_idr_input(Idriver* idr)
 															  : 0;
 				if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
 					idr->buttons |= mb;
-				}
-				else if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+				} else if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP) {
 					idr->buttons &= ~mb;
 				}
 				break;
 
-			//!TODO: figure out a better event loop for SDL where
-			//       not everything is done inside IDR?
+				//! TODO: figure out a better event loop for SDL where
+				//       not everything is done inside IDR?
 
 			case SDL_EVENT_WINDOW_RESIZED:
 			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
@@ -191,8 +190,7 @@ static Errcode sdl_idr_setclip(Idriver* idr, short channel, long clipmax)
 
 	if ((uint32_t)clipmax > (uint32_t)idr->max[channel]) {
 		idr->clipmax[channel] = idr->max[channel];
-	}
-	else {
+	} else {
 		idr->clipmax[channel] = clipmax;
 	}
 

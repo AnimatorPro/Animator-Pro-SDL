@@ -1,10 +1,11 @@
 #include "dfile.ih"
 
-long pj_tell(Jfl *f)
+long pj_tell(Jfl* f)
 {
-long pos;
+	long pos;
 
-	if ((pos = pj_dtell(f->handle.j)) < Success)
+	if ((pos = pj_dtell(f->handle.j)) < Success) {
 		jerr = pos;
-	return(pos);
+	}
+	return (pos);
 }

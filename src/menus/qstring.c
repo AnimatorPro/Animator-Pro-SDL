@@ -1,5 +1,5 @@
 
-/* qstring.c - This module is for popping up little requestor to 
+/* qstring.c - This module is for popping up little requestor to
 	get a single string */
 
 #include "errcodes.h"
@@ -17,81 +17,84 @@ typedef struct qstrwork {
 	Button canb;
 } Qstrwork;
 
-static void string_close(Button *b)
+static void string_close(Button* b)
 {
-	if(feel_string_req(b) & STQ_ENTER)
+	if (feel_string_req(b) & STQ_ENTER) {
 		mb_close_ok(b);
+	}
 }
-void cleanup_qstrreq(Menuhdr *mh)
+
+void cleanup_qstrreq(Menuhdr* mh)
 {
 	pj_free(mh);
 }
 
-Errcode build_qstrreq(Wscreen *s, 
-					  Menuhdr **pmh,
-					  char *hailing,     /* text at top of box */ 
-					  char **ok_cancel,  /* text for buttons */
-					  char *strbuf,
-					  int strlength)
-/* build a menu for a quick string requestor the first button in the 
- * menuhdr->mbs list will be the string request field for do_reqloop 
+Errcode build_qstrreq(Wscreen* s, Menuhdr** pmh, char* hailing, /* text at top of box */
+					  char** ok_cancel,                         /* text for buttons */
+					  char* strbuf, int strlength)
+/* build a menu for a quick string requestor the first button in the
+ * menuhdr->mbs list will be the string request field for do_reqloop
  * initialization */
 {
-Vfont *f;
-Qstrwork *qw;
-Button *b;
-SHORT cheight;  /* character height */
-SHORT lheight;	/* line height (char + interline space) */
-SHORT spwidth;	/* width of space */
-SHORT bwidth;   /* button width */
-SHORT bheight;  /* button height */
-SHORT temp;
-SHORT hborder;  /* horiz border */
-SHORT twidth;	/* non border width */
-SHORT strwid;	/* width of string button */
-SHORT strdchars;
-SHORT yoff;
+	Vfont* f;
+	Qstrwork* qw;
+	Button* b;
+	SHORT cheight; /* character height */
+	SHORT lheight; /* line height (char + interline space) */
+	SHORT spwidth; /* width of space */
+	SHORT bwidth;  /* button width */
+	SHORT bheight; /* button height */
+	SHORT temp;
+	SHORT hborder; /* horiz border */
+	SHORT twidth;  /* non border width */
+	SHORT strwid;  /* width of string button */
+	SHORT strdchars;
+	SHORT yoff;
 
-	if(NULL == (*pmh = pj_zalloc(sizeof(Qstrwork))))
-		return(Err_no_memory);
+	if (NULL == (*pmh = pj_zalloc(sizeof(Qstrwork)))) {
+		return (Err_no_memory);
+	}
 
-	qw = (Qstrwork *)(*pmh);
+	qw = (Qstrwork*)(*pmh);
 
 	/* calculate font based sizes */
 	f = s->mufont;
 	cheight = tallest_char(f);
 	lheight = font_cel_height(f);
-	spwidth = fchar_spacing(f," ");
-	bwidth = fchar_spacing(f,"9") * 7; /* minimum size */
-	if(bwidth < (temp = widest_line(f,ok_cancel,2) + spwidth*2))
+	spwidth = fchar_spacing(f, " ");
+	bwidth = fchar_spacing(f, "9") * 7; /* minimum size */
+	if (bwidth < (temp = widest_line(f, ok_cancel, 2) + spwidth * 2)) {
 		bwidth = temp;
-	bheight = (9*lheight)/5; /* 9/5 */
-	hborder = (4*spwidth)/3;
+	}
+	bheight = (9 * lheight) / 5; /* 9/5 */
+	hborder = (4 * spwidth) / 3;
 
 	strdchars = strlength;
-	if (strdchars > 32)
+	if (strdchars > 32) {
 		strdchars = 32;
-	strwid = fchar_spacing(f, "M")*strdchars + 2*spwidth;
+	}
+	strwid = fchar_spacing(f, "M") * strdchars + 2 * spwidth;
 
-	twidth = bwidth*3 + spwidth*4;
-	if (twidth < strwid)
+	twidth = bwidth * 3 + spwidth * 4;
+	if (twidth < strwid) {
 		twidth = strwid;
-	strwid -= 2*spwidth;
+	}
+	strwid -= 2 * spwidth;
 
 	/* first button is for displaying hailing text */
 	qw->hailb.x = hborder;
 	qw->hailb.y = cheight;
 	qw->hailb.width = twidth;
-	qw->hailb.height = wwcount_lines(f,hailing,twidth,NULL)*lheight;
+	qw->hailb.height = wwcount_lines(f, hailing, twidth, NULL) * lheight;
 	qw->hailb.datme = hailing;
 	qw->hailb.seeme = see_hailing;
 	qw->hailb.flags = MB_NORESCALE;
 
-	twidth += 2*hborder;
+	twidth += 2 * hborder;
 
 	/* make up the stringq structure */
-	qw->sq.pxoff = spwidth/3;
-	qw->sq.pyoff = font_ycent_oset(f,bheight);
+	qw->sq.pxoff = spwidth / 3;
+	qw->sq.pyoff = font_ycent_oset(f, bheight);
 	qw->sq.string = strbuf;
 	qw->sq.dcount = strdchars;
 	qw->sq.bcount = strlength;
@@ -99,7 +102,7 @@ SHORT yoff;
 
 	/* make up the stringq button */
 	b = &(qw->stqb);
-	b->x = (twidth - strwid)>>1;
+	b->x = (twidth - strwid) >> 1;
 	yoff = b->y = qw->hailb.y + qw->hailb.height + cheight;
 	b->width = strwid;
 	b->height = bheight;
@@ -138,12 +141,11 @@ SHORT yoff;
 	qw->okb.next = &(qw->canb);
 	qw->canb.next = &(qw->hailb);
 
-	qw->mh.ioflags = (MBPEN|MBRIGHT|KEYHIT); /* any of this */
+	qw->mh.ioflags = (MBPEN | MBRIGHT | KEYHIT); /* any of this */
 	qw->mh.flags = MENU_NORESCALE;
 	qw->mh.seebg = seebg_white;
 	qw->mh.width = twidth;
 	qw->mh.height = b->y + bheight + lheight;
-	menu_to_reqpos(s,&(qw->mh));
-	return(0);
+	menu_to_reqpos(s, &(qw->mh));
+	return (0);
 }
-

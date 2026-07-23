@@ -2,11 +2,11 @@
 #define PICDRIVE_H
 
 #ifndef REXLIB_H
-	#include "rexlib.h"
+#include "rexlib.h"
 #endif
 
 #ifndef RCEL_H
-	#include "rcel.h"
+#include "rcel.h"
 #endif
 
 struct anim_info;
@@ -19,7 +19,6 @@ struct rgb3;
 // forward declarations for the SDL picdrivers
 typedef struct SDL_Surface SDL_Surface;
 
-
 /*----------------------------------------------------------------------------
  * structure used by PDR to specify that the CONVERT program is to conduct
  * Qchoice dialogs before calling create_image_file().
@@ -27,16 +26,16 @@ typedef struct SDL_Surface SDL_Surface;
  *--------------------------------------------------------------------------*/
 
 typedef struct pdr_options {
-	char	*choicelst1;
-	char	*choicelst2;
-	char	*choicelst3;
-	char	*choicelst4;
-	UBYTE	option1;
-	UBYTE	option2;
-	UBYTE	option3;
-	UBYTE	option4;
-	bool	options_valid;
-	} Pdroptions;
+	char* choicelst1;
+	char* choicelst2;
+	char* choicelst3;
+	char* choicelst4;
+	UBYTE option1;
+	UBYTE option2;
+	UBYTE option3;
+	UBYTE option4;
+	bool options_valid;
+} Pdroptions;
 
 /*----------------------------------------------------------------------------
  * Data structure returned by create_image_file() or open_image_file(), and
@@ -47,18 +46,17 @@ typedef struct pdr_options {
  *--------------------------------------------------------------------------*/
 
 typedef struct image_file {
-	struct pdr *pd; 	/* pointer to module header vectors and data
-						 * set by host */
+	struct pdr* pd; /* pointer to module header vectors and data
+					 * set by host */
 
-	UBYTE write_mode;	/* set to TRUE if this file is opened by
-						 * create_image_file()
-						 * FALSE if opened by open_image_file() set by host */
+	UBYTE write_mode; /* set to TRUE if this file is opened by
+					   * create_image_file()
+					   * FALSE if opened by open_image_file() set by host */
 
 	UBYTE needs_work_cel; /* if set means that write_frames() needs a work cel
 						   * that is the same size and depth of the source
 						   * screen set by open and create image file */
 } Image_file;
-
 
 /*----------------------------------------------------------------------------
  * Structure which contains the rexlib header for the PDR, as well as the
@@ -66,42 +64,42 @@ typedef struct image_file {
  *--------------------------------------------------------------------------*/
 
 struct pdr {
-	Rexlib hdr; 	/* REX_PICDRIVER, PDR_VERSION, rex library header */
+	Rexlib hdr; /* REX_PICDRIVER, PDR_VERSION, rex library header */
 
-	char *title_info;		/* string with capsule description of picture file
-							 * format type. used for titles on menus and
-							 * format directory. only 34 characters used.
-							 * example "BrandX 8 bit picture format." */
+	char* title_info; /* string with capsule description of picture file
+					   * format type. used for titles on menus and
+					   * format directory. only 34 characters used.
+					   * example "BrandX 8 bit picture format." */
 
-	char *long_info;		/* optional long info text string to be displayed
-							 * in a text window under the title info.
-							 * The text will be word wrapped. newlines force
-							 * a new line */
+	char* long_info; /* optional long info text string to be displayed
+					  * in a text window under the title info.
+					  * The text will be word wrapped. newlines force
+					  * a new line */
 
-	char default_suffi[PDR_SUFFI_SIZE+1];	/* most commonly used file suffi
-							 * for this image file type separated by
-							 * semi-colons.
-							 *	  Default suffix for saving files is the first
-							 * one.  Suffi include "dots" as in ".pic", etc.
-							 * sample:	".GIF;.XXX;.YYY" note no ";" after
-							 * last suffix. Maximum of 3 suffi even if less
-							 * than 3 chars */
+	char default_suffi[PDR_SUFFI_SIZE + 1]; /* most commonly used file suffi
+											 * for this image file type separated by
+											 * semi-colons.
+											 *	  Default suffix for saving files is the first
+											 * one.  Suffi include "dots" as in ".pic", etc.
+											 * sample:	".GIF;.XXX;.YYY" note no ";" after
+											 * last suffix. Maximum of 3 suffi even if less
+											 * than 3 chars */
 
-	ULONG max_write_frames;  /* maximum number of image frames that can be
-							  * written to a single file, including the first
-							  * but not including the ring frame.
-							  * 1 for still pictures, 0 if this module
-							  * doesn't do writing */
+	ULONG max_write_frames; /* maximum number of image frames that can be
+							 * written to a single file, including the first
+							 * but not including the ring frame.
+							 * 1 for still pictures, 0 if this module
+							 * doesn't do writing */
 
-	ULONG max_read_frames;	 /* maximum number of frames that can be read from
-							  * an image file, including the first but not
-							  * including the ring frame.
-							  * 1 for still pictures, 0 if this module doesn't
-							  * do reading */
+	ULONG max_read_frames; /* maximum number of frames that can be read from
+							* an image file, including the first but not
+							* including the ring frame.
+							* 1 for still pictures, 0 if this module doesn't
+							* do reading */
 
 	/********************/
 
-	bool (*spec_best_fit)(struct anim_info *spec);
+	bool (*spec_best_fit)(struct anim_info* spec);
 	/**************************************************************************
 	 * this is called before trying to write an image file to verify whether
 	 * or not the images can be saved exactly as specified.
@@ -114,8 +112,8 @@ struct pdr {
 	 * return TRUE (its ok) and leave spec unaltered
 	 *************************************************************************/
 
-	Errcode (*create_image_file)(struct pdr *pd, char *path, Image_file **pif,
-			struct anim_info *spec);
+	Errcode (*create_image_file)(struct pdr* pd, char* path, Image_file** pif,
+								 struct anim_info* spec);
 	/**************************************************************************
 	 * create_image_file() does all preparatory work to open things up
 	 * to recieve picture data for a new image file it will overwrite existing
@@ -126,8 +124,8 @@ struct pdr {
 	 * May be NOFUNC (NULL) if max_write_frames == 0
 	 *************************************************************************/
 
-	Errcode (*open_image_file)(struct pdr *pd, char *path, Image_file **pif,
-			struct anim_info *ainfo);
+	Errcode (*open_image_file)(struct pdr* pd, char* path, Image_file** pif,
+							   struct anim_info* ainfo);
 	/**************************************************************************
 	 * open_image_file() will open and verify the file type of
 	 * an existing image file and return info about the contents of the file.
@@ -145,14 +143,14 @@ struct pdr {
 	 * processing should not take place until read_first_frame()
 	 *************************************************************************/
 
-	void (*close_image_file)(Image_file **pif);
+	void (*close_image_file)(Image_file** pif);
 	/**************************************************************************
 	 * This will close io and deallocate
 	 * all resources allocated by open_image_file() or create_image_file()
 	 * and set *pif to NULL, If *pif is NULL it should do nothing
 	 *************************************************************************/
 
-	Errcode (*read_first_frame)(Image_file *ifile, Rcel *screen);
+	Errcode (*read_first_frame)(Image_file* ifile, Rcel* screen);
 	/**************************************************************************
 	 * Will read first image in image_file and put it in screen.
 	 * Screen will be the size retrieved in the ainfo when open_image_file()
@@ -166,7 +164,7 @@ struct pdr {
 	 * May be NOFUNC (NULL) if max_read_frames == 0
 	 *************************************************************************/
 
-	Errcode (*read_delta_next)(Image_file *ifile,Rcel *screen);
+	Errcode (*read_delta_next)(Image_file* ifile, Rcel* screen);
 	/**************************************************************************
 	 * Assuming:
 	 *		screen - screen to contain next frame. will contain previous
@@ -183,12 +181,9 @@ struct pdr {
 	 * May be NOFUNC (NULL) if max_read_frames == 0
 	 *************************************************************************/
 
-	Errcode (*save_frames)(Image_file *ifile,
-						   Rcel *screen,
-						   ULONG num_frames,
-						   Errcode (*seek_frame)(int ix,void *seek_data),
-						   void *seek_data,
-						   Rcel *work_screen );
+	Errcode (*save_frames)(Image_file* ifile, Rcel* screen, ULONG num_frames,
+						   Errcode (*seek_frame)(int ix, void* seek_data), void* seek_data,
+						   Rcel* work_screen);
 	/**************************************************************************
 	 * This is only called after a call to create_image_file() and will
 	 * write num_frames images to the image file.
@@ -237,13 +232,13 @@ struct pdr {
 	 *				always read 0s
 	 *************************************************************************/
 
-	Pdroptions *poptions;	 /* pointer to Pdroptions structure used to query
-							  * (via qchoicef) output options from the
-							  * user.  this is currently used by TIFF & TARGA.
-							  * must be set to NULL if unneeded.
-							  */
+	Pdroptions* poptions; /* pointer to Pdroptions structure used to query
+						   * (via qchoicef) output options from the
+						   * user.  this is currently used by TIFF & TARGA.
+						   * must be set to NULL if unneeded.
+						   */
 
-	Errcode (*rgb_seekstart)(Image_file *ifile);
+	Errcode (*rgb_seekstart)(Image_file* ifile);
 	/**************************************************************************
 	 * This will prepare for reading the first line of data from an RGB-type
 	 * image file (currently TIFF and TARGA files).  This may be called any
@@ -267,7 +262,7 @@ struct pdr {
 	 * processing.
 	 *************************************************************************/
 
-	Errcode (*rgb_readline)(Image_file *ifile, struct rgb3 *linebuf);
+	Errcode (*rgb_readline)(Image_file* ifile, struct rgb3* linebuf);
 	/**************************************************************************
 	 * This will return the next line of RGB data from the file into linebuf.
 	 * The data placed into linebuf by the PDR must be in Rgb3 format.	This
@@ -278,12 +273,11 @@ struct pdr {
 	 *************************************************************************/
 
 	// SDL picdriver specific functions
-	SDL_Surface*  (*sdl_load_image)(char* path);
+	SDL_Surface* (*sdl_load_image)(char* path);
 	bool (*sdl_save_image)(SDL_Surface* surface, char* path);
 
-	long reserved[4];	/* PDR should init these fields to NULL */
+	long reserved[4]; /* PDR should init these fields to NULL */
 };
-
 
 #define Pdr struct pdr
 
@@ -293,59 +287,55 @@ struct pdr {
 #define LOCAL_PDR_CHAR '='
 
 typedef struct local_pdr {
-	void *next;
-	char *name;
-	Pdr *header;
+	void* next;
+	char* name;
+	Pdr* header;
 } Local_pdr;
 
 struct names;
 
-extern char 	 gif_pdr_name[];
-extern char 	 fli_pdr_name[];
+extern char gif_pdr_name[];
+extern char fli_pdr_name[];
 extern Local_pdr fli_local_pdr;
-extern char 	 pic_pdr_name[];
+extern char pic_pdr_name[];
 extern Local_pdr pic_local_pdr;
 
 /*
  * following items found in picdrive\host\picdrive.c...
  */
 
-extern	Local_pdr *local_pdrs;
+extern Local_pdr* local_pdrs;
 
-extern Errcode
-go_pdr_menu(char *header, char *name_buf, char *suffi_buf,
-		struct names *local_names, int rwmode,
-						   bool multiframe_only);
+extern Errcode go_pdr_menu(char* header, char* name_buf, char* suffi_buf, struct names* local_names,
+						   int rwmode, bool multiframe_only);
 
-void	add_local_pdr(Local_pdr *lpd); /* make a locally linked in pdr available */
+void add_local_pdr(Local_pdr* lpd); /* make a locally linked in pdr available */
 
-Errcode load_pdr(char *path, Pdr **ppdr);
-void	free_pdr(Pdr **ppdr);
+Errcode load_pdr(char* path, Pdr** ppdr);
+void free_pdr(Pdr** ppdr);
 
-int 	pdr_get_title(Pdr *pd, char *buf, int maxlen);
-int 	pdr_get_suffi(Pdr *pd, char *buf);
+int pdr_get_title(Pdr* pd, char* buf, int maxlen);
+int pdr_get_suffi(Pdr* pd, char* buf);
 
-char	*pdr_alloc_info(Pdr *pd);
-void	pdr_free_info(char *info);
+char* pdr_alloc_info(Pdr* pd);
+void pdr_free_info(char* info);
 
-void    get_screen_ainfo(Rcel *screen, struct anim_info *spec);
+void get_screen_ainfo(Rcel* screen, struct anim_info* spec);
 
-bool pdr_best_fit(Pdr *pd, struct anim_info *spec);
-Errcode pdr_create_ifile(Pdr *pd, char *path, Image_file **pifile,
-		struct anim_info *spec);
-Errcode pdr_open_ifile(Pdr *pd, char *path, Image_file **pifile,
-		struct anim_info *ainfo);
-void	pdr_close_ifile(Image_file **pifile);
-Errcode pdr_read_first(Image_file *ifile, Rcel *screen);
-Errcode pdr_read_next(Image_file *ifile,Rcel *screen);
-Errcode pdr_load_picture(char *pdr_path, char *picname, Rcel *screen);
+bool pdr_best_fit(Pdr* pd, struct anim_info* spec);
+Errcode pdr_create_ifile(Pdr* pd, char* path, Image_file** pifile, struct anim_info* spec);
+Errcode pdr_open_ifile(Pdr* pd, char* path, Image_file** pifile, struct anim_info* ainfo);
+void pdr_close_ifile(Image_file** pifile);
+Errcode pdr_read_first(Image_file* ifile, Rcel* screen);
+Errcode pdr_read_next(Image_file* ifile, Rcel* screen);
+Errcode pdr_load_picture(char* pdr_path, char* picname, Rcel* screen);
 
-Errcode pdr_save_frames(Image_file *ifile,	Rcel *screen, ULONG num_frames,
-						Errcode (*seek_frame)(int ix,void *seek_data),
-						void *seek_data, Rcel *work_screen );
+Errcode pdr_save_frames(Image_file* ifile, Rcel* screen, ULONG num_frames,
+						Errcode (*seek_frame)(int ix, void* seek_data), void* seek_data,
+						Rcel* work_screen);
 
-Errcode pdr_rgb_seekstart(Image_file *ifile);
-Errcode pdr_rgb_readline(Image_file *ifile, struct rgb3 *linebuf);
+Errcode pdr_rgb_seekstart(Image_file* ifile);
+Errcode pdr_rgb_readline(Image_file* ifile, struct rgb3* linebuf);
 
 #endif /* REXLIB_CODE */
 

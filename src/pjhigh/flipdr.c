@@ -12,68 +12,68 @@ typedef struct fliif {
 	Flifile ff;
 } Fliif;
 
-
-static Errcode fliif_read_first(Image_file *imf, Rcel *screen)
+static Errcode fliif_read_first(Image_file* imf, Rcel* screen)
 {
-Fliif *flif = (Fliif *)imf;
+	Fliif* flif = (Fliif*)imf;
 
-	return(pj_fli_read_first(NULL,&flif->ff,screen, true));
+	return (pj_fli_read_first(NULL, &flif->ff, screen, true));
 }
 
-
-static void close_fliif(Image_file **pif)
+static void close_fliif(Image_file** pif)
 {
-Fliif *flif;
+	Fliif* flif;
 
-	if((flif = (Fliif *)(*pif)) == NULL)
+	if ((flif = (Fliif*)(*pif)) == NULL) {
 		return;
+	}
 	pj_fli_close(&(flif->ff));
 	pj_freez(pif);
 }
 
-static Errcode open_fliif(Pdr *pd, char *path, Image_file **pif, 
-						  Anim_info *ainfo )
+static Errcode open_fliif(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
 {
-Fliif *flif;
-Errcode err;
-(void)pd;
+	Fliif* flif;
+	Errcode err;
+	(void)pd;
 
-	if(NULL == (*pif = pj_zalloc(sizeof(Fliif))))
-		return(Err_no_memory);
-	flif = (Fliif *)(*pif);
+	if (NULL == (*pif = pj_zalloc(sizeof(Fliif)))) {
+		return (Err_no_memory);
+	}
+	flif = (Fliif*)(*pif);
 
-	if((err = pj_fli_info_open(&flif->ff, path, ainfo)) < Success)
+	if ((err = pj_fli_info_open(&flif->ff, path, ainfo)) < Success) {
 		goto error;
+	}
 
-	return(Success);
+	return (Success);
 error:
 	close_fliif(pif);
-	return(err);
+	return (err);
 }
 
-static bool fliif_spec_best_fit(Anim_info *ainfo)
+static bool fliif_spec_best_fit(Anim_info* ainfo)
 {
-	if(ainfo->depth == 8
-		 && ainfo->num_frames == 1)
-	{
-		return(true);
+	if (ainfo->depth == 8 && ainfo->num_frames == 1) {
+		return (true);
 	}
 	ainfo->depth = 8;
 	ainfo->num_frames = 1;
-	return(false);
+	return (false);
 }
-static Errcode create_fliif(Pdr *pd, char *path, Image_file **pif, 
-						    Anim_info *ainfo )
-{
-Fliif *flif;
-Errcode err;
-(void)pd;
 
-	if(NULL == (*pif = pj_zalloc(sizeof(Fliif))))
-		return(Err_no_memory);
-	flif = (Fliif *)(*pif);
-	if((err = pj_fli_create(path,&flif->ff)) < Success)
+static Errcode create_fliif(Pdr* pd, char* path, Image_file** pif, Anim_info* ainfo)
+{
+	Fliif* flif;
+	Errcode err;
+	(void)pd;
+
+	if (NULL == (*pif = pj_zalloc(sizeof(Fliif)))) {
+		return (Err_no_memory);
+	}
+	flif = (Fliif*)(*pif);
+	if ((err = pj_fli_create(path, &flif->ff)) < Success) {
 		goto error;
+	}
 	flif->ff.hdr.aspect_dx = ainfo->aspect_dx;
 	flif->ff.hdr.aspect_dy = ainfo->aspect_dy;
 	flif->ff.hdr.speed = ainfo->millisec_per_frame;
@@ -83,40 +83,40 @@ Errcode err;
 error:
 	close_fliif(pif);
 done:
-	return(err);
+	return (err);
 }
-static Errcode fliif_save_frames(Image_file *ifile, 
-						   		 Rcel *screen, 
-								 ULONG num_frames,
-						   		 Errcode (*seek_frame)(int ix,void *seek_data),
-						   		 void *seek_data,
-						   		 Rcel *work_screen )
+
+static Errcode fliif_save_frames(Image_file* ifile, Rcel* screen, ULONG num_frames,
+								 Errcode (*seek_frame)(int ix, void* seek_data), void* seek_data,
+								 Rcel* work_screen)
 {
-Fliif *flif = ((Fliif *)ifile);
-(void)seek_frame;
-(void)seek_data;
-(void)work_screen;
+	Fliif* flif = ((Fliif*)ifile);
+	(void)seek_frame;
+	(void)seek_data;
+	(void)work_screen;
 
-	if(num_frames != 1)
-		return(Err_bad_input);
-	return(pj_write_one_frame_fli(NULL,&flif->ff,screen));
+	if (num_frames != 1) {
+		return (Err_bad_input);
+	}
+	return (pj_write_one_frame_fli(NULL, &flif->ff, screen));
 }
 
-static char title_info[] =  "\"FLC\" Animator image file.";
+static char title_info[] = "\"FLC\" Animator image file.";
 
 static Pdr fli_pdr_head = {
-	{ REX_PICDRIVER, PDR_VERSION, NOFUNC, NOFUNC, NULL },
-	title_info,  			/* title_info */
-	NULL,  					/* long_info */
-	".FLC",			 		/* default_suffi */
-	MAXFRAMES,MAXFRAMES,	/* max_write_frames, max_read_frames */
-	fliif_spec_best_fit,	/* (*spec_best_fit)() */
-	create_fliif,			/* (*create_image_file)() */
-	open_fliif,				/* (*open_image_file)() */
-	close_fliif,			/* (*close_image_file)() */
-	fliif_read_first,		/* (*read_first_frame)() */
-	NOFUNC,					/* (*read_delta_next)() */
-	fliif_save_frames,	 	/* (*save_frames)() */
+	{REX_PICDRIVER, PDR_VERSION, NOFUNC, NOFUNC, NULL},
+	title_info, /* title_info */
+	NULL,       /* long_info */
+	".FLC",     /* default_suffi */
+	MAXFRAMES,
+	MAXFRAMES,           /* max_write_frames, max_read_frames */
+	fliif_spec_best_fit, /* (*spec_best_fit)() */
+	create_fliif,        /* (*create_image_file)() */
+	open_fliif,          /* (*open_image_file)() */
+	close_fliif,         /* (*close_image_file)() */
+	fliif_read_first,    /* (*read_first_frame)() */
+	NOFUNC,              /* (*read_delta_next)() */
+	fliif_save_frames,   /* (*save_frames)() */
 };
 
 /* global items for outside */
@@ -129,4 +129,3 @@ Local_pdr fli_local_pdr = {
 	fli_pdr_name,
 	&fli_pdr_head,
 };
-

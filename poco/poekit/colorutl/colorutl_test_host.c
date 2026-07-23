@@ -4,11 +4,11 @@
 
 #include <stdio.h>
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
 	PocoVmOptions options = {0};
-	PocoVm *vm = NULL;
-	PocoProgram *program = NULL;
+	PocoVm* vm = NULL;
+	PocoProgram* program = NULL;
 	PocoStatus status;
 	int32_t result = 0;
 
@@ -18,10 +18,12 @@ int main(int argc, char **argv)
 	}
 	ani_poco_configure_legacy_poe(&options);
 	status = poco_vm_create(&options, &vm);
-	if (status == POCO_STATUS_OK)
+	if (status == POCO_STATUS_OK) {
 		status = poco_vm_compile_file(vm, argv[1], &program);
-	if (status == POCO_STATUS_OK)
+	}
+	if (status == POCO_STATUS_OK) {
 		status = poco_vm_run(vm, program, NULL, &result);
+	}
 	poco_program_destroy(program);
 	poco_vm_destroy(vm);
 	if (status != POCO_STATUS_OK) {

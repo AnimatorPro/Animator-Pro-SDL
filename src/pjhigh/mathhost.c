@@ -7,7 +7,7 @@ double _f_o_rce_reference(double in)
 /* needed to force at least one reference to the emulator and cause it to
  * initialize the library properly so the rex library will have it all */
 {
-	return(sin(in));
+	return (sin(in));
 }
 #endif /* SLUFFED */
 
@@ -15,7 +15,8 @@ Mathhost_lib aa_mathlib = {
 	/* header */
 	{
 		sizeof(Mathhost_lib),
-		AA_MATHLIB, AA_MATHLIB_VERSION,
+		AA_MATHLIB,
+		AA_MATHLIB_VERSION,
 	},
 	acos,
 	asin,
@@ -44,22 +45,6 @@ Mathhost_lib aa_mathlib = {
 /* register protocall calls in watcom library */
 
 #ifdef NOTYET /* __FPI__  floating point instructions (watcom emulator calls) */
-	__ACOS,
-	__ASIN,
-	__ATAN,
-	__ATAN2,
-	__COS,
-	__COSH,
-	__EXP,
-	__FMOD,
-	__LOG,
-	__LOG10,
-	__POW,
-	__SIN,
-	__SINH,
-	__SQRT,
-	__TAN,
-	__TANH,
+__ACOS, __ASIN, __ATAN, __ATAN2, __COS, __COSH, __EXP, __FMOD, __LOG, __LOG10, __POW, __SIN, __SINH,
+	__SQRT, __TAN, __TANH,
 #endif /* not __FPI__ */
-
-

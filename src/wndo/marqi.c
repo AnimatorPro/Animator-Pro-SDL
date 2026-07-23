@@ -14,61 +14,55 @@
 #include "rastlib.h"
 #include "wndo.h"
 
-static void marqidot(SHORT x, SHORT y, void *data)
+static void marqidot(SHORT x, SHORT y, void* data)
 /* dotout for creepy marqi users */
 {
-Marqihdr *mh = data;
-Pixel color;
+	Marqihdr* mh = data;
+	Pixel color;
 
-	color = ((--(mh->dmod)&7) < 4 ? mh->oncolor : mh->offcolor);
-	(*(mh->putdot))((Raster *)mh->w, color, x, y);
+	color = ((--(mh->dmod) & 7) < 4 ? mh->oncolor : mh->offcolor);
+	(*(mh->putdot))((Raster*)mh->w, color, x, y);
 }
-static void oncolordot(SHORT x, SHORT y, void *data)
+static void oncolordot(SHORT x, SHORT y, void* data)
 /* set dot to oncolor */
 {
-	Marqihdr *mh = data;
+	Marqihdr* mh = data;
 	(*(mh->putdot))((Raster*)mh->w, mh->oncolor, x, y);
 }
 
-void init_marqihdr(Marqihdr *mh,Wndo *w,Rectangle *port,
-			  Pixel oncolor,Pixel offcolor)
+void init_marqihdr(Marqihdr* mh, Wndo* w, Rectangle* port, Pixel oncolor, Pixel offcolor)
 {
-Rectangle winrect;
+	Rectangle winrect;
 
 	clear_mem(mh, sizeof(*mh));
 	mh->w = w;
 
 	winrect.x = winrect.y = 0; /* window relative to itself */
-	if(w->type == RT_WINDOW)
-	{
+	if (w->type == RT_WINDOW) {
 		winrect.width = w->behind.width;
 		winrect.height = w->behind.height;
-	}
-	else /* treat as raster */
+	} else /* treat as raster */
 	{
 		winrect.width = w->width;
 		winrect.height = w->height;
 	}
 
-	if(port != NULL) /* clip port to window and move in to mh->port */
+	if (port != NULL) /* clip port to window and move in to mh->port */
 	{
-		copy_rectfields(port,&(mh->port));
-		bclip_rect((Rectangle *)&(mh->port.RECTSTART),&winrect);
-		rect_tofrect((Rectangle *)&(mh->port.RECTSTART),&(mh->port));
-	}
-	else /* port is window or raster's visible port */
+		copy_rectfields(port, &(mh->port));
+		bclip_rect((Rectangle*)&(mh->port.RECTSTART), &winrect);
+		rect_tofrect((Rectangle*)&(mh->port.RECTSTART), &(mh->port));
+	} else /* port is window or raster's visible port */
 	{
-		rect_tofrect(&winrect,&(mh->port));
+		rect_tofrect(&winrect, &(mh->port));
 	}
 
-	if(oncolor != offcolor) /* weze marqi'in */
+	if (oncolor != offcolor) /* weze marqi'in */
 	{
 		mh->pdot = marqidot;
 		mh->offcolor = offcolor;
 		mh->waitcount = 4;
-	}
-	else
-	{
+	} else {
 		mh->pdot = oncolordot; /* solid lines */
 		mh->waitcount = -1;
 	}
@@ -79,103 +73,102 @@ Rectangle winrect;
 
 /********* for marqi-ing raster rectangles when moving windows etc ********/
 
-#define RD ((Rectdata *)(mh->adata))
+#define RD ((Rectdata*)(mh->adata))
 
 typedef struct rectdata {
 	Fullrect fr;
-	UBYTE *save;
-	Rectangle *clip; /* the boundary or size clip */
+	UBYTE* save;
+	Rectangle* clip; /* the boundary or size clip */
 	SHORT lastx, lasty;
 	SHORT saved;
 } Rectdata;
 
-static void saverest_frame(Marqihdr *mh, bool save)
+static void saverest_frame(Marqihdr* mh, bool save)
 
 /* saves a frame (clips for safety) and has inverse restore */
 {
-UBYTE *sbuf;
-Rectdata *rd;
-VFUNC hmove, vmove;
+	UBYTE* sbuf;
+	Rectdata* rd;
+	VFUNC hmove, vmove;
 
 	rd = mh->adata;
-	if(save)
-	{
+	if (save) {
 		hmove = pj_get_hseg;
 		vmove = pj_get_vseg;
 		rd->saved = 1;
-	}
-	else /* restore */
+	} else /* restore */
 	{
-		if(!rd->saved)
+		if (!rd->saved) {
 			return;
+		}
 		hmove = pj_put_hseg;
 		vmove = pj_put_vseg;
 	}
 
 	sbuf = rd->save;
-	(*hmove)(mh->w,sbuf,rd->fr.x,rd->fr.y,rd->fr.width);
+	(*hmove)(mh->w, sbuf, rd->fr.x, rd->fr.y, rd->fr.width);
 	sbuf += rd->fr.width;
-	(*hmove)(mh->w,sbuf,rd->fr.x,rd->fr.MaxY-1,rd->fr.width);
+	(*hmove)(mh->w, sbuf, rd->fr.x, rd->fr.MaxY - 1, rd->fr.width);
 	sbuf += rd->fr.width;
-	(*vmove)(mh->w,sbuf,rd->fr.x,rd->fr.y,rd->fr.height);
+	(*vmove)(mh->w, sbuf, rd->fr.x, rd->fr.y, rd->fr.height);
 	sbuf += rd->fr.height;
-	(*vmove)(mh->w,sbuf,rd->fr.MaxX-1,rd->fr.y,rd->fr.height);
+	(*vmove)(mh->w, sbuf, rd->fr.MaxX - 1, rd->fr.y, rd->fr.height);
 }
 
-static void marqi_mhframe(Marqihdr *mh)
+static void marqi_mhframe(Marqihdr* mh)
 /* Draw a hollow rectangle through marqidot routine */
 {
-Rectdata *rd = mh->adata;
-	cline_frame(rd->fr.x,rd->fr.y,rd->fr.MaxX-1,rd->fr.MaxY-1,mh->pdot,mh);
+	Rectdata* rd = mh->adata;
+	cline_frame(rd->fr.x, rd->fr.y, rd->fr.MaxX - 1, rd->fr.MaxY - 1, mh->pdot, mh);
 }
 
-static int clip_moverect(Marqihdr *mh)
+static int clip_moverect(Marqihdr* mh)
 
 /* increment mod delta move, clip, and Draw frame. */
 {
-Rectdata *rd = mh->adata;
-SHORT dy;
-Rectangle newrect;
-SHORT dx;
+	Rectdata* rd = mh->adata;
+	SHORT dy;
+	Rectangle newrect;
+	SHORT dx;
 
-	if(JSTHIT(MMOVE) || !(rd->saved))
-	{
-		copy_rectfields(&(rd->fr),&newrect);
+	if (JSTHIT(MMOVE) || !(rd->saved)) {
+		copy_rectfields(&(rd->fr), &newrect);
 		newrect.x += icb.mx - rd->lastx;
 		newrect.y += icb.my - rd->lasty;
 
-		if(rd->clip != NULL)
-			bclip_rect(&newrect,rd->clip);
+		if (rd->clip != NULL) {
+			bclip_rect(&newrect, rd->clip);
+		}
 
 		dx = newrect.x - rd->fr.x;
 		dy = newrect.y - rd->fr.y;
 
-		if(dx || dy | !rd->saved)
-		{
-			saverest_frame(mh,0); /* restore frame */
-			rect_tofrect(&newrect,&rd->fr);
+		if (dx || dy | !rd->saved) {
+			saverest_frame(mh, 0); /* restore frame */
+			rect_tofrect(&newrect, &rd->fr);
 			rd->lastx += dx;
 			rd->lasty += dy;
-			saverest_frame(mh,1);
+			saverest_frame(mh, 1);
 		}
 	}
 	mh->dmod = mh->smod++;
 	marqi_mhframe(mh);
-	return(0);
+	return (0);
 }
 
-Errcode marqmove_rect(Marqihdr *mh, Rectangle *rect, Rectangle *bclip)
+Errcode marqmove_rect(Marqihdr* mh, Rectangle* rect, Rectangle* bclip)
 
-/* marqmove_rect.  Will display marqi-ing rectangle in raster following cursor 
+/* marqmove_rect.  Will display marqi-ing rectangle in raster following cursor
  * until next click if bclip is there rectangle must be entirely inside
  * the marquidata raster or it will be shrunk to the size of the raster
  * port */
 {
-Rectdata rd;
+	Rectdata rd;
 
-	rect_tofrect(rect,&rd.fr);
-	if(NULL == (rd.save = pj_malloc((rect->width + rect->height)*2 )))
-		return(Err_no_memory);
+	rect_tofrect(rect, &rd.fr);
+	if (NULL == (rd.save = pj_malloc((rect->width + rect->height) * 2))) {
+		return (Err_no_memory);
+	}
 	mh->adata = &rd;
 	rd.clip = bclip;
 
@@ -183,58 +176,55 @@ Rectdata rd;
 	rd.lasty = icb.my;
 	rd.saved = 0;
 
-	anim_wait_input(KEYHIT|MBRIGHT|MBPEN,MMOVE,mh->waitcount,clip_moverect,mh);
+	anim_wait_input(KEYHIT | MBRIGHT | MBPEN, MMOVE, mh->waitcount, clip_moverect, mh);
 
-	saverest_frame(mh,0); /* restore frame */
-	pj_free(rd.save); /* free backup buffer */
+	saverest_frame(mh, 0); /* restore frame */
+	pj_free(rd.save);      /* free backup buffer */
 
-	if(JSTHIT(MBPEN))
-	{
+	if (JSTHIT(MBPEN)) {
 		rect->x = rd.fr.x; /* we waaant it baaaybee */
 		rect->y = rd.fr.y;
-		return(0);
+		return (0);
+	} else {
+		return (Err_abort);
 	}
-	else
-		return(Err_abort);
 }
 
-static int clip_rubrect(Marqihdr *mh)
+static int clip_rubrect(Marqihdr* mh)
 
 /* increment mod delta move, clip, and Draw frame. */
 {
-Rectdata *rd = mh->adata;
-Rectangle newrect;
+	Rectdata* rd = mh->adata;
+	Rectangle newrect;
 
-	if(JSTHIT(MMOVE) || !(rd->saved))
-	{
+	if (JSTHIT(MMOVE) || !(rd->saved)) {
 		frame_torect(rd->lastx, rd->lasty, icb.mx, icb.my, &newrect);
-		sclip_rect(&newrect,rd->clip);
+		sclip_rect(&newrect, rd->clip);
 
-		if(newrect.width != rd->fr.width 
-			|| newrect.height != rd->fr.height
-			|| !rd->saved)
-		{
-			saverest_frame(mh,0); /* restore frame */
-			rect_tofrect(&newrect,&rd->fr);
-			saverest_frame(mh,1);
+		if (newrect.width != rd->fr.width || newrect.height != rd->fr.height || !rd->saved) {
+			saverest_frame(mh, 0); /* restore frame */
+			rect_tofrect(&newrect, &rd->fr);
+			saverest_frame(mh, 1);
 		}
 	}
 	mh->dmod = mh->smod++;
 	marqi_mhframe(mh);
-	return(0);
+	return (0);
 }
-static Errcode marqrub_rect(Marqihdr *mh, Rectangle *rect, Rectangle *sclip)
-/* marqmove_rect.  Will display marqi-ing rubber rect following cursor 
+static Errcode marqrub_rect(Marqihdr* mh, Rectangle* rect, Rectangle* sclip)
+/* marqmove_rect.  Will display marqi-ing rubber rect following cursor
  * until next click if clipit the clipit function is called after each delta
  * and before redisplay will clip to maximum width and height in sclip */
 {
-Rectdata rd;
+	Rectdata rd;
 
-	if(!sclip)
-		sclip = (Rectangle *)&(mh->port.RECTSTART);
+	if (!sclip) {
+		sclip = (Rectangle*)&(mh->port.RECTSTART);
+	}
 
-	if(NULL == (rd.save = pj_malloc((sclip->width + sclip->height)*2 )))
-		return(Err_no_memory);
+	if (NULL == (rd.save = pj_malloc((sclip->width + sclip->height) * 2))) {
+		return (Err_no_memory);
+	}
 
 	mh->adata = &rd;
 	rd.clip = sclip;
@@ -242,117 +232,115 @@ Rectdata rd;
 	rd.lasty = icb.my;
 	rd.saved = 0;
 
-	anim_wait_input(KEYHIT|MBRIGHT|MBPEN,MMOVE,mh->waitcount,clip_rubrect,mh);
+	anim_wait_input(KEYHIT | MBRIGHT | MBPEN, MMOVE, mh->waitcount, clip_rubrect, mh);
 
-	saverest_frame(mh,0); /* restore frame */
-	pj_free(rd.save); /* free backup buffer */
+	saverest_frame(mh, 0); /* restore frame */
+	pj_free(rd.save);      /* free backup buffer */
 
-	if(JSTHIT(MBPEN))
-	{
-		copy_rectfields(&rd.fr,rect);
-		return(0);
+	if (JSTHIT(MBPEN)) {
+		copy_rectfields(&rd.fr, rect);
+		return (0);
+	} else {
+		return (Err_abort);
 	}
-	else
-		return(Err_abort);
 }
 
-void marqi_cut(Marqihdr *mh,Coor x,Coor y)
+void marqi_cut(Marqihdr* mh, Coor x, Coor y)
 {
 	mh->dmod = mh->smod++;
 	pj_cline(mh->port.x, y, x, y, mh->pdot, mh);
 	mh->dmod = mh->smod;
-	pj_cline(mh->port.MaxX-1, y,x, y, mh->pdot, mh);
+	pj_cline(mh->port.MaxX - 1, y, x, y, mh->pdot, mh);
 	mh->dmod = mh->smod;
 	pj_cline(x, mh->port.y, x, y, mh->pdot, mh);
 	mh->dmod = mh->smod;
-	pj_cline(x, mh->port.MaxY-1,x, y, mh->pdot,mh);
+	pj_cline(x, mh->port.MaxY - 1, x, y, mh->pdot, mh);
 }
-static void saverest_cut(Marqihdr *mh, int save)
-{
-Rectdata *rd = mh->adata;
-rl_type_get_hseg hseg;
-rl_type_get_vseg vseg;
 
-	if(save)
-	{
+static void saverest_cut(Marqihdr* mh, int save)
+{
+	Rectdata* rd = mh->adata;
+	rl_type_get_hseg hseg;
+	rl_type_get_vseg vseg;
+
+	if (save) {
 		hseg = pj_get_hseg;
 		vseg = pj_get_vseg;
 		rd->saved = 1;
-	}
-	else
-	{
+	} else {
 		hseg = pj_put_hseg;
 		vseg = pj_put_vseg;
 	}
 
-	hseg((Raster *)mh->w, rd->save,
-			0, rd->lasty, mh->port.width);
+	hseg((Raster*)mh->w, rd->save, 0, rd->lasty, mh->port.width);
 
-	vseg((Raster *)mh->w, rd->save + mh->port.width,
-			rd->lastx, 0, mh->port.height);
+	vseg((Raster*)mh->w, rd->save + mh->port.width, rd->lastx, 0, mh->port.height);
 }
 
-static int anim_cut(Marqihdr *mh)
+static int anim_cut(Marqihdr* mh)
 
 /* increment mod delta move, clip, and Draw a cut cursor */
 {
-Rectdata *rd = mh->adata;
+	Rectdata* rd = mh->adata;
 
-	if(JSTHIT(MMOVE) || !(rd->saved))
-	{
-		if(rd->saved)
-			saverest_cut(mh,0);
+	if (JSTHIT(MMOVE) || !(rd->saved)) {
+		if (rd->saved) {
+			saverest_cut(mh, 0);
+		}
 		rd->lastx = icb.mx;
 		rd->lasty = icb.my;
-		saverest_cut(mh,1);
+		saverest_cut(mh, 1);
 	}
-	marqi_cut(mh,rd->lastx,rd->lasty);
-	return(0);
+	marqi_cut(mh, rd->lastx, rd->lasty);
+	return (0);
 }
-static Errcode marq_getcut(Marqihdr *mh)
+static Errcode marq_getcut(Marqihdr* mh)
 
 /* marqmove_rect.  Will display marqi-ing cut cursor and returns
  * x and y unless keyhit or right click then Err_abort returned */
 {
-Rectdata rd;
+	Rectdata rd;
 
-	if(NULL == (rd.save = pj_malloc((mh->port.width + mh->port.height)*2 )))
-		return(Err_no_memory);
+	if (NULL == (rd.save = pj_malloc((mh->port.width + mh->port.height) * 2))) {
+		return (Err_no_memory);
+	}
 
 	mh->adata = &rd;
 	rd.saved = 0;
 
-	anim_wait_input(KEYHIT|MBRIGHT|MBPEN,MMOVE,mh->waitcount,anim_cut,mh);
+	anim_wait_input(KEYHIT | MBRIGHT | MBPEN, MMOVE, mh->waitcount, anim_cut, mh);
 
-	saverest_cut(mh,0);
+	saverest_cut(mh, 0);
 	pj_free(rd.save); /* free backup buffer */
 
-	if(JSTHIT(MBPEN))
-		return(0);
-	else
-		return(Err_abort);
+	if (JSTHIT(MBPEN)) {
+		return (0);
+	} else {
+		return (Err_abort);
+	}
 }
-Errcode mh_cut_rect(Marqihdr *mh,Rectangle *rect,Rectangle *sclip)
-{
-Errcode err;
 
-	if((err = marq_getcut(mh)) >= 0)
-		err = marqrub_rect(mh,rect,sclip);
-	return(err);
-}
-Errcode screen_cut_rect(Wscreen *s,Rectangle *rect,Rectangle *sclip)
+Errcode mh_cut_rect(Marqihdr* mh, Rectangle* rect, Rectangle* sclip)
 {
-Errcode err;
-Marqihdr mh;
-Wiostate wio;
+	Errcode err;
+
+	if ((err = marq_getcut(mh)) >= 0) {
+		err = marqrub_rect(mh, rect, sclip);
+	}
+	return (err);
+}
+
+Errcode screen_cut_rect(Wscreen* s, Rectangle* rect, Rectangle* sclip)
+{
+	Errcode err;
+	Marqihdr mh;
+	Wiostate wio;
 
 	save_wiostate(&wio);
-	set_mouse_oset(0,0);
+	set_mouse_oset(0, 0);
 
-	init_marqihdr(&mh,(Wndo *)(s->viscel),NULL,s->SWHITE,s->SBLACK);
-	err = mh_cut_rect(&mh,rect,sclip);
+	init_marqihdr(&mh, (Wndo*)(s->viscel), NULL, s->SWHITE, s->SBLACK);
+	err = mh_cut_rect(&mh, rect, sclip);
 	rest_wiostate(&wio);
-	return(err);
+	return (err);
 }
-
-

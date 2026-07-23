@@ -12,30 +12,30 @@
 #include "pentools.h"
 
 static SHORT c1, c2;
-static Rgb3 *ictab;
+static Rgb3* ictab;
 
-static void pp_unhi_bundle(Button *b);
-static void pp_hi_bundle(Button *b, int ocolor);
-static void pp_hi_ccolor(Button *b);
-static int f_cbun(Button *m);
+static void pp_unhi_bundle(Button* b);
+static void pp_hi_bundle(Button* b, int ocolor);
+static void pp_hi_ccolor(Button* b);
+static int f_cbun(Button* m);
 
 /* returns 0 if not found otherwise ix+1 of bundle color */
-int in_bundle(Pixel color, Bundle *bun)
+int in_bundle(Pixel color, Bundle* bun)
 {
 	return in_cnums(color, bun->bundle, bun->bun_count);
 }
 
-static Button *bsel[] = {&pal_bun_sel, &pal_spe_sel};
+static Button* bsel[] = {&pal_bun_sel, &pal_spe_sel};
 
 /* macros for # of colors in current bundle, and current bundle
    colors list */
 #define bctt (vs.buns[vs.use_bun].bun_count)
 #define bndl (vs.buns[vs.use_bun].bundle)
 
-void ctable_to_cluster(Rgb3 *ctab, int ccount)
+void ctable_to_cluster(Rgb3* ctab, int ccount)
 {
 	int i;
-	Rgb3 *s;
+	Rgb3* s;
 
 	s = vb.pencel->cmap->ctab;
 	for (i = 0; i < ccount && i < bctt; i++) {
@@ -44,9 +44,9 @@ void ctable_to_cluster(Rgb3 *ctab, int ccount)
 	}
 }
 
-static void clus_ctab(Rgb3 *ctab)
+static void clus_ctab(Rgb3* ctab)
 {
-	Rgb3 *s;
+	Rgb3* s;
 	int i;
 
 	s = vb.pencel->cmap->ctab;
@@ -56,9 +56,9 @@ static void clus_ctab(Rgb3 *ctab)
 	}
 }
 
-Rgb3 *cluster_to_ctable(void)
+Rgb3* cluster_to_ctable(void)
 {
-	Rgb3 *ctab;
+	Rgb3* ctab;
 
 	if ((ctab = begmem(bctt * sizeof(Rgb3))) != NULL) {
 		clus_ctab(ctab);
@@ -66,7 +66,7 @@ Rgb3 *cluster_to_ctable(void)
 	return (ctab);
 }
 
-static Errcode ccycle1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode ccycle1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	Rgb3 *cm, *cm2;
 	Errcode err;
@@ -108,7 +108,7 @@ void ccycle(void)
 
 /* Go switch all the nasty mode flags to be what you _really_ want when
    you're trying to color cycle over time. */
-void shortcut_ccycle(Button *b)
+void shortcut_ccycle(Button* b)
 {
 	BYTE opal_fit; /* fit option on palette menu */
 	BYTE omulti;   /* do it to many frames? */
@@ -136,7 +136,7 @@ void shortcut_ccycle(Button *b)
 
 void cl_cut(void)
 {
-	UBYTE *cbuf;
+	UBYTE* cbuf;
 	long ccut_size;
 
 	if (vs.pal_to == 0) /* bundle... */
@@ -146,7 +146,7 @@ void cl_cut(void)
 			return;
 		}
 		cbuf[0] = bctt;
-		clus_ctab((Rgb3 *)(cbuf + 1));
+		clus_ctab((Rgb3*)(cbuf + 1));
 	} else {
 		ccut_size = COLORS * sizeof(Rgb3) + 1;
 		if ((cbuf = begmem(ccut_size)) == NULL) {
@@ -159,7 +159,7 @@ void cl_cut(void)
 	pj_free(cbuf);
 }
 
-static void do_ramp_cluster(UBYTE *s1, UBYTE *s2, int count, struct bundle *b)
+static void do_ramp_cluster(UBYTE* s1, UBYTE* s2, int count, struct bundle* b)
 {
 	UBYTE rgb[3];
 	int i, j;
@@ -168,17 +168,17 @@ static void do_ramp_cluster(UBYTE *s1, UBYTE *s2, int count, struct bundle *b)
 		for (j = 0; j < 3; j++) {
 			rgb[j] = interp_range(s1[j], s2[j], i, count);
 		}
-		b->bundle[i] = closestc((Rgb3 *)rgb, vb.pencel->cmap->ctab, COLORS);
+		b->bundle[i] = closestc((Rgb3*)rgb, vb.pencel->cmap->ctab, COLORS);
 	}
 	b->bun_count = count;
 }
 
 /* figure how much difference there is from a 'perfect' ramp of colors
    and the closest count sized ramp we can find in current color map */
-static LONG sum_ramp_error(UBYTE *s1, UBYTE *s2, UBYTE count)
+static LONG sum_ramp_error(UBYTE* s1, UBYTE* s2, UBYTE count)
 {
 	long acc;
-	UBYTE *d1;
+	UBYTE* d1;
 	UBYTE rgb[3];
 	int i, j;
 	long h;
@@ -189,8 +189,7 @@ static LONG sum_ramp_error(UBYTE *s1, UBYTE *s2, UBYTE count)
 		for (j = 0; j < 3; j++) {
 			rgb[j] = interp_range(s1[j], s2[j], i, count);
 		}
-		d1 =
-			(UBYTE *)(vb.pencel->cmap->ctab + closestc((Rgb3 *)rgb, vb.pencel->cmap->ctab, COLORS));
+		d1 = (UBYTE*)(vb.pencel->cmap->ctab + closestc((Rgb3*)rgb, vb.pencel->cmap->ctab, COLORS));
 		for (j = 0; j < 3; j++) {
 			acc += (intabs(rgb[j] - d1[j]) << 4);
 		}
@@ -208,14 +207,14 @@ static LONG sum_ramp_error(UBYTE *s1, UBYTE *s2, UBYTE count)
 }
 
 /* Figure out best size for ramp during a 'find ramp' */
-static int find_ramp_count(Rgb3 *r1, Rgb3 *r2) /* ramp truecolor endpoints */
+static int find_ramp_count(Rgb3* r1, Rgb3* r2) /* ramp truecolor endpoints */
 {
 	int best;
 	long dist, ldist;
 	int i;
 
 	for (i = 2; i <= 32; i++) {
-		ldist = sum_ramp_error((UBYTE *)r1, (UBYTE *)r2, i);
+		ldist = sum_ramp_error((UBYTE*)r1, (UBYTE*)r2, i);
 		if (i == 2 || ldist < dist) {
 			best = i;
 			dist = ldist;
@@ -224,11 +223,11 @@ static int find_ramp_count(Rgb3 *r1, Rgb3 *r2) /* ramp truecolor endpoints */
 	return (best);
 }
 
-static char *rgb_key;
+static char* rgb_key;
 
 static void show_rgb(Pixel c)
 {
-	Rgb3 *rgb;
+	Rgb3* rgb;
 
 	rgb = vb.pencel->cmap->ctab + c;
 	soft_top_textf("!%-3d%-3d%-3d%-3d", rgb_key, c, rgb->r, rgb->g, rgb->b);
@@ -248,7 +247,7 @@ static SHORT pwp_200yoff[9] = {
 static SHORT pwp_xoff[Array_els(pwp_320xoff)];
 static SHORT pwp_yoff[Array_els(pwp_200yoff)];
 
-void scale_powell_palette(Rscale *scale)
+void scale_powell_palette(Rscale* scale)
 {
 	scale_button(&pal_pal_sel, scale);
 	scale_xlist(scale, pwp_320xoff, pwp_xoff, Array_els(pwp_xoff));
@@ -289,7 +288,7 @@ static int which_pp(int yoff)
 }
 
 /* respond to left click over color matrix */
-void feel_pp(Button *m)
+void feel_pp(Button* m)
 {
 	update_ccolor(which_pp(m->y));
 }
@@ -303,7 +302,7 @@ static int get_pp_color(void)
 {
 	int c;
 	Mouset mset;
-	Menuwndo *mw;
+	Menuwndo* mw;
 
 	c = pj_get_dot(vb.screen->viscel, icb.sx, icb.sy);
 
@@ -313,7 +312,7 @@ static int get_pp_color(void)
 		}
 
 		get_mouset(&mset);
-		load_wndo_mouset((Wndo *)palette_menu.mw);
+		load_wndo_mouset((Wndo*)palette_menu.mw);
 
 		if (ptin_button(&pal_pal_sel, icb.mx, icb.my)) {
 			c = which_pp(pal_pal_sel.y);
@@ -324,7 +323,7 @@ static int get_pp_color(void)
 		}
 	} else if (NULL != (mw = get_button_wndo(&qmu_clus_sel))) {
 		get_mouset(&mset);
-		load_wndo_mouset((Wndo *)mw);
+		load_wndo_mouset((Wndo*)mw);
 		if (ptin_button(&qmu_clus_sel, icb.mx, icb.my)) {
 			c = f_cbun(&qmu_clus_sel);
 		}
@@ -387,19 +386,19 @@ static bool define_ramp(void)
 	return (true);
 }
 
-static void ramp_cluster(Button *b, int which)
+static void ramp_cluster(Button* b, int which)
 {
-	Wscreen *s = b->root->w.W_screen;
+	Wscreen* s = b->root->w.W_screen;
 
 	if (!define_ramp()) {
 		return;
 	}
 	pp_unhi_bundle(b);
-	do_ramp_cluster((UBYTE *)&r1, (UBYTE *)&r2, find_ramp_count(&r1, &r2), vs.buns + which);
+	do_ramp_cluster((UBYTE*)&r1, (UBYTE*)&r2, find_ramp_count(&r1, &r2), vs.buns + which);
 	pp_hi_bundle(b, s->SBRIGHT);
 }
 
-static Errcode framp1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode framp1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)data;
 	(void)ix;
@@ -431,7 +430,7 @@ static void cl_pblend(EFUNC autov)
 	Errcode err;
 	long ccut_size;
 	unsigned char c;
-	XFILE *xf;
+	XFILE* xf;
 
 	ictab = NULL;
 
@@ -472,7 +471,7 @@ void cl_paste(void)
 	show_mp();
 }
 
-static void cl_blend_1c(int scale, Rgb3 *dcol, int cix, int ix)
+static void cl_blend_1c(int scale, Rgb3* dcol, int cix, int ix)
 {
 	(void)cix;
 
@@ -482,7 +481,7 @@ static void cl_blend_1c(int scale, Rgb3 *dcol, int cix, int ix)
 	true_blend(dcol, ictab + ix, itmult(scale, vs.cblend), dcol);
 }
 
-static int cl_blend1(void *dat, int ix, int intween, int scale)
+static int cl_blend1(void* dat, int ix, int intween, int scale)
 {
 	(void)dat;
 	(void)ix;
@@ -501,10 +500,10 @@ void cl_blend(void)
 	show_mp();
 }
 
-void some_cmod(void (*f)(int scale, struct rgb3 *p, int cix, int ix), int scale)
+void some_cmod(void (*f)(int scale, struct rgb3* p, int cix, int ix), int scale)
 {
-	UBYTE *bun;
-	Rgb3 *p;
+	UBYTE* bun;
+	Rgb3* p;
 	int i;
 	int cix;
 	int bct;
@@ -527,7 +526,7 @@ void some_cmod(void (*f)(int scale, struct rgb3 *p, int cix, int ix), int scale)
 	refit_vf();
 }
 
-static void unique_cluster(struct bundle *s, struct bundle *d)
+static void unique_cluster(struct bundle* s, struct bundle* d)
 {
 	int i;
 	UBYTE c;
@@ -541,7 +540,7 @@ static void unique_cluster(struct bundle *s, struct bundle *d)
 	}
 }
 
-static void tint_1c(int scale, Rgb3 *p, int cix, int ix)
+static void tint_1c(int scale, Rgb3* p, int cix, int ix)
 {
 	(void)cix;
 	(void)ix;
@@ -549,7 +548,7 @@ static void tint_1c(int scale, Rgb3 *p, int cix, int ix)
 	true_blend(p, &r1, itmult(scale, vs.ctint), p);
 }
 
-static Errcode ctint1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode ctint1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)data;
 	(void)ix;
@@ -564,7 +563,7 @@ void ctint(void)
 {
 	int c;
 	struct bundle uniq;
-	struct bundle *cb;
+	struct bundle* cb;
 
 	rgb_key = "tinting_rgb";
 	if ((c = get_a_end(show_rgb)) < 0) {
@@ -586,7 +585,7 @@ void ctint(void)
 	show_mp();
 }
 
-static void neg_1c(int scale, Rgb3 *p, int cix, int ix)
+static void neg_1c(int scale, Rgb3* p, int cix, int ix)
 {
 	Rgb3 nrgb;
 	(void)cix;
@@ -599,7 +598,7 @@ static void neg_1c(int scale, Rgb3 *p, int cix, int ix)
 	true_blend(p, &nrgb, itmult(scale, 100), p);
 }
 
-static Errcode cneg1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode cneg1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)data;
 	(void)ix;
@@ -613,7 +612,7 @@ static Errcode cneg1(void *data, int ix, int intween, int scale, Autoarg *aa)
 void cneg(void)
 {
 	struct bundle uniq;
-	struct bundle *cb;
+	struct bundle* cb;
 
 	/* force each cluster color to be used only once or will look wierd
 	   if ping-ponged */
@@ -641,10 +640,10 @@ void force_ramp(void)
 	pj_free(ictab);
 }
 
-static void make_close_bundle(Rgb3 *rgb, int threshold)
+static void make_close_bundle(Rgb3* rgb, int threshold)
 {
 	int i;
-	Rgb3 *c;
+	Rgb3* c;
 	int cscale;
 
 	cscale = sqr_root((long)RGB_MAX * RGB_MAX * 3);
@@ -677,7 +676,7 @@ void cclose(void)
 	show_mp();
 }
 
-static void cluster_unused(char *ctab, int ccount)
+static void cluster_unused(char* ctab, int ccount)
 {
 	int i;
 
@@ -696,7 +695,7 @@ void cluster_invert(void)
 {
 	struct bundle new;
 	int i;
-	Button *b;
+	Button* b;
 
 	new.bun_count = 0;
 	for (i = 0; i < COLORS; i++) {
@@ -711,10 +710,10 @@ void cluster_invert(void)
 	draw_buttontop(b);
 }
 
-static void reverse_bytes(char *b, int count)
+static void reverse_bytes(char* b, int count)
 {
 	char swap;
-	char *end;
+	char* end;
 
 	end = b + count - 1;
 	count >>= 1;
@@ -775,11 +774,11 @@ static void show_secondc(Pixel c2)
 	soft_top_textf("!%3d%3d%3d", "top_secondc", c1, intabs(c1 - c2) + 1, c2);
 }
 
-static void scrange(Button *bt, struct bundle *b)
+static void scrange(Button* bt, struct bundle* b)
 {
 	int ccount, dc;
-	UBYTE *pb;
-	Wscreen *s = bt->root->w.W_screen;
+	UBYTE* pb;
+	Wscreen* s = bt->root->w.W_screen;
 
 	if ((c1 = get_a_end(show_startc)) < 0) {
 		return;
@@ -809,7 +808,7 @@ static void scrange(Button *bt, struct bundle *b)
 
 static void load_bundle(int which)
 {
-	Button *m;
+	Button* m;
 
 	m = bsel[which];
 	hilight(m);
@@ -819,7 +818,7 @@ static void load_bundle(int which)
 
 static void show_lastc(Pixel c2)
 {
-	Bundle *bun;
+	Bundle* bun;
 
 	bun = &vs.buns[vs.use_bun];
 	soft_top_textf("!%3d%3d%3d", "top_lastc", bun->bundle[0], bun->bun_count, c2);
@@ -828,8 +827,8 @@ static void show_lastc(Pixel c2)
 void qpick_bundle(void)
 {
 	int color;
-	Bundle *bun;
-	Button *b;
+	Bundle* bun;
+	Button* b;
 	Pixel occolor;
 
 	b = bsel[vs.use_bun];
@@ -867,14 +866,14 @@ void qselect_bundle(void)
 	load_bundle(vs.use_bun);
 }
 
-void mselect_bundle(Button *m)
+void mselect_bundle(Button* m)
 {
 	load_bundle(m->identity);
 }
 
 void find_ramp(void)
 {
-	Button *me;
+	Button* me;
 
 	me = bsel[vs.use_bun];
 	hilight(me);
@@ -882,7 +881,7 @@ void find_ramp(void)
 	draw_buttontop(me);
 }
 
-static void pp_unframe_color(Button *b, int ix)
+static void pp_unframe_color(Button* b, int ix)
 {
 	bool bottom, left, right;
 	int x, y, w, h, yix, xix;
@@ -908,22 +907,22 @@ static void pp_unframe_color(Button *b, int ix)
 	}
 }
 
-static void pp_frame_color(Button *b, int ix, int ocolor)
+static void pp_frame_color(Button* b, int ix, int ocolor)
 {
 	int yix, xix;
 
 	yix = ix >> 5;
 	xix = ix & 31;
-	draw_quad((Raster *)b->root, ocolor, pwp_xoff[xix] + b->x, pwp_yoff[yix] + b->y,
+	draw_quad((Raster*)b->root, ocolor, pwp_xoff[xix] + b->x, pwp_yoff[yix] + b->y,
 			  pwp_width(xix) + 1, pwp_height(yix) + 1);
 }
 
 /* will color the box and draw an X on the box if it is a taken over menu
  * color */
-static void pp_color_box(Button *b, int ix)
+static void pp_color_box(Button* b, int ix)
 {
 	int yix, xix;
-	Vfont *f;
+	Vfont* f;
 
 	yix = ix >> 5;
 	xix = ix & 31;
@@ -940,7 +939,7 @@ static void pp_color_box(Button *b, int ix)
 	}
 }
 
-static void pp_inner_colors(Button *b)
+static void pp_inner_colors(Button* b)
 {
 	int color;
 
@@ -949,7 +948,7 @@ static void pp_inner_colors(Button *b)
 	}
 }
 
-static void pp_unhi_bundle(Button *b)
+static void pp_unhi_bundle(Button* b)
 {
 	int count;
 
@@ -961,7 +960,7 @@ static void pp_unhi_bundle(Button *b)
 	pp_hi_ccolor(b);
 }
 
-static void pp_hi_bundle(Button *b, int ocolor)
+static void pp_hi_bundle(Button* b, int ocolor)
 {
 	int count;
 
@@ -973,7 +972,7 @@ static void pp_hi_bundle(Button *b, int ocolor)
 	pp_hi_ccolor(b);
 }
 
-void change_cluster_mode(Button *b)
+void change_cluster_mode(Button* b)
 {
 	pp_unhi_bundle(b);
 	set_use_bun(b->identity);
@@ -981,10 +980,10 @@ void change_cluster_mode(Button *b)
 	pp_hi_bundle(b, mc_bright(b));
 }
 
-static void pp_hi_ccolor(Button *b)
+static void pp_hi_ccolor(Button* b)
 {
 	int tx, ty;
-	Wscreen *s = b->root->w.W_screen;
+	Wscreen* s = b->root->w.W_screen;
 
 	b = &pal_pal_sel;
 	tx = vs.ccolor & 31;
@@ -996,7 +995,7 @@ static void pp_hi_ccolor(Button *b)
 	pp_frame_color(b, vs.ccolor, s->SRED);
 }
 
-void see_powell_palette(Button *b)
+void see_powell_palette(Button* b)
 {
 	int grey;
 
@@ -1017,7 +1016,7 @@ static void show_ccp1(Pixel c1)
 void ping_cluster(void)
 {
 	int count;
-	struct bundle *bun;
+	struct bundle* bun;
 	UBYTE *b, *endb, *bb, *newb;
 
 	bun = vs.buns + vs.use_bun;
@@ -1037,12 +1036,12 @@ void ping_cluster(void)
 	draw_buttontop(bsel[vs.use_bun]);
 }
 
-static Errcode cl_swap1(void *data, int ix, int intween, int scale, Autoarg *aa)
+static Errcode cl_swap1(void* data, int ix, int intween, int scale, Autoarg* aa)
 {
 	static int bcount;
 	int i;
 	UBYTE *b1, *b2;
-	Rgb3 *ctab;
+	Rgb3* ctab;
 	(void)data;
 	(void)ix;
 	(void)intween;
@@ -1077,14 +1076,14 @@ typedef struct copy1dat {
 	Pixel where;
 } Copy1dat;
 
-static Errcode ccopy1(Copy1dat *cd)
+static Errcode ccopy1(Copy1dat* cd)
 {
 	set_color_rgb(&cd->rgb, cd->where, vb.pencel->cmap);
-	pj_set_colors(vb.pencel, cd->where, 1, (UBYTE *)&(cd->rgb));
+	pj_set_colors(vb.pencel, cd->where, 1, (UBYTE*)&(cd->rgb));
 	return (Success);
 }
 
-static Errcode auto_ccopy1(void *cd, int ix, int intween, int scale, Autoarg *aa)
+static Errcode auto_ccopy1(void* cd, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)ix;
 	(void)intween;
@@ -1094,10 +1093,10 @@ static Errcode auto_ccopy1(void *cd, int ix, int intween, int scale, Autoarg *aa
 	return ccopy1(cd);
 }
 
-void right_click_pp(Button *m)
+void right_click_pp(Button* m)
 {
 	int s;
-	Wscreen *ws = m->root->w.W_screen;
+	Wscreen* ws = m->root->w.W_screen;
 	Copy1dat cd;
 
 	cd.where = which_pp(m->y);             /* get destination color from matrix */
@@ -1118,7 +1117,7 @@ void right_click_pp(Button *m)
 
 /********************** cluster seeme functions ********************/
 
-static void s_colors(Button *m, UBYTE *lookup, int divx)
+static void s_colors(Button* m, UBYTE* lookup, int divx)
 {
 	SHORT j, count;
 	SHORT nextx, lastx;
@@ -1127,7 +1126,7 @@ static void s_colors(Button *m, UBYTE *lookup, int divx)
 	SHORT tx, ty;
 	Pixel col;
 	Pixel outcolor;
-	Wscreen *s;
+	Wscreen* s;
 
 	s = m->root->w.W_screen;
 
@@ -1165,7 +1164,7 @@ static void s_colors(Button *m, UBYTE *lookup, int divx)
 	}
 }
 
-static int f_colors(Button *m, UBYTE *lookup, int divx)
+static int f_colors(Button* m, UBYTE* lookup, int divx)
 {
 	SHORT j, count;
 	SHORT nextx;
@@ -1186,28 +1185,28 @@ static int f_colors(Button *m, UBYTE *lookup, int divx)
 	return (lookup[count]);
 }
 
-static int f_cbun(Button *m)
+static int f_cbun(Button* m)
 {
-	struct bundle *bun;
+	struct bundle* bun;
 
 	bun = vs.buns + m->identity;
 	return (f_colors(m, bun->bundle, bun->bun_count));
 }
 
-void see_cluster(Button *m)
+void see_cluster(Button* m)
 {
-	struct bundle *bun;
+	struct bundle* bun;
 
 	bun = vs.buns + m->identity;
 	s_colors(m, bun->bundle, bun->bun_count);
 }
 
-void feel_cluster(Button *m)
+void feel_cluster(Button* m)
 {
 	update_ccolor(f_cbun(m));
 }
 
-void ccolor_box(Button *b)
+void ccolor_box(Button* b)
 {
 	mb_isquare(b, vs.ccolor);
 	a_frame(b, mc_grey(b));

@@ -2,23 +2,21 @@
 #define SLD_H
 
 #ifndef STDTYPES_H
-	#include "stdtypes.h"
+#include "stdtypes.h"
 #endif
 
-struct llpoint
-	{
-	struct llpoint *next;
+struct llpoint {
+	struct llpoint* next;
 	SHORT x, y, z;
-	};
+};
 typedef struct llpoint LLpoint;
 
-struct poly
-	{
+struct poly {
 	SHORT pt_count;
-	LLpoint *clipped_list;
+	LLpoint* clipped_list;
 	UBYTE reserved;
 	UBYTE polymagic;
-	};
+};
 typedef struct poly Poly;
 
 #endif /* SLD_H */

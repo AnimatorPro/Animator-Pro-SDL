@@ -12,84 +12,78 @@
 #include "render.h"
 
 /* separate control block. */
-typedef struct sep_cb
-	{
+typedef struct sep_cb {
 	Sep_p p;
-	Rgb3 *abs_ctable;
+	Rgb3* abs_ctable;
 	Rgb3 sep_rgb_dest;
-	} Sep_cb;
+} Sep_cb;
 
-int in_cnums(UBYTE color, UBYTE *table, int count)
+int in_cnums(UBYTE color, UBYTE* table, int count)
 /* returns 0 if not found otherwise ix+1 of color in table */
 {
 	table += count;
-	while(count > 0)
-	{
-		if(color == *(--table))
+	while (count > 0) {
+		if (color == *(--table)) {
 			break;
+		}
 		--count;
 	}
-	return(count);
+	return (count);
 }
 
-
-static int rgb_close_enough(Rgb3 *c1,Rgb3 *c2,int threshold)
+static int rgb_close_enough(Rgb3* c1, Rgb3* c2, int threshold)
 {
-	return( sqr_root((long)color_dif(c1,c2)) <= threshold);
+	return (sqr_root((long)color_dif(c1, c2)) <= threshold);
 }
 
-
-static Errcode sep1(Sep_cb *sep)
+static Errcode sep1(Sep_cb* sep)
 {
-Errcode err;
-int i,j;
-Rgb3 *absc, *pt;
-UBYTE *rgb_cnums;
-int rgb_ccount;
-int threshold;
-int occolor;
-int cscale;
+	Errcode err;
+	int i, j;
+	Rgb3 *absc, *pt;
+	UBYTE* rgb_cnums;
+	int rgb_ccount;
+	int threshold;
+	int occolor;
+	int cscale;
 
-	if (vs.sep_rgb == 1)	/* case NEAR */
+	if (vs.sep_rgb == 1) /* case NEAR */
 	{
-		cscale = sqr_root((long)RGB_MAX*RGB_MAX*3)+1;
-		threshold = vs.sep_threshold * cscale/100;
-		if ((rgb_cnums = pj_malloc(COLORS)) == NULL)
-			return(Err_no_memory);
+		cscale = sqr_root((long)RGB_MAX * RGB_MAX * 3) + 1;
+		threshold = vs.sep_threshold * cscale / 100;
+		if ((rgb_cnums = pj_malloc(COLORS)) == NULL) {
+			return (Err_no_memory);
+		}
 		occolor = vs.ccolor;
-		vs.ccolor = closestc(&sep->sep_rgb_dest,vb.pencel->cmap->ctab, COLORS);
+		vs.ccolor = closestc(&sep->sep_rgb_dest, vb.pencel->cmap->ctab, COLORS);
 		rgb_ccount = 0;
 		absc = sep->abs_ctable;
 		i = sep->p.ccount;
-		while (--i >= 0)
-		{
+		while (--i >= 0) {
 			pt = vb.pencel->cmap->ctab;
-			for (j=0; j<COLORS; j++)
-			{
-				if (rgb_close_enough(pt, absc, threshold) )
-				{
-				if (!in_cnums(j, rgb_cnums, rgb_ccount))
-					rgb_cnums[rgb_ccount++] = j;
+			for (j = 0; j < COLORS; j++) {
+				if (rgb_close_enough(pt, absc, threshold)) {
+					if (!in_cnums(j, rgb_cnums, rgb_ccount)) {
+						rgb_cnums[rgb_ccount++] = j;
+					}
 				}
 				++pt;
 			}
 			++absc;
 		}
-		err = render_separate(rgb_cnums,rgb_ccount,&sep->p.rect);
+		err = render_separate(rgb_cnums, rgb_ccount, &sep->p.rect);
 		pj_free(rgb_cnums);
 		vs.ccolor = occolor;
+	} else {
+		err = render_separate(sep->p.ctable, sep->p.ccount, &sep->p.rect);
 	}
-	else
-	{
-		err = render_separate(sep->p.ctable,sep->p.ccount,&sep->p.rect);
-	}
-	if(vs.cycle_draw && err >= Success)
+	if (vs.cycle_draw && err >= Success) {
 		cycle_ccolor();
-	return(err);
+	}
+	return (err);
 }
 
-static Errcode
-auto_sep1(void *sep_cb, int ix, int intween, int scale, Autoarg *aa)
+static Errcode auto_sep1(void* sep_cb, int ix, int intween, int scale, Autoarg* aa)
 {
 	(void)ix;
 	(void)intween;
@@ -99,152 +93,152 @@ auto_sep1(void *sep_cb, int ix, int intween, int scale, Autoarg *aa)
 	return sep1(sep_cb);
 }
 
-static Errcode get_sep_source_colors(Sep_cb *sep)
+static Errcode get_sep_source_colors(Sep_cb* sep)
 {
-int color;
-Errcode err;
-SHORT ogrid;
+	int color;
+	Errcode err;
+	SHORT ogrid;
 
-	if ((sep->p.ctable = pj_malloc(COLORS)) == NULL)
-		return(Err_no_memory);
-	save_undo();
-	if (vs.sep_box)
-	{
-		if((err = get_rub_rect(&sep->p.rect)) < 0)
-			goto error;
-		if((err = rub_rect_in_place(&sep->p.rect)) < 0)
-			goto error;
+	if ((sep->p.ctable = pj_malloc(COLORS)) == NULL) {
+		return (Err_no_memory);
 	}
-	else
-	{
+	save_undo();
+	if (vs.sep_box) {
+		if ((err = get_rub_rect(&sep->p.rect)) < 0) {
+			goto error;
+		}
+		if ((err = rub_rect_in_place(&sep->p.rect)) < 0) {
+			goto error;
+		}
+	} else {
 		sep->p.rect.x = sep->p.rect.y = 0;
 		sep->p.rect.width = vb.pencel->width;
 		sep->p.rect.height = vb.pencel->height;
 	}
 
-	if (vs.sep_rgb	== 2)	/* range */
+	if (vs.sep_rgb == 2) /* range */
 	{
 		sep->p.ccount = cluster_count();
 		pj_copy_bytes(cluster_bundle(), sep->p.ctable, sep->p.ccount);
-		return(Success);
+		return (Success);
 	}
 
 	ogrid = vs.use_grid;
 	vs.use_grid = false;
 
-	for (;;)	/* gather up a table while pen down of colors under cursor */
+	for (;;) /* gather up a table while pen down of colors under cursor */
 	{
-		color = pj_get_dot(vb.pencel,icb.mx,icb.my);
-		if (!in_cnums(color, sep->p.ctable, sep->p.ccount) )
+		color = pj_get_dot(vb.pencel, icb.mx, icb.my);
+		if (!in_cnums(color, sep->p.ctable, sep->p.ccount)) {
 			sep->p.ctable[sep->p.ccount++] = color;
+		}
 		wait_any_input();
-		if (!ISDOWN(MBPEN))
+		if (!ISDOWN(MBPEN)) {
 			break;
+		}
 	}
 	vs.use_grid = ogrid;
 	err = Success;
 error:
-	return(err);
+	return (err);
 }
 
-static Errcode get_abs_ctable(Sep_cb *sep)
+static Errcode get_abs_ctable(Sep_cb* sep)
 {
-UBYTE *s;
-Rgb3 *d;
-int i;
+	UBYTE* s;
+	Rgb3* d;
+	int i;
 
-if (vs.sep_rgb == 1)
-	{
-	/* copy the absolute rgb values of cnums somewhere */
-	get_color_rgb(vs.ccolor,vb.pencel->cmap,&sep->sep_rgb_dest);
+	if (vs.sep_rgb == 1) {
+		/* copy the absolute rgb values of cnums somewhere */
+		get_color_rgb(vs.ccolor, vb.pencel->cmap, &sep->sep_rgb_dest);
 
-	if ((sep->abs_ctable = pj_malloc(sep->p.ccount*3)) == NULL)
-		return(Err_no_memory);
+		if ((sep->abs_ctable = pj_malloc(sep->p.ccount * 3)) == NULL) {
+			return (Err_no_memory);
+		}
 
-	s = sep->p.ctable;
-	d = sep->abs_ctable;
-	i = sep->p.ccount;
-	while (--i >= 0)
-		{
-		get_color_rgb(*s++,vb.pencel->cmap,d);
-		++d;
+		s = sep->p.ctable;
+		d = sep->abs_ctable;
+		i = sep->p.ccount;
+		while (--i >= 0) {
+			get_color_rgb(*s++, vb.pencel->cmap, d);
+			++d;
 		}
 	}
-return(Success);
+	return (Success);
 }
 
-static Errcode gather_ctable(Sep_cb *sep)
+static Errcode gather_ctable(Sep_cb* sep)
 {
-Errcode err;
+	Errcode err;
 
-if ((err = get_sep_source_colors(sep)) < Success)
-	return(err);
-return(get_abs_ctable(sep));
+	if ((err = get_sep_source_colors(sep)) < Success) {
+		return (err);
+	}
+	return (get_abs_ctable(sep));
 }
 
-static void free_ctable(Sep_cb *sep)
+static void free_ctable(Sep_cb* sep)
 {
 	pj_gentle_free(sep->p.ctable);
 	pj_gentle_free(sep->abs_ctable);
 }
 
-
-Errcode do_sep_redo(Sep_p *sep)
+Errcode do_sep_redo(Sep_p* sep)
 {
-Sep_cb scb;
-Errcode err;
+	Sep_cb scb;
+	Errcode err;
 
-clear_struct(&scb);
-scb.p = *sep;
-if ((err = get_abs_ctable(&scb)) >= Success)
-	{
-	sep1(&scb);
+	clear_struct(&scb);
+	scb.p = *sep;
+	if ((err = get_abs_ctable(&scb)) >= Success) {
+		sep1(&scb);
 	}
-free_ctable(&scb);
-return(err);
+	free_ctable(&scb);
+	return (err);
 }
 
 static UBYTE from_menu;
+
 static Errcode do_sep_tool(void)
 {
-Errcode err;
-Sep_cb sep;
-USHORT flags;
+	Errcode err;
+	Sep_cb sep;
+	USHORT flags;
 
-	if (!pti_input())
-		return(Success);
+	if (!pti_input()) {
+		return (Success);
+	}
 	clear_struct(&sep);
-	if((err = gather_ctable(&sep)) >= 0)
-	{
-		if(from_menu)
-		{
-			if(vs.multi)
-			{
+	if ((err = gather_ctable(&sep)) >= 0) {
+		if (from_menu) {
+			if (vs.multi) {
 				flags = AUTO_UNZOOM;
-				if(vl.ink->needs & INK_NEEDS_CEL)
+				if (vl.ink->needs & INK_NEEDS_CEL) {
 					flags |= AUTO_USESCEL;
-			}
-			else
+				}
+			} else {
 				flags = 0;
+			}
 
 			err = go_autodraw(auto_sep1, &sep, flags);
-		}
-		else
-		{
+		} else {
 			sep1(&sep);
 			err = save_redo_sep(&sep.p);
 		}
 	}
 	free_ctable(&sep);
-	return(err);
+	return (err);
 }
-Errcode sep_tool(Pentool *pt, Wndo *w)
+
+Errcode sep_tool(Pentool* pt, Wndo* w)
 {
 	(void)pt;
 	(void)w;
 
-	return(do_sep_tool());
+	return (do_sep_tool());
 }
+
 void separate(void)
 {
 	from_menu = true;
@@ -254,18 +248,17 @@ void separate(void)
 
 Errcode csd_edge1(Pixel ecolor)
 {
-Errcode err;
-UBYTE *linebufs;
-UBYTE *prevline, *line, *nextline;
-UBYTE *pbyte, *lbyte, *nbyte;
-UBYTE *swaper;
-int linesize;
-SHORT x, y;
+	Errcode err;
+	UBYTE* linebufs;
+	UBYTE *prevline, *line, *nextline;
+	UBYTE *pbyte, *lbyte, *nbyte;
+	UBYTE* swaper;
+	int linesize;
+	SHORT x, y;
 
 	set_full_gradrect();
 	linesize = undof->width + 2; /* one Pixel on each end to be an edge */
-	if((linebufs = pj_malloc(linesize * 3)) == NULL)
-	{
+	if ((linebufs = pj_malloc(linesize * 3)) == NULL) {
 		err = Err_no_memory;
 		goto error;
 	}
@@ -276,22 +269,21 @@ SHORT x, y;
 
 	/* Fast enough, set them all to ecolor */
 	pj_stuff_bytes(ecolor, linebufs, linesize * 3);
-	pj__get_hseg(undof,&line[1],0,0,undof->width);
+	pj__get_hseg(undof, &line[1], 0, 0, undof->width);
 
 	y = -1;
-	for(;;)
-	{
+	for (;;) {
 		/* for Y, +2 and -- make a net +1 */
 
-		if((y += 2) >= undof->height)
-		{
-			if(y > undof->height)
+		if ((y += 2) >= undof->height) {
+			if (y > undof->height) {
 				break;
+			}
 			/* last time set line to ecolor for one beyond screen */
-			pj_stuff_bytes(ecolor,nextline,linesize);
+			pj_stuff_bytes(ecolor, nextline, linesize);
+		} else {
+			pj__get_hseg(undof, &nextline[1], 0, y, undof->width);
 		}
-		else
-			pj__get_hseg(undof,&nextline[1],0,y, undof->width);
 		--y;
 
 		/* note first pixel is one before screen edge */
@@ -300,17 +292,14 @@ SHORT x, y;
 		lbyte = line;
 		nbyte = nextline;
 
-		for (x=0; x < undof->width; ++x)
-		{
+		for (x = 0; x < undof->width; ++x) {
 			++pbyte;
 			++nbyte;
 			++lbyte;
-			if (lbyte[0] == ecolor)
-			{
-				if (  lbyte[-1] != ecolor || lbyte[1] != ecolor
-					|| pbyte[0] != ecolor || nbyte[0] != ecolor)
-				{
-					render_brush(x,y);
+			if (lbyte[0] == ecolor) {
+				if (lbyte[-1] != ecolor || lbyte[1] != ecolor || pbyte[0] != ecolor ||
+					nbyte[0] != ecolor) {
+					render_brush(x, y);
 				}
 			}
 		}
@@ -321,16 +310,17 @@ SHORT x, y;
 	}
 	pj_free(linebufs);
 error:
-	return(err);
+	return (err);
 }
 
 int edge1(Pixel ecolor)
 {
-Errcode err;
+	Errcode err;
 
-if((err = make_render_cashes()) < 0)
-	return(err);
-err = csd_edge1(ecolor);
-free_render_cashes();
-return(err);
+	if ((err = make_render_cashes()) < 0) {
+		return (err);
+	}
+	err = csd_edge1(ecolor);
+	free_render_cashes();
+	return (err);
 }

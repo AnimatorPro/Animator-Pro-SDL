@@ -130,55 +130,54 @@
 
 #define TOKEN_MAX SZTOKE
 #ifndef LINE_MAX
-	#define LINE_MAX SZTOKE
+#define LINE_MAX SZTOKE
 #endif
 #define MAX_MACRO_PARMS 32
 #define RECURSE_LIMIT 10000
 #define free_string(s) \
-	if (s != NULL)     \
-	po_freemem(s)
+	if (s != NULL) po_freemem(s)
 
 /*----------------------------------------------------------------------------
  * error message literals...
  *--------------------------------------------------------------------------*/
 
 
-
 static char recurse_detected[] = "infinite loop detected during macro substitution";
 
-static char macro_overflow[]	= "buffer size exceeded during macro expansion";
-static char macro_oneline[]		= "end of line found before end of parameters for macro";
-static char macro_parmexceed[]	= "maximum number of macro parameters exceeded";
-static char macro_name[]		= "name of macro";
+static char macro_overflow[] = "buffer size exceeded during macro expansion";
+static char macro_oneline[] = "end of line found before end of parameters for macro";
+static char macro_parmexceed[] = "maximum number of macro parameters exceeded";
+static char macro_name[] = "name of macro";
 static char macro_expect_name[] = "expecting name of macro";
-static char macro_parmname[]	= "name of macro parameter";
-static char macro_needparm[]	= "expecting parameter(s) for macro %s";
-static char macro_redefined[]	= "macro redefined with non-identical value";
-static char macro_builtin[]		= "a builtin macro cannot be un-defined";
-static char macro_toomany[]		= "too many";
-static char macro_toofew[]		= "not enough";
-static char macro_parmcount[]	= "%s parameters for macro %s";
-static char comma_or_rparen[]	= "comma or )";
+static char macro_parmname[] = "name of macro parameter";
+static char macro_needparm[] = "expecting parameter(s) for macro %s";
+static char macro_redefined[] = "macro redefined with non-identical value";
+static char macro_builtin[] = "a builtin macro cannot be un-defined";
+static char macro_toomany[] = "too many";
+static char macro_toofew[] = "not enough";
+static char macro_parmcount[] = "%s parameters for macro %s";
+static char comma_or_rparen[] = "comma or )";
 
 static char incl_name_missing[] = "missing or malformed name of file for #include";
-static char incl_open[]			= "can't open source file %s";
+static char incl_open[] = "can't open source file %s";
 
-static char pragma_unknown[]	= "'%s' is not a valid poco pragma";
-static char lib_name_missing[]	= "missing or malformed filename for library pragma";
-static char lib_cant_find[]		= "can't find POE library module %s";
-static char lib_open_failed[]	= "can't load POE library module %s";
-static char stksz_value_bad[]	= "stacksize value must be in kbytes, between 4 and 64";
-static char unexpected_tok[]	= "Unexpected \"%s\"";
-static char unexpected_eol[]	= "Unexpected end of line.";
+static char pragma_unknown[] = "'%s' is not a valid poco pragma";
+static char lib_name_missing[] = "missing or malformed filename for library pragma";
+static char use_name_missing[] = "missing or malformed filename for use pragma";
+static char lib_cant_find[] = "can't find POE library module %s";
+static char lib_open_failed[] = "can't load POE library module %s";
+static char stksz_value_bad[] = "stacksize value must be in kbytes, between 4 and 64";
+static char unexpected_tok[] = "Unexpected \"%s\"";
+static char unexpected_eol[] = "Unexpected end of line.";
 static char if_defined_syntax[] = "syntax error in '#if defined' statement";
 
 static char ppcmd_unknown[] = "unknown preprocessor command '%s'";
 
 static char forced_fatal[] = "fatal error forced by #error directive...";
 
-static char else_unmatched[]  = "#else/#elif without preceeding #if/#ifdef";
+static char else_unmatched[] = "#else/#elif without preceeding #if/#ifdef";
 static char endif_unmatched[] = "#endif without preceeding #if/#ifdef";
-static char else_multiple[]	  = "only one #else is allowed per #if/#ifdef";
+static char else_multiple[] = "only one #else is allowed per #if/#ifdef";
 static char elif_after_else[] = "#elif cannot follow a #else directive";
 
 static char eof_in_conditional[] = "EOF inside #if/#ifdef";
@@ -215,16 +214,16 @@ void pp_say_fatal(Poco_cb* pcb, char* fmt, ...)
  *	first path in the list).  if no paths are a null string, all file searches
  *	will be rooted in the dirs specified in the include list.
  ****************************************************************************/
-static char* pp_findfile(Poco_cb* pcb, Names* idirs, char* fname)
+static char* pp_findfile(Poco_cb* pcb, Names* idirs, char* fname, char path[PATH_SIZE])
 {
-	static char path[PATH_SIZE];
 	FILE* f;
 	int namelen;
 	PoBoolean verbose = (pcb && pcb->t.verbose);
 	PoBoolean found = false;
 
-	if (0 == (namelen = strlen(fname))) /* naughty naughty user...	  */
-		return NULL;					/* ...can't fool us that easy */
+	if (0 == (namelen = strlen(fname))) { /* naughty naughty user...	  */
+		return NULL;                      /* ...can't fool us that easy */
+	}
 
 	if (verbose) {
 		fprintf(stderr, "[poco include] #include search for '%s'\n", fname);
@@ -264,9 +263,11 @@ static Text_symbol* pp_in_hash_list(char* word, Text_symbol** list)
 
 	ts = list[po_hashfunc(word)];
 	while (ts != NULL) {
-		if (ts->name[0] == *word) /* quick-test 1st char before strcmp call */
-			if (po_eqstrcmp(ts->name, word) == 0)
+		if (ts->name[0] == *word) { /* quick-test 1st char before strcmp call */
+			if (po_eqstrcmp(ts->name, word) == 0) {
 				return (ts);
+			}
+		}
 		ts = ts->next;
 	}
 	return NULL;
@@ -279,7 +280,7 @@ static void add_to_hash(Text_symbol* hash, Text_symbol** table)
 {
 	table += po_hashfunc(hash->name);
 	hash->next = *table;
-	*table	   = hash;
+	*table = hash;
 }
 
 /*****************************************************************************
@@ -289,11 +290,11 @@ static void pp_add_new_ts(Poco_cb* pcb, char* name, char* value, SHORT pcount, T
 {
 	register Text_symbol* ts;
 
-	ts			  = po_memalloc(pcb, sizeof(Text_symbol));
-	ts->name	  = name;
-	ts->value	  = value;
+	ts = po_memalloc(pcb, sizeof(Text_symbol));
+	ts->name = name;
+	ts->value = value;
 	ts->parmcount = pcount;
-	ts->flags	  = flags;
+	ts->flags = flags;
 	add_to_hash(ts, pcb->t.define_list);
 }
 
@@ -303,7 +304,7 @@ static void pp_add_new_ts(Poco_cb* pcb, char* name, char* value, SHORT pcount, T
 static void free_a_ts(Text_symbol* ts)
 {
 	if (!(ts->flags & TSFL_ISBUILTIN)) /* The name and value strings for		*/
-	{								   /* builtins are not dynamically alloc'd.*/
+	{                                  /* builtins are not dynamically alloc'd.*/
 		free_string(ts->name);
 		free_string(ts->value);
 	}
@@ -319,8 +320,9 @@ static void unhash(char* name, Text_symbol** table)
 
 	table += po_hashfunc(name);
 	hash = *table;
-	if (hash == NULL)
+	if (hash == NULL) {
 		return;
+	}
 	if (po_eqstrcmp(hash->name, name) == 0) {
 		*table = hash->next;
 		free_a_ts(hash);
@@ -366,11 +368,27 @@ static void new_file_stack_entry(Poco_cb* pcb, void* fp, char* fname, Fsflags fl
 	new_filep = po_memalloc(pcb, sizeof(File_stack));
 
 	new_filep->source.file = fp;
-	new_filep->name		   = po_clone_string(pcb, fname);
-	new_filep->line_count  = 0;
-	new_filep->flags	   = flags;
-	new_filep->pred		   = pcb->t.file_stack;
-	pcb->t.file_stack	   = new_filep;
+	new_filep->name = po_clone_string(pcb, fname);
+	new_filep->line_count = 0;
+	new_filep->flags = flags;
+	new_filep->pred = pcb->t.file_stack;
+	pcb->t.file_stack = new_filep;
+}
+
+static void new_buffer_stack_entry(Poco_cb* pcb, const char* source, size_t source_length,
+								   char* source_name)
+{
+	File_stack* new_filep;
+
+	new_filep = po_memalloc(pcb, sizeof(File_stack));
+	new_filep->source.buffer.data = source;
+	new_filep->source.buffer.length = source_length;
+	new_filep->source.buffer.position = 0;
+	new_filep->name = po_clone_string(pcb, source_name);
+	new_filep->line_count = 0;
+	new_filep->flags = FSF_ISBUFFER | FSF_MACSUB;
+	new_filep->pred = pcb->t.file_stack;
+	pcb->t.file_stack = new_filep;
 }
 
 /*****************************************************************************
@@ -379,9 +397,11 @@ static void new_file_stack_entry(Poco_cb* pcb, void* fp, char* fname, Fsflags fl
 static void prev_file_stack_entry(Poco_cb* pcb)
 {
 	File_stack* fs = pcb->t.file_stack;
+	bool source_ended = (fs->flags & (FSF_ISFILE | FSF_ISBUFFER)) != 0;
 
-	if (fs->flags & FSF_ISFILE)
+	if (fs->flags & FSF_ISFILE) {
 		fclose(fs->source.file);
+	}
 
 	free_string(fs->name);
 	pcb->t.file_stack = fs->pred;
@@ -390,7 +410,7 @@ static void prev_file_stack_entry(Poco_cb* pcb)
 	fs = pcb->t.file_stack;
 
 	if (fs == NULL && pcb->t.ifdef_stack != NULL) {
-		if (fs->flags & FSF_ISFILE) {
+		if (source_ended) {
 			pp_say_fatal(pcb, eof_in_conditional);
 			PO_CHECK_ABORT_VOID(pcb);
 		} else {
@@ -408,14 +428,17 @@ static char* pp_strtrim(char* line)
 	char* first;
 	char* last = NULL;
 
-	while (isspace(*line))
+	while (isspace(*line)) {
 		++line;
-	if (*line == '\0')
+	}
+	if (*line == '\0') {
 		return line;
+	}
 	first = line;
 	while (*line) {
-		if (!isspace(*line))
+		if (!isspace(*line)) {
 			last = line;
+		}
 		++line;
 	}
 	*++last = '\0';
@@ -430,9 +453,11 @@ static SHORT pp_in_parm_array(char** parms, SHORT pcount, char* word)
 	int i;
 
 	for (i = 1; i <= pcount; i++) {
-		if (*parms[i] == *word)
-			if (0 == po_eqstrcmp(parms[i], word))
+		if (*parms[i] == *word) {
+			if (0 == po_eqstrcmp(parms[i], word)) {
 				return i;
+			}
+		}
 	}
 	return 0;
 }
@@ -450,12 +475,13 @@ static SHORT pp_count_qstring(Poco_cb* pcb, char* in, char delim)
 	for (;;) {
 		++count;
 		c = *in++;
-		if (c == '\\' && lastc == '\\')		  /* don't let a slash-slash-delim screw us:*/
-			lastc = ~c;						  /* make 2nd slash invisible when checking */
-		else if (c == delim && lastc != '\\') /* the delim next time around. */
+		if (c == '\\' && lastc == '\\') {         /* don't let a slash-slash-delim screw us:*/
+			lastc = ~c;                           /* make 2nd slash invisible when checking */
+		} else if (c == delim && lastc != '\\') { /* the delim next time around. */
 			break;
-		else
+		} else {
 			lastc = c;
+		}
 	}
 	return count;
 }
@@ -465,24 +491,26 @@ static SHORT pp_count_qstring(Poco_cb* pcb, char* in, char delim)
  ****************************************************************************/
 static void pp_copy_qstring(Poco_cb* pcb, char** out, char** in, char delim)
 {
-	char* inptr	 = *in;
+	char* inptr = *in;
 	char* outptr = *out;
 	register SHORT c;
 	register SHORT lastc = 0;
 
 	for (;;) {
 		*outptr++ = c = *inptr++;
-		if (c == 0)
+		if (c == 0) {
 			pp_say_fatal(pcb, macro_oneline);
-   PO_CHECK_ABORT_VOID(pcb);
-		if (c == '\\' && lastc == '\\')		  /* don't let a slash-slash-delim screw us:*/
-			lastc = ~c;						  /* make 2nd slash invisible when checking */
-		else if (c == delim && lastc != '\\') /* the delim next time around. */
+		}
+		PO_CHECK_ABORT_VOID(pcb);
+		if (c == '\\' && lastc == '\\') {         /* don't let a slash-slash-delim screw us:*/
+			lastc = ~c;                           /* make 2nd slash invisible when checking */
+		} else if (c == delim && lastc != '\\') { /* the delim next time around. */
 			break;
-		else
+		} else {
 			lastc = c;
+		}
 	}
-	*in	 = inptr;
+	*in = inptr;
 	*out = outptr;
 }
 
@@ -491,24 +519,26 @@ static void pp_copy_qstring(Poco_cb* pcb, char** out, char** in, char delim)
  ****************************************************************************/
 static void pp_copy_pstring(Poco_cb* pcb, char** out, char** in)
 {
-	char* inptr	 = *in;
+	char* inptr = *in;
 	char* outptr = *out;
 	register SHORT c;
 	register SHORT pcount = 0;
 
 	for (;;) {
 		*outptr++ = c = *inptr++;
-		if (c == 0)
+		if (c == 0) {
 			pp_say_fatal(pcb, macro_oneline);
-   PO_CHECK_ABORT_VOID(pcb);
-		if (c == '(')
+		}
+		PO_CHECK_ABORT_VOID(pcb);
+		if (c == '(') {
 			++pcount;
-		else if (c == ')') {
-			if (--pcount == 0)
+		} else if (c == ')') {
+			if (--pcount == 0) {
 				break;
+			}
 		}
 	}
-	*in	 = inptr;
+	*in = inptr;
 	*out = outptr;
 }
 
@@ -517,24 +547,24 @@ static void pp_copy_pstring(Poco_cb* pcb, char** out, char** in)
  */
 static void pp_get_dir_from_path(const char* path, char* dir, size_t dir_size)
 {
-    const char* last_slash = strrchr(path, '/');
+	const char* last_slash = strrchr(path, '/');
 #ifdef _WIN32
-    const char* last_backslash = strrchr(path, '\\');
-    if (last_backslash > last_slash) {
-        last_slash = last_backslash;
-    }
+	const char* last_backslash = strrchr(path, '\\');
+	if (last_backslash > last_slash) {
+		last_slash = last_backslash;
+	}
 #endif
-    if (last_slash != NULL) {
-        size_t len = (size_t)(last_slash - path + 1);
-        if (len < dir_size) {
-            strncpy(dir, path, len);
-            dir[len] = '\0';
-        } else {
-            dir[0] = '\0';
-        }
-    } else {
-        dir[0] = '\0';
-    }
+	if (last_slash != NULL) {
+		size_t len = (size_t)(last_slash - path + 1);
+		if (len < dir_size) {
+			strncpy(dir, path, len);
+			dir[len] = '\0';
+		} else {
+			dir[0] = '\0';
+		}
+	} else {
+		dir[0] = '\0';
+	}
 }
 
 /*
@@ -542,17 +572,19 @@ static void pp_get_dir_from_path(const char* path, char* dir, size_t dir_size)
  */
 static void pp_ensure_trailing_sep(char* dir, size_t dir_size)
 {
-    size_t len = strlen(dir);
-    if (len == 0) return;
-    if (dir[len - 1] != '/'
+	size_t len = strlen(dir);
+	if (len == 0) {
+		return;
+	}
+	if (dir[len - 1] != '/'
 #ifdef _WIN32
-        && dir[len - 1] != '\\'
+		&& dir[len - 1] != '\\'
 #endif
-        ) {
-        if (len + 1 < dir_size) {
-            strcat(dir, "/");
-        }
-    }
+	) {
+		if (len + 1 < dir_size) {
+			strcat(dir, "/");
+		}
+	}
 }
 
 /*
@@ -564,102 +596,111 @@ static void pp_ensure_trailing_sep(char* dir, size_t dir_size)
  */
 static void pp_print_library_search_candidates(Poco_cb* pcb, const char* libname)
 {
-    char dir_path[PATH_SIZE * 2];
-    char exe_path[PATH_SIZE * 2];
-    const char* platform_ext;
-    const char* dot = strrchr(libname, '.');
-    int has_ext = (dot && dot != libname && *(dot + 1) != '\0');
+	char dir_path[PATH_SIZE * 2];
+	char exe_path[PATH_SIZE * 2];
+	const char* platform_ext;
+	const char* dot = strrchr(libname, '.');
+	int has_ext = (dot && dot != libname && *(dot + 1) != '\0');
 
-    /* Only print if verbose flag is enabled */
-    if (!pcb || !pcb->t.verbose) {
-        return;
-    }
+	/* Only print if verbose flag is enabled */
+	if (!pcb || !pcb->t.verbose) {
+		return;
+	}
 
 #ifdef _WIN32
-    platform_ext = ".dll";
+	platform_ext = ".dll";
 #elif defined(__APPLE__)
-    platform_ext = ".dylib";
+	platform_ext = ".dylib";
 #else
-    platform_ext = ".so";
+	platform_ext = ".so";
 #endif
 
-    fprintf(stderr, "[poco library] #pragma poco library search for '%s'\n", libname);
+	fprintf(stderr, "[poco library] #pragma poco library search for '%s'\n", libname);
 
-    /* 1) Script directory */
-    if (pcb && pcb->t.file_stack && pcb->t.file_stack->name) {
-        pp_get_dir_from_path(pcb->t.file_stack->name, dir_path, sizeof(dir_path));
-        if (dir_path[0]) {
-            pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
-            if (has_ext) {
-                fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
-            } else {
-                fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, ".poe");
-                fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, platform_ext);
-            }
-        }
-    }
+	/* 1) Script directory */
+	if (pcb && pcb->t.file_stack && pcb->t.file_stack->name) {
+		pp_get_dir_from_path(pcb->t.file_stack->name, dir_path, sizeof(dir_path));
+		if (dir_path[0]) {
+			pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
+			if (has_ext) {
+				fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
+			} else {
+				fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+						".poe");
+				fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+						platform_ext);
+			}
+		}
+	}
 
-    /* 2) Current working directory */
-    if (getcwd(dir_path, sizeof(dir_path)) != NULL) {
-        pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
-        if (has_ext) {
-            fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
-        } else {
-            fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, ".poe");
-            fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, platform_ext);
-        }
-    }
+	/* 2) Current working directory */
+	if (getcwd(dir_path, sizeof(dir_path)) != NULL) {
+		pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
+		if (has_ext) {
+			fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
+		} else {
+			fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, ".poe");
+			fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+					platform_ext);
+		}
+	}
 
-    /* 3) Poco executable directory */
+	/* 3) Poco executable directory */
 #ifdef _WIN32
-    {
-        DWORD len = GetModuleFileNameA(NULL, exe_path, (DWORD)sizeof(exe_path));
-        if (len > 0) {
-            pp_get_dir_from_path(exe_path, dir_path, sizeof(dir_path));
-            if (dir_path[0]) {
-                pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
-                if (has_ext) {
-                    fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
-                } else {
-                    fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, ".poe");
-                    fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, platform_ext);
-                }
-            }
-        }
-    }
+	{
+		DWORD len = GetModuleFileNameA(NULL, exe_path, (DWORD)sizeof(exe_path));
+		if (len > 0) {
+			pp_get_dir_from_path(exe_path, dir_path, sizeof(dir_path));
+			if (dir_path[0]) {
+				pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
+				if (has_ext) {
+					fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
+				} else {
+					fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+							".poe");
+					fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+							platform_ext);
+				}
+			}
+		}
+	}
 #else
-    {
-        ssize_t r = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-        if (r > 0) {
-            exe_path[r] = '\0';
-            pp_get_dir_from_path(exe_path, dir_path, sizeof(dir_path));
-            if (dir_path[0]) {
-                pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
-                if (has_ext) {
-                    fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
-                } else {
-                    fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, ".poe");
-                    fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, platform_ext);
-                }
-            }
-        }
+	{
+		ssize_t r = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+		if (r > 0) {
+			exe_path[r] = '\0';
+			pp_get_dir_from_path(exe_path, dir_path, sizeof(dir_path));
+			if (dir_path[0]) {
+				pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
+				if (has_ext) {
+					fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
+				} else {
+					fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+							".poe");
+					fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+							platform_ext);
+				}
+			}
+		}
 #ifdef __APPLE__
-        /* Fallback for macOS bundles */
-        uint32_t bsize = (uint32_t)sizeof(exe_path);
-        if (_NSGetExecutablePath(exe_path, &bsize) == 0) {
-            pp_get_dir_from_path(exe_path, dir_path, sizeof(dir_path));
-            if (dir_path[0]) {
-                pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
-                if (has_ext) {
-                    fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
-                } else {
-                    fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, ".poe");
-                    fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname, platform_ext);
-                }
-            }
-        }
+		/* Fallback for macOS bundles */
+		uint32_t bsize = (uint32_t)sizeof(exe_path);
+		if (_NSGetExecutablePath(exe_path, &bsize) == 0) {
+			pp_get_dir_from_path(exe_path, dir_path, sizeof(dir_path));
+			if (dir_path[0]) {
+				pp_ensure_trailing_sep(dir_path, sizeof(dir_path));
+				if (has_ext) {
+					fprintf(stderr, "[poco library search] trying '%s%s'\n", dir_path, libname);
+				} else {
+					fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+							".poe");
+					fprintf(stderr, "[poco library search] trying '%s%s%s'\n", dir_path, libname,
+							platform_ext);
+				}
+			}
+		}
 #endif
-    }
+	}
 #endif
 }
 
@@ -670,20 +711,17 @@ static char* pp_join_strings(char* dest, char* s)
 {
 	register char c;
 
-	while ((c = *s++) != 0)
+	while ((c = *s++) != 0) {
 		*dest++ = c;
+	}
 	return dest;
 }
 
 /*****************************************************************************
  * perform macro substitution.
  ****************************************************************************/
-static char* pp_expand(Poco_cb* pcb,
-					   register char* outbuf,
-					   char* savbuf,
-					   Text_symbol* ts,
-					   register SHORT bufrspace,
-					   SHORT wordlen)
+static char* pp_expand(Poco_cb* pcb, register char* outbuf, char* savbuf, Text_symbol* ts,
+					   register SHORT bufrspace, SHORT wordlen)
 {
 	char* rv;
 	char* line;
@@ -691,15 +729,15 @@ static char* pp_expand(Poco_cb* pcb,
 	PPToken pptok;
 
 	rv = line = outbuf;
-	template  = ts->value;
+	template = ts->value;
 
 	if (ts->flags & TSFL_ISSPECIAL) /* If it requires special handling...	*/
 	{
-		time_t timenow;			/* time value return by time()			*/
-		char* ctimestr;			/* -> string returned by ctime()		*/
+		time_t timenow;         /* time value return by time()			*/
+		char* ctimestr;         /* -> string returned by ctime()		*/
 		char dtlbuf[PATH_SIZE]; /* buffer for filename/date/time/line#	*/
 
-		pptok	 = *template;
+		pptok = *template;
 		template = dtlbuf;
 
 		switch (pptok) {
@@ -713,12 +751,13 @@ static char* pp_expand(Poco_cb* pcb,
 
 			case PPTOK_SDATE:
 			case PPTOK_STIME:
-				timenow	 = time(NULL);
+				timenow = time(NULL);
 				ctimestr = ctime(&timenow);
-				if (pptok == PPTOK_STIME)
+				if (pptok == PPTOK_STIME) {
 					sprintf(dtlbuf, "\"%8.8s\"", &ctimestr[11]);
-				else
+				} else {
 					sprintf(dtlbuf, "\"%6.6s %4.4s\"", &ctimestr[4], &ctimestr[20]);
+				}
 				goto SIMPLE_SUBSTITUTE;
 
 			case PPTOK_SNULL:
@@ -751,9 +790,10 @@ static char* pp_expand(Poco_cb* pcb,
 		line = po_skip_space(line + wordlen);
 		if (line == NULL || *line != '(') {
 			pp_say_fatal(pcb, macro_needparm, ts->name);
-   PO_CHECK_ABORT(pcb, NULL);
-		} else
+			PO_CHECK_ABORT(pcb, NULL);
+		} else {
 			++line;
+		}
 
 		/*
 		 * gather the parameter values from the macro invokation.
@@ -762,23 +802,24 @@ static char* pp_expand(Poco_cb* pcb,
 		 * pointer to each parameter value in the buffer into an array, for use
 		 * during the actual substitution.
 		 */
-		pcount	 = 0;
+		pcount = 0;
 		thisparm = parmbuf;
-		parmwrk	 = parmbuf;
+		parmwrk = parmbuf;
 
-		if (ts->parmcount == 0) { // if it's a macro that 'has parms', but really
-			if (*line++ == ')')	  // just has empty parens, then skip all the
-				goto ENDOFPARMS;  // parm-gathering groodah.
-			else
+		if (ts->parmcount == 0) {  // if it's a macro that 'has parms', but really
+			if (*line++ == ')') {  // just has empty parens, then skip all the
+				goto ENDOFPARMS;   // parm-gathering groodah.
+			} else {
 				pp_say_fatal(pcb, macro_parmcount, macro_toomany);
-    PO_CHECK_ABORT(pcb, NULL);
+			}
+			PO_CHECK_ABORT(pcb, NULL);
 		}
 
 		for (;;) {
 			switch (*line) {
 				case '\0':
 					pp_say_fatal(pcb, macro_oneline);
-     PO_CHECK_ABORT(pcb, NULL);
+					PO_CHECK_ABORT(pcb, NULL);
 					break;
 				case '"':
 					pp_copy_qstring(pcb, &parmwrk, &line, '"');
@@ -792,13 +833,15 @@ static char* pp_expand(Poco_cb* pcb,
 				case ')':
 				case ',':
 					*parmwrk++ = '\0';
-					if (++pcount >= MAX_MACRO_PARMS)
+					if (++pcount >= MAX_MACRO_PARMS) {
 						pp_say_fatal(pcb, macro_parmcount, macro_toomany);
-      PO_CHECK_ABORT(pcb, NULL);
+					}
+					PO_CHECK_ABORT(pcb, NULL);
 					parms[pcount] = pp_strtrim(thisparm);
-					thisparm	  = parmwrk;
-					if (*line++ == ')')
+					thisparm = parmwrk;
+					if (*line++ == ')') {
 						goto ENDOFPARMS;
+					}
 					break;
 				default:
 					*parmwrk++ = *line++;
@@ -806,7 +849,7 @@ static char* pp_expand(Poco_cb* pcb,
 			}
 		}
 
-	ENDOFPARMS:
+ENDOFPARMS:
 
 		/*
 		 * make sure we got the right number of parameters.
@@ -815,9 +858,9 @@ static char* pp_expand(Poco_cb* pcb,
 		 * the macro, so that we can splice it back on after the expansion.
 		 */
 		if (pcount != ts->parmcount) {
-			pp_say_fatal(pcb, 
-			  macro_parmcount, ((pcount < ts->parmcount) ? macro_toofew : macro_toomany), ts->name);
-     PO_CHECK_ABORT(pcb, NULL);
+			pp_say_fatal(pcb, macro_parmcount,
+						 ((pcount < ts->parmcount) ? macro_toofew : macro_toomany), ts->name);
+			PO_CHECK_ABORT(pcb, NULL);
 		}
 
 		strcpy(savbuf, line);
@@ -847,12 +890,14 @@ static char* pp_expand(Poco_cb* pcb,
 				--bufrspace;
 			}
 
-			if (bufrspace <= 0) /* If overflow, die */
+			if (bufrspace <= 0) { /* If overflow, die */
 				pp_say_fatal(pcb, macro_overflow);
-    PO_CHECK_ABORT(pcb, NULL);
+			}
+			PO_CHECK_ABORT(pcb, NULL);
 
-			if (c == 0) /* If end of template, exit loop. */
+			if (c == 0) { /* If end of template, exit loop. */
 				break;
+			}
 
 			else if (c == PPTOK_PARMN) /* Normal parameter substitution */
 			{
@@ -868,7 +913,7 @@ static char* pp_expand(Poco_cb* pcb,
 				*outbuf++ = '"';
 				--bufrspace;
 				thisparm = parms[*template ++];
-				lastc	 = 0;
+				lastc = 0;
 				while (0 != (c = *thisparm++)) {
 					if ((c == '"' || c == '\\') && lastc != '\\') {
 						*outbuf++ = '\\';
@@ -880,17 +925,19 @@ static char* pp_expand(Poco_cb* pcb,
 				*outbuf++ = '"';
 				--bufrspace;
 			}
-			if (bufrspace <= 0)
+			if (bufrspace <= 0) {
 				pp_say_fatal(pcb, macro_overflow);
-    PO_CHECK_ABORT(pcb, NULL);
+			}
+			PO_CHECK_ABORT(pcb, NULL);
 		}
 
 		/*
 		 * make sure the substitution left us enough room to put the tail back.
 		 */
-		if (bufrspace < strlen(savbuf))
+		if (bufrspace < strlen(savbuf)) {
 			pp_say_fatal(pcb, macro_overflow);
-   PO_CHECK_ABORT(pcb, NULL);
+		}
+		PO_CHECK_ABORT(pcb, NULL);
 		strcpy(outbuf, savbuf);
 
 		po_freemem(parmbuf);
@@ -901,7 +948,7 @@ static char* pp_expand(Poco_cb* pcb,
 		register SHORT diff;
 		register SHORT len;
 
-	SIMPLE_SUBSTITUTE:
+SIMPLE_SUBSTITUTE:
 
 		/*
 		 * for a macro without parameters, processing is pretty simple...
@@ -912,21 +959,23 @@ static char* pp_expand(Poco_cb* pcb,
 		 * the tail of the line, plug in the replacement value, then splice on
 		 * the tail we saved.
 		 */
-		len	 = strlen(template); /* Subtract len of token we're replacing*/
-		diff = len - wordlen;	 /* from length of replacement value.	*/
-		if (diff <= 0)			 /* If replacement will fit in-place...	*/
-		{						 /* copy replacement over top of original*/
+		len = strlen(template); /* Subtract len of token we're replacing*/
+		diff = len - wordlen;   /* from length of replacement value.	*/
+		if (diff <= 0)          /* If replacement will fit in-place...	*/
+		{                       /* copy replacement over top of original*/
 			line = pp_join_strings(line, template);
-			while (diff++ < 0) /* Wipe out rest of original token with */
-				*line++ = ' '; /* spaces. (Is this cheating or what?)  */
-		} else				   /* It's simple, but won't fit in-place. */
+			while (diff++ < 0) { /* Wipe out rest of original token with */
+				*line++ = ' ';   /* spaces. (Is this cheating or what?)  */
+			}
+		} else /* It's simple, but won't fit in-place. */
 		{
-			if ((bufrspace - diff) < 0) /* Make sure we won't overflow buffer.  */
+			if ((bufrspace - diff) < 0) { /* Make sure we won't overflow buffer.  */
 				pp_say_fatal(pcb, macro_overflow);
-    PO_CHECK_ABORT(pcb, NULL);
-			strcpy(savbuf, line + wordlen);			/* Save input line tail,	*/
+			}
+			PO_CHECK_ABORT(pcb, NULL);
+			strcpy(savbuf, line + wordlen);         /* Save input line tail,	*/
 			line = pp_join_strings(line, template); /* put new value in line, */
-			strcpy(line, savbuf);					/* copy tail after new.	*/
+			strcpy(line, savbuf);                   /* copy tail after new.	*/
 		}
 	}
 
@@ -942,30 +991,31 @@ static UBYTE* prep_line(Poco_cb* pcb, UBYTE* line_buf, UBYTE* word_buf, int bsiz
 	SHORT ttype;
 	SHORT bufrspace = bsize - 2;
 	SHORT len;
-	USHORT loopcount   = 0;
+	USHORT loopcount = 0;
 	register UBYTE* in = line_buf;
 	UBYTE* nxtchr;
 	Text_symbol* ts;
 
 	for (;;) {
-		if (++loopcount > RECURSE_LIMIT)
+		if (++loopcount > RECURSE_LIMIT) {
 			pp_say_fatal(pcb, recurse_detected);
-   PO_CHECK_ABORT(pcb, NULL);
-		if ('\0' == (c = *in++))
+		}
+		PO_CHECK_ABORT(pcb, NULL);
+		if ('\0' == (c = *in++)) {
 			break;
+		}
 		if (c == '\'' || c == '"') {
 			len = pp_count_qstring(pcb, in, c);
 			bufrspace -= len;
 			in += len;
 		} else if (c == '0' && (*in == 'x' || *in == 'X')) {
-			++in;			/* don't let 0x... get mixed up with a #defined     */
+			++in;           /* don't let 0x... get mixed up with a #defined     */
 			bufrspace -= 2; /* symbol with the name 'x...' !                    */
 		} else if (!iscsymf(c)) {
 			--bufrspace;
 		} else {
 			nxtchr = tokenize_word(--in, word_buf, NULL, NULL, &ttype, true);
 			if (NULL != (ts = pp_in_hash_list(word_buf, pcb->t.define_list))) {
-
 #ifdef DEBUG_PP
 				printf("b: %s\n", pcb->t.line_b1);
 				nxtchr = pp_expand(pcb, in, word_buf, ts, bufrspace, strlen(word_buf));
@@ -995,13 +1045,15 @@ static void pp_ifdef(Poco_cb* pcb, char* line, char* word_buf, SHORT positive)
 	}
 
 	con = po_memalloc(pcb, sizeof(Conditional));
-	if (NULL != pp_in_hash_list(word_buf, pcb->t.define_list))
+	if (NULL != pp_in_hash_list(word_buf, pcb->t.define_list)) {
 		con->state = positive;
-	else
+	} else {
 		con->state = !positive;
-	if (!con->state)
+	}
+	if (!con->state) {
 		pcb->t.out_of_it++;
-	con->next		   = pcb->t.ifdef_stack;
+	}
+	con->next = pcb->t.ifdef_stack;
 	pcb->t.ifdef_stack = con;
 }
 
@@ -1013,8 +1065,8 @@ static bool pp_if(Poco_cb* pcb, char* line, char* word_buf)
 	register SHORT c;
 	SHORT len;
 	SHORT ttype;
-	USHORT loopcount  = 0;
-	SHORT bufrspace	  = LINE_MAX - 2;
+	USHORT loopcount = 0;
+	SHORT bufrspace = LINE_MAX - 2;
 	register char* in = line;
 	char* nxtchr;
 	Text_symbol* ts;
@@ -1026,47 +1078,52 @@ static bool pp_if(Poco_cb* pcb, char* line, char* word_buf)
 	 * that are not macros with '0'.
 	 */
 	for (;;) {
-		if (++loopcount > RECURSE_LIMIT)
+		if (++loopcount > RECURSE_LIMIT) {
 			pp_say_fatal(pcb, recurse_detected);
-   PO_CHECK_ABORT(pcb, false);
-		if ('\0' == (c = *in++))
+		}
+		PO_CHECK_ABORT(pcb, false);
+		if ('\0' == (c = *in++)) {
 			break;
+		}
 		if (c == '\'' || c == '"') {
 			len = pp_count_qstring(pcb, in, c);
 			bufrspace -= len;
 			in += len;
 		} else if (c == '0' && (*in == 'x' || *in == 'X')) {
-			++in;			/* don't let 0x... get mixed up with a #defined     */
+			++in;           /* don't let 0x... get mixed up with a #defined     */
 			bufrspace -= 2; /* symbol with the name 'x...' !                    */
 		} else if (!iscsymf(c)) {
 			--bufrspace;
 		} else {
 			nxtchr = tokenize_word(--in, word_buf, NULL, NULL, &ttype, true);
-			len	   = strlen(word_buf);
+			len = strlen(word_buf);
 			if (NULL == (ts = pp_in_hash_list(word_buf, pcb->t.define_list))) {
 				if (0 == po_eqstrcmp(word_buf, "defined")) {
 					if (NULL ==
-						(nxtchr = tokenize_word(nxtchr, word_buf, NULL, NULL, &ttype, true)))
+						(nxtchr = tokenize_word(nxtchr, word_buf, NULL, NULL, &ttype, true))) {
 						pp_say_fatal(pcb, if_defined_syntax);
-      PO_CHECK_ABORT(pcb, false);
+					}
+					PO_CHECK_ABORT(pcb, false);
 					if (ttype == '(') {
 						if (NULL ==
-							(nxtchr = tokenize_word(nxtchr, word_buf, NULL, NULL, &ttype, true)))
+							(nxtchr = tokenize_word(nxtchr, word_buf, NULL, NULL, &ttype, true))) {
 							pp_say_fatal(pcb, if_defined_syntax);
-       PO_CHECK_ABORT(pcb, false);
+						}
+						PO_CHECK_ABORT(pcb, false);
 						if (NULL == (nxtchr = po_skip_space(nxtchr)) || *nxtchr != ')') {
 							pp_say_fatal(pcb, if_defined_syntax);
 							PO_CHECK_ABORT(pcb, false);
-						} else
+						} else {
 							++nxtchr;
+						}
 					}
 					len = nxtchr - in;
 					poco_stuff_bytes(in, ' ', len);
-					ts	= pp_in_hash_list(word_buf, pcb->t.define_list);
+					ts = pp_in_hash_list(word_buf, pcb->t.define_list);
 					*in = (ts == NULL) ? '0' : '1';
 				} else {
 					poco_stuff_bytes(in, ' ', len); /* Unknown identifier,  */
-					*in = '0';						/* replace with 0       */
+					*in = '0';                      /* replace with 0       */
 				}
 			} else {
 				nxtchr = pp_expand(pcb, in, word_buf, ts, bufrspace, len);
@@ -1086,7 +1143,7 @@ static void pp_define(Poco_cb* pcb, char* line, char* wrkbuf)
 {
 	SHORT ttype;
 	SHORT parmnum;
-	SHORT pcount   = 0;
+	SHORT pcount = 0;
 	Ts_flags flags = 0;
 	char* name;
 	char* parms[MAX_MACRO_PARMS];
@@ -1098,8 +1155,9 @@ static void pp_define(Poco_cb* pcb, char* line, char* wrkbuf)
 	 * isolate the name of the macro and validate it...
 	 */
 	line = tokenize_word(line, wrkbuf, NULL, NULL, &ttype, true);
-	if (line == NULL || ttype != TOK_UNDEF)
+	if (line == NULL || ttype != TOK_UNDEF) {
 		po_expecting_got_str(pcb, macro_name, wrkbuf);
+	}
 	name = wrkbuf;
 	wrkbuf += 1 + strlen(name);
 
@@ -1113,18 +1171,21 @@ static void pp_define(Poco_cb* pcb, char* line, char* wrkbuf)
 		flags |= TSFL_HASPARMS;
 		line = tokenize_word(line, wrkbuf, NULL, NULL, &ttype, true);
 		while (ttype != TOK_RPAREN) {
-			if (ttype != TOK_UNDEF)
+			if (ttype != TOK_UNDEF) {
 				po_expecting_got_str(pcb, macro_parmname, wrkbuf);
-			if (++pcount >= MAX_MACRO_PARMS)
+			}
+			if (++pcount >= MAX_MACRO_PARMS) {
 				pp_say_fatal(pcb, macro_parmexceed);
-    PO_CHECK_ABORT_VOID(pcb);
+			}
+			PO_CHECK_ABORT_VOID(pcb);
 			parms[pcount] = wrkbuf;
 			wrkbuf += 1 + strlen(wrkbuf);
 			line = tokenize_word(line, wrkbuf, NULL, NULL, &ttype, true);
-			if (ttype != ',' && ttype != TOK_RPAREN)
+			if (ttype != ',' && ttype != TOK_RPAREN) {
 				po_expecting_got_str(pcb, comma_or_rparen, wrkbuf);
-			else if (ttype != TOK_RPAREN)
+			} else if (ttype != TOK_RPAREN) {
 				line = tokenize_word(line, wrkbuf, NULL, NULL, &ttype, true);
+			}
 		}
 	}
 
@@ -1146,28 +1207,31 @@ static void pp_define(Poco_cb* pcb, char* line, char* wrkbuf)
 			*wrkbuf = '\0'; /* tie off last value token */
 			break;
 		}
-		if (iscsymf(*line) && ttype == TOK_UNDEF) /* Last tok & this tok	*/
-			*wrkbuf++ = ' ';					  /* both UNDEF, add space*/
+		if (iscsymf(*line) && ttype == TOK_UNDEF) { /* Last tok & this tok	*/
+			*wrkbuf++ = ' ';                        /* both UNDEF, add space*/
+		}
 		line = tokenize_word(line, wrkbuf, NULL, NULL, &ttype, true);
 		if (ttype == '#') {
 			if (*line == '#') {
-				++line;						 /* double sharp - go backwards	*/
-				while (*(wrkbuf - 1) == ' ') /* in value string until we are */
-					--wrkbuf;				 /* just past last non-blank tok.*/
+				++line;                        /* double sharp - go backwards	*/
+				while (*(wrkbuf - 1) == ' ') { /* in value string until we are */
+					--wrkbuf;                  /* just past last non-blank tok.*/
+				}
 			} else {
-				if (iscsymf(*line)) /* single sharp - remember where*/
-					sharp = wrkbuf; /* only if any chance its a parm*/
+				if (iscsymf(*line)) { /* single sharp - remember where*/
+					sharp = wrkbuf;   /* only if any chance its a parm*/
+				}
 			}
 		} else {
 			if (ttype == TOK_UNDEF && pcount != 0 &&
 				(0 != (parmnum = pp_in_parm_array(parms, pcount, wrkbuf)))) {
 				if (sharp != NULL) {
-					wrkbuf	  = sharp;		 /* parm preceded by a sharp,	*/
+					wrkbuf = sharp;          /* parm preceded by a sharp,	*/
 					*wrkbuf++ = PPTOK_PARMQ; /* set magic # followed 		*/
-					*wrkbuf++ = parmnum;	 /* by parameter number. 		*/
+					*wrkbuf++ = parmnum;     /* by parameter number. 		*/
 				} else {
 					*wrkbuf++ = PPTOK_PARMN; /* parm without a sharp, set	*/
-					*wrkbuf++ = parmnum;	 /* magic # and parm number. 	*/
+					*wrkbuf++ = parmnum;     /* magic # and parm number. 	*/
 				}
 			} else {
 				wrkbuf += strlen(wrkbuf); /* plain ol' token in buf.    */
@@ -1188,11 +1252,12 @@ static void pp_define(Poco_cb* pcb, char* line, char* wrkbuf)
 	 */
 
 	if (NULL != (old = pp_in_hash_list(name, pcb->t.define_list))) {
-		if (old->parmcount == pcount && 0 == po_eqstrcmp(old->value, value))
+		if (old->parmcount == pcount && 0 == po_eqstrcmp(old->value, value)) {
 			return;
-		else
+		} else {
 			pp_say_fatal(pcb, macro_redefined);
-   PO_CHECK_ABORT_VOID(pcb);
+		}
+		PO_CHECK_ABORT_VOID(pcb);
 	}
 
 	/*
@@ -1210,14 +1275,16 @@ static void pp_undef(Poco_cb* pcb, char* line, char* word_buf)
 	SHORT ttype;
 	Text_symbol* ts;
 
-	if (NULL == (line = tokenize_word(line, word_buf, NULL, NULL, &ttype, true)))
+	if (NULL == (line = tokenize_word(line, word_buf, NULL, NULL, &ttype, true))) {
 		pp_say_fatal(pcb, macro_expect_name);
-  PO_CHECK_ABORT_VOID(pcb);
+	}
+	PO_CHECK_ABORT_VOID(pcb);
 
 	if (NULL != (ts = pp_in_hash_list(word_buf, pcb->t.define_list))) {
-		if (ts->flags & TSFL_ISBUILTIN)
+		if (ts->flags & TSFL_ISBUILTIN) {
 			pp_say_fatal(pcb, macro_builtin);
-   PO_CHECK_ABORT_VOID(pcb);
+		}
+		PO_CHECK_ABORT_VOID(pcb);
 		unhash(word_buf, pcb->t.define_list);
 	}
 }
@@ -1231,28 +1298,32 @@ static char* pp_chop_string(Poco_cb* pcb, char* line, char* word_buf, bool inclu
 	bool already_tried_expansion = false;
 
 	for (;;) {
-		if (NULL == (line = po_skip_space(line)))
+		if (NULL == (line = po_skip_space(line))) {
 			goto eoline;
+		}
 
 		c = *line;
-		if (c == '"')
+		if (c == '"') {
 			break;
-		else if (c == '<') {
-			if (!include_name)
+		} else if (c == '<') {
+			if (!include_name) {
 				goto unexpected;
+			}
 			c = '>';
 			break;
 		}
 
-		if (already_tried_expansion)
+		if (already_tried_expansion) {
 			goto unexpected;
+		}
 
 		prep_line(pcb, line, word_buf, LINE_MAX);
 		already_tried_expansion = true;
 	}
 
-	if (*(line = po_chop_to(++line, word_buf, c)) == 0)
+	if (*(line = po_chop_to(++line, word_buf, c)) == 0) {
 		goto eoline;
+	}
 
 	return (++line);
 
@@ -1270,20 +1341,21 @@ eoline:
 static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 {
 	SHORT ttype;
-	int state			= 0;	/* state switch */
+	int state = 0;           /* state switch */
 	bool keep_quotes = true; /* keep quotes on strings */
-	bool end_ok		= true;
-	char* fatal;			/* fatal error text */
+	bool end_ok = true;
+	char* fatal;            /* fatal error text */
 	int want_pp_string = 0; /* 0 == non string token,
 							 * 1 == allow "<>" include delimiter as well as "",
 							 * 2 == quoted string only */
-	char tbuf[PATH_SIZE];	/* temp buffer */
+	char tbuf[PATH_SIZE];   /* temp buffer */
 
 	for (;;) {
 		if (want_pp_string) {
 			if ((line = pp_chop_string(pcb, line, word_buf, want_pp_string == 1)) == NULL) {
-				if (!end_ok)
+				if (!end_ok) {
 					goto unexpected;
+				}
 			}
 		} else {
 			if ((line = tokenize_word(line, word_buf, NULL, NULL, &ttype, keep_quotes)) == NULL) {
@@ -1301,8 +1373,9 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 					 or line ignored ***/
 
 			case 0: {
-				if (0 != strcmp("poco", word_buf))
+				if (0 != strcmp("poco", word_buf)) {
 					return;
+				}
 				state = 1;
 				break;
 			}
@@ -1311,10 +1384,14 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 			case 1: {
 				if (0 == strcmp("library", word_buf)) {
 					want_pp_string = 1; /* want an include name */
-					end_ok		   = false;
-					state		   = 3;
+					end_ok = false;
+					state = 3;
+				} else if (0 == strcmp("use", word_buf)) {
+					want_pp_string = 1;
+					end_ok = false;
+					state = 6;
 				} else if (0 == strcmp("eof", word_buf)) {
-					prev_file_stack_entry(pcb); // pretend we hit EOF
+					prev_file_stack_entry(pcb);  // pretend we hit EOF
 					goto pragma_done;
 				} else if (0 == strcmp("macrosub", word_buf)) {
 					pcb->t.file_stack->flags |= FSF_MACSUB;
@@ -1326,7 +1403,7 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 					state = 2;
 				} else if (0 == strcmp("echo", word_buf)) {
 					keep_quotes = false;
-					state		= 5;
+					state = 5;
 				} else {
 					fatal = pragma_unknown;
 					goto fatal_error;
@@ -1344,7 +1421,7 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 					goto pragma_done;
 				}
 				pp_say_fatal(pcb, stksz_value_bad);
-    PO_CHECK_ABORT_VOID(pcb);
+				PO_CHECK_ABORT_VOID(pcb);
 			}
 				/***** library cases *****/
 			case 3: /* want a library name */
@@ -1360,8 +1437,8 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 					/* Defer actual resolution to the loader; pass raw name */
 					path = word_buf;
 				}
-				want_pp_string = 2;	   /* quotes only */
-				end_ok		   = true; /* we can finish here */
+				want_pp_string = 2; /* quotes only */
+				end_ok = true;      /* we can finish here */
 				strcpy(tbuf, path);
 				state = 4;
 				break;
@@ -1375,12 +1452,13 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 					id_string = word_buf;
 				} else if (word_buf[0] && word_buf[0] != ';') {
 					goto unexpected;
-				} else
+				} else {
 					id_string = NULL;
+				}
 
 				if (NULL == (lib = po_open_library(pcb, tbuf, id_string))) {
 					word_buf = tbuf;
-					fatal	 = lib_open_failed;
+					fatal = lib_open_failed;
 					goto fatal_error;
 				}
 				new_file_stack_entry(pcb, lib, lib->name, FSF_ISLIB);
@@ -1389,6 +1467,14 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 				/**** echo cases ****/
 			case 5: {
 				fprintf(pcb->t.err_file, "%s\n", word_buf);
+				goto pragma_done;
+			}
+				/**** source-use case (resolved by the multi-unit file front end) ****/
+			case 6: {
+				if (word_buf[0] == '\0') {
+					pp_say_fatal(pcb, use_name_missing);
+					PO_CHECK_ABORT_VOID(pcb);
+				}
 				goto pragma_done;
 			}
 				/**** default should never happen ****/
@@ -1400,14 +1486,129 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 pragma_done:
 	return;
 unexpected:
-	if (word_buf[0])
+	if (word_buf[0]) {
 		fatal = unexpected_eol;
-	else
+	} else {
 		fatal = unexpected_tok;
+	}
 fatal_error:
 	pp_say_fatal(pcb, fatal, word_buf);
- PO_CHECK_ABORT_VOID(pcb);
+	PO_CHECK_ABORT_VOID(pcb);
 	return;
+}
+
+static const char* pp_scan_word(const char* cursor, const char* end, const char* word)
+{
+	size_t length = strlen(word);
+
+	while (cursor < end && isspace((unsigned char)*cursor)) {
+		++cursor;
+	}
+	if ((size_t)(end - cursor) < length || memcmp(cursor, word, length) != 0 ||
+		(cursor + length < end && iscsym((unsigned char)cursor[length]))) {
+		return NULL;
+	}
+	return cursor + length;
+}
+
+/*
+ * Discover literal source dependencies before parsing so used units can be
+ * compiled first.  The ordinary pragma parser above remains authoritative for
+ * syntax during compilation; this lightweight pass only extracts dependency
+ * names and deliberately ignores text that does not begin a directive line.
+ */
+bool po_pp_scan_uses(const char* source, size_t source_length, Poco_use_visitor visitor,
+					 void* context, char* error, size_t error_capacity)
+{
+	const char* cursor = source;
+	const char* end = source + source_length;
+	size_t line_number = 1;
+	bool in_comment = false;
+
+	while (cursor < end) {
+		const char* line = cursor;
+		const char* line_end = memchr(cursor, '\n', (size_t)(end - cursor));
+		const char* scan;
+		char path[PATH_SIZE];
+		size_t path_length;
+		char delimiter;
+
+		if (line_end == NULL) {
+			line_end = end;
+		}
+		cursor = line_end < end ? line_end + 1 : end;
+		scan = line;
+		while (scan < line_end) {
+			while (scan < line_end && isspace((unsigned char)*scan)) {
+				++scan;
+			}
+			if (in_comment) {
+				const char* close = NULL;
+				const char* candidate;
+				for (candidate = scan; candidate + 1 < line_end; ++candidate) {
+					if (candidate[0] == '*' && candidate[1] == '/') {
+						close = candidate;
+						break;
+					}
+				}
+				if (close == NULL) {
+					break;
+				}
+				in_comment = false;
+				scan = close + 2;
+				continue;
+			}
+			if (scan + 1 < line_end && scan[0] == '/' && scan[1] == '*') {
+				in_comment = true;
+				scan += 2;
+				continue;
+			}
+			break;
+		}
+		if (scan >= line_end || *scan != '#') {
+			++line_number;
+			continue;
+		}
+		++scan;
+		if ((scan = pp_scan_word(scan, line_end, "pragma")) == NULL ||
+			(scan = pp_scan_word(scan, line_end, "poco")) == NULL ||
+			(scan = pp_scan_word(scan, line_end, "use")) == NULL) {
+			++line_number;
+			continue;
+		}
+		while (scan < line_end && isspace((unsigned char)*scan)) {
+			++scan;
+		}
+		if (scan >= line_end || (*scan != '"' && *scan != '<')) {
+			if (error != NULL && error_capacity != 0) {
+				snprintf(error, error_capacity, "%s at line %zu", use_name_missing, line_number);
+			}
+			return false;
+		}
+		delimiter = *scan++ == '"' ? '"' : '>';
+		path_length = 0;
+		while (scan < line_end && *scan != delimiter) {
+			if (path_length + 1 >= sizeof(path)) {
+				if (error != NULL && error_capacity != 0) {
+					snprintf(error, error_capacity, "use path is too long at line %zu", line_number);
+				}
+				return false;
+			}
+			path[path_length++] = *scan++;
+		}
+		if (scan >= line_end || path_length == 0) {
+			if (error != NULL && error_capacity != 0) {
+				snprintf(error, error_capacity, "%s at line %zu", use_name_missing, line_number);
+			}
+			return false;
+		}
+		path[path_length] = '\0';
+		if (visitor != NULL && !visitor(context, path, line_number)) {
+			return false;
+		}
+		++line_number;
+	}
+	return true;
 }
 
 /*****************************************************************************
@@ -1416,14 +1617,14 @@ fatal_error:
 static void pp_include(Poco_cb* pcb, char* line, char* word_buf)
 {
 	FILE* fp;
-	char* path;
+	char path[PATH_SIZE];
 
 	if (NULL == pp_chop_string(pcb, line, word_buf, true)) {
 		pp_say_fatal(pcb, incl_name_missing);
 		PO_CHECK_ABORT_VOID(pcb);
 	}
 
-	if (NULL == (path = pp_findfile(pcb, pcb->t.include_dirs, word_buf))) {
+	if (NULL == pp_findfile(pcb, pcb->t.include_dirs, word_buf, path)) {
 		pp_say_fatal(pcb, incl_open, word_buf);
 		PO_CHECK_ABORT_VOID(pcb);
 	}
@@ -1448,7 +1649,6 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 	/* sharp followed by all white space is compiler comment*/
 
 	if (line != NULL) {
-
 		line = tokenize_word(line, word_buf, NULL, NULL, &ttype, true);
 
 		/* define */
@@ -1473,13 +1673,14 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 
 		else if (po_eqstrcmp(word_buf, "error") == 0 && pcb->t.out_of_it == 0) {
 			line = po_skip_space(line);
-			if (line != NULL)
 			if (line != NULL) {
-				pp_say_fatal(pcb, "#error: %s", line);
-				PO_CHECK_ABORT_VOID(pcb);
-			} else {
-				pp_say_fatal(pcb, forced_fatal);
-				PO_CHECK_ABORT_VOID(pcb);
+				if (line != NULL) {
+					pp_say_fatal(pcb, "#error: %s", line);
+					PO_CHECK_ABORT_VOID(pcb);
+				} else {
+					pp_say_fatal(pcb, forced_fatal);
+					PO_CHECK_ABORT_VOID(pcb);
+				}
 			}
 		}
 		/* line */
@@ -1511,13 +1712,14 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 		else if (po_eqstrcmp(word_buf, "if") == 0) {
 			register Conditional* con;
 
-			con				   = po_memalloc(pcb, sizeof(Conditional));
-			con->else_state	   = false;
-			con->next		   = pcb->t.ifdef_stack;
+			con = po_memalloc(pcb, sizeof(Conditional));
+			con->else_state = false;
+			con->next = pcb->t.ifdef_stack;
 			pcb->t.ifdef_stack = con;
 
-			if (0 == (con->state = pp_if(pcb, line, word_buf)))
+			if (0 == (con->state = pp_if(pcb, line, word_buf))) {
 				pcb->t.out_of_it++;
+			}
 		}
 
 		/* elif */
@@ -1525,22 +1727,25 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 		else if (po_eqstrcmp(word_buf, "elif") == 0) {
 			register Conditional* con;
 
-			if (NULL == (con = pcb->t.ifdef_stack))
+			if (NULL == (con = pcb->t.ifdef_stack)) {
 				pp_say_fatal(pcb, else_unmatched);
-    PO_CHECK_ABORT_VOID(pcb);
+			}
+			PO_CHECK_ABORT_VOID(pcb);
 
 			if (con->else_state == PP_NO_ELSE_SEEN) {
 				if (con->state) {
-					con->state		= false;
+					con->state = false;
 					con->else_state = PP_DONE_ELIF;
 					++pcb->t.out_of_it;
 				} else {
-					if (0 != (con->state = pp_if(pcb, line, word_buf)))
+					if (0 != (con->state = pp_if(pcb, line, word_buf))) {
 						--pcb->t.out_of_it;
+					}
 				}
-			} else if (con->else_state == PP_DONE_ELSE)
+			} else if (con->else_state == PP_DONE_ELSE) {
 				pp_say_fatal(pcb, elif_after_else);
-    PO_CHECK_ABORT_VOID(pcb);
+			}
+			PO_CHECK_ABORT_VOID(pcb);
 		}
 
 		/* else */
@@ -1548,16 +1753,18 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 		else if (po_eqstrcmp(word_buf, "else") == 0) {
 			register Conditional* con;
 
-			if (NULL == (con = pcb->t.ifdef_stack))
+			if (NULL == (con = pcb->t.ifdef_stack)) {
 				pp_say_fatal(pcb, else_unmatched);
-    PO_CHECK_ABORT_VOID(pcb);
+			}
+			PO_CHECK_ABORT_VOID(pcb);
 
 			if (con->else_state ==
 				PP_NO_ELSE_SEEN) { /* C *almost* has the grace of APL.  Consider the next line...*/
 				pcb->t.out_of_it += (con->state = !con->state) ? -1 : 1;
-			} else if (con->else_state == PP_DONE_ELSE)
+			} else if (con->else_state == PP_DONE_ELSE) {
 				pp_say_fatal(pcb, else_multiple);
-    PO_CHECK_ABORT_VOID(pcb);
+			}
+			PO_CHECK_ABORT_VOID(pcb);
 
 			con->else_state = PP_DONE_ELSE;
 		}
@@ -1567,12 +1774,14 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 		else if (po_eqstrcmp(word_buf, "endif") == 0) {
 			register Conditional* con;
 
-			if ((con = pcb->t.ifdef_stack) == NULL)
+			if ((con = pcb->t.ifdef_stack) == NULL) {
 				pp_say_fatal(pcb, endif_unmatched);
-    PO_CHECK_ABORT_VOID(pcb);
+			}
+			PO_CHECK_ABORT_VOID(pcb);
 
-			if (!con->state)
+			if (!con->state) {
 				--pcb->t.out_of_it;
+			}
 			pcb->t.ifdef_stack = con->next;
 			po_freemem(con);
 		}
@@ -1581,7 +1790,7 @@ static void feed_preproc(Poco_cb* pcb, char* line, char* word_buf)
 
 		else if (pcb->t.out_of_it == 0) {
 			pp_say_fatal(pcb, ppcmd_unknown, word_buf);
-   PO_CHECK_ABORT_VOID(pcb);
+			PO_CHECK_ABORT_VOID(pcb);
 		}
 	}
 }
@@ -1596,8 +1805,9 @@ void po_free_pp(Poco_cb* pcb)
 	while ((fp = pcb->t.file_stack) != NULL) /*only meaningful during error abort*/
 	{
 		free_string(fp->name);
-		if (fp->flags & FSF_ISFILE)
+		if (fp->flags & FSF_ISFILE) {
 			fclose(fp->source.file);
+		}
 		pcb->t.file_stack = fp->pred;
 		po_freemem(fp);
 	}
@@ -1610,11 +1820,10 @@ void po_free_pp(Poco_cb* pcb)
 /*****************************************************************************
  * fire up the preprocessor, do pre-defined symbols & #include for main file.
  ****************************************************************************/
-bool po_init_pp(Poco_cb* pcb, char* filename)
+static void po_init_pp_defines(Poco_cb* pcb)
 {
 	char wrkstr[256];
 	register Names* cldefs;
-
 
 
 	pcb->t.out_of_it = 0;
@@ -1655,6 +1864,20 @@ bool po_init_pp(Poco_cb* pcb, char* filename)
 	feed_preproc(pcb, "#define Array_els(a) (sizeof((a))/sizeof((a)[0]))", pcb->t.line_b2);
 	feed_preproc(pcb, "#define TRUE  1", pcb->t.line_b2);
 	feed_preproc(pcb, "#define FALSE 0", pcb->t.line_b2);
+}
+
+static void po_init_pp_libraries(Poco_cb* pcb)
+{
+	if (pcb->builtin_lib != NULL) {
+		feed_preproc(pcb, "#pragma poco library <poco$builtin>", pcb->t.line_b2);
+	}
+}
+
+bool po_init_pp(Poco_cb* pcb, char* filename)
+{
+	char wrkstr[256];
+
+	po_init_pp_defines(pcb);
 
 	/*
 	 * do #include of root file...
@@ -1663,9 +1886,16 @@ bool po_init_pp(Poco_cb* pcb, char* filename)
 
 	sprintf(wrkstr, "#include <%s>", filename);
 	feed_preproc(pcb, wrkstr, pcb->t.line_b2);
+	po_init_pp_libraries(pcb);
 
-	if (pcb->builtin_lib != NULL)
-		feed_preproc(pcb, "#pragma poco library <poco$builtin>", pcb->t.line_b2);
+	return true;
+}
+
+bool po_init_pp_buffer(Poco_cb* pcb, char* source_name, const char* source, size_t source_length)
+{
+	po_init_pp_defines(pcb);
+	new_buffer_stack_entry(pcb, source, source_length, source_name);
+	po_init_pp_libraries(pcb);
 
 	return true;
 }
@@ -1706,13 +1936,15 @@ char* po_pp_next_line(Poco_cb* pcb)
 
 	do {
 		PO_CHECK_ABORT(pcb, NULL);
-		if ((fs = pcb->t.file_stack) == NULL) /* all out of input */
+		if ((fs = pcb->t.file_stack) == NULL) { /* all out of input */
 			return NULL;
+		}
 
-		if (fs->flags & FSF_ISLIB)
+		if (fs->flags & FSF_ISLIB) {
 			instring = po_get_libproto_line(pcb);
-		else
+		} else {
 			instring = po_get_csource_line(pcb);
+		}
 
 		if (instring == NULL) {
 			prev_file_stack_entry(pcb);
@@ -1723,9 +1955,9 @@ char* po_pp_next_line(Poco_cb* pcb)
 					feed_preproc(pcb, instring, pcb->t.line_b2);
 					instring = NULL;
 				} else {
-					if (pcb->t.out_of_it)
+					if (pcb->t.out_of_it) {
 						instring = NULL;
-					else {
+					} else {
 						if (fs->flags & FSF_MACSUB) {
 							instring = prep_line(pcb, pcb->t.line_b1, pcb->t.line_b2, LINE_MAX);
 							instring = po_skip_space(instring);

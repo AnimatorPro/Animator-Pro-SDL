@@ -6,13 +6,13 @@
  * include the usual header files...
  *--------------------------------------------------------------------------*/
 
-#include "errcodes.h"   /* host error codes (must precede pocorex.h)     */
-#include "pocorex.h"    /* required header file, also includes pocolib.h */
+#include "errcodes.h" /* host error codes (must precede pocorex.h)     */
+#include "pocorex.h"  /* required header file, also includes pocolib.h */
 
-//#include "syslib.h"   /* include this if you use AA_SYSLIB   */
-//#include "gfx.h"      /* include this if you use AA_GFXLIB   */
-//#include "math.h"     /* include this if you use AA_MATHLIB  */
-//#include "stdio.h"    /* include this if you use AA_STDIOLIB */
+// #include "syslib.h"   /* include this if you use AA_SYSLIB   */
+// #include "gfx.h"      /* include this if you use AA_GFXLIB   */
+// #include "math.h"     /* include this if you use AA_MATHLIB  */
+// #include "stdio.h"    /* include this if you use AA_STDIOLIB */
 
 /*----------------------------------------------------------------------------
  * set up the host libraries we need...
@@ -21,8 +21,8 @@
  *	don't need, it only slows down the loading of your POE module at runtime.
  *--------------------------------------------------------------------------*/
 
-#define HLIB_TYPE_1 AA_POCOLIB	/* this one is always required in a POE */
-								/* add other defines here, as needed	*/
+#define HLIB_TYPE_1 AA_POCOLIB /* this one is always required in a POE */
+							   /* add other defines here, as needed	*/
 #include <hliblist.h>
 
 /*----------------------------------------------------------------------------
@@ -39,7 +39,7 @@ static void skeleton_func(void)
  *--------------------------------------------------------------------------*/
 
 static Lib_proto poe_calls[] = {
-	{ skeleton_func, "void SkeletonFunc(void);" },
+	{skeleton_func, "void SkeletonFunc(void);"},
 };
 
 Setup_Pocorex(NOFUNC, NOFUNC, "Skeleton POE", poe_calls);

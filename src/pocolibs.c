@@ -19,7 +19,7 @@
 #include "ani_poco_adapter.h"
 
 extern bool po_check_abort(void* data);
-extern Errcode clone_ppoints(Poly* s, Poly* d); // from polytool.c
+extern Errcode clone_ppoints(Poly* s, Poly* d);  // from polytool.c
 
 /* Forward declarations for Animator's retained native-POE table. */
 extern Hostlib _a_a_pocolib; /* from animhost/hostlib_table.c */
@@ -31,15 +31,13 @@ extern Porexlib aa_pocolib;  /* defined later in this file */
  * when ani_poco_register_libraries() converts these entries to public
  * PocoLibrary registrations on a VM.
  */
-typedef struct AniPocoLegacyBinding
-{
+typedef struct AniPocoLegacyBinding {
 	PocoNativeFunction function;
-	char *prototype;
+	char* prototype;
 } AniPocoLegacyBinding;
 
-typedef struct AniPocoLibrarySource
-{
-	Poco_lib *library;
+typedef struct AniPocoLibrarySource {
+	Poco_lib* library;
 	size_t binding_stride;
 } AniPocoLibrarySource;
 
@@ -74,24 +72,26 @@ static const AniPocoLibrarySource animator_libraries[] = {
 	{&po_picdrive_lib, sizeof(Lib_proto)},
 };
 
-static void get_animator_binding(const AniPocoLibrarySource *source,
-	int index, PocoBinding *binding)
+static void get_animator_binding(const AniPocoLibrarySource* source, int index,
+								 PocoBinding* binding)
 {
-	char *entry;
+	char* entry;
 
-	entry = (char *)source->library->lib + (size_t)index * source->binding_stride;
+	entry = (char*)source->library->lib + (size_t)index * source->binding_stride;
 	if (source->binding_stride == sizeof(Lib_proto)) {
-		Lib_proto *legacy_binding = (Lib_proto *)entry;
+		Lib_proto* legacy_binding = (Lib_proto*)entry;
 
 		binding->prototype = legacy_binding->proto;
 		binding->function = (PocoNativeFunction)legacy_binding->func;
 		binding->contract = legacy_binding->contract;
+		binding->flags = legacy_binding->flags;
 	} else {
-		AniPocoLegacyBinding *legacy_binding = (AniPocoLegacyBinding *)entry;
+		AniPocoLegacyBinding* legacy_binding = (AniPocoLegacyBinding*)entry;
 
 		binding->prototype = legacy_binding->prototype;
 		binding->function = legacy_binding->function;
 		binding->contract = NULL;
+		binding->flags = 0;
 	}
 }
 
@@ -110,43 +110,47 @@ static void ani_poco_typedef_placeholder(void)
  * registered parameter a shallower pointer than the char*[] arguments callers
  * pass, which the compiler rejects as a pointer type mismatch.
  */
-static char *copy_animator_prototype(const char *prototype)
+static char* copy_animator_prototype(const char* prototype)
 {
-	char *copy;
+	char* copy;
 
-	if (prototype == NULL)
+	if (prototype == NULL) {
 		return NULL;
+	}
 	copy = malloc(strlen(prototype) + 1);
-	if (copy == NULL)
+	if (copy == NULL) {
 		return NULL;
+	}
 	strcpy(copy, prototype);
 	return copy;
 }
 
-static void free_animator_binding_prototypes(PocoBinding *bindings,
-	int binding_count)
+static void free_animator_binding_prototypes(PocoBinding* bindings, int binding_count)
 {
 	int index;
 
-	for (index = 0; index < binding_count; ++index)
-		free((void *)bindings[index].prototype);
+	for (index = 0; index < binding_count; ++index) {
+		free((void*)bindings[index].prototype);
+	}
 }
 
-static PocoStatus initialize_animator_library(PocoLibrary *library)
+static PocoStatus initialize_animator_library(PocoLibrary* library)
 {
-	Poco_lib *legacy_library = library != NULL ? library->user_data : NULL;
+	Poco_lib* legacy_library = library != NULL ? library->user_data : NULL;
 
-	if (legacy_library == NULL)
+	if (legacy_library == NULL) {
 		return POCO_STATUS_NULL_REFERENCE;
+	}
 	return (PocoStatus)po_init_libs(legacy_library);
 }
 
-static void cleanup_animator_library(PocoLibrary *library)
+static void cleanup_animator_library(PocoLibrary* library)
 {
-	Poco_lib *legacy_library = library != NULL ? library->user_data : NULL;
+	Poco_lib* legacy_library = library != NULL ? library->user_data : NULL;
 
-	if (legacy_library != NULL)
+	if (legacy_library != NULL) {
 		po_cleanup_libs(legacy_library);
+	}
 }
 
 static void ani_poco_install_legacy_poe_table(void)
@@ -154,48 +158,55 @@ static void ani_poco_install_legacy_poe_table(void)
 	_a_a_pocolib.next = &aa_pocolib;
 }
 
-static PocoStatus register_animator_library(PocoVm *vm,
-	const AniPocoLibrarySource *source)
+static PocoStatus register_animator_library(PocoVm* vm, const AniPocoLibrarySource* source)
 {
-	PocoBinding *bindings;
+	PocoBinding* bindings;
 	PocoLibrary library;
 	PocoStatus status;
-	Poco_lib *legacy_library;
+	Poco_lib* legacy_library;
 	int index;
 	int binding_count = 0;
 	int binding_index = 0;
 
-	if (source == NULL)
+	if (source == NULL) {
 		return POCO_STATUS_NULL_REFERENCE;
+	}
 	legacy_library = source->library;
 	if (vm == NULL || legacy_library == NULL || legacy_library->name == NULL ||
-		legacy_library->lib == NULL || legacy_library->count <= 0)
+		legacy_library->lib == NULL || legacy_library->count <= 0) {
 		return POCO_STATUS_PARAMETER_RANGE;
+	}
 	for (index = 0; index < legacy_library->count; ++index) {
 		PocoBinding binding;
 
 		get_animator_binding(source, index, &binding);
 		if (binding.function == NULL && binding.prototype != NULL &&
-			strncmp(binding.prototype, "typedef", strlen("typedef")) == 0)
+			strncmp(binding.prototype, "typedef", strlen("typedef")) == 0) {
 			binding.function = ani_poco_typedef_placeholder;
-		if (binding.function != NULL)
+		}
+		if (binding.function != NULL) {
 			++binding_count;
+		}
 	}
-	if (binding_count == 0)
+	if (binding_count == 0) {
 		return POCO_STATUS_PARAMETER_RANGE;
+	}
 	bindings = calloc((size_t)binding_count, sizeof(*bindings));
-	if (bindings == NULL)
+	if (bindings == NULL) {
 		return POCO_STATUS_OUT_OF_MEMORY;
+	}
 	for (index = 0; index < legacy_library->count; ++index) {
 		PocoBinding binding;
 
 		/* Typedef lines use a placeholder because public descriptors require a function. */
 		get_animator_binding(source, index, &binding);
 		if (binding.function == NULL && binding.prototype != NULL &&
-			strncmp(binding.prototype, "typedef", strlen("typedef")) == 0)
+			strncmp(binding.prototype, "typedef", strlen("typedef")) == 0) {
 			binding.function = ani_poco_typedef_placeholder;
-		if (binding.function == NULL)
+		}
+		if (binding.function == NULL) {
 			continue;
+		}
 		binding.prototype = copy_animator_prototype(binding.prototype);
 		if (binding.prototype == NULL) {
 			free_animator_binding_prototypes(bindings, binding_index);
@@ -217,73 +228,79 @@ static PocoStatus register_animator_library(PocoVm *vm,
 	return status;
 }
 
-PocoStatus ani_poco_register_libraries(PocoVm *vm)
+PocoStatus ani_poco_register_libraries(PocoVm* vm)
 {
 	size_t index;
 	PocoStatus status;
 
-	if (vm == NULL)
+	if (vm == NULL) {
 		return POCO_STATUS_NULL_REFERENCE;
+	}
 	ani_poco_install_legacy_poe_table();
 	for (index = 0; index < Array_els(animator_libraries); ++index) {
 		status = register_animator_library(vm, &animator_libraries[index]);
-		if (status != POCO_STATUS_OK)
+		if (status != POCO_STATUS_OK) {
 			return status;
+		}
 	}
 	return POCO_STATUS_OK;
 }
 
-PocoStatus ani_poco_write_library_list(const char *filename)
+PocoStatus ani_poco_write_library_list(const char* filename)
 {
-	FILE *file;
+	FILE* file;
 	size_t library_index;
 	int binding_index;
 
-	if (filename == NULL)
+	if (filename == NULL) {
 		return POCO_STATUS_NULL_REFERENCE;
+	}
 	file = fopen(filename, "w");
-	if (file == NULL)
+	if (file == NULL) {
 		return POCO_STATUS_CREATE_FAILED;
-	for (library_index = 0; library_index < Array_els(animator_libraries);
-		++library_index) {
-		const AniPocoLibrarySource *source = &animator_libraries[library_index];
-		Poco_lib *library = source->library;
+	}
+	for (library_index = 0; library_index < Array_els(animator_libraries); ++library_index) {
+		const AniPocoLibrarySource* source = &animator_libraries[library_index];
+		Poco_lib* library = source->library;
 
 		for (binding_index = 0; binding_index < library->count; ++binding_index) {
 			PocoBinding binding;
 
 			get_animator_binding(source, binding_index, &binding);
-			if (binding.prototype != NULL)
+			if (binding.prototype != NULL) {
 				fprintf(file, "%s\n", binding.prototype);
+			}
 		}
 	}
-	if (fclose(file) != 0)
+	if (fclose(file) != 0) {
 		return POCO_STATUS_WRITE_FAILED;
+	}
 	return POCO_STATUS_OK;
 }
 
-PocoStatus ani_poco_write_library_inventory(const char *filename)
+PocoStatus ani_poco_write_library_inventory(const char* filename)
 {
-	FILE *file;
+	FILE* file;
 	size_t library_index;
 
-	if (filename == NULL)
+	if (filename == NULL) {
 		return POCO_STATUS_NULL_REFERENCE;
+	}
 	file = fopen(filename, "w");
-	if (file == NULL)
+	if (file == NULL) {
 		return POCO_STATUS_CREATE_FAILED;
-	for (library_index = 0; library_index < Array_els(animator_libraries);
-		++library_index) {
-		Poco_lib *library = animator_libraries[library_index].library;
+	}
+	for (library_index = 0; library_index < Array_els(animator_libraries); ++library_index) {
+		Poco_lib* library = animator_libraries[library_index].library;
 
-		if (library == NULL || library->name == NULL ||
-			fprintf(file, "%s\n", library->name) < 0) {
+		if (library == NULL || library->name == NULL || fprintf(file, "%s\n", library->name) < 0) {
 			fclose(file);
 			return POCO_STATUS_WRITE_FAILED;
 		}
 	}
-	if (fclose(file) != 0)
+	if (fclose(file) != 0) {
 		return POCO_STATUS_WRITE_FAILED;
+	}
 	return POCO_STATUS_OK;
 }
 
@@ -427,18 +444,18 @@ static int get_menu_colors(Pixel** indicies, Rgb3** lastrgbs, Rgb3** idealrgbs)
 /*****************************************************************************
  *
  ****************************************************************************/
-Popot po_ptr2ppt(void *ptr, int bytes) {
-    Popot p = { ptr, ptr, bytes > 0 ? (char*)ptr + bytes - 1 : ptr };
-    return p;
+Popot po_ptr2ppt(void* ptr, int bytes)
+{
+	Popot p = {ptr, ptr, bytes > 0 ? (char*)ptr + bytes - 1 : ptr};
+	return p;
 }
 
-
-void *po_ppt2ptr(Popot ppt) {
-    return ppt.pt;
+void* po_ppt2ptr(Popot ppt)
+{
+	return ppt.pt;
 }
 
-
- /*****************************************************************************
+/*****************************************************************************
  *
  ****************************************************************************/
 Porexlib aa_pocolib = {

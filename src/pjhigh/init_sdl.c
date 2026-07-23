@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 
 #ifndef _MSC_VER
-	#include <unistd.h>
+#include <unistd.h>
 #endif
 
 #include "aaconfig.h"
@@ -34,7 +34,7 @@ void new_config(void)
 }
 
 /*--------------------------------------------------------------*/
-static int dir_exists(const char *const path)
+static int dir_exists(const char* const path)
 {
 	struct stat info;
 
@@ -54,8 +54,8 @@ static int dir_exists(const char *const path)
 
 /*--------------------------------------------------------------*/
 
-Errcode init_pj_startup(Argparse_list *more_args, Do_aparse do_others, int argc, char **argv,
-						char *help_key, char *menufile_name)
+Errcode init_pj_startup(Argparse_list* more_args, Do_aparse do_others, int argc, char** argv,
+						char* help_key, char* menufile_name)
 {
 	bool force_config;
 	Errcode err;
@@ -112,13 +112,17 @@ Errcode init_pj_startup(Argparse_list *more_args, Do_aparse do_others, int argc,
 	return Success;
 }
 
-Errcode open_pj_startup_screen(Errcode (*init_with_screen)(void *data), void *data)
+Errcode open_pj_startup_screen(Errcode (*init_with_screen)(void* data), void* data)
 {
-	Screen_mode *open_mode;
-	Screen_mode *alt_mode;
+	Screen_mode* open_mode;
+	Screen_mode* alt_mode;
 
-	Uint32 flags = (SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK |
-					SDL_INIT_GAMEPAD | SDL_INIT_EVENTS);
+	Uint32 flags =
+		(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS);
+
+	/* Register as a regular foreground GUI app so the window can take focus
+	 * over the launching terminal on macOS. Must be set before SDL_Init. */
+	SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "0");
 
 	SDL_Init(flags);
 

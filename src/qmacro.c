@@ -20,8 +20,9 @@ void qmacro(void)
 			/* let them close while using */
 			/* otherwise only close while making */
 
-			if (icb.macro_mode != USE_MACRO)
+			if (icb.macro_mode != USE_MACRO) {
 				mdisables[1] = QCF_DISABLED;
+			}
 			if (!pj_exists(macro_name)) /* if no macro defined can't use */
 			{
 				mdisables[2] = mdisables[3] = QCF_DISABLED;
@@ -35,8 +36,9 @@ void qmacro(void)
 				break;
 			case 1:
 				qclose_macro();
-				if ((icb.macro_mode | MACRO_OK) == USE_MACRO)
+				if ((icb.macro_mode | MACRO_OK) == USE_MACRO) {
 					break;
+				}
 				continue; /* leave menu up if closed and not executing a
 						   * macro */
 			case 2:

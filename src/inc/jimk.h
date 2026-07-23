@@ -91,11 +91,11 @@ enum muids {
 /* pic file IO settings */
 enum {
 	PIC_IO_PAL_OVERWRITE = 0,
-	PIC_IO_PAL_FIT       = 1,
+	PIC_IO_PAL_FIT = 1,
 };
 
 enum {
-	PIC_IO_NO_ALPHA    = 0,
+	PIC_IO_NO_ALPHA = 0,
 	PIC_IO_WRITE_ALPHA = 1,
 };
 
@@ -104,27 +104,28 @@ extern Button ink_group_sel;
 
 /* error message and dialog handling and text box functions */
 
-Errcode errline(Errcode err, char *fmt, ...);
-Errcode softerr(Errcode err, char *fmt, ...);
+Errcode errline(Errcode err, char* fmt, ...);
+Errcode softerr(Errcode err, char* fmt, ...);
 
-extern void cant_find(char *name);
-extern Errcode cant_load(Errcode err, char *name);
-extern Errcode cant_query_driver(Errcode err, char *name);
-extern Errcode cant_use_module(Errcode err, char *modname);
+extern void cant_find(char* name);
+extern Errcode cant_load(Errcode err, char* name);
+extern Errcode cant_query_driver(Errcode err, char* name);
+extern Errcode cant_use_module(Errcode err, char* modname);
 
-Errcode qchoicef(USHORT *qc_flags, char *fmt, ...);
-int qchoice(USHORT *qc_flags, char *header, char **choices, int ccount);
-int qchoice_feel(USHORT *qc_flags, char *header, char **choices, int ccount, bool hide_on_hit, VFUNC* feelers);
-int soft_qchoice(USHORT *qc_flags, char *key, ...);
+Errcode qchoicef(USHORT* qc_flags, char* fmt, ...);
+int qchoice(USHORT* qc_flags, char* header, char** choices, int ccount);
+int qchoice_feel(USHORT* qc_flags, char* header, char** choices, int ccount, bool hide_on_hit,
+				 VFUNC* feelers);
+int soft_qchoice(USHORT* qc_flags, char* key, ...);
 
 /* some vpaint specific dotout functions */
 
-extern void ccolor_dot(SHORT x, SHORT y, void *data);
+extern void ccolor_dot(SHORT x, SHORT y, void* data);
 
 /* standard menu header parts structures and funcs */
 
 typedef struct sg1_data {
-	Minitime_data *minidat;
+	Minitime_data* minidat;
 } Sgroup1_data;
 
 extern Button std_head1_sel;
@@ -172,7 +173,7 @@ extern char loaded_screen; /* another flag kludge */
 
 /* An optics move (well except for the path) */
 struct ado_setting {
-	struct ado_setting *next;
+	struct ado_setting* next;
 	Short_xyz spin_center;
 	Short_xyz spin_axis;
 	Short_xyz spin_theta;
@@ -182,8 +183,8 @@ struct ado_setting {
 	Short_xyz move;
 };
 
-Errcode default_temp_path(char *buf);
-char *get_default_config_name(void);
+Errcode default_temp_path(char* buf);
+char* get_default_config_name(void);
 
 /* names of all our temp files */
 
@@ -211,8 +212,8 @@ extern char tflxname[];
 extern char tsettings_name[];
 extern char tween_name[];
 
-extern char *state_temp_files[];
-extern char *work_temp_files[];
+extern char* state_temp_files[];
+extern char* work_temp_files[];
 
 extern char dirty_file;    /* need to resave file? */
 extern char dirty_frame;   /* need to recompress frame? */
@@ -396,9 +397,9 @@ struct vsettings {
 	SHORT font_unzag;   /* Oversample/antialias outline fonts? */
 
 	/* pic operation options */
-	BYTE  pic_auto_fit_palette;  /* when loading a pic, auto-fit to the current palette */
-	BYTE  pic_write_alpha;       /* If True, color zero is written as full alpha */
-	SHORT pic_save_quality;      /* when saving a pic, save with this quality */
+	BYTE pic_auto_fit_palette; /* when loading a pic, auto-fit to the current palette */
+	BYTE pic_write_alpha;      /* If True, color zero is written as full alpha */
+	SHORT pic_save_quality;    /* when saving a pic, save with this quality */
 
 	/* WARNING! do NOT add any pad to this struct. If additional fields are
 	 * added and the order unchanged the settings loader will fill fields beyond
@@ -412,11 +413,11 @@ typedef struct vsettings Vsettings;
 extern Vsettings vs, default_vs; /* see globals.c */
 
 typedef struct vlcb { /* v local control block not saved !!! */
-	Rcel *alt_cel;    /* alternate cel for swapping with fli-cel */
+	Rcel* alt_cel;    /* alternate cel for swapping with fli-cel */
 
 	/* zoom stuff */
 
-	Wndo *zoomwndo;     /* window attached to zwinmenu if open */
+	Wndo* zoomwndo;     /* window attached to zwinmenu if open */
 	Rectangle zrect;    /* rectangle containing zoomed area in penwndo */
 	SHORT zwinw, zwinh; /* zoom window size */
 
@@ -433,19 +434,19 @@ typedef struct vlcb { /* v local control block not saved !!! */
 	SHORT flidiag_scale; /* scalar for diag relative items */
 	Short_xy scrcent;    /* precalculated center of screen */
 
-	struct pentool *ptool;    /* current pen tool */
-	struct ink *ink;          /* curent ink tool */
+	struct pentool* ptool;    /* current pen tool */
+	struct ink* ink;          /* curent ink tool */
 	SHORT hide_brush;         /* hide the brush in the brush cursor */
 	VFUNC undoit;             /* current undo function */
 	VFUNC redoit;             /* current redo function */
-	struct rast_brush *brush; /* THE drawing brush */
+	struct rast_brush* brush; /* THE drawing brush */
 	Rectangle expand_pos;
 } Vlcb;
 
 /* globals found in globals.c */
 
 extern Vlcb vl;
-extern Rcel *undof;
+extern Rcel* undof;
 
 extern long pj_ddfree(int device);
 

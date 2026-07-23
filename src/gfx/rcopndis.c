@@ -4,17 +4,18 @@
 #include "rcel.h"
 #include "vdevcall.h"
 
-Errcode open_display_rcel(Vdevice *vd, Rcel *cel,
-						  USHORT width, USHORT height, SHORT mode)
+Errcode open_display_rcel(Vdevice* vd, Rcel* cel, USHORT width, USHORT height, SHORT mode)
 {
-Errcode err;
+	Errcode err;
 
-	if((err = pj_vd_open_screen(vd,(Raster *)cel,width,height,mode)) < 0)
+	if ((err = pj_vd_open_screen(vd, (Raster*)cel, width, height, mode)) < 0) {
 		goto error;
-	if((err = pj_cmap_alloc(&cel->cmap,COLORS)) < Success)
+	}
+	if ((err = pj_cmap_alloc(&cel->cmap, COLORS)) < Success) {
 		goto error;
-	return(Success);
+	}
+	return (Success);
 error:
 	pj_close_raster(cel);
-	return(err);
+	return (err);
 }

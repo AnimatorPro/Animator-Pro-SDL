@@ -16,25 +16,25 @@
 #include "pentools.h"
 
 
-void get_uvfont_name(char *buf);
+void get_uvfont_name(char* buf);
 void qfont_text();
-char *pj_get_path_name(char *path);
-Errcode do_titles(bool with_menu);	/* aka do text */
+char* pj_get_path_name(char* path);
+Errcode do_titles(bool with_menu); /* aka do text */
 
-extern Errcode load_the_font(char *path); // from pjfont.c
-extern Errcode load_titles(char *title);  // from textfile.c
-
+extern Errcode load_the_font(char* path);  // from pjfont.c
+extern Errcode load_titles(char* title);   // from textfile.c
 
 /*
  * Make sure width is at least as wide as minimum font width.
  */
 static int check_font_width(int width)
 {
-int widest;
-widest = widest_char(uvfont);
-if (width < widest)
-	width = widest;
-return width;
+	int widest;
+	widest = widest_char(uvfont);
+	if (width < widest) {
+		width = widest;
+	}
+	return width;
 }
 
 static void po_word_wrap(int x, int y, int width, int height, void* text)
@@ -42,24 +42,24 @@ static void po_word_wrap(int x, int y, int width, int height, void* text)
  * void WordWrap(int x, int y, int width, int height, char *text)
  ****************************************************************************/
 {
-Rectangle rect;
+	Rectangle rect;
 
-if (text == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (text == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-width = check_font_width(width);
-rect.x = x;
-rect.y = y;
-rect.width = width;
-rect.height = height;
-set_gradrect(&rect);
-wwtext(vb.pencel, uvfont, text,
-	x, y, width, height, 0, vs.tit_just, vs.ccolor, TM_RENDER, sblack);
-if (vs.cycle_draw)
-	cycle_redraw_ccolor();
-dirties();
+	width = check_font_width(width);
+	rect.x = x;
+	rect.y = y;
+	rect.width = width;
+	rect.height = height;
+	set_gradrect(&rect);
+	wwtext(vb.pencel, uvfont, text, x, y, width, height, 0, vs.tit_just, vs.ccolor, TM_RENDER,
+		   sblack);
+	if (vs.cycle_draw) {
+		cycle_redraw_ccolor();
+	}
+	dirties();
 }
 
 static int po_word_wrap_count_lines(int width, void* text)
@@ -71,8 +71,9 @@ static int po_word_wrap_count_lines(int width, void* text)
 {
 	SHORT maxwid;
 
-	if (text == NULL)
+	if (text == NULL) {
 		return builtin_err = Err_null_ref;
+	}
 	width = check_font_width(width);
 	return wwcount_lines(uvfont, text, width, &maxwid);
 }
@@ -82,16 +83,15 @@ static void po_ink_string(int x, int y, void* string)
  * void Text(int x, int y, char *string)
  ****************************************************************************/
 {
-if (string == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (string == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-gftext(vb.pencel, uvfont, string, x, y, vs.ccolor, TM_RENDER,
-	vs.inks[0]);
-if (vs.cycle_draw)
-	cycle_redraw_ccolor();
-dirties();
+	gftext(vb.pencel, uvfont, string, x, y, vs.ccolor, TM_RENDER, vs.inks[0]);
+	if (vs.cycle_draw) {
+		cycle_redraw_ccolor();
+	}
+	dirties();
 }
 
 static void po_get_font_name(void* name)
@@ -99,12 +99,11 @@ static void po_get_font_name(void* name)
  * void GetFontName(char *name)
  ****************************************************************************/
 {
-if (name == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (name == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-get_uvfont_name(name);
+	get_uvfont_name(name);
 }
 
 static Errcode po_load_font(void* name)
@@ -112,9 +111,10 @@ static Errcode po_load_font(void* name)
  * ErrCode LoadFont(char *name)
  ****************************************************************************/
 {
-	if(name == NULL)
-		return(builtin_err = Err_null_ref);
-	return(load_the_font(name));
+	if (name == NULL) {
+		return (builtin_err = Err_null_ref);
+	}
+	return (load_the_font(name));
 }
 
 
@@ -123,9 +123,10 @@ static int po_string_width(void* string)
  * int StringWidth(char *string)
  ****************************************************************************/
 {
-if (string == NULL)
-	return(builtin_err = Err_null_ref);
-return(fstring_width(uvfont, string));
+	if (string == NULL) {
+		return (builtin_err = Err_null_ref);
+	}
+	return (fstring_width(uvfont, string));
 }
 
 static int po_font_height(void)
@@ -133,7 +134,7 @@ static int po_font_height(void)
  * int FontHeight(void)
  ****************************************************************************/
 {
-return(font_cel_height(uvfont));
+	return (font_cel_height(uvfont));
 }
 
 static int po_tallest_char(void)
@@ -141,7 +142,7 @@ static int po_tallest_char(void)
  * int TallestChar(void)
  ****************************************************************************/
 {
-return(tallest_char(uvfont));
+	return (tallest_char(uvfont));
 }
 
 static void po_get_font_dir(void* dir)
@@ -149,13 +150,12 @@ static void po_get_font_dir(void* dir)
  * void GetFontDir(char *dir)
  ****************************************************************************/
 {
-if (dir == NULL)
-	{
-	builtin_err = Err_null_ref;
-	return;
+	if (dir == NULL) {
+		builtin_err = Err_null_ref;
+		return;
 	}
-vset_get_path(FONT_PATH+vs.font_type, dir);
-*pj_get_path_name(dir) = 0;
+	vset_get_path(FONT_PATH + vs.font_type, dir);
+	*pj_get_path_name(dir) = 0;
 }
 
 static int po_get_justify(void)
@@ -163,7 +163,7 @@ static int po_get_justify(void)
  * int GetJustify(void)
  ****************************************************************************/
 {
-return(vs.tit_just);
+	return (vs.tit_just);
 }
 
 static void po_set_justify(int just)
@@ -171,10 +171,11 @@ static void po_set_justify(int just)
  * void SetJustify(int just)
  ****************************************************************************/
 {
-if (just < 0 || just > 3)
-	builtin_err = Err_parameter_range;
-else
-	vs.tit_just = just;
+	if (just < 0 || just > 3) {
+		builtin_err = Err_parameter_range;
+	} else {
+		vs.tit_just = just;
+	}
 }
 
 /*****************************************************************************
@@ -256,12 +257,13 @@ static void po_title_set_movement(int movement)
  *		This will be either up the screen, across the screen, typed on,
  *		or still.  See constants in title.h.
  ****************************************************************************/
- {
-	if (movement < TM_SCROLL_UP || movement > TM_STILL)
+{
+	if (movement < TM_SCROLL_UP || movement > TM_STILL) {
 		builtin_err = Err_parameter_range;
-	else
+	} else {
 		vs.tit_move = movement;
- }
+	}
+}
 
 static int po_title_get_movement(void)
 /*****************************************************************************
@@ -270,9 +272,9 @@ static int po_title_get_movement(void)
  *		This will be either up the screen, across the screen, typed on,
  *		or still.  See constants in title.h.
  ****************************************************************************/
- {
- 	return vs.tit_move;
- }
+{
+	return vs.tit_move;
+}
 
 static void po_title_set_scrolling(int scrolling)
 /*****************************************************************************
@@ -280,12 +282,13 @@ static void po_title_set_scrolling(int scrolling)
  *		Set whether scrolling is done by pixel or by character.
  *		See constants in title.h.
  ****************************************************************************/
- {
- 	if (scrolling < TS_BY_PIXEL || scrolling > TS_BY_CHARACTER)
+{
+	if (scrolling < TS_BY_PIXEL || scrolling > TS_BY_CHARACTER) {
 		builtin_err = Err_parameter_range;
-	else
+	} else {
 		vs.tit_scroll = scrolling;
- }
+	}
+}
 
 
 static int po_title_get_scrolling(void)
@@ -294,9 +297,9 @@ static int po_title_get_scrolling(void)
  *		Get whether scrolling is done by pixel or by character.
  *		See constants in title.h.
  ****************************************************************************/
- {
- 	return vs.tit_scroll;
- }
+{
+	return vs.tit_scroll;
+}
 
 
 static Errcode po_title_set_text(void* text)
@@ -305,14 +308,15 @@ static Errcode po_title_set_text(void* text)
  *		Set the titling text to the contents of a string.
  *		If text is NULL then get rid of titling text.
  ****************************************************************************/
- {
+{
 	int len;
 
-	if (text == NULL)			
+	if (text == NULL) {
 		return pj_delete(text_name);
-	len = strlen(text);							
- 	return write_gulp(text_name, text, len);
- }
+	}
+	len = strlen(text);
+	return write_gulp(text_name, text, len);
+}
 
 static Errcode po_title_set_text_from_file(void* name)
 /*****************************************************************************
@@ -320,55 +324,49 @@ static Errcode po_title_set_text_from_file(void* name)
  *		Set the titling text to the contents of a file.
  ****************************************************************************/
 {
-	if (name == NULL)
-		return(builtin_err = Err_null_ref);
-	return(load_titles(name));
+	if (name == NULL) {
+		return (builtin_err = Err_null_ref);
+	}
+	return (load_titles(name));
 }
 
 static void* po_title_get_text(void)
 /*****************************************************************************
  *"char 	*TitleGetText(void);"
- *		Read the current titling text file into a string. 
+ *		Read the current titling text file into a string.
  *		The Poco programmer should free() this string sometime.
  *		Returns NULL if there's no current titling text, or if there's
  *		an error.
  ****************************************************************************/
- {
- 	long len;
+{
+	long len;
 	Popot ret;
-	char *buf;
+	char* buf;
 
-	if ((len = pj_file_size(text_name)) < Success)
-		{
+	if ((len = pj_file_size(text_name)) < Success) {
 		return NULL;
-		}
-	else
-		{
-		ret = poco_lmalloc(len+1);
-		if ((buf = ret.pt) != NULL)
-			{
-			if (len > 0)
-				{
-				if (read_gulp(text_name, ret.pt, len) < Success)
-					{
+	} else {
+		ret = poco_lmalloc(len + 1);
+		if ((buf = ret.pt) != NULL) {
+			if (len > 0) {
+				if (read_gulp(text_name, ret.pt, len) < Success) {
 					poco_freez(&ret);
 					return NULL;
-					}
 				}
 			}
 		}
+	}
 	return ret.pt;
- }
-
+}
 
 /*****************************************************************************
  *"bool	TitleHasText(void);"
  *		Returns TRUE if there is some titling text.
  ****************************************************************************/
 static bool po_title_has_text(void)
- {
- 	return pj_exists(text_name);
- }
+{
+	return pj_exists(text_name);
+}
 
 
 static void po_title_set_position(int x, int y, int w, int h)
@@ -376,12 +374,12 @@ static void po_title_set_position(int x, int y, int w, int h)
  *"void	TitleSetPosition(int x, int y, int w, int h);"
  *		Set position of  the rectangle in which the titles will be rendered.
  ****************************************************************************/
- {
+{
 	vs.twin.x = x;
 	vs.twin.y = y;
 	vs.twin.width = w;
 	vs.twin.height = h;
- }
+}
 
 
 static void po_title_get_position(int* x, int* y, int* w, int* h)
@@ -389,17 +387,16 @@ static void po_title_get_position(int* x, int* y, int* w, int* h)
  *"void	TitleGetPosition(int *x, int *y, int *w, int *h);"
  *		Get position of the rectangle in which the titles will be rendered.
  ****************************************************************************/
- {
-	if (x == NULL || y == NULL || w == NULL || h == NULL)
-		{
+{
+	if (x == NULL || y == NULL || w == NULL || h == NULL) {
 		builtin_err = Err_null_ref;
 		return;
-		}
+	}
 	*x = vs.twin.x;
 	*y = vs.twin.y;
 	*w = vs.twin.width;
 	*h = vs.twin.height;
- }
+}
 
 
 static void po_title_edit(void)
@@ -408,9 +405,9 @@ static void po_title_edit(void)
  *		Invoke the titling menu "place text" function, which lets the
  *		user type in text and move around the text rectangle.
  ****************************************************************************/
- {
+{
 	qpwtitles(0);
- }
+}
 
 
 static Errcode po_title_render(void)
@@ -420,15 +417,14 @@ static Errcode po_title_render(void)
  *		to decide whether to go over a single frame, the segment, or
  *		over all.)
  ****************************************************************************/
- {
+{
 	Errcode err;
 
-	free_render_cashes();		/* AAARRRR */
- 	err = do_titles(false);
+	free_render_cashes(); /* AAARRRR */
+	err = do_titles(false);
 	make_render_cashes();
 	return err;
- }
-
+}
 
 
 /*----------------------------------------------------------------------------
@@ -455,79 +451,83 @@ static Errcode po_title_render(void)
  *--------------------------------------------------------------------------*/
 
 PolibText po_libtext = {
-po_ink_string,
+	po_ink_string,
 	"void    Text(int x, int y, char *string);",
-po_word_wrap,
+	po_word_wrap,
 	"void    WordWrap(int x, int y, int width, int height, char *text);",
-po_set_justify,
+	po_set_justify,
 	"void    SetJustify(int just);",
-po_get_justify,
+	po_get_justify,
 	"int     GetJustify(void);",
-po_string_width,
+	po_string_width,
 	"int     StringWidth(char *string);",
-po_font_height,
+	po_font_height,
 	"int     FontHeight(void);",
-po_tallest_char,
+	po_tallest_char,
 	"int     TallestChar(void);",
-po_get_font_name,
+	po_get_font_name,
 	"void    GetFontName(char *name);",
-po_load_font,
+	po_load_font,
 	"ErrCode LoadFont(char *name);",
-po_get_font_dir,
+	po_get_font_dir,
 	"void    GetFontDir(char *dir);",
-qfont_text,
+	qfont_text,
 	"void    Qfont(void);",
-/* From here on new with Ani Pro 1.5 */
-po_can_scale_font,
+	/* From here on new with Ani Pro 1.5 */
+	po_can_scale_font,
 	"Boolean CanScaleFont(void);",
-po_scale_font,
+	po_scale_font,
 	"Errcode ScaleFont(int height);",
-po_set_font_spacing,
+	po_set_font_spacing,
 	"void SetFontSpacing(int spacing);",
-po_get_font_spacing,
+	po_get_font_spacing,
 	"int GetFontSpacing(void);",
-po_set_font_leading,
+	po_set_font_leading,
 	"void SetFontLeading(int leading);",
-po_get_font_leading,
+	po_get_font_leading,
 	"int GetFontLeading(void);",
-po_word_wrap_count_lines,
+	po_word_wrap_count_lines,
 	"int    WordWrapCountLines(int width, char *text);",
 };
 
 Poco_lib po_text_lib = {
-	NULL, "Text",
-	(Lib_proto *)&po_libtext,POLIB_TEXT_SIZE,
-	};
+	NULL,
+	"Text",
+	(Lib_proto*)&po_libtext,
+	POLIB_TEXT_SIZE,
+};
 
 /***************************Titling Library*******************************/
 PolibTitle po_libtitle = {
-po_title_set_movement,
+	po_title_set_movement,
 	"void	TitleSetMovement(int movement);",
-po_title_get_movement,
+	po_title_get_movement,
 	"int	TitleGetMovement(void);",
-po_title_set_scrolling,
+	po_title_set_scrolling,
 	"void	TitleSetScrolling(int scrolling);",
-po_title_get_scrolling,
+	po_title_get_scrolling,
 	"int	TitleGetScrolling(void);",
-po_title_set_text,
+	po_title_set_text,
 	"ErrCode	TitleSetText(char *text);",
-po_title_set_text_from_file,
+	po_title_set_text_from_file,
 	"ErrCode	TitleSetTextFromFile(char *file_name);",
-po_title_get_text,
+	po_title_get_text,
 	"char 	*TitleGetText(void);",
-po_title_has_text,
+	po_title_has_text,
 	"Boolean TitleHasText(void);",
-po_title_set_position,
+	po_title_set_position,
 	"void	TitleSetPosition(int x, int y, int w, int h);",
-po_title_get_position,
+	po_title_get_position,
 	"void	TitleGetPosition(int *x, int *y, int *w, int *h);",
-po_title_edit,
+	po_title_edit,
 	"void	TitleEdit(void);",
-po_title_render,
+	po_title_render,
 	"ErrCode	TitleRender(void);",
 };
 
 Poco_lib po_title_lib = {
-	NULL, "Title",
-	(Lib_proto *)&po_libtitle,POLIB_TITLE_SIZE,
-	};
+	NULL,
+	"Title",
+	(Lib_proto*)&po_libtitle,
+	POLIB_TITLE_SIZE,
+};

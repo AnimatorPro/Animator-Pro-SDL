@@ -13,7 +13,7 @@
 #include "stdtypes.h"
 #include "linklist.h"
 #define POCO_LEGACY_NAMES_TYPE Names
-#include "../../poco/include/pocoface.h"
+#include "../../poco/src/pocoface.h"
 #undef POCO_LEGACY_NAMES_TYPE
 
 #endif /* ANIMATOR_POCOFACE_COMPAT_H */

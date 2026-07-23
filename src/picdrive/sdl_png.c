@@ -20,7 +20,6 @@
 #include "jimk.h"
 #include "sdl_pdr.h"
 
-
 // ---------------------------------------------------------------------------
 static SDL_Surface* sdlpdr_load_png(const char* path)
 {
@@ -220,45 +219,45 @@ static bool sdlpdr_save_png(SDL_Surface* surface, const char* path)
 	if (write_alpha) {
 		// Write tRNS chunk for transparency of index 0
 		uint8_t trans_data[256];
-		
+
 		// Set all palette entries to fully opaque (255)
 		memset(trans_data, 255, 256);
-		
+
 		// Set palette index 0 to fully transparent (0)
 		trans_data[0] = 0;
-		
+
 		// Use the actual palette size for the chunk length
 		chunk_length = palette->ncolors;
 		write_uint32(length_bytes, chunk_length);
 		if (fwrite(length_bytes, 1, 4, fp) != 4) {
 			goto cleanup;
 		}
-		
+
 		// Write tRNS chunk type
 		chunk_type = "tRNS";
 		if (fwrite(chunk_type, 1, 4, fp) != 4) {
 			goto cleanup;
 		}
-		
+
 		// Write tRNS chunk data
 		if (fwrite(trans_data, 1, chunk_length, fp) != chunk_length) {
 			goto cleanup;
 		}
-		
+
 		// Calculate and write tRNS chunk CRC
 		uint8_t* trns_crc_data = (uint8_t*)malloc(4 + chunk_length);
 		if (!trns_crc_data) {
 			goto cleanup;
 		}
-		
+
 		memcpy(trns_crc_data, chunk_type, 4);
 		memcpy(trns_crc_data + 4, trans_data, chunk_length);
 		uint32_t trns_crc = calculate_crc(trns_crc_data, 4 + chunk_length);
 		uint8_t trns_crc_bytes[4];
 		write_uint32(trns_crc_bytes, trns_crc);
-		
+
 		free(trns_crc_data);
-		
+
 		if (fwrite(trns_crc_bytes, 1, 4, fp) != 4) {
 			goto cleanup;
 		}
@@ -361,7 +360,6 @@ cleanup:
 	return success;
 }
 
-
 /*----------------------------------------------------------------------------
  * Setup rex & pdr interface structures...
  *--------------------------------------------------------------------------*/
@@ -372,11 +370,4 @@ static char long_description[] =
 	"at load time as needed.";
 
 
-SDL_PDR_CREATE(
-	PNG,
-	"PNG Format (SDL)",
-	long_description,
-	"png",
-	sdlpdr_load_png,
-	sdlpdr_save_png
-);
+SDL_PDR_CREATE(PNG, "PNG Format (SDL)", long_description, "png", sdlpdr_load_png, sdlpdr_save_png);

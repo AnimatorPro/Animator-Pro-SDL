@@ -23,10 +23,7 @@ bool po_check_instr_table(Poco_cb* pcb)
 
 	for (i = 0; i < po_ins_table_els; i++) {
 		if (i != po_ins_table[i].op_type) {
-			po_say_internal(pcb,
-							"opcode mismatch %d != %d on %s",
-							i,
-							po_ins_table[i].op_type,
+			po_say_internal(pcb, "opcode mismatch %d != %d on %s", i, po_ins_table[i].op_type,
 							po_ins_table[i].op_name);
 		}
 	}
@@ -40,8 +37,9 @@ bool po_check_instr_table(Poco_cb* pcb)
 char* find_c_name(C_frame* list, void* fpt)
 {
 	while (list != NULL) {
-		if (fpt == list->code_pt)
+		if (fpt == list->code_pt) {
 			return (list->name);
+		}
 		list = list->mlink;
 	}
 	return ("(unknown)");
@@ -57,7 +55,7 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
 	Poco_op_table* pta;
 	Popot* pp_code;
 
-	op	 = ((int*)code)[0];
+	op = ((int*)code)[0];
 	code = OPTR(code, sizeof(op));
 	if (op >= 0 && op < po_ins_table_els) {
 		pta = po_ins_table + op;
@@ -71,9 +69,7 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
 				fprintf(f, "\t%d", ((int*)code)[0]);
 				break;
 			case OEX_ADDRESS:
-				fprintf(f,
-						"\tvar %d size %ld",
-						((int*)OPTR(code, 0))[0],
+				fprintf(f, "\tvar %d size %ld", ((int*)OPTR(code, 0))[0],
 						((long*)OPTR(code, sizeof(int)))[0]);
 				break;
 			case OEX_LONG:
@@ -82,10 +78,8 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
 			case OEX_POINTER:
 				pp_code = (Popot*)code;
 				fprintf(f,
-//						"\tmin %p max %p pt %p (%llu bytes)",
-						"\tpointer: %p (%lu bytes)",
-						pp_code->pt,
-						pp_code->max - pp_code->min);
+						//						"\tmin %p max %p pt %p (%llu bytes)",
+						"\tpointer: %p (%lu bytes)", pp_code->pt, pp_code->max - pp_code->min);
 				break;
 			case OEX_DOUBLE:
 				fprintf(f, "\t%f", ((double*)code)[0]);
@@ -95,8 +89,9 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
 				fprintf(f, "\t%s", fuf->name);
 				break;
 			case OEX_CFUNCTION:
-				if (cframes != NULL)
+				if (cframes != NULL) {
 					fprintf(f, "\t%s", find_c_name(cframes, ((void**)code)[0]));
+				}
 				break;
 		}
 		code = OPTR(code, pta->op_size);
@@ -107,7 +102,6 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
 	}
 	return code;
 }
-
 
 /*****************************************************************************
  * disassemble lots of ops, starting from runtime environment only
@@ -122,7 +116,6 @@ void po_disassemble_code(Poco_run_env* poco_env, FILE* file, void* code, long cs
 	fflush(file);
 }
 
-
 /*****************************************************************************
  * disassemble lots of ops.
  ****************************************************************************/
@@ -130,7 +123,6 @@ void dump_code(Poco_cb* pcb, FILE* file, void* code, long csize)
 {
 	po_disassemble_code(&pcb->run, file, code, csize);
 }
-
 
 /*****************************************************************************
  * disassemble an entire poco program.
@@ -140,8 +132,9 @@ void po_dump_file(Poco_cb* pcb)
 	Func_frame* ff;
 	FILE* file;
 
-	if ((file = pcb->po_dump_file) == NULL)
+	if ((file = pcb->po_dump_file) == NULL) {
 		return;
+	}
 	ff = pcb->run.fff;
 	while (ff != NULL) {
 		fprintf(file, "Program: %s -- Code size: %ld\n", ff->name, ff->code_size);
@@ -153,7 +146,8 @@ void po_dump_file(Poco_cb* pcb)
 /*****************************************************************************
  * disassemble an entire poco program and write to specified file.
  ****************************************************************************/
-void po_disassemble_program(Poco_run_env* poco_env, FILE* fp) {
+void po_disassemble_program(Poco_run_env* poco_env, FILE* fp)
+{
 	if (fp == NULL) {
 		return;
 	}

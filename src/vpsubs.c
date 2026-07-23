@@ -32,13 +32,13 @@ int fli_screen_height(void)
 #endif /* WITH_POCO */
 
 
-void ccolor_dot(SHORT x, SHORT y, void *data)
+void ccolor_dot(SHORT x, SHORT y, void* data)
 {
 	(void)data;
 	pj_put_dot(vb.pencel, vs.ccolor, x, y);
 }
 
-void undo_dot(SHORT x, SHORT y, void *data)
+void undo_dot(SHORT x, SHORT y, void* data)
 {
 	(void)data;
 	pj_put_dot(vb.pencel, pj_get_dot(undof, x, y), x, y);
@@ -49,7 +49,7 @@ void undo_rect(Coor x, Coor y, Coor w, Coor h)
 	pj_blitrect(undof, x, y, vb.pencel, x, y, w, h);
 }
 
-void undo_rect_lbh(Coor x, Coor y, Coor w, Coor h, void *data)
+void undo_rect_lbh(Coor x, Coor y, Coor w, Coor h, void* data)
 {
 	(void)data;
 	pj_blitrect(undof, x, y, vb.pencel, x, y, w, h);
@@ -61,7 +61,7 @@ void save_undo_rect(Coor x, Coor y, Coor w, Coor h)
 }
 
 /* This exists to correctly satisfy the do_leftbehind_func callback. */
-void save_undo_rect_lbh(Coor x, Coor y, Coor w, Coor h, void *data)
+void save_undo_rect_lbh(Coor x, Coor y, Coor w, Coor h, void* data)
 {
 	(void)data;
 	pj_blitrect(vb.pencel, x, y, undof, x, y, w, h);
@@ -71,21 +71,21 @@ void zoom_undo_rect(Coor x, Coor y, Coor w, Coor h)
 {
 	pj_blitrect(undof, x, y, vb.pencel, x, y, w, h);
 	if (vs.zoom_open) {
-		zoom_blitrect((Raster *)undof, x, y, x, y, w, h);
+		zoom_blitrect((Raster*)undof, x, y, x, y, w, h);
 	}
 }
 
 static bool rclick_on_screen(void)
 {
 	return ((JSTHIT(MBRIGHT) &&
-			 (curson_wndo((Wndo *)vb.pencel) || (vs.zoom_open && curson_wndo(vl.zoomwndo)) ||
+			 (curson_wndo((Wndo*)vb.pencel) || (vs.zoom_open && curson_wndo(vl.zoomwndo)) ||
 			  curson_wndo(&vb.screen->wndo))));
 }
 
 bool check_esc_abort(void)
 {
 	if (JSTHIT(KEYHIT) && (UBYTE)icb.inkey == ESCKEY) {
-		close_group_code((Mugroup *)see_head(&vb.screen->gstack), Err_abort);
+		close_group_code((Mugroup*)see_head(&vb.screen->gstack), Err_abort);
 		return true;
 	}
 	return false;
@@ -95,7 +95,7 @@ bool check_esc_abort(void)
 bool check_pen_abort(void)
 {
 	if (rclick_on_screen() || (JSTHIT(KEYHIT) && is_abortkey())) {
-		close_group_code((Mugroup *)see_head(&vb.screen->gstack), Err_abort);
+		close_group_code((Mugroup*)see_head(&vb.screen->gstack), Err_abort);
 		return true;
 	}
 	return false;
@@ -115,7 +115,7 @@ bool check_toggle_menu(void)
 bool check_toggle_abort(void)
 {
 	if (JSTHIT(KEYHIT) && (UBYTE)icb.inkey == ESCKEY) {
-		close_group_code((Mugroup *)see_head(&vb.screen->gstack), Err_abort);
+		close_group_code((Mugroup*)see_head(&vb.screen->gstack), Err_abort);
 		return 1;
 	}
 
@@ -127,7 +127,7 @@ int cluster_count(void)
 	return vs.buns[vs.use_bun].bun_count;
 }
 
-UBYTE *cluster_bundle(void)
+UBYTE* cluster_bundle(void)
 {
 	return vs.buns[vs.use_bun].bundle;
 }
@@ -198,20 +198,20 @@ static SHORT flidiag_rel[] = {INITOSENT(rgr, rgr), -1};
 
 #undef INITOSENT
 
-static void vs_uscaleum(SHORT *tab, SHORT relto)
+static void vs_uscaleum(SHORT* tab, SHORT relto)
 {
-	void *vlroot = &vl;
-	void *vsroot = &vs;
+	void* vlroot = &vl;
+	void* vsroot = &vs;
 	SHORT usval;
 
 	while (*tab >= 0) {
-		usval = uscale_vscoor(*(Vscoor *)OPTR(vsroot, tab[0]), relto);
+		usval = uscale_vscoor(*(Vscoor*)OPTR(vsroot, tab[0]), relto);
 		if (tab[2] == sizeof(BYTE)) {
-			*((BYTE *)OPTR(vlroot, tab[1])) = usval;
+			*((BYTE*)OPTR(vlroot, tab[1])) = usval;
 		} else if (tab[2] == sizeof(SHORT)) {
-			*((SHORT *)OPTR(vlroot, tab[1])) = usval;
+			*((SHORT*)OPTR(vlroot, tab[1])) = usval;
 		} else if (tab[2] == sizeof(LONG)) {
-			*((LONG *)OPTR(vlroot, tab[1])) = usval;
+			*((LONG*)OPTR(vlroot, tab[1])) = usval;
 		}
 		tab += 3;
 	}
@@ -231,17 +231,17 @@ void reres_settings(void)
 
 typedef struct qkmove {
 	SHORT ox, oy;
-	Menuhdr *mh;
+	Menuhdr* mh;
 } Qkmove;
 
-static void init_qkmove(Qkmove *qk, Button *b)
+static void init_qkmove(Qkmove* qk, Button* b)
 {
 	qk->mh = get_button_hdr(b);
 	qk->ox = qk->mh->x;
 	qk->oy = qk->mh->y;
 }
 
-static void finish_qkmove(Qkmove *qk)
+static void finish_qkmove(Qkmove* qk)
 {
 	vl.quickcent.x = qk->mh->x + (qk->mh->width / 2); /* for now same width */
 	if (qk->mh == &quick_menu) {
@@ -254,7 +254,7 @@ static void finish_qkmove(Qkmove *qk)
 	vs.quickcenty = scale_vscoor(vl.quickcent.y, vb.screen->wndo.height);
 }
 
-void mb_quickmenu_to_bottom(Button *b)
+void mb_quickmenu_to_bottom(Button* b)
 {
 	Qkmove sqk;
 
@@ -263,7 +263,7 @@ void mb_quickmenu_to_bottom(Button *b)
 	finish_qkmove(&sqk);
 }
 
-void mb_move_quickmenu(Button *b)
+void mb_move_quickmenu(Button* b)
 {
 	Qkmove sqk;
 
@@ -272,7 +272,7 @@ void mb_move_quickmenu(Button *b)
 	finish_qkmove(&sqk);
 }
 
-void menu_to_quickcent(Menuhdr *mh)
+void menu_to_quickcent(Menuhdr* mh)
 {
 	menu_to_point(vb.screen, mh, vl.quickcent.x, vl.quickcent.y);
 }

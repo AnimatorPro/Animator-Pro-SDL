@@ -3,8 +3,7 @@
 #include "memory.h"
 #include "ptrmacro.h"
 
-
-void pj_cmap_free(Cmap *cmap)
+void pj_cmap_free(Cmap* cmap)
 {
 	if (cmap == NULL) {
 		return;
@@ -12,8 +11,7 @@ void pj_cmap_free(Cmap *cmap)
 	pj_free(cmap);
 }
 
-
-Errcode pj_cmap_alloc(Cmap **pcm, LONG num_colors)
+Errcode pj_cmap_alloc(Cmap** pcm, LONG num_colors)
 {
 	*pcm = pj_malloc(OFFSET(Cmap, ctab) + (num_colors * sizeof(Rgb3)));
 	if (*pcm == NULL) {

@@ -1,33 +1,33 @@
 #include "rectang.h"
 
-int quad9(SHORT px, SHORT py, SHORT x,SHORT y,SHORT w,SHORT h)
+int quad9(SHORT px, SHORT py, SHORT x, SHORT y, SHORT w, SHORT h)
 /* figure out which quadrant of rectangle the point is in.  Returns 0-8 */
 {
-int quad;
+	int quad;
 
-	if (w < 0)
-	{
+	if (w < 0) {
 		x += w;
 		w = -w;
 	}
-	if (h < 0)
-	{
+	if (h < 0) {
 		y += h;
 		h = -h;
 	}
-	if (py < y)
+	if (py < y) {
 		quad = 0;
-	else if (py <= y + h)
+	} else if (py <= y + h) {
 		quad = 3;
-	else
+	} else {
 		quad = 6;
+	}
 
 	if (px < x)
 		;
-	else if (px <= x + w)
+	else if (px <= x + w) {
 		quad += 1;
-	else
+	} else {
 		quad += 2;
+	}
 
-	return(quad);
+	return (quad);
 }

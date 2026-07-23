@@ -1,10 +1,10 @@
 #include "gfx.h"
 
-void rect_to_xyz(Rectangle *r, Short_xyz *dest)
+void rect_to_xyz(Rectangle* r, Short_xyz* dest)
 /* build a rectangular vector polygon from a rectangle */
 {
-register SHORT *dst;
-SHORT x,y,w,h;
+	register SHORT* dst;
+	SHORT x, y, w, h;
 
 	dst = &(dest->x);
 
@@ -13,8 +13,8 @@ SHORT x,y,w,h;
 	w = r->width;
 	h = r->height;
 
-	w += x-1;
-	h += y-1;
+	w += x - 1;
+	h += y - 1;
 
 	*dst++ = x;
 	*dst++ = y;

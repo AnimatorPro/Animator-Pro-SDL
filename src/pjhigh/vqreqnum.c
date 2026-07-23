@@ -2,14 +2,14 @@
 #include "ftextf.h"
 #include "jimk.h"
 
-bool varg_qreq_number(SHORT *val, SHORT min, SHORT max, Errcode (*update)(void *data, SHORT val),
-					  void *ud_dat, char *formats, char *text, va_list args)
+bool varg_qreq_number(SHORT* val, SHORT min, SHORT max, Errcode (*update)(void* data, SHORT val),
+					  void* ud_dat, char* formats, char* text, va_list args)
 {
 	Errcode err;
-	Menuhdr *mh = NULL;
-	char *okcan[3];
+	Menuhdr* mh = NULL;
+	char* okcan[3];
 	char sbuf[256];
-	char *tbuf = sbuf;
+	char* tbuf = sbuf;
 
 	okcan[0] = ok_str;
 	okcan[1] = cancel_str;
@@ -23,8 +23,8 @@ bool varg_qreq_number(SHORT *val, SHORT min, SHORT max, Errcode (*update)(void *
 		text = tbuf;
 	}
 
-	err = build_qnumreq(icb.input_screen, &mh, text, okcan, leftright_arrs, *val, min, max,
-								 update, ud_dat);
+	err = build_qnumreq(icb.input_screen, &mh, text, okcan, leftright_arrs, *val, min, max, update,
+						ud_dat);
 	if (err < Success) {
 		return err;
 	}

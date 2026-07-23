@@ -2,8 +2,9 @@
 
 void toggle_menu(void)
 {
-	if(curr_group(vb.screen)->non_hidden)
+	if (curr_group(vb.screen)->non_hidden) {
 		hide_mp();
-	else
+	} else {
 		show_mp();
+	}
 }

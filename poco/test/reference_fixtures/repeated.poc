@@ -1,0 +1,11 @@
+#define OFFSET 13
+
+main()
+{
+	int index;
+	int result = 0;
+
+	for (index = 1; index <= 5; ++index)
+		result += index * 6 + OFFSET;
+	return reference_identity(result);
+}

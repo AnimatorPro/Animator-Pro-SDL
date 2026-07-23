@@ -29,46 +29,47 @@
 
 #ifndef HOSTLIB_DEFINED
 #define HOSTLIB_DEFINED
+
 typedef struct hostlib {
-    void *next;           /* pointer to next as declared Libhead pointer as loaded */
-    uint16_t type;        /* type and version of library desired by rexlib */
-    uint16_t version;
+	void* next;    /* pointer to next as declared Libhead pointer as loaded */
+	uint16_t type; /* type and version of library desired by rexlib */
+	uint16_t version;
 } Hostlib;
 #endif
 
 
 #if HLIB_TYPE == AA_SYSLIB
-  Hostlib _a_a_syslib = {HLIB_LIST, AA_SYSLIB, AA_SYSLIB_VERSION};
-  #undef  HLIB_LIST
-  #define HLIB_LIST &_a_a_syslib
+Hostlib _a_a_syslib = {HLIB_LIST, AA_SYSLIB, AA_SYSLIB_VERSION};
+#undef HLIB_LIST
+#define HLIB_LIST &_a_a_syslib
 
 #elif HLIB_TYPE == AA_LOADPATH
-  Hostlib _a_a_loadpath = {HLIB_LIST, AA_LOADPATH, AA_LOADPATH_VERSION};
-  #undef  HLIB_LIST
-  #define HLIB_LIST &_a_a_loadpath
+Hostlib _a_a_loadpath = {HLIB_LIST, AA_LOADPATH, AA_LOADPATH_VERSION};
+#undef HLIB_LIST
+#define HLIB_LIST &_a_a_loadpath
 
 #elif HLIB_TYPE == AA_STDIOLIB
-  Hostlib _a_a_stdiolib = {HLIB_LIST, AA_STDIOLIB, AA_STDIOLIB_VERSION};
-  #undef  HLIB_LIST
-  #define HLIB_LIST &_a_a_stdiolib
+Hostlib _a_a_stdiolib = {HLIB_LIST, AA_STDIOLIB, AA_STDIOLIB_VERSION};
+#undef HLIB_LIST
+#define HLIB_LIST &_a_a_stdiolib
 
 #elif HLIB_TYPE == AA_GFXLIB
-  Hostlib _a_a_gfxlib = {HLIB_LIST, AA_GFXLIB, AA_GFXLIB_VERSION};
-  #undef  HLIB_LIST
-  #define HLIB_LIST &_a_a_gfxlib
+Hostlib _a_a_gfxlib = {HLIB_LIST, AA_GFXLIB, AA_GFXLIB_VERSION};
+#undef HLIB_LIST
+#define HLIB_LIST &_a_a_gfxlib
 
 #elif HLIB_TYPE == AA_POCOLIB
-  Hostlib _a_a_pocolib = {HLIB_LIST, AA_POCOLIB, AA_POCOLIB_VERSION};
-  #undef  HLIB_LIST
-  #define HLIB_LIST &_a_a_pocolib
+Hostlib _a_a_pocolib = {HLIB_LIST, AA_POCOLIB, AA_POCOLIB_VERSION};
+#undef HLIB_LIST
+#define HLIB_LIST &_a_a_pocolib
 
 #elif HLIB_TYPE == AA_MATHLIB
-  Hostlib _a_a_mathlib = {HLIB_LIST, AA_MATHLIB, AA_MATHLIB_VERSION};
-  #undef  HLIB_LIST
-  #define HLIB_LIST &_a_a_mathlib
+Hostlib _a_a_mathlib = {HLIB_LIST, AA_MATHLIB, AA_MATHLIB_VERSION};
+#undef HLIB_LIST
+#define HLIB_LIST &_a_a_mathlib
 
 #else
-  #error USEHLIB.H: Unknown library type assigned to HLIB_TYPE.
+#error USEHLIB.H: Unknown library type assigned to HLIB_TYPE.
 #endif
 
-#undef HLIB_TYPE	/* undef it so it can be #define'd again in main source */
+#undef HLIB_TYPE /* undef it so it can be #define'd again in main source */
