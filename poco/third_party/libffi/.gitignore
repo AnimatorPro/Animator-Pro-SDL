@@ -1,10 +1,6 @@
+# The libffi build is native CMake and writes nothing into this tree.  These
+# entries only catch stray artifacts from an older autotools checkout.
 tmp/
 build/
 share/
 artifacts/
-main/bootstrap.sh
-main/Makefile
-main/aarch64-*
-main/auto*.cache
-main/x86_64-apple*
-
