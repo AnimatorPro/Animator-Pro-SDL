@@ -173,10 +173,17 @@ elseif(UNIX)
 endif()
 
 set(POCO_CMAKE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/Poco")
+# A shared poco_core absorbs libffi/hashmap/blake3 at link time, so the install
+# is one file.  A static one cannot: libpoco.a would reach the consumer with
+# undefined ffi_*/hashmap_*/blake3_* symbols.  Install those archives into a
+# private subdirectory of libdir and let PocoConfig append them behind
+# Poco::poco, so the consumer still names exactly one target.
+set(POCO_PRIVATE_LIBDIR "${CMAKE_INSTALL_LIBDIR}/poco")
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/PocoConfig.cmake"
     INSTALL_DESTINATION "${POCO_CMAKE_INSTALL_DIR}"
+    PATH_VARS POCO_PRIVATE_LIBDIR
 )
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/PocoConfigVersion.cmake"
@@ -191,6 +198,20 @@ install(TARGETS poco_core
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
+if(NOT POCO_BUILD_SHARED)
+    install(TARGETS poco_hashmap poco_blake3
+        ARCHIVE DESTINATION "${POCO_PRIVATE_LIBDIR}"
+    )
+    if(NOT POCO_FFI_STATIC_LIBRARY)
+        message(FATAL_ERROR
+            "A static Poco install needs the private libffi archive, but "
+            "POCO_FFI_STATIC_LIBRARY was not set by third_party/libffi.")
+    endif()
+    install(FILES "${POCO_FFI_STATIC_LIBRARY}"
+        DESTINATION "${POCO_PRIVATE_LIBDIR}"
+        RENAME "${CMAKE_STATIC_LIBRARY_PREFIX}poco_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    )
+endif()
 install(TARGETS poco RUNTIME DESTINATION .)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/poco/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/poco"

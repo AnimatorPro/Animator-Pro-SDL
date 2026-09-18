@@ -47,3 +47,10 @@ target_include_directories(poco_ffi INTERFACE
 target_link_libraries(poco_ffi INTERFACE
     "${_poco_ffi_artifacts}/lib/libffi.a"
 )
+
+# A static Poco install has to ship this archive beside libpoco.a, because the
+# objects cannot be folded into it the way a shared poco_core absorbs them.
+# libffi is built by ExternalProject rather than as a CMake target, so the
+# parent needs the artifact path rather than a target name.
+set(POCO_FFI_STATIC_LIBRARY "${_poco_ffi_artifacts}/lib/libffi.a"
+    CACHE INTERNAL "Poco-private libffi archive")

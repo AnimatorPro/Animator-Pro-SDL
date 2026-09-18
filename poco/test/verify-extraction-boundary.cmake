@@ -140,7 +140,7 @@ macro(verify_consumer_contract _label _source_dir _target _requires_subdirectory
     endif()
 endmacro()
 
-macro(verify_installed_surface _install_prefix)
+macro(verify_installed_surface _install_prefix _installed_is_shared)
     set(_installed_include_dir "${_install_prefix}/include")
     set(_installed_public_header "${_installed_include_dir}/poco/poco.h")
     if(NOT EXISTS "${_installed_public_header}")
@@ -165,20 +165,41 @@ macro(verify_installed_surface _install_prefix)
         "${_install_prefix}/bin/poco.dll")
     if("${_installed_poco_libraries}" STREQUAL "")
         list(APPEND _gate_failures
-            "Poco install is missing the bundled shared-library artifact")
+            "Poco install is missing the bundled Poco library artifact")
     endif()
 
+    # The private dependencies must not sit next to libpoco where a consumer
+    # could find and name them.  A static install still has to ship them, but
+    # only inside lib/poco, reached through Poco::poco and nowhere else.
     file(GLOB _private_dependency_artifacts LIST_DIRECTORIES FALSE
         "${_install_prefix}/lib/*ffi*"
         "${_install_prefix}/lib/*hashmap*"
+        "${_install_prefix}/lib/*blake3*"
         "${_install_prefix}/lib64/*ffi*"
         "${_install_prefix}/lib64/*hashmap*"
+        "${_install_prefix}/lib64/*blake3*"
         "${_install_prefix}/bin/*ffi*"
-        "${_install_prefix}/bin/*hashmap*")
+        "${_install_prefix}/bin/*hashmap*"
+        "${_install_prefix}/bin/*blake3*")
     if(NOT "${_private_dependency_artifacts}" STREQUAL "")
         list(JOIN _private_dependency_artifacts "\n    " _dependency_report)
         list(APPEND _gate_failures
-            "Poco install leaked private libffi/hashmap artifacts:\n    ${_dependency_report}")
+            "Poco install leaked private libffi/hashmap/blake3 artifacts:\n    ${_dependency_report}")
+    endif()
+
+    # A static install is only usable if those archives are actually present:
+    # libpoco.a alone reaches the consumer with undefined ffi_*/hashmap_*/
+    # blake3_* symbols.
+    if(NOT _installed_is_shared)
+        foreach(_private_name IN ITEMS poco_ffi poco_hashmap poco_blake3)
+            file(GLOB _private_archive LIST_DIRECTORIES FALSE
+                "${_install_prefix}/lib/poco/*${_private_name}*"
+                "${_install_prefix}/lib64/poco/*${_private_name}*")
+            if("${_private_archive}" STREQUAL "")
+                list(APPEND _gate_failures
+                    "Static Poco install does not ship its private ${_private_name} archive under lib/poco")
+            endif()
+        endforeach()
     endif()
 
     set(_imports_poco_artifact FALSE)
@@ -191,10 +212,11 @@ macro(verify_installed_surface _install_prefix)
     else()
         list(GET _package_target_files 0 _package_target_file)
         file(READ "${_package_target_file}" _package_target_contents)
-        string(FIND "${_package_target_contents}" "add_library(Poco::poco SHARED IMPORTED)" _shared_import_offset)
-        if(_shared_import_offset EQUAL -1)
+        string(REGEX MATCH "add_library\\(Poco::poco (STATIC|SHARED) IMPORTED\\)"
+            _poco_import_declaration "${_package_target_contents}")
+        if("${_poco_import_declaration}" STREQUAL "")
             list(APPEND _gate_failures
-                "Poco package must export Poco::poco as the bundled shared library")
+                "Poco package must export Poco::poco as an imported Poco library")
         endif()
         get_filename_component(_package_target_dir "${_package_target_file}" DIRECTORY)
         file(GLOB _package_target_config_files LIST_DIRECTORIES FALSE
@@ -282,16 +304,15 @@ verify_consumer_contract("package-config consumer" "${CMAKE_CURRENT_LIST_DIR}/pa
     poco_package_consumer FALSE)
 
 # First configure/build Poco by itself.  This must never use the parent build
-# directory; only the copied poco/ tree is available to it.  The installed
-# package deliverable is the self-contained shared library, so build it shared
-# here; the add_subdirectory consumer below exercises the default static embed.
+# directory; only the copied poco/ tree is available to it.  Pass no linkage
+# option: the install path a third party actually gets by default is the static
+# one, so that is what this gate has to prove works end to end.
 configure_and_build(
     "copied Poco tree"
     "${_copied_poco_source}"
     "${_sandbox}/poco-build"
     "-DCMAKE_INSTALL_PREFIX=${_install_prefix}"
     "-DCMAKE_BUILD_TYPE=Release"
-    "-DPOCO_BUILD_SHARED=ON"
 )
 
 # Then configure/build a minimal third-party project.  Its source contains
@@ -317,7 +338,7 @@ execute_process(
 if(NOT "${_install_result}" STREQUAL "0")
     record_command_failure("copied Poco tree" "install" _install_result _install_stdout _install_stderr)
 endif()
-verify_installed_surface("${_install_prefix}")
+verify_installed_surface("${_install_prefix}" FALSE)
 
 # A package consumer names only Poco::poco in target_link_libraries().
 set(_package_consumer_source "${_sandbox}/package-consumer")

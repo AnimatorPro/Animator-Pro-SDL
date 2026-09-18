@@ -225,10 +225,17 @@ silently flip it.  The static archive is built position-independent so it can
 be linked into shared hosts such as frameworks and plugins.
 
 Poco's libffi, hashmap, and blake3 dependencies are Poco-private: they are
-linked privately, wrapped in `BUILD_INTERFACE`, and neither installed nor
-exported.  The package export contains only `Poco::poco`, the canonical header,
-CMake package files, and `PocoModule.cmake`.  Do not name those private targets
-or link their archives directly.
+linked privately, wrapped in `BUILD_INTERFACE`, and never exported as targets.
+The package export contains only `Poco::poco`, the canonical header, CMake
+package files, and `PocoModule.cmake`.  Do not name those private targets or
+link their archives directly.
+
+A shared `poco_core` absorbs those dependencies at link time, so a shared
+install is a single library file.  A static one cannot, so a static install
+also ships the three archives in `lib/poco/` and `PocoConfig.cmake` appends
+them behind `Poco::poco`.  That directory is an implementation detail of the
+package: it is not on any search path, its contents are not exported targets,
+and a consumer still links `Poco::poco` alone.
 
 On macOS, the in-tree generic helper installs modules with
 `@loader_path/../lib`; the Animator helper adds `@loader_path/..` for Animator
@@ -246,7 +253,7 @@ supported POE modules need them.  New work must use the replacement column.
 
 | Retained or removed layer | Current status and replacement | Removal condition |
 |---|---|---|
-| `compile_poco()`, `run_poco()`, `free_poco()` | Compatibility-only compiler lifecycle. Use `PocoVm`, `PocoProgram`, `poco_vm_compile_file()`, `poco_vm_run()`, and `poco_program_destroy()`. | All retained Animator runner/caller paths use the Ani adapter and public VM lifecycle; the legacy-header compile fixture can be intentionally retired in a separately approved ABI-breaking change. |
+| `compile_poco()`, `run_poco()`, `free_poco()` | Removed. Use `PocoVm`, `PocoProgram`, `poco_vm_compile_file()`, `poco_vm_run()`, and `poco_program_destroy()`. The internal `compile_poco_*_with_vm` family and `po_free_executable()` remain private to `poco/src/`; the Animator `src/inc/pocoface.h` shim and the legacy-header compile fixture were removed with them. | No removal work remains; do not reintroduce the entry points or a host-facing `pocoface.h`. |
 | `Poco_lib`, `Lib_proto`, and legacy Poco headers | One Poco-owned compatibility ABI layout remains in the private `poco/src/` headers; do not copy it. Use `PocoLibrary` and `PocoBinding` for all new registration. | The Ani adapter no longer needs to convert retained Animator tables and no supported legacy source caller includes the compatibility headers. |
 | `Pocorex` / `poco_rexlib_get()` | Animator native-POE compatibility format only. Migrate portable modules to `PocoModuleDescriptor`; use `ani_add_poe_library(... LEGACY_POE)` only while an Animator-specific direct table is unavoidable. | No supported module exports `poco_rexlib_get()` or relies on direct `Pocorex` layout; then remove the legacy loader policy, fixtures, and headers together. |
 | `Polib*`, `PolibUser`, `_plptr`, `_a_a_pocolib` | Animator-only direct native-POE function-table ABI, not Poco/libffi dispatch. Generic modules must never include or receive it. | All retained Animator-native modules have moved to descriptor/service APIs or have been explicitly retired; no module needs the Ani policy to install direct tables. |
