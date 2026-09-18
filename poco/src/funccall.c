@@ -43,6 +43,10 @@
  ****************************************************************************/
 
 #include "poco_internal.h"
+#include "code.h"
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "postring.h"
 
 typedef struct ffi_vararg_type {
 	struct ffi_vararg_type* next;

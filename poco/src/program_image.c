@@ -7,6 +7,8 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pocmemry.h"
+#include "pocoface.h"
 
 #define PO_IMAGE_VERSION_MULTI_SOURCE 3u
 #define PO_IMAGE_MINIMAL_SECTION_COUNT 5u

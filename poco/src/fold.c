@@ -27,6 +27,9 @@
 
 #include "poco_internal.h"
 #include "activation.h"
+#include "code.h"
+#include "pocotype.h"
+#include "runops.h"
 
 void po_fold_const(Poco_cb* pcb, Exp_frame* exp)
 /*****************************************************************************

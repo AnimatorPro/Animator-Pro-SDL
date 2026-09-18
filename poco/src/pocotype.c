@@ -46,6 +46,9 @@
 
 #include "poco_internal.h"
 #include <string.h>
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "struct.h"
 
 struct type_table {
 	char* name;

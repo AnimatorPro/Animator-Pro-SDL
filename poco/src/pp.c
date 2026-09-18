@@ -102,6 +102,11 @@
 #include "filepath.h"
 #include "linklist.h"
 #include "poco_internal.h"
+#include "chopper.h"
+#include "pocmemry.h"
+#include "pocoface.h"
+#include "pp.h"
+#include "ppeval.h"
 #include "stdtypes.h"
 #include <ctype.h>
 #include <string.h>

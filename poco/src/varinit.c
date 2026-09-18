@@ -21,6 +21,10 @@
  ****************************************************************************/
 
 #include "poco_internal.h"
+#include "code.h"
+#include "declare.h"
+#include "pocotype.h"
+#include "statemen.h"
 
 /*----------------------------------------------------------------------------
  * local datatype to keep parm-passing count smaller during recursion...
@@ -31,8 +35,6 @@ typedef struct init_control {
 	Exp_frame* exp_head;
 	int frame_type;
 } InitControl;
-
-extern const int po_scoped_address_op[2];
 
 static void anytype_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff);
 

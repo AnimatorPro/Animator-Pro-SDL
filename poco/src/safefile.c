@@ -13,10 +13,9 @@
 #include "poco_errcodes.h"
 #include "linklist.h"
 #include "standard_library.h"
-
-void po_free(void* pt);
-
-extern Poco_lib po_FILE_lib, po_mem_lib;
+#include "safefile.h"
+#include "poco_ffi.h"
+#include "pocoface.h"
 
 static Errcode poco_record_builtin_error(PocoVm* vm, Errcode err)
 {

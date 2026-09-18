@@ -48,6 +48,10 @@
 
 #include "poco_internal.h"
 #include <string.h>
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "trace.h"
+#include "postring.h"
 
 #define EXPANDCBUF 2 /* Make code buffer 2 times larger on re-alloc */
 

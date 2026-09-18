@@ -77,7 +77,11 @@
 #include "poco_internal.h"
 #include "activation.h"
 #include "poco_hash.h"
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "pp.h"
 #include "program_internal.h"
+#include "runops.h"
 #include "standard_library.h"
 
 #include <ctype.h>

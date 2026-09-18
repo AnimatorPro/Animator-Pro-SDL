@@ -25,6 +25,10 @@
  ****************************************************************************/
 
 #include "poco_internal.h"
+#include "code.h"
+#include "fold.h"
+#include "pocotype.h"
+#include "postring.h"
 
 #define PREC_COUNT 11 /* This needs to be big enough to hold one for each */
 					  /* level of precedence, plus one */

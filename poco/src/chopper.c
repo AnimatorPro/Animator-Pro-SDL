@@ -27,6 +27,7 @@
 #include "poco_internal.h"
 #include <ctype.h>
 #include <string.h>
+#include "chopper.h"
 
 /*****************************************************************************
  * is_all_white - Decide whether string is all whitespace.

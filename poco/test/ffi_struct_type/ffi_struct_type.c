@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "poco_internal.h"
+#include "poco_ffi.h"
 
 #define ARRAY_COUNT(values) (sizeof(values) / sizeof((values)[0]))
 #define NATIVE_ALIGNMENT(type) \

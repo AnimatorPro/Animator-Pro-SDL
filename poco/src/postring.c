@@ -20,6 +20,9 @@
 
 #include "pocolib.h"
 #include "activation.h"
+#include "code.h"
+#include "pocmemry.h"
+#include "postring.h"
 
 /*----------------------------------------------------------------------------
  * Compile-time support.

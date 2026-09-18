@@ -8,6 +8,7 @@
 #define POCO_ACTIVATION_H
 
 #include "poco_internal.h"
+#include "poco_ffi.h"
 #include "standard_library.h"
 
 struct Poco_registered_library;

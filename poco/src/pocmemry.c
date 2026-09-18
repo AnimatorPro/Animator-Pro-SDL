@@ -14,6 +14,7 @@
 
 #include "poco_internal.h"
 #include <string.h>
+#include "pocmemry.h"
 
 /*----------------------------------------------------------------------------
  * Tweakable defines...

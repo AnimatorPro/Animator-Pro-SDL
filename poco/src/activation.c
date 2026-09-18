@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pocoface.h"
 
 static void free_libraries(Poco_lib* library);
 static void free_program_libraries(Poco_program_library* library);

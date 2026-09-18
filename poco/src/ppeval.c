@@ -11,9 +11,10 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "token.h"
+#include "pp.h"
+#include "ppeval.h"
 
 static long pp_exp(Poco_cb* pcb);
-extern void pp_say_fatal(Poco_cb* pcb, const char* fmt, ...);
 
 static bool pp_token(Poco_cb* pcb)
 /*****************************************************************************

@@ -5,6 +5,7 @@
 #include "poco_errcodes.h"
 #include "ptrmacro.h"
 #include "standard_library.h"
+#include "mathlib.h"
 
 
 static Lib_proto mathlib[] = {

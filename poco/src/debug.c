@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pocotype.h"
 
 typedef struct PocoLineBreakpoint {
 	const Func_frame* frame;

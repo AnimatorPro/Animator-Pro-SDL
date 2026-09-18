@@ -97,6 +97,14 @@
 
 #include "poco_internal.h"
 #include <string.h>
+#include "funccall.h"
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "struct.h"
+#include "code.h"
+#include "statemen.h"
+#include "varinit.h"
+#include "postring.h"
 
 static void dirdcl(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, Symbol** name, Symbol** osym);
 static void dcl(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, Symbol** name, Symbol** osym);

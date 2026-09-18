@@ -45,6 +45,7 @@
 #include "poco_internal.h"
 #include "activation.h"
 #include "pocoface.h"
+#include "pocmemry.h"
 
 #define i86_ptr_to_long(a) (a)
 
@@ -146,7 +147,7 @@ bool po_add_line_data(Poco_cb* pcb, Line_data* ld, long offset, long line)
 /*****************************************************************************
  * find the source code line number for a given code offset.
  ****************************************************************************/
-long find_line(Line_data* ld, long offset)
+static long find_line(Line_data* ld, long offset)
 {
 	int i = ld->count;
 	long* offsets = ld->offsets;
@@ -205,7 +206,7 @@ static bool is_char_string_type(Type_info* ti)
 /*****************************************************************************
  * make a guess as to whether a string is printable ascii or not.
  ****************************************************************************/
-bool po_seems_ascii(char* s)
+static bool po_seems_ascii(char* s)
 {
 	int count = 0;
 	char c;

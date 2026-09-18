@@ -24,8 +24,15 @@
 #include "poco_errcodes.h"
 #include "poco_internal.h"
 #include "pocoface.h"
+#include "pocodos_standalone.h"
+#include "mathlib.h"
 #include "program_internal.h"
 #include "ptrmacro.h"
+#include "runops.h"
+#include "safefile.h"
+#include "pocodis.h"
+#include "poco_unix.h"
+#include "strlib.h"
 
 /* Builtin status reporting is per-activation; this host writes the slot of
  * whichever VM is running on this thread. */
@@ -163,11 +170,6 @@ Poco_lib po_main_lib = {.next = NULL,
 						.rexhead = NULL,
 						{0}};
 
-extern Poco_lib po_mem_lib;
-extern Poco_lib po_FILE_lib;
-extern Poco_lib po_math_lib;
-extern Poco_lib po_str_lib;
-extern Poco_lib po_dos_standalone_lib;
 
 static Poco_lib* poco_libs[] = {
 	&po_main_lib, &po_str_lib, &po_mem_lib, &po_FILE_lib, &po_math_lib, &po_dos_standalone_lib,
@@ -192,8 +194,6 @@ static Poco_lib* get_poco_libs(void)
 
 #ifdef DEVELOPMENT
 /* variables for runops tracing */
-extern FILE* po_trace_file;
-extern bool po_trace_flag;
 #endif /* DEVELOPMENT */
 
 

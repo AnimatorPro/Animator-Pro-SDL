@@ -66,6 +66,9 @@
 #include "activation.h"
 #include <limits.h>
 #include <string.h>
+#include "pocodis.h"
+#include "trace.h"
+#include "postring.h"
 
 #define MIN_PCALL_STACK 512  /* we check real often, small is fine. */
 #define MIN_CCALL_STACK 4096 /* we guarantee min 2k to poe users */

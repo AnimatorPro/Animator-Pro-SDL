@@ -26,6 +26,20 @@
 #include "poco_errcodes.h"
 #endif
 
+#include <stddef.h>
+
 #include <poco/poco_legacy.h>
+
+/*----------------------------------------------------------------------------
+ * pocolib.c -- registration and teardown of the builtin library tables.
+ *--------------------------------------------------------------------------*/
+
+Errcode init_poco_libs(Poco_lib* lib);
+void po_cleanup_libs(Poco_lib* lib);
+void poco_freez(Popot* pt);
+
+/* Weak fallbacks in pocolib.c; an embedding host (Animator) supplies its own. */
+Errcode errline(Errcode err, char* fmt, ...);
+size_t get_errtext(Errcode err, char* buf);
 
 #endif /* POCOLIB_H */

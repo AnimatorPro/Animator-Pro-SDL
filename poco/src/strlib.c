@@ -10,6 +10,7 @@
 #include "pocolib.h"
 #include "ptrmacro.h"
 #include "standard_library.h"
+#include "pocoface.h"
 
 #define builtin_err (*poco_vm_builtin_error(vm))
 
