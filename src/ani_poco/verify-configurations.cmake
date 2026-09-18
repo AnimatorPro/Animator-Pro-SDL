@@ -94,7 +94,7 @@ foreach(required_option WITH_ANI WITH_POCO)
 endforeach()
 require_file("built Animator executable" "${ANI_EXECUTABLE}")
 require_file("Animator registration fixture" "${ANI_REGISTRATION_EXECUTABLE}")
-require_file("installed Poco executable" "${POCO_EXECUTABLE}")
+require_file("built Poco executable" "${POCO_EXECUTABLE}")
 
 # The fixture compiles an API from every registered Animator category and runs
 # GetAbort() in the minimal runtime.  Its generated category inventory must

@@ -17,7 +17,7 @@ install(FILES hello.poc DESTINATION ${CMAKE_INSTALL_PREFIX}/tests)
 # module left in the install prefix.
 add_test(
     NAME poco_generic_hello
-    COMMAND $<TARGET_FILE:poco> "${CMAKE_CURRENT_SOURCE_DIR}/hello.poc"
+    COMMAND $<TARGET_FILE:poco_cli> "${CMAKE_CURRENT_SOURCE_DIR}/hello.poc"
     WORKING_DIRECTORY "$<TARGET_FILE_DIR:hello>"
 )
 set_tests_properties(poco_generic_hello PROPERTIES

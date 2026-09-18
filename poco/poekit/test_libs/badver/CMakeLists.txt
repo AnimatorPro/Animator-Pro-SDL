@@ -14,7 +14,7 @@ add_poe_library(test_badver
 if(POCO_BUILD_TESTS)
     add_test(
         NAME "poco_neg_lib04_bad_ver"
-        COMMAND $<TARGET_FILE:poco>
+        COMMAND $<TARGET_FILE:poco_cli>
             "${CMAKE_SOURCE_DIR}/poco/test/neg/nlib04.poc"
         WORKING_DIRECTORY "$<TARGET_FILE_DIR:test_badver>"
     )

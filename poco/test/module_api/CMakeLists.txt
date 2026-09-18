@@ -28,7 +28,7 @@ endforeach()
 
 add_test(
     NAME poco_generic_module_valid
-    COMMAND $<TARGET_FILE:poco> "${POCO_MODULE_API_DIR}/generic.poc"
+    COMMAND $<TARGET_FILE:poco_cli> "${POCO_MODULE_API_DIR}/generic.poc"
     WORKING_DIRECTORY "${POCO_MODULE_API_DIR}"
 )
 set_tests_properties(poco_generic_module_valid PROPERTIES
@@ -44,7 +44,7 @@ foreach(outcome IN ITEMS missing_entry bad_version empty)
     add_test(
         NAME "poco_generic_module_${outcome}"
         COMMAND "${CMAKE_COMMAND}"
-            "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+            "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
             "-DPOCO_SCRIPT=${POCO_MODULE_API_DIR}/${outcome}.poc"
             "-DEXPECTED_TEXT=${POCO_MODULE_OUTCOME_${outcome}}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-outcome.cmake"

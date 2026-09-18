@@ -103,7 +103,7 @@ function(add_poe_library TARGET)
         if(POE_RUNNER STREQUAL "poco")
             add_test(
                 NAME "poco_${TARGET}"
-                COMMAND ${CMAKE_INSTALL_PREFIX}/poco
+                COMMAND $<TARGET_FILE:poco_cli>
                     ${CMAKE_INSTALL_PREFIX}/tests/${_test_filename}
                 WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
             )

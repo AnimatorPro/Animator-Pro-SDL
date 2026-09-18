@@ -33,11 +33,19 @@ add_executable(my_host main.c)
 target_link_libraries(my_host PRIVATE Poco::poco)
 ```
 
-An `add_subdirectory(poco)` host gets the library and the `poco` CLI only:
+An `add_subdirectory(poco)` host gets the library and the CLI only:
 `POCO_BUILD_TESTS` defaults to OFF unless Poco is the top-level project, and
 `POCO_BUILD_EXAMPLES` defaults to OFF for everyone -- including a host that
 already defines `SDL3::SDL3` -- so the `examples/` targets appear only when the
 host asks for them.
+
+Poco claims no generic CMake target names.  The library target is `poco_core`
+(aliased `Poco::poco`) and the command-line interpreter is `poco_cli`; a host
+remains free to define its own `poco` target.  Both still produce files named
+`poco`.  `POCO_INSTALL_CLI` defaults to ON only when Poco is the top-level
+project, so `cmake --install` on an embedding host does not deposit the
+interpreter in the host's prefix; when it is installed it goes to
+`${CMAKE_INSTALL_BINDIR}`, never the prefix root.
 
 Include only `<poco/poco.h>`.  Create a VM, register the libraries the host
 wants to expose, compile a script, run it, then destroy its program before

@@ -9,7 +9,7 @@ set_target_properties(poco_cli_external_hello PROPERTIES OUTPUT_NAME hello)
 add_test(
     NAME poco_cli_external_library_roundtrip
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/../../poekit/hello/hello.poc"
         "-DPOCO_GOOD_LIBRARY=$<TARGET_FILE:poco_cli_external_hello>"
         "-DPOCO_BAD_ABI_LIBRARY=$<TARGET_FILE:badabi____fixture>"

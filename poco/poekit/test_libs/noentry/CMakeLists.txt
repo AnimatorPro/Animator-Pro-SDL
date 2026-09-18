@@ -14,7 +14,7 @@ add_poe_library(test_noentry
 if(POCO_BUILD_TESTS)
     add_test(
         NAME "poco_neg_lib02_no_entry"
-        COMMAND $<TARGET_FILE:poco>
+        COMMAND $<TARGET_FILE:poco_cli>
             "${CMAKE_SOURCE_DIR}/poco/test/neg/nlib02.poc"
         WORKING_DIRECTORY "$<TARGET_FILE_DIR:test_noentry>"
     )
