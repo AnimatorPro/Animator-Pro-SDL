@@ -110,6 +110,11 @@ if (WITH_POCO)
 		set(POCO_BUILD_SHARED ON)
 	endif()
 
+	# Poco builds its test suite only when it is the top-level project.  This
+	# repository is Poco's home, so ask for it explicitly; foreign hosts that
+	# embed poco/ get a test-free configure.
+	set(POCO_BUILD_TESTS ON)
+
 	# Add new standalone poco subproject
 	add_subdirectory(poco)
 

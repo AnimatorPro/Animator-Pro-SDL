@@ -2,9 +2,22 @@ cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
 project(Poco VERSION 2.0.0 LANGUAGES C)
 
-include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+
+# An embedding host that does add_subdirectory(poco) has no use for Poco's own
+# test tree: it brings ~50 extra targets, ~150 ctest registrations, a hard
+# Threads dependency and CTest's Experimental/Nightly machinery.  Build the
+# suite only when Poco is the top-level project, or when a host asks for it.
+if(DEFINED PROJECT_IS_TOP_LEVEL)
+    set(_poco_build_tests_default ${PROJECT_IS_TOP_LEVEL})
+elseif(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_poco_build_tests_default ON)
+else()
+    set(_poco_build_tests_default OFF)
+endif()
+option(POCO_BUILD_TESTS "Build the Poco test suite" ${_poco_build_tests_default})
+unset(_poco_build_tests_default)
 
 # This end-to-end gate copies, builds, installs, and tests Poco independently,
 # so keep it opt-in for normal project test runs.
@@ -12,6 +25,10 @@ option(POCO_ENABLE_EXTRACTION_BOUNDARY_TEST
     "Enable the standalone Poco extraction-boundary CTest"
     OFF
 )
+
+if(POCO_BUILD_TESTS)
+    include(CTest)
+endif()
 
 # Static linkage is the primary Apple embedding deliverable, so it is the
 # default.  A shared library remains available for hosts that prefer to load
@@ -197,4 +214,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(POCO_BUILD_EXAMPLES)
     add_subdirectory(examples/snake)
 endif()
-add_subdirectory(test)
+if(POCO_BUILD_TESTS)
+    add_subdirectory(test)
+endif()
