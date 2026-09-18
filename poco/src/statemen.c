@@ -47,30 +47,6 @@
 static void statement(Poco_cb* pcb, Poco_frame* pf);
 Loop_frame* po_get_top_switch(Poco_cb* pcb);
 
-#ifdef DEADWOOD
-
-/* Type structure for simple integer */
-static TypeComp ity_comp[1] = {
-	TYPE_INT,
-};
-static LONG ity_dims[1] = {
-	0,
-};
-static Type_info ity = {
-	ity_comp, (Pt_long*)ity_dims, 1, 1, IDO_INT,
-};
-
-/* Type structure for ... in function parameters */
-static TypeComp ely_comp[1] = {
-	TYPE_ELLIPSIS,
-};
-static LONG ely_dims[1] = {
-	0,
-};
-static Type_info ely = {
-	ely_comp, (Pt_long*)ely_dims, 1, 1, IDO_BAD,
-};
-#endif /* DEADWOOD */
 
 /*****************************************************************************
  * if the next token is a semicolon eat it, else complain and 'insert' one.

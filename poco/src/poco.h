@@ -97,7 +97,9 @@ extern "C" {
  * Tweakable #define's...
  ****************************************************************************/
 
-#undef STRING_EXPERIMENT
+/* STRING_EXPERIMENT selects the experimental String type (see POSTRING.C).
+ * It is defined by the POCO_STRING_EXPERIMENT CMake option, not here; builds
+ * outside CMake get the default-off behaviour by simply not defining it. */
 
 #if 1
 	#ifndef DEVELOPMENT
@@ -986,7 +988,6 @@ SHORT po_force_num_exp(Poco_cb* pcb, Type_info* ti);
 SHORT po_force_int_exp(Poco_cb* pcb, Type_info* ti);
 SHORT po_force_ptr_or_num_exp(Poco_cb* pcb, Type_info* ti);
 void po_coerce_to_boolean(Poco_cb* pcb, Exp_frame* e);
-void po_coerce_to_string(Poco_cb* pcb, Exp_frame* e);
 void po_coerce_numeric_exp(Poco_cb* pcb, Exp_frame* e, SHORT ido_type);
 void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast);
 void po_get_prim(Poco_cb* pcb, Exp_frame* e);
@@ -1171,26 +1172,35 @@ bool poco_pointer_registry_find(PocoPointerRegistry* registry, const void* point
 								Popot* out_pointer, uint32_t* out_permissions);
 
 #ifdef STRING_EXPERIMENT
-/* in postring.c */
+/* The complete interface of the String experiment; everything behind it is
+ * implemented in postring.c.  See the POCO_STRING_EXPERIMENT CMake option. */
+struct string_ref;
+
+/* compile time */
 void po_add_local_string(Poco_cb* pcb, Poco_frame* pf, Symbol* symbol);
 void po_free_local_string_list(Poco_cb* pcb, Poco_frame* pf);
 void po_code_free_string_ops(Poco_cb* pcb, Poco_frame* pf);
+bool po_is_string(Type_info* ti);
+void po_coerce_to_string(Poco_cb* pcb, Exp_frame* e);
+void po_coerce_to_string_type(Poco_cb* pcb, Exp_frame* e, TypeComp start_type, int start_count);
 
-String_ref* po_sr_new(int len);
-String_ref* po_sr_new_copy(char* pt, int len);
-String_ref* po_sr_new_string(char* pt);
-String_ref* po_sr_cat(String_ref* a, String_ref* b);
-void po_sr_inc_ref(String_ref* ref);
-void po_sr_destroy(String_ref* ref);
-Boolean po_sr_clean_ref(String_ref* ref);
-void po_sr_dec_ref(String_ref* ref);
-Boolean po_sr_eq(String_ref* a, String_ref* b);
-Boolean po_sr_ge(String_ref* a, String_ref* b);
-Boolean po_sr_le(String_ref* a, String_ref* b);
-Boolean po_sr_eq_and_clean(String_ref* a, String_ref* b);
-Boolean po_sr_ge_and_clean(String_ref* a, String_ref* b);
-Boolean po_sr_le_and_clean(String_ref* a, String_ref* b);
-String_ref* po_sr_cat_and_clean(String_ref* a, String_ref* b);
+/* run time.  The allocating calls report failure through env->builtin_error. */
+struct string_ref* po_sr_new(struct PocoActivation* env, int len);
+struct string_ref* po_sr_new_copy(struct PocoActivation* env, char* pt, int len);
+struct string_ref* po_sr_new_string(struct PocoActivation* env, char* pt);
+struct string_ref* po_sr_cat(struct PocoActivation* env, struct string_ref* a, struct string_ref* b);
+struct string_ref* po_sr_cat_and_clean(struct PocoActivation* env, struct string_ref* a,
+									   struct string_ref* b);
+void po_sr_inc_ref(struct string_ref* ref);
+void po_sr_dec_ref(struct string_ref* ref);
+void po_sr_destroy(struct PocoActivation* env, struct string_ref* ref);
+bool po_sr_clean_ref(struct PocoActivation* env, struct string_ref* ref);
+bool po_sr_eq(struct string_ref* a, struct string_ref* b);
+bool po_sr_ge(struct string_ref* a, struct string_ref* b);
+bool po_sr_le(struct string_ref* a, struct string_ref* b);
+bool po_sr_eq_and_clean(struct PocoActivation* env, struct string_ref* a, struct string_ref* b);
+bool po_sr_ge_and_clean(struct PocoActivation* env, struct string_ref* a, struct string_ref* b);
+bool po_sr_le_and_clean(struct PocoActivation* env, struct string_ref* a, struct string_ref* b);
 #endif /* STRING_EXPERIMENT */
 
 #ifdef __APPLE__

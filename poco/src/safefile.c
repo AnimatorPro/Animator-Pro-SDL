@@ -744,21 +744,3 @@ const PocoLibrary* poco_standard_memory_library(void)
 	return &library;
 }
 
-#ifdef DEADWOOD
-
-Errcode po_file_to_stdout(char* name)
-{
-	FILE* f;
-	int c;
-
-	if ((f = fopen(name, "r")) == NULL) {
-		return Err_create;
-	}
-	while ((c = fgetc(f)) != EOF) {
-		fputc(c, stdout);
-	}
-	fclose(f);
-	return Success;
-}
-
-#endif /* DEADWOOD */

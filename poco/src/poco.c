@@ -1046,18 +1046,6 @@ bool po_eat_rparen(Poco_cb* pcb)
 	return (po_eat_token(pcb, TOK_RPAREN));
 }
 
-#ifdef DEADWOOD
-
-Boolean po_check_rparen(Poco_cb* pcb)
-/*****************************************************************************
- * ensure a closing paren is next, if not, complain and die.
- * (this was used only by mk_func_call(), it has been nuked.)
- ****************************************************************************/
-{
-	return (po_is_next_token(pcb, TOK_RPAREN));
-}
-
-#endif /* DEADWOOD */
 
 /******* MODULE VARIABLE stuff to assign and use variables *******/
 
@@ -1271,8 +1259,8 @@ Ido_table po_ido_table[] =
 		},
 #ifdef STRING_EXPERIMENT
 		{
-			FALSE,
-			FALSE,
+			false,
+			false,
 			IDO_STRING,
 		},
 #endif /* STRING_EXPERIMENT */
@@ -2012,18 +2000,6 @@ void po_coerce_to_boolean(Poco_cb* pcb, Exp_frame* e)
 	}
 }
 
-#ifdef STRING_EXPERIMENT
-void po_coerce_to_string(Poco_cb* pcb, Exp_frame* e)
-/*****************************************************************************
- * make a cast to promote an expression to a String type.
- ****************************************************************************/
-{
-	static TypeComp st = TYPE_STRING;
-	static Type_info string_type_info = {&st, NULL, 1, 1, IDO_STRING, 0};
-	po_coerce_expression(pcb, e, &string_type_info, TRUE);
-}
-#endif /* STRING_EXPERIMENT */
-
 /*****************************************************************************
  * make cast of expression to given type, if bad starting type, complain & die.
  ****************************************************************************/
@@ -2035,18 +2011,6 @@ void po_coerce_numeric_exp(Poco_cb* pcb, Exp_frame* e, SHORT ido_type)
 	}
 	upgrade_numerical_expression(pcb, e, ido_type);
 }
-
-#ifdef STRING_EXPERIMENT
-static void cant_convert_to_String(Poco_cb* pcb)
-/*****************************************************************************
- * issue error message that string must be a char *, char [], or
- * another string.
- ****************************************************************************/
-{
-	po_say_fatal(pcb, "expression can't be converted to String type");
-	PO_CHECK_ABORT_VOID(pcb);
-}
-#endif /* STRING_EXPERIMENT */
 
 /*****************************************************************************
  * make a cast of an expression to a given type.
@@ -2075,41 +2039,8 @@ void po_coerce_expression(Poco_cb* pcb, Exp_frame* e, Type_info* ti, bool recast
 
 	if (end_count == 1) {
 #ifdef STRING_EXPERIMENT
-		if (end_type == TYPE_STRING)
-		/* The only thing that converts to a String is another String,
-		 * a char *, or a char [] */
-		{
-			if (start_count == 1) {
-				if (start_type != TYPE_STRING) {
-					cant_convert_to_String(pcb);
-				}
-				/* else will end up returning happily - both are strings! */
-			} else if (start_count == 2) {
-				if (e->ctc.comp[0] == TYPE_CHAR) {
-					switch (start_type) {
-						case TYPE_POINTER:
-						case TYPE_ARRAY:
-							po_code_op(pcb, &e->ecd, OP_PPT_TO_STRING);
-							e->ctc.comp[0] = TYPE_STRING;
-							e->ctc.comp_count = 1;
-							e->ctc.ido_type = IDO_STRING;
-							break;
-						case TYPE_CPT:
-							po_code_op(pcb, &e->ecd, OP_CPT_TO_STRING);
-							e->ctc.comp[0] = TYPE_STRING;
-							e->ctc.comp_count = 1;
-							e->ctc.ido_type = IDO_STRING;
-							break;
-						default:
-							cant_convert_to_String(pcb);
-							break;
-					}
-				} else {
-					cant_convert_to_String(pcb);
-				}
-			} else {
-				cant_convert_to_String(pcb);
-			}
+		if (end_type == TYPE_STRING) {
+			po_coerce_to_string_type(pcb, e, start_type, start_count);
 		} else
 #endif /* STRING_EXPERIMENT */
 		/* Then (hopefully) it's a numerical type of some sort */

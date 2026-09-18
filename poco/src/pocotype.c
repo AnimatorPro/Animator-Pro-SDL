@@ -164,7 +164,7 @@ static struct type_table base_type_names[] = {
 		"TYPE_STRING",
 		TYPE_STRING,
 		sizeof(PoString),
-		FALSE,
+		false,
 	},
 #endif /* STRING_EXPERIMENT */
 	{
@@ -265,7 +265,7 @@ bool po_is_int_ido(SHORT ido)
 /*****************************************************************************
  * indicate whether type is string.
  ****************************************************************************/
-Boolean po_is_string(Type_info* ti)
+bool po_is_string(Type_info* ti)
 {
 	return (ti->comp_count == 1 && ti->comp[0] == TYPE_STRING);
 }

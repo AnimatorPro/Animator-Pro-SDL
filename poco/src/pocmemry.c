@@ -216,15 +216,6 @@ void po_freemem(void* pt)
 			pc->cookie_val = MBLK_FREED;
 			break;
 
-#ifdef DEVELOPEMENT
-
-		case MBLK_FREED:
-			fprintf(stdout, "\npoc_freemem: freeing memory twice!!!\n");
-			break;
-		default:
-			fprintf(stdout, "\npoc_freemem: unknown magic cookie!!!\n");
-			break;
-#endif
 	}
 }
 

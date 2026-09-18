@@ -346,26 +346,6 @@ char* tokenize_word(char* line,    /* (in) -> current line position */
 		word = wrkptr;
 		toktype = TOK_UNDEF;
 	}
-#ifdef DEADWOOD
-	else if (iscsymf(c)) {
-		toktype = TOK_UNDEF;
-		*word++ = c;
-		++line;
-		toklen = MAX_SYM_LEN;
-		for (;;) {
-			c = *line;
-			if (iscsym(c)) {
-				++line;
-				if (toklen) {
-					*word++ = c;
-					--toklen;
-				}
-			} else {
-				break;
-			}
-		}
-	}
-#endif /* DEADWOOD */
 
 	/*----------------------------------------------------------------------------
 	 * Handle numeric constants

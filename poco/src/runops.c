@@ -94,9 +94,6 @@
 #define LC_call(s, f) ((long)((*f)(s)))
 #define DC_call(s, f) ((double)((*f)(s)))
 #define PC_call(s, f) ((Popot)((*f)(s)))
-#ifdef STRING_EXPERIMENT
-#define STRING_C_call(s, f) po_string_ccall(s, f)
-#endif
 
 typedef union eax {
 	Func_frame* f;
@@ -347,13 +344,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->ppt.pt));
 				stack->p = acc.ret.p;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_TO_CPT:
-				po_sr_dec_ref(stack->postring); /* dec ref count but
-												 * don't deallocate yet */
-				stack->p = PoStringBuf(&stack->postring);
-				break;
-#endif /* STRING_EXPERIMENT */
 			case OP_CPT_TO_PPT:
 				// convert void* to popot pointer
 				/* Expression-tier programs cannot contain a native pointer
@@ -373,33 +363,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack->ppt.min = NULL;
 				stack->ppt.max = (void*)~(size_t)0;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_CPT_TO_STRING:
-				err = Err_bad_instruction; /* Right now we don't generate
-											* these and so it'd be hard
-											* to test the code required.... */
-				goto DEBUG_TRACE;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_TO_PPT:
-				acc.ret.postring = stack->postring;
-				po_sr_dec_ref(acc.ret.postring); /* dec ref count but
-												  * don't deallocate yet */
-				stack = OPTR(stack, sizeof(stack->postring) - sizeof(stack->ppt));
-				stack->ppt = acc.ret.postring->string;
-				break;
-			case OP_PPT_TO_STRING:
-				acc.ret.postring = po_sr_new_copy(stack->ppt.pt, Popot_bufsize(&stack->ppt));
-				if (p->builtin_error < Success) {
-					goto ERR_IN_LIBROUTINE;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->postring));
-				stack->postring = acc.ret.postring;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * FUNCTION CALLS
 				 *--------------------------------------------------------------------------*/
@@ -436,20 +399,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				}
 				ip = OPTR(ip, sizeof(ip->func));
 				break;
-
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_CCALL: /* call string valued C function */
-				if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
-					err = Err_stack;
-					goto DEBUG_TRACE;
-				}
-				STRING_C_call(stack, ip->func);
-				if (p->builtin_error < Success) {
-					goto ERR_IN_LIBROUTINE;
-				}
-				ip = OPTR(ip, sizeof(ip->func));
-				break;
-#endif /* STRING_EXPERIMENT */
 
 			case OP_CALLI: /* Call Indirect (via pointer) */
 				if ((acc.f = stack->ppt.pt) == NULL) {
@@ -691,15 +640,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack->d = ((double*)(OPTR(globals, ip->doff)))[0];
 				ip = OPTR(ip, INTY_SIZE);
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_GLO_STRING_VAR: /* push a global string onto data stack */
-				stack = OPTR(stack, -sizeof(PoString));
-				stack->postring = ((PoString*)(OPTR(globals, ip->doff)))[0];
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
 			case OP_LOC_CVAR: /* push a local variable onto data stack */
 				stack = OPTR(stack, -INT_SIZE);
 				stack->inty = ((char*)(OPTR(base, ip->doff)))[0];
@@ -735,15 +675,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack->d = ((double*)(OPTR(base, ip->doff)))[0];
 				ip = OPTR(ip, INTY_SIZE);
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_LOC_STRING_VAR: /* push a local string onto data stack */
-				stack = OPTR(stack, -sizeof(PoString));
-				stack->postring = ((PoString*)(OPTR(base, ip->doff)))[0];
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * STORE A VARIABLE (DIRECT)
 				 *--------------------------------------------------------------------------*/
@@ -776,15 +707,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				((double*)(OPTR(globals, ip->doff)))[0] = stack->d;
 				ip = OPTR(ip, INTY_SIZE);
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_GLO_STRING_ASS: /* top of stack to global string variable */
-				po_sr_clean_ref((((PoString*)(OPTR(globals, ip->doff)))[0]));
-				((PoString*)(OPTR(globals, ip->doff)))[0] = stack->postring;
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
 			case OP_LOC_CASS: /* move top of stack to local variable */
 				((char*)(OPTR(base, ip->doff)))[0] = stack->inty;
 				ip = OPTR(ip, INTY_SIZE);
@@ -813,15 +735,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				((double*)(OPTR(base, ip->doff)))[0] = stack->d;
 				ip = OPTR(ip, INTY_SIZE);
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_LOC_STRING_ASS: /* top of stack to local string variable */
-				po_sr_clean_ref((((PoString*)(OPTR(base, ip->doff)))[0]));
-				((PoString*)(OPTR(base, ip->doff)))[0] = stack->postring;
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * LOAD A VARIABLE (INDIRECT)
 				 *--------------------------------------------------------------------------*/
@@ -959,29 +872,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.d));
 				stack->d = *((double*)(acc.ret.ppt.pt));
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_I_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(PoString),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.postring));
-				stack->postring = *((PoString*)(acc.ret.ppt.pt));
-				po_sr_inc_ref(stack->postring);
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * STORE A VARIABLE (INDIRECT)
 				 *--------------------------------------------------------------------------*/
@@ -1119,30 +1009,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, sizeof(stack->ppt));
 				((double*)(acc.ret.ppt.pt))[0] = stack->d;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_I_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(PoString),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				po_sr_clean_ref(((PoString*)(acc.ret.ppt.pt))[0]);
-				((PoString*)(acc.ret.ppt.pt))[0] = stack->postring;
-				po_sr_inc_ref(stack->postring);
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * ADDITION
 				 *--------------------------------------------------------------------------*/
@@ -1170,15 +1036,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, sizeof(stack->inty));
 				stack->ppt.pt = OPTR(stack->ppt.pt, acc.ret.inty);
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_CAT: /* Concatenate top two strings */
-				acc.ret.postring = po_sr_cat_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->postring));
-				stack->postring = acc.ret.postring;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * SUBTRACTION
 				 *--------------------------------------------------------------------------*/
@@ -1293,15 +1150,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_EQ:
-				acc.ret.inty = po_sr_eq_and_clean(
-					stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * COMPARISONS - NE
 				 *--------------------------------------------------------------------------*/
@@ -1334,15 +1182,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
 				stack->inty = acc.ret.inty;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_NE:
-				acc.ret.inty = !po_sr_eq_and_clean(
-					stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * COMPARISONS - GE
 				 *--------------------------------------------------------------------------*/
@@ -1376,15 +1215,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
 				stack->inty = acc.ret.inty;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_GE:
-				acc.ret.inty = po_sr_ge_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * COMPARISONS - GT
 				 *--------------------------------------------------------------------------*/
@@ -1418,15 +1248,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
 				stack->inty = acc.ret.inty;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_GT:
-				acc.ret.inty = !po_sr_le_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * COMPARISONS - LE
 				 *--------------------------------------------------------------------------*/
@@ -1460,15 +1281,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
 				stack->inty = acc.ret.inty;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_LE:
-				acc.ret.inty = po_sr_le_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * COMPARISONS - LT
 				 *--------------------------------------------------------------------------*/
@@ -1502,15 +1314,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
 				stack->inty = acc.ret.inty;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_LT:
-				acc.ret.inty = !po_sr_ge_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * NEGATION
 				 *--------------------------------------------------------------------------*/
@@ -1688,13 +1491,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				stack = OPTR(stack, -sizeof(stack->ppt));
 				stack->ppt = acc.ret.ppt;
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_PUSH:
-				stack = OPTR(stack, -sizeof(stack->postring));
-				stack->postring = acc.ret.postring;
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * POP STACK TO ACCUMULATOR (RETURN VALUE)
 				 *--------------------------------------------------------------------------*/
@@ -1720,20 +1516,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				p->result = acc.ret;
 				stack = OPTR(stack, sizeof(stack->ppt));
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_POP:
-				acc.ret.postring = stack->postring;
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->postring));
-				break;
-			case OP_CLEAN_STRING: /* Pop string and dec reference count */
-				acc.ret.postring = stack->postring;
-				po_sr_clean_ref(acc.ret.postring);
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->postring));
-				break;
-#endif /* STRING_EXPERIMENT */
-
 				/*----------------------------------------------------------------------------
 				 * DUPLICATE TOP-OF-STACK ITEM
 				 *--------------------------------------------------------------------------*/
@@ -1810,13 +1592,6 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 				ip = OPTR(ip, sizeof(ip->l));
 				stack = OPTR(stack, 2 * sizeof(stack->ppt));
 				break;
-#ifdef STRING_EXPERIMENT
-			case OP_FREE_STRING:
-				po_sr_clean_ref((((PoString*)(OPTR(base, ip->doff)))[0]));
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
 			/*----------------------------------------------------------------------------
 //			 * LIBFFI HELPERS
 			 *--------------------------------------------------------------------------*/
@@ -1875,6 +1650,213 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 
 			case OP_NOP:
 				break;
+
+				/*----------------------------------------------------------------------------
+				 * THE STRING EXPERIMENT
+				 *
+				 * Every opcode of the String type lives here, in one guard, rather
+				 * than interleaved with the numeric and pointer opcodes it shadows.
+				 * Case order is immaterial to the switch, and keeping the experiment
+				 * in one place is what lets it be read, compiled, or dropped as a
+				 * unit.  See postring.c and the POCO_STRING_EXPERIMENT option.
+				 *--------------------------------------------------------------------------*/
+
+#ifdef STRING_EXPERIMENT
+			case OP_STRING_TO_CPT:
+				po_sr_dec_ref(stack->postring); /* dec ref count but
+												 * don't deallocate yet */
+				stack->p = PoStringBuf(&stack->postring);
+				break;
+
+			case OP_CPT_TO_STRING:
+				err = Err_bad_instruction; /* Right now we don't generate
+											* these and so it'd be hard
+											* to test the code required.... */
+				goto DEBUG_TRACE;
+				break;
+
+			case OP_STRING_TO_PPT:
+				acc.ret.postring = stack->postring;
+				po_sr_dec_ref(acc.ret.postring); /* dec ref count but
+												  * don't deallocate yet */
+				stack = OPTR(stack, sizeof(stack->postring) - sizeof(stack->ppt));
+				stack->ppt = acc.ret.postring->string;
+				break;
+			case OP_PPT_TO_STRING:
+				acc.ret.postring =
+					po_sr_new_copy(p, stack->ppt.pt, (int)Popot_bufsize(&stack->ppt));
+				if (p->builtin_error < Success) {
+					goto ERR_IN_LIBROUTINE;
+				}
+				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->postring));
+				stack->postring = acc.ret.postring;
+				break;
+
+			case OP_STRING_CCALL: /* call string valued C function */
+				if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
+					err = Err_stack;
+					goto DEBUG_TRACE;
+				}
+				binding = po_ffi_find_binding(p, ip->func);
+				if (p->builtin_error < Success) {
+					goto ERR_IN_LIBROUTINE;
+				}
+				acc.ret = po_ffi_call(binding, stack, &p->variadic, p);
+				if (p->builtin_error < Success) {
+					goto ERR_IN_LIBROUTINE;
+				}
+				ip = OPTR(ip, sizeof(ip->func));
+				break;
+
+			case OP_GLO_STRING_VAR: /* push a global string onto data stack */
+				stack = OPTR(stack, -sizeof(PoString));
+				stack->postring = ((PoString*)(OPTR(globals, ip->doff)))[0];
+				po_sr_inc_ref(stack->postring);
+				ip = OPTR(ip, INTY_SIZE);
+				break;
+
+			case OP_LOC_STRING_VAR: /* push a local string onto data stack */
+				stack = OPTR(stack, -sizeof(PoString));
+				stack->postring = ((PoString*)(OPTR(base, ip->doff)))[0];
+				po_sr_inc_ref(stack->postring);
+				ip = OPTR(ip, INTY_SIZE);
+				break;
+
+			case OP_GLO_STRING_ASS: /* top of stack to global string variable */
+				po_sr_clean_ref(p, (((PoString*)(OPTR(globals, ip->doff)))[0]));
+				((PoString*)(OPTR(globals, ip->doff)))[0] = stack->postring;
+				po_sr_inc_ref(stack->postring);
+				ip = OPTR(ip, INTY_SIZE);
+				break;
+
+			case OP_LOC_STRING_ASS: /* top of stack to local string variable */
+				po_sr_clean_ref(p, (((PoString*)(OPTR(base, ip->doff)))[0]));
+				((PoString*)(OPTR(base, ip->doff)))[0] = stack->postring;
+				po_sr_inc_ref(stack->postring);
+				ip = OPTR(ip, INTY_SIZE);
+				break;
+
+			case OP_STRING_I_VAR:
+				acc.ret.ppt = stack->ppt;
+				if (acc.ret.ppt.pt == NULL) {
+					goto ERR_NULL;
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(PoString),
+														   POCO_POINTER_PERMISSION_READ)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
+					goto ERR_SMALL;
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
+					goto ERR_BIG;
+				}
+				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.postring));
+				stack->postring = *((PoString*)(acc.ret.ppt.pt));
+				po_sr_inc_ref(stack->postring);
+				break;
+
+			case OP_STRING_I_ASS:
+				acc.ret.ppt = stack->ppt;
+				if (acc.ret.ppt.pt == NULL) {
+					goto ERR_NULL;
+				}
+				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
+														   sizeof(PoString),
+														   POCO_POINTER_PERMISSION_WRITE)) {
+					goto ERR_POINTER_ACCESS;
+				}
+				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
+					goto ERR_SMALL;
+				}
+				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
+					goto ERR_BIG;
+				}
+				stack = OPTR(stack, sizeof(stack->ppt));
+				po_sr_clean_ref(p, ((PoString*)(acc.ret.ppt.pt))[0]);
+				((PoString*)(acc.ret.ppt.pt))[0] = stack->postring;
+				po_sr_inc_ref(stack->postring);
+				break;
+
+			case OP_STRING_CAT: /* Concatenate top two strings */
+				acc.ret.postring = po_sr_cat_and_clean(
+					p, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring,
+					stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->postring));
+				stack->postring = acc.ret.postring;
+				break;
+
+			case OP_STRING_EQ:
+				acc.ret.inty = po_sr_eq_and_clean(
+					p, stack->postring,
+					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+				stack->inty = acc.ret.inty;
+				break;
+
+			case OP_STRING_NE:
+				acc.ret.inty = !po_sr_eq_and_clean(
+					p, stack->postring,
+					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+				stack->inty = acc.ret.inty;
+				break;
+
+			case OP_STRING_GE:
+				acc.ret.inty = po_sr_ge_and_clean(
+					p, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring,
+					stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+				stack->inty = acc.ret.inty;
+				break;
+
+			case OP_STRING_GT:
+				acc.ret.inty = !po_sr_le_and_clean(
+					p, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring,
+					stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+				stack->inty = acc.ret.inty;
+				break;
+
+			case OP_STRING_LE:
+				acc.ret.inty = po_sr_le_and_clean(
+					p, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring,
+					stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+				stack->inty = acc.ret.inty;
+				break;
+
+			case OP_STRING_LT:
+				acc.ret.inty = !po_sr_ge_and_clean(
+					p, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring,
+					stack->postring);
+				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
+				stack->inty = acc.ret.inty;
+				break;
+
+			case OP_STRING_PUSH:
+				stack = OPTR(stack, -sizeof(stack->postring));
+				stack->postring = acc.ret.postring;
+				break;
+
+			case OP_STRING_POP:
+				acc.ret.postring = stack->postring;
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->postring));
+				break;
+			case OP_CLEAN_STRING: /* Pop string and dec reference count */
+				acc.ret.postring = stack->postring;
+				po_sr_clean_ref(p, acc.ret.postring);
+				p->result = acc.ret;
+				stack = OPTR(stack, sizeof(stack->postring));
+				break;
+
+			case OP_FREE_STRING:
+				po_sr_clean_ref(p, (((PoString*)(OPTR(base, ip->doff)))[0]));
+				ip = OPTR(ip, INTY_SIZE);
+				break;
+#endif /* STRING_EXPERIMENT */
 		}
 	}
 
