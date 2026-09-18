@@ -35,7 +35,9 @@ target_link_libraries(my_host PRIVATE Poco::poco)
 
 An `add_subdirectory(poco)` host gets the library and the `poco` CLI only:
 `POCO_BUILD_TESTS` defaults to OFF unless Poco is the top-level project, and
-the `examples/` targets are built only when `POCO_BUILD_EXAMPLES` is on.
+`POCO_BUILD_EXAMPLES` defaults to OFF for everyone -- including a host that
+already defines `SDL3::SDL3` -- so the `examples/` targets appear only when the
+host asks for them.
 
 Include only `<poco/poco.h>`.  Create a VM, register the libraries the host
 wants to expose, compile a script, run it, then destroy its program before

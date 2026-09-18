@@ -115,6 +115,14 @@ if (WITH_POCO)
 	# embed poco/ get a test-free configure.
 	set(POCO_BUILD_TESTS ON)
 
+	# The examples are off for every embedder by default.  This tree already
+	# built SDL3 above (thirdparty/sdl3), so opt in explicitly here rather than
+	# letting Poco infer consent from the presence of an SDL3::SDL3 target.
+	# Guarded so -DPOCO_BUILD_EXAMPLES=OFF on this tree's configure still wins.
+	if (NOT DEFINED POCO_BUILD_EXAMPLES)
+		set(POCO_BUILD_EXAMPLES ON)
+	endif()
+
 	# Add new standalone poco subproject
 	add_subdirectory(poco)
 

@@ -23,7 +23,7 @@ Useful options:
 |---|---|---|
 | `POCO_BUILD_SHARED` | `OFF` | Build `poco_core` as a shared library instead of a static archive |
 | `POCO_BUILD_TESTS` | ON when Poco is the top-level project | Build the Poco test suite |
-| `POCO_BUILD_EXAMPLES` | see `CMakeLists.txt` | Build the SDL3 examples under `examples/` |
+| `POCO_BUILD_EXAMPLES` | `OFF` | Build the SDL3 examples under `examples/` |
 
 The distribution is one Poco library plus the `poco` CLI.  Poco links its
 vendored libffi, hashmap, and blake3 targets privately and exports neither
@@ -272,10 +272,11 @@ calls while they migrate to `PocoModuleDescriptor`; new modules must not use
 
 ## Compatibility status
 
-`pocoface.h`, `pocolib.h`, `pocorex.h`, `compile_poco()`, `run_poco()`,
-`free_poco()`, `Poco_lib`, and `Pocorex` are retained only for current Animator
-and legacy-POE source compatibility.  They are not an alternate embedding API.
-`poco_cont_ops()` and the old dummy binding catalog are already removed; a
+`pocolib.h`, `pocorex.h`, `Poco_lib`, and `Pocorex` are retained only for
+current Animator and legacy-POE source compatibility.  They are not an
+alternate embedding API.  `compile_poco()`, `run_poco()`, `free_poco()`,
+`pocoface.h` as a host-facing header, and `poco_cont_ops()` together with the
+old dummy binding catalog are already removed; a
 standalone host must register a real binding or receive an undefined-API
 diagnostic.  See the migration table in
 [`docs/poco-embedding.md`](docs/poco-embedding.md) for each compatibility

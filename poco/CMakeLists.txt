@@ -36,18 +36,11 @@ endif()
 # an embedding project's global choice does not silently flip Poco's linkage.
 option(POCO_BUILD_SHARED "Build poco_core as a shared library instead of static" OFF)
 
-# The parent Animator tree provides SDL3 before adding Poco, so make the
-# graphical examples follow that availability by default.  A standalone Poco
-# build stays dependency-free unless the caller explicitly enables examples;
-# the example then adds the repository's vendored SDL3 itself.
-if(TARGET SDL3::SDL3)
-    set(_poco_build_examples_default ON)
-else()
-    set(_poco_build_examples_default OFF)
-endif()
-option(POCO_BUILD_EXAMPLES "Build Poco examples that require SDL3"
-    ${_poco_build_examples_default})
-unset(_poco_build_examples_default)
+# The examples are demonstrations, not part of the library.  They stay off by
+# default for every caller, including a host that already defines SDL3::SDL3 --
+# having SDL3 around is not a request for an extra executable and its install
+# rules.  A host that wants them sets POCO_BUILD_EXAMPLES before adding Poco.
+option(POCO_BUILD_EXAMPLES "Build Poco examples that require SDL3" OFF)
 
 # The parent Animator build uses directory-wide include paths.  Clear the
 # inherited property before creating Poco targets so standalone and embedded

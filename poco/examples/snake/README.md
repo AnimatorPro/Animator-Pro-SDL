@@ -41,11 +41,12 @@ the same setting.
 
 If the enclosing project already defines an `SDL3::SDL3` target, the example
 uses it and does not add SDL a second time. Otherwise it adds an SDL3 source
-tree: set `POCO_SDL3_SOURCE_DIR` to that tree (the default points at the
-Animator Pro repository's vendored `thirdparty/sdl3`, and the configure fails
-with an explicit message when neither is available). A Poco configure with
-`POCO_BUILD_EXAMPLES` off needs no SDL at all, so the library build and test
-suite stay dependency-free.
+tree: set `POCO_SDL3_SOURCE_DIR` to that tree. It has no default -- Poco does
+not vendor SDL3 and does not reach outside its own tree for one -- so the
+configure fails with an explicit message when neither an `SDL3::SDL3` target
+nor `POCO_SDL3_SOURCE_DIR` is available. `POCO_BUILD_EXAMPLES` is off by
+default for every caller, including hosts that already define `SDL3::SDL3`, so
+the library build and test suite stay dependency-free.
 
 Run `snake` without arguments to use the source-tree `snake.poc`, or pass a
 different script path as the first argument.
