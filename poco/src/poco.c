@@ -345,7 +345,7 @@ void po_old_frame(Poco_cb* pcb)
 /*****************************************************************************
  * Make up symbolic tokens for reserved words, add symbols to root poco_frame.
  ****************************************************************************/
-static bool init_reserved_words(Poco_cb* pcb)
+static Errcode init_reserved_words(Poco_cb* pcb)
 {
 	int i;
 	Symbol* n;
@@ -488,10 +488,22 @@ bool po_check_undefined_funcs(Poco_cb* pcb, Symbol* sl)
 }
 
 /*****************************************************************************
- * compile pcb->file into pcb->run.fff.
+ * the error code to report for a failure that only signalled itself through
+ * the pcb (po_say_fatal and friends), or that reported no code at all.
  ****************************************************************************/
-static bool po_compile_source(Poco_cb* pcb, char* name, const char* source, size_t source_length,
-							  bool from_buffer)
+static Errcode compile_failure_code(Poco_cb* pcb)
+{
+	if (pcb->compile_err < Success) {
+		return pcb->compile_err;
+	}
+	return Err_syntax;
+}
+
+/*****************************************************************************
+ * compile pcb->file into pcb->run.fff.  Returns Success or a negative Errcode.
+ ****************************************************************************/
+static Errcode po_compile_source(Poco_cb* pcb, char* name, const char* source,
+								 size_t source_length, bool from_buffer)
 {
 	Tstack* dummy_token;
 	Func_frame* fuf = NULL;
@@ -499,24 +511,25 @@ static bool po_compile_source(Poco_cb* pcb, char* name, const char* source, size
 	bool globals_retained = false;
 	Struct_info* previous_struct_infos = pcb->run.struct_infos;
 	Struct_info* struct_tail;
+	Errcode err = Success;
 
 	pcb->current_unit_name = po_clone_string(pcb, name);
 	if (pcb->current_unit_name == NULL) {
-		return false;
+		return Err_no_memory;
 	}
 
 #ifdef DEVELOPMENT
 	if (!po_check_instr_table(pcb)) {
 		po_say_internal(pcb, "instruction table failed self-check\n");
-		PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, compile_failure_code(pcb));
 	}
 	if (!po_check_type_names(pcb)) {
 		po_say_internal(pcb, "type_names table failed self-check\n");
-		PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, compile_failure_code(pcb));
 	}
 	if (!po_check_ido_table(pcb)) {
 		po_say_internal(pcb, "ido_table table failed self-check\n");
-		PO_CHECK_ABORT(pcb, false);
+		PO_CHECK_ABORT(pcb, compile_failure_code(pcb));
 	}
 #endif
 
@@ -530,10 +543,11 @@ static bool po_compile_source(Poco_cb* pcb, char* name, const char* source, size
 
 	if (po_new_frame(pcb, SCOPE_GLOBAL, name, FTY_GLOBAL)) {
 		pf = pcb->rframe;
-		if (init_reserved_words(pcb) < Success) {
+		if ((err = init_reserved_words(pcb)) < Success) {
 			goto BADOUT;
 		}
 		if (!po_import_used_symbols(pcb)) {
+			err = compile_failure_code(pcb);
 			goto BADOUT;
 		}
 
@@ -551,7 +565,10 @@ static bool po_compile_source(Poco_cb* pcb, char* name, const char* source, size
 		lookup_token(pcb);
 		if (pcb->t.toktype != TOK_EOF) {
 			po_say_fatal(pcb, "unexpected '}'");
-			PO_CHECK_ABORT(pcb, false);
+			if (pcb->compile_aborted) {
+				err = compile_failure_code(pcb);
+				goto BADOUT;
+			}
 		}
 
 		po_code_op(pcb, &pf->fcd, OP_END);
@@ -560,19 +577,26 @@ static bool po_compile_source(Poco_cb* pcb, char* name, const char* source, size
 		fuf->mlink = pcb->run.protos;
 		pcb->run.protos = fuf;
 		if (!po_compress_func(pcb, pf, fuf)) {
+			err = compile_failure_code(pcb);
 			goto BADOUT;
 		}
 		fuf->parameters = po_retain_global_variables(pf, &fuf->pcount);
 		globals_retained = true;
 		po_dump_file(pcb);
 		pcb->run.data_size = -pf->doff;
+	} else {
+		err = Err_no_memory;
 	}
 
 BADOUT:
 
 	po_free_token_lists(pcb);
 
-	po_free_symbol_list(&pf->parameters); /* free res. words */
+	/* pf is NULL when the global frame was never built; everything below that
+	 * touches it has to be skipped rather than faulting on the error path. */
+	if (pf != NULL) {
+		po_free_symbol_list(&pf->parameters); /* free res. words */
+	}
 
 	if (fuf != NULL && !globals_retained) {
 		fuf->parameters = NULL; /* we just freed these above! */
@@ -581,7 +605,7 @@ BADOUT:
 	/* Struct-valued C bindings build their libffi descriptors after parsing
 	 * returns.  Keep the root layouts (including member symbols) alive until
 	 * the compiled run environment is destroyed. */
-	pcb->run.struct_infos = pf->fsif;
+	pcb->run.struct_infos = (pf != NULL) ? pf->fsif : NULL;
 	if (pcb->run.struct_infos == NULL) {
 		pcb->run.struct_infos = previous_struct_infos;
 	} else {
@@ -591,7 +615,9 @@ BADOUT:
 		}
 		struct_tail->next = previous_struct_infos;
 	}
-	pf->fsif = NULL;
+	if (pf != NULL) {
+		pf->fsif = NULL;
+	}
 
 	po_old_frame(pcb);
 
@@ -599,15 +625,20 @@ BADOUT:
 
 	po_free_pp(pcb);
 
-	return Success;
+	/* A fatal diagnostic unwinds by setting compile_aborted rather than by
+	 * returning a code, so the pcb has the last word on success. */
+	if (err >= Success && pcb->compile_aborted) {
+		err = compile_failure_code(pcb);
+	}
+	return err;
 }
 
-bool po_compile_file(Poco_cb* pcb, char* name)
+Errcode po_compile_file(Poco_cb* pcb, char* name)
 {
 	return po_compile_source(pcb, name, NULL, 0, false);
 }
 
-bool po_compile_buffer(Poco_cb* pcb, char* name, const char* source, size_t source_length)
+Errcode po_compile_buffer(Poco_cb* pcb, char* name, const char* source, size_t source_length)
 {
 	return po_compile_source(pcb, name, source, source_length, true);
 }

@@ -363,8 +363,8 @@ void po_get_expression(Poco_cb* pcb, Exp_frame* e);
 bool po_new_frame(Poco_cb* pcb, int scope, char* name, int type);
 void po_old_frame(Poco_cb* pcb);
 bool po_check_undefined_funcs(Poco_cb* pcb, Symbol* sl);
-bool po_compile_file(Poco_cb* pcb, char* name);
-bool po_compile_buffer(Poco_cb* pcb, char* name, const char* source, size_t source_length);
+Errcode po_compile_file(Poco_cb* pcb, char* name);
+Errcode po_compile_buffer(Poco_cb* pcb, char* name, const char* source, size_t source_length);
 bool po_link_compiled_units(Poco_cb* pcb);
 void po_free_run_env(Poco_run_env* pev);
 
