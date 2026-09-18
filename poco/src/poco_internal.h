@@ -849,7 +849,7 @@ typedef struct poco_cb {
  * Prototypes for all global vars and routines in Poco...
  ****************************************************************************/
 
-extern Ido_table po_ido_table[];
+extern const Ido_table po_ido_table[];
 
 /* Byte and string helpers that used to live in the hand-written pocoutil.asm.
  * There is no assembly module any more; these are plain library calls. */
@@ -927,11 +927,11 @@ char* po_clone_string(Poco_cb* pcb, char* s);
 /* in poco.c */
 
 int po_hashfunc(UBYTE* s);
-void po_say_warning(Poco_cb* pcb, char* fmt, ...);
-void po_say_fatal(Poco_cb* pcb, char* fmt, ...);
-void po_say_internal(Poco_cb* pcb, char* fmt, ...);
-void po_expecting_got(Poco_cb* pcb, char* expecting);
-void po_expecting_got_str(Poco_cb* pcb, char* expecting, char* got);
+void po_say_warning(Poco_cb* pcb, const char* fmt, ...);
+void po_say_fatal(Poco_cb* pcb, const char* fmt, ...);
+void po_say_internal(Poco_cb* pcb, const char* fmt, ...);
+void po_expecting_got(Poco_cb* pcb, const char* expecting);
+void po_expecting_got_str(Poco_cb* pcb, const char* expecting, const char* got);
 bool po_need_token(Poco_cb* pcb);
 void po_redefined(Poco_cb* pcb, char* s);
 void po_undefined(Poco_cb* pcb, char* s);
@@ -1004,6 +1004,7 @@ void po_disassemble_program(Poco_run_env* poco_env, FILE* fp);
 
 void poco_set_error(PocoVm* vm, const char* fmt, ...);
 Errcode* poco_vm_builtin_error(PocoVm* vm);
+char* poco_vm_errtext_buffer(PocoVm* vm);
 Errcode* poco_active_builtin_error(void);
 PocoVm* poco_active_vm(void);
 PocoVm* poco_push_active_vm(PocoVm* vm);

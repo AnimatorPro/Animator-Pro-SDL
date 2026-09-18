@@ -259,37 +259,37 @@ typedef struct poco_op_tab {
 	Op_type op_type;
 } Poco_op_table;
 
-extern Poco_op_table po_ins_table[];
-extern int po_ins_table_els;
+extern const Poco_op_table po_ins_table[];
+extern const int po_ins_table_els;
 
-extern Op_type po_mul_ops[];
-extern Op_type po_div_ops[];
-extern Op_type po_mod_ops[];
-extern Op_type po_add_ops[];
-extern Op_type po_sub_ops[];
-extern Op_type po_lshift_ops[];
-extern Op_type po_rshift_ops[];
-extern Op_type po_lt_ops[];
-extern Op_type po_le_ops[];
-extern Op_type po_gt_ops[];
-extern Op_type po_ge_ops[];
-extern Op_type po_eq_ops[];
-extern Op_type po_ne_ops[];
-extern Op_type po_band_ops[];
-extern Op_type po_xor_ops[];
-extern Op_type po_bor_ops[];
-extern Op_type po_land_ops[];
-extern Op_type po_lor_ops[];
-extern Op_type po_push_ops[];
-extern Op_type po_pop_ops[];
-extern Op_type po_clean_ops[];
-extern Op_type po_ccall_ops[];
-extern Op_type po_con_ops[];
-extern Op_type po_add_offset_ops[];
-extern Op_type po_neg_ops[];
-extern Op_type po_not_ops[];
-extern Op_type po_comp_ops[];
-extern Op_type po_dupe_ops[];
+extern const Op_type po_mul_ops[];
+extern const Op_type po_div_ops[];
+extern const Op_type po_mod_ops[];
+extern const Op_type po_add_ops[];
+extern const Op_type po_sub_ops[];
+extern const Op_type po_lshift_ops[];
+extern const Op_type po_rshift_ops[];
+extern const Op_type po_lt_ops[];
+extern const Op_type po_le_ops[];
+extern const Op_type po_gt_ops[];
+extern const Op_type po_ge_ops[];
+extern const Op_type po_eq_ops[];
+extern const Op_type po_ne_ops[];
+extern const Op_type po_band_ops[];
+extern const Op_type po_xor_ops[];
+extern const Op_type po_bor_ops[];
+extern const Op_type po_land_ops[];
+extern const Op_type po_lor_ops[];
+extern const Op_type po_push_ops[];
+extern const Op_type po_pop_ops[];
+extern const Op_type po_clean_ops[];
+extern const Op_type po_ccall_ops[];
+extern const Op_type po_con_ops[];
+extern const Op_type po_add_offset_ops[];
+extern const Op_type po_neg_ops[];
+extern const Op_type po_not_ops[];
+extern const Op_type po_comp_ops[];
+extern const Op_type po_dupe_ops[];
 
 
 #endif /* POCOOP_H */

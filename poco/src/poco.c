@@ -338,7 +338,7 @@ static void po_say_err(Poco_cb* pcb, char* s)
 /*****************************************************************************
  * format & output an error message but don't stop & don't save errline #.
  ****************************************************************************/
-void po_say_warning(Poco_cb* pcb, char* fmt, ...)
+void po_say_warning(Poco_cb* pcb, const char* fmt, ...)
 {
 	char sbuf[512];
 	va_list args;
@@ -358,7 +358,7 @@ void po_say_warning(Poco_cb* pcb, char* fmt, ...)
 /*****************************************************************************
  * format & output an error message, then longjump to error handler.
  ****************************************************************************/
-void po_say_fatal(Poco_cb* pcb, char* fmt, ...)
+void po_say_fatal(Poco_cb* pcb, const char* fmt, ...)
 {
 	char sbuf[512];
 	va_list args;
@@ -384,7 +384,7 @@ void po_say_fatal(Poco_cb* pcb, char* fmt, ...)
 /*****************************************************************************
  * format & output an error message, then longjump to error handler.
  ****************************************************************************/
-void po_say_internal(Poco_cb* pcb, char* fmt, ...)
+void po_say_internal(Poco_cb* pcb, const char* fmt, ...)
 {
 	char sbuf[512];
 	va_list args;
@@ -401,7 +401,7 @@ void po_say_internal(Poco_cb* pcb, char* fmt, ...)
 /*****************************************************************************
  * output a message saying we were expecting one token and got another.
  ****************************************************************************/
-void po_expecting_got(Poco_cb* pcb, char* expecting)
+void po_expecting_got(Poco_cb* pcb, const char* expecting)
 {
 	po_expecting_got_str(pcb, expecting, pcb->curtoken->ctoke);
 }
@@ -409,7 +409,7 @@ void po_expecting_got(Poco_cb* pcb, char* expecting)
 /*****************************************************************************
  * output a message saying we expecting something and got something else.
  ****************************************************************************/
-void po_expecting_got_str(Poco_cb* pcb, char* expecting, char* got)
+void po_expecting_got_str(Poco_cb* pcb, const char* expecting, const char* got)
 {
 	po_say_fatal(pcb, "expecting %s got '%s'", expecting, got);
 	PO_CHECK_ABORT_VOID(pcb);
@@ -1049,7 +1049,7 @@ bool po_eat_rparen(Poco_cb* pcb)
 /******* MODULE VARIABLE stuff to assign and use variables *******/
 
 /* table to convert from expression type to variable type */
-static SHORT inv_ido[] = {
+static const SHORT inv_ido[] = {
 	TYPE_INT,
 	TYPE_LONG,
 	TYPE_DOUBLE,
@@ -1216,7 +1216,7 @@ void po_var_too_complex(Poco_cb* pcb)
 	PO_CHECK_ABORT_VOID(pcb);
 }
 
-Ido_table po_ido_table[] =
+const Ido_table po_ido_table[] =
 	/* Table that lets us quickly determine what operations are legal on
 	 * a certain IDO_TYPE */
 	{
@@ -1743,7 +1743,7 @@ NOTSTRUCT:
 	return;
 }
 
-int po_scoped_address_op[2] = {OP_GLO_ADDRESS, OP_LOC_ADDRESS};
+const int po_scoped_address_op[2] = {OP_GLO_ADDRESS, OP_LOC_ADDRESS};
 
 /*****************************************************************************
  * generate code to use a variable.
@@ -2337,7 +2337,7 @@ static void code_one(Poco_cb* pcb, Code_buf* cb, Type_info* ti)
 /*****************************************************************************
  * code a post-increment or post-decrement, depending of value of op_group.
  ****************************************************************************/
-static void get_post_increment(Poco_cb* pcb, Exp_frame* e, Op_type op_group[NUM_IDOS])
+static void get_post_increment(Poco_cb* pcb, Exp_frame* e, const Op_type op_group[NUM_IDOS])
 {
 	Symbol* v;
 	SHORT ido_type;
@@ -2361,7 +2361,7 @@ static void get_post_increment(Poco_cb* pcb, Exp_frame* e, Op_type op_group[NUM_
 /*****************************************************************************
  * code a pre-increment or pre-decrement, depending on value of op_group.
  ****************************************************************************/
-static void get_pre_increment(Poco_cb* pcb, Exp_frame* e, Op_type op_group[NUM_IDOS])
+static void get_pre_increment(Poco_cb* pcb, Exp_frame* e, const Op_type op_group[NUM_IDOS])
 {
 	Symbol* v;
 	SHORT ido_type;
@@ -2428,7 +2428,7 @@ void po_get_unop_expression(Poco_cb* pcb, Exp_frame* e)
 {
 	PO_CHECK_ABORT_VOID(pcb);
 	TypeComp t1;
-	Op_type* op_group;
+	const Op_type* op_group;
 	int fok = false; /* float ok? */
 	int temp;
 	register SHORT ttype;
@@ -2595,7 +2595,7 @@ bool po_assign_after_equals(Poco_cb* pcb, Exp_frame* e, Symbol* var, bool must_b
 /*****************************************************************************
  * code a '+=' type op (eg, *= <<=, etc).
  ****************************************************************************/
-static void plus_equals(Poco_cb* pcb, Exp_frame* e, Symbol* var, Op_type op_group[NUM_IDOS],
+static void plus_equals(Poco_cb* pcb, Exp_frame* e, Symbol* var, const Op_type op_group[NUM_IDOS],
 						SHORT (*enforcer)(Poco_cb* pcb, Type_info* ti))
 {
 	Exp_frame val_eee;
@@ -2760,7 +2760,7 @@ static bool init_reserved_words(Poco_cb* pcb)
 		char* string;
 		SHORT type;
 		SHORT val;
-	} rwi[] = {
+	} const rwi[] = {
 		{
 			"void",
 			PTOK_TYPE,
@@ -2951,7 +2951,7 @@ static bool patch_link_references(Poco_cb* pcb)
 
 		while (cursor < end) {
 			int op;
-			Poco_op_table* entry;
+			const Poco_op_table* entry;
 			UBYTE* operand;
 
 			if ((size_t)(end - cursor) < sizeof(op)) {

@@ -107,7 +107,7 @@ bool po_is_static_init_const(Poco_cb* pcb, Code_buf* cb)
  ****************************************************************************/
 {
 	int op;
-	Poco_op_table* pta = po_ins_table;
+	const Poco_op_table* pta = po_ins_table;
 	void* code;
 	bool rv = true;
 

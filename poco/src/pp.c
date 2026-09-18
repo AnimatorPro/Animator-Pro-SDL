@@ -142,46 +142,46 @@
  *--------------------------------------------------------------------------*/
 
 
-static char recurse_detected[] = "infinite loop detected during macro substitution";
+static const char recurse_detected[] = "infinite loop detected during macro substitution";
 
-static char macro_overflow[] = "buffer size exceeded during macro expansion";
-static char macro_oneline[] = "end of line found before end of parameters for macro";
-static char macro_parmexceed[] = "maximum number of macro parameters exceeded";
-static char macro_name[] = "name of macro";
-static char macro_expect_name[] = "expecting name of macro";
-static char macro_parmname[] = "name of macro parameter";
-static char macro_needparm[] = "expecting parameter(s) for macro %s";
-static char macro_redefined[] = "macro redefined with non-identical value";
-static char macro_builtin[] = "a builtin macro cannot be un-defined";
-static char macro_toomany[] = "too many";
-static char macro_toofew[] = "not enough";
-static char macro_parmcount[] = "%s parameters for macro %s";
-static char comma_or_rparen[] = "comma or )";
+static const char macro_overflow[] = "buffer size exceeded during macro expansion";
+static const char macro_oneline[] = "end of line found before end of parameters for macro";
+static const char macro_parmexceed[] = "maximum number of macro parameters exceeded";
+static const char macro_name[] = "name of macro";
+static const char macro_expect_name[] = "expecting name of macro";
+static const char macro_parmname[] = "name of macro parameter";
+static const char macro_needparm[] = "expecting parameter(s) for macro %s";
+static const char macro_redefined[] = "macro redefined with non-identical value";
+static const char macro_builtin[] = "a builtin macro cannot be un-defined";
+static const char macro_toomany[] = "too many";
+static const char macro_toofew[] = "not enough";
+static const char macro_parmcount[] = "%s parameters for macro %s";
+static const char comma_or_rparen[] = "comma or )";
 
-static char incl_name_missing[] = "missing or malformed name of file for #include";
-static char incl_open[] = "can't open source file %s";
+static const char incl_name_missing[] = "missing or malformed name of file for #include";
+static const char incl_open[] = "can't open source file %s";
 
-static char pragma_unknown[] = "'%s' is not a valid poco pragma";
-static char lib_name_missing[] = "missing or malformed filename for library pragma";
-static char use_name_missing[] = "missing or malformed filename for use pragma";
-static char lib_cant_find[] = "can't find POE library module %s";
-static char lib_open_failed[] = "can't load POE library module %s";
-static char stksz_value_bad[] = "stacksize value must be in kbytes, between 4 and 64";
-static char unexpected_tok[] = "Unexpected \"%s\"";
-static char unexpected_eol[] = "Unexpected end of line.";
-static char if_defined_syntax[] = "syntax error in '#if defined' statement";
+static const char pragma_unknown[] = "'%s' is not a valid poco pragma";
+static const char lib_name_missing[] = "missing or malformed filename for library pragma";
+static const char use_name_missing[] = "missing or malformed filename for use pragma";
+static const char lib_cant_find[] = "can't find POE library module %s";
+static const char lib_open_failed[] = "can't load POE library module %s";
+static const char stksz_value_bad[] = "stacksize value must be in kbytes, between 4 and 64";
+static const char unexpected_tok[] = "Unexpected \"%s\"";
+static const char unexpected_eol[] = "Unexpected end of line.";
+static const char if_defined_syntax[] = "syntax error in '#if defined' statement";
 
-static char ppcmd_unknown[] = "unknown preprocessor command '%s'";
+static const char ppcmd_unknown[] = "unknown preprocessor command '%s'";
 
-static char forced_fatal[] = "fatal error forced by #error directive...";
+static const char forced_fatal[] = "fatal error forced by #error directive...";
 
-static char else_unmatched[] = "#else/#elif without preceeding #if/#ifdef";
-static char endif_unmatched[] = "#endif without preceeding #if/#ifdef";
-static char else_multiple[] = "only one #else is allowed per #if/#ifdef";
-static char elif_after_else[] = "#elif cannot follow a #else directive";
+static const char else_unmatched[] = "#else/#elif without preceeding #if/#ifdef";
+static const char endif_unmatched[] = "#endif without preceeding #if/#ifdef";
+static const char else_multiple[] = "only one #else is allowed per #if/#ifdef";
+static const char elif_after_else[] = "#elif cannot follow a #else directive";
 
-static char eof_in_conditional[] = "EOF inside #if/#ifdef";
-static char eol_in_conditional[] = "end of library prototypes inside #if/#ifdef";
+static const char eof_in_conditional[] = "EOF inside #if/#ifdef";
+static const char eol_in_conditional[] = "end of library prototypes inside #if/#ifdef";
 
 /*****************************************************************************
  * complain about something and die.
@@ -189,7 +189,7 @@ static char eol_in_conditional[] = "end of library prototypes inside #if/#ifdef"
  * po_say_fatal() directly.  this lets us set the error line number to the
  * proper line, instead of taking it from curtoken.
  ****************************************************************************/
-void pp_say_fatal(Poco_cb* pcb, char* fmt, ...)
+void pp_say_fatal(Poco_cb* pcb, const char* fmt, ...)
 {
 	char sbuf[512];
 	va_list args;
@@ -1344,7 +1344,7 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 	int state = 0;           /* state switch */
 	bool keep_quotes = true; /* keep quotes on strings */
 	bool end_ok = true;
-	char* fatal;            /* fatal error text */
+	const char* fatal;      /* fatal error text */
 	int want_pp_string = 0; /* 0 == non string token,
 							 * 1 == allow "<>" include delimiter as well as "",
 							 * 2 == quoted string only */

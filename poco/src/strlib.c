@@ -362,7 +362,10 @@ static char* po_strupr(char* d, PocoVm* vm)
  ****************************************************************************/
 static char* po_strerror(int err, PocoVm* vm)
 {
-	static char errmsg[ERRTEXT_SIZE];
+	/* The text lives on the VM, not in a file-scope buffer: two VMs on two
+	 * threads must not overwrite each other's strerror() result.  This is a
+	 * POCO_BINDING_RUN_CONTEXT binding, so vm is always the running VM. */
+	char* errmsg = poco_vm_errtext_buffer(vm);
 
 	get_errtext(err, errmsg);
 	return errmsg;

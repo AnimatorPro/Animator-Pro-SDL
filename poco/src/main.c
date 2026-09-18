@@ -42,21 +42,6 @@ static void _fpreset(void)
 }
 #endif
 
-#if defined(IAN) /* Where Ian keeps poco source */
-Names incdirs[] = {
-	{&incdirs[1], ""},
-	{NULL, "\\paa\\resource\\"},
-};
-#elif defined(JIM) /* Where Jim keeps poco source */
-Names incdirs[] = {
-	{&incdirs[1], ""},
-	{&incdirs[2], "\\paa\\resource\\"},
-	{NULL, "c:\\tc\\include\\"},
-};
-#else
-Names incdirs[] = {{&incdirs[1], ""}, {NULL, "\\paa\\resource\\"}};
-#endif
-
 /****************************************************************************
  * some memory management routines...
  * (simulation of the facilities available in PJ)

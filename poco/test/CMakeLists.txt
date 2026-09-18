@@ -205,6 +205,16 @@ add_poco_test(hello "hello.poc")
 add_poco_test(array "array.poc")
 add_poco_test(ffi_01 "po_ffi_01.poc")
 
+# STRERROR.POC sat unregistered next to the suite it belongs to.  It is the
+# only script that reads the buffer strerror() returns, which now lives on the
+# VM rather than in a file-scope static, so assert on the text and not just on
+# the exit status: a binding handing back a pointer to the wrong buffer exits
+# zero.
+add_poco_test(strerror "STRERROR.POC")
+set_tests_properties("poco_strerror" PROPERTIES
+    PASS_REGULAR_EXPRESSION "Err -002 = Trying to use a NULL pointer"
+)
+
 # The standalone compiler writes the canonical source-less program image.
 # Exercise explicit compile/output, output-implies-compile, and syntax-check
 # modes through the installed CLI surface.
@@ -1071,6 +1081,35 @@ add_test(
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-source-boundary.cmake"
 )
 set_tests_properties("poco_source_boundary" PROPERTIES TIMEOUT 30)
+
+# GLOBAL_STATE_INVENTORY.md used to be audited by hand against a list of names,
+# which could only find state someone had already noticed.  This asks the
+# linker for every writable object in the core instead, so a new global fails
+# on the commit that adds it.
+#
+# At -O1 and above the AArch64 backend pools every internal global into one
+# anonymous "MergedGlobals" object, which erases exactly the names the audit
+# reads.  The flag is attached here rather than in poco/CMakeLists.txt so the
+# test that needs it owns it: a consumer building with POCO_BUILD_TESTS=OFF
+# gets the stock codegen.  The verifier still fails loudly on a MergedGlobals
+# symbol, so a build that drops the flag reports a broken audit rather than a
+# clean one.
+# Probed by compiler id rather than by check_c_compiler_flag: that runs a
+# try_compile, and a nested configure of this tree (the extraction-boundary
+# sandbox) does not always have a usable C toolchain at that point.  Clang
+# accepts -mno-global-merge on every target and ignores it where the pass does
+# not run, so the plain guard is enough.
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(poco_core PRIVATE -mno-global-merge)
+endif()
+
+add_test(
+    NAME "poco_global_state_inventory"
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPOCO_CORE_LIBRARY=$<TARGET_FILE:poco_core>"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-global-state.cmake"
+)
+set_tests_properties("poco_global_state_inventory" PROPERTIES TIMEOUT 30)
 
 # The String experiment is compiled by no other configuration, so without this
 # it goes back to rotting the moment someone edits the code around it.

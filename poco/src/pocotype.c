@@ -54,7 +54,7 @@ struct type_table {
 	bool is_int;
 };
 
-static struct type_table base_type_names[] = {
+static const struct type_table base_type_names[] = {
 	/*		 name			  val			  size			is_int */
 	/*	-----------------	-------------	-------------	-------*/
 	{
@@ -621,8 +621,8 @@ long po_get_subtype_size(Poco_cb* pcb, Type_info* ti)
 bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 {
 	PO_CHECK_ABORT(pcb, false);
-	static char signed_and_unsigned[] = "cannot specify both signed and unsigned.";
-	static char long_and_short[] = "cannot specify both long and short";
+	static const char signed_and_unsigned[] = "cannot specify both signed and unsigned.";
+	static const char long_and_short[] = "cannot specify both long and short";
 	SHORT type_token;
 	Struct_info* sif;
 	UBYTE flags = 0;

@@ -29,6 +29,9 @@ struct PocoVm {
 	int poe_libraries_disabled;
 	PocoModuleHooks module_hooks;
 	char last_error[512];
+	/* Return buffer for the strerror() binding.  Per-VM so two VMs on two
+	 * threads do not hand each other's text back to poco code. */
+	char strerror_text[ERRTEXT_SIZE];
 	void* diagnostic_lock;
 	PocoPointerRegistry* pointer_registry;
 	struct PocoActivation* activation;

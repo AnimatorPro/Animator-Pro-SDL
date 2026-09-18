@@ -25,7 +25,7 @@
 
 /* op table for virtual stack machine poco */
 
-Poco_op_table po_ins_table[] = {
+const Poco_op_table po_ins_table[] = {
 
 	/* "opname",      operand size,        op flags  operand class,   opcode */
 
@@ -1414,7 +1414,7 @@ Poco_op_table po_ins_table[] = {
 	},
 
 };
-int po_ins_table_els = Array_els(po_ins_table);
+const int po_ins_table_els = Array_els(po_ins_table);
 
 #ifdef STRING_EXPERIMENT
 #define SE(a, b, c, d, e, f, g, h, i) \
@@ -1431,60 +1431,60 @@ int po_ins_table_els = Array_els(po_ins_table);
 #endif /* STRING_EXPERIMENT */
 
 /** Tables of binary operation virtual machine codes indexed by IDO_TYPE **/
-Op_type po_mul_ops[NUM_IDOS] =
+const Op_type po_mul_ops[NUM_IDOS] =
 	SE(OP_IMUL, OP_LMUL, OP_DMUL, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_div_ops[NUM_IDOS] =
+const Op_type po_div_ops[NUM_IDOS] =
 	SE(OP_IDIV, OP_LDIV, OP_DDIV, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_mod_ops[NUM_IDOS] =
+const Op_type po_mod_ops[NUM_IDOS] =
 	SE(OP_IMOD, OP_LMOD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_add_ops[NUM_IDOS] =
+const Op_type po_add_ops[NUM_IDOS] =
 	SE(OP_IADD, OP_LADD, OP_DADD, OP_PADD, OP_BAD, OP_BAD, OP_BAD, OP_STRING_CAT, OP_BAD);
-Op_type po_sub_ops[NUM_IDOS] =
+const Op_type po_sub_ops[NUM_IDOS] =
 	SE(OP_ISUB, OP_LSUB, OP_DSUB, OP_PSUB, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_lshift_ops[NUM_IDOS] =
+const Op_type po_lshift_ops[NUM_IDOS] =
 	SE(OP_ILSHIFT, OP_LLSHIFT, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_rshift_ops[NUM_IDOS] =
+const Op_type po_rshift_ops[NUM_IDOS] =
 	SE(OP_IRSHIFT, OP_LRSHIFT, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_lt_ops[NUM_IDOS] =
+const Op_type po_lt_ops[NUM_IDOS] =
 	SE(OP_ILT, OP_LLT, OP_DLT, OP_PLT, OP_BAD, OP_BAD, OP_BAD, OP_STRING_LT, OP_BAD);
-Op_type po_le_ops[NUM_IDOS] =
+const Op_type po_le_ops[NUM_IDOS] =
 	SE(OP_ILE, OP_LLE, OP_DLE, OP_PLE, OP_BAD, OP_BAD, OP_BAD, OP_STRING_LE, OP_BAD);
-Op_type po_gt_ops[NUM_IDOS] =
+const Op_type po_gt_ops[NUM_IDOS] =
 	SE(OP_IGT, OP_LGT, OP_DGT, OP_PGT, OP_BAD, OP_BAD, OP_BAD, OP_STRING_GT, OP_BAD);
-Op_type po_ge_ops[NUM_IDOS] =
+const Op_type po_ge_ops[NUM_IDOS] =
 	SE(OP_IGE, OP_LGE, OP_DGE, OP_PGE, OP_BAD, OP_BAD, OP_BAD, OP_STRING_GE, OP_BAD);
-Op_type po_eq_ops[NUM_IDOS] =
+const Op_type po_eq_ops[NUM_IDOS] =
 	SE(OP_IEQ, OP_LEQ, OP_DEQ, OP_PEQ, OP_BAD, OP_BAD, OP_BAD, OP_STRING_EQ, OP_BAD);
-Op_type po_ne_ops[NUM_IDOS] =
+const Op_type po_ne_ops[NUM_IDOS] =
 	SE(OP_INE, OP_LNE, OP_DNE, OP_PNE, OP_BAD, OP_BAD, OP_BAD, OP_STRING_NE, OP_BAD);
-Op_type po_band_ops[NUM_IDOS] =
+const Op_type po_band_ops[NUM_IDOS] =
 	SE(OP_IBAND, OP_LBAND, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_xor_ops[NUM_IDOS] =
+const Op_type po_xor_ops[NUM_IDOS] =
 	SE(OP_IXOR, OP_LXOR, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_bor_ops[NUM_IDOS] =
+const Op_type po_bor_ops[NUM_IDOS] =
 	SE(OP_IBOR, OP_LBOR, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_land_ops[NUM_IDOS] =
+const Op_type po_land_ops[NUM_IDOS] =
 	SE(OP_ILAND, OP_LLAND, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_lor_ops[NUM_IDOS] =
+const Op_type po_lor_ops[NUM_IDOS] =
 	SE(OP_ILOR, OP_LLOR, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_push_ops[NUM_IDOS] = SE(OP_IPUSH, OP_LPUSH, OP_DPUSH, OP_PPUSH, OP_CPPUSH, OP_BAD,
+const Op_type po_push_ops[NUM_IDOS] = SE(OP_IPUSH, OP_LPUSH, OP_DPUSH, OP_PPUSH, OP_CPPUSH, OP_BAD,
 								   OP_PPUSH, OP_STRING_PUSH, OP_PPUSH);
-Op_type po_pop_ops[NUM_IDOS] =
+const Op_type po_pop_ops[NUM_IDOS] =
 	SE(OP_IPOP, OP_LPOP, OP_DPOP, OP_PPOP, OP_CPPOP, OP_BAD, OP_PPOP, OP_STRING_POP, OP_PPOP);
-Op_type po_clean_ops[NUM_IDOS] =
+const Op_type po_clean_ops[NUM_IDOS] =
 	SE(OP_IPOP, OP_LPOP, OP_DPOP, OP_PPOP, OP_CPPOP, OP_BAD, OP_PPOP, OP_CLEAN_STRING, OP_PPOP);
-Op_type po_ccall_ops[NUM_IDOS] = SE(OP_ICCALL, OP_LCCALL, OP_DCCALL, OP_PCCALL, OP_CPCCALL,
+const Op_type po_ccall_ops[NUM_IDOS] = SE(OP_ICCALL, OP_LCCALL, OP_DCCALL, OP_PCCALL, OP_CPCCALL,
 									OP_CVCCALL, OP_BAD, OP_STRING_CCALL, OP_PCCALL);
-Op_type po_con_ops[NUM_IDOS] =
+const Op_type po_con_ops[NUM_IDOS] =
 	SE(OP_ICON, OP_LCON, OP_DCON, OP_PCON, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_add_offset_ops[NUM_IDOS] =
+const Op_type po_add_offset_ops[NUM_IDOS] =
 	SE(OP_ADD_IOFFSET, OP_ADD_LOFFSET, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_neg_ops[NUM_IDOS] =
+const Op_type po_neg_ops[NUM_IDOS] =
 	SE(OP_INEG, OP_LNEG, OP_DNEG, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_not_ops[NUM_IDOS] =
+const Op_type po_not_ops[NUM_IDOS] =
 	SE(OP_INOT, OP_LNOT, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_comp_ops[NUM_IDOS] =
+const Op_type po_comp_ops[NUM_IDOS] =
 	SE(OP_ICOMP, OP_LCOMP, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
-Op_type po_dupe_ops[NUM_IDOS] =
+const Op_type po_dupe_ops[NUM_IDOS] =
 	SE(OP_IDUPE, OP_LDUPE, OP_DDUPE, OP_PDUPE, OP_BAD, OP_BAD, OP_BAD, OP_BAD, OP_BAD);
 #undef SE

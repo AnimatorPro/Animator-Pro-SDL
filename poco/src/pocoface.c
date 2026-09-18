@@ -267,6 +267,16 @@ Errcode* poco_vm_builtin_error(PocoVm* vm)
 }
 
 /*
+ * Return buffer for bindings that hand poco code a pointer to error text.
+ * Per-VM, so two VMs running on two threads cannot overwrite each other's
+ * result between the callee's return and the caller's read.
+ */
+char* poco_vm_errtext_buffer(PocoVm* vm)
+{
+	return vm != NULL ? vm->strerror_text : NULL;
+}
+
+/*
  * Active-VM tracking.
  *
  * Builtin bindings that predate the embedding API take no PocoVm parameter, so

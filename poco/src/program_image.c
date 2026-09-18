@@ -1840,7 +1840,7 @@ static PoProgramImageStatus po_decode_code_frame(PoReader* encoded, Poco_cb* own
 	while (encoded->offset < encoded->size) {
 		uint32_t op_value;
 		int op;
-		Poco_op_table* entry;
+		const Poco_op_table* entry;
 		if (!po_reader_u32(encoded, &op_value) || op_value >= (uint32_t)po_ins_table_els) {
 			status = PO_PROGRAM_IMAGE_MALFORMED;
 			goto CLEANUP;

@@ -32,7 +32,7 @@ typedef struct init_control {
 	int frame_type;
 } InitControl;
 
-extern int po_scoped_address_op[2];
+extern const int po_scoped_address_op[2];
 
 static void anytype_init(Poco_cb* pcb, InitControl* ctl, Type_info* ti, int doff);
 

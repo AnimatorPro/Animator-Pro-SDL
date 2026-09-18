@@ -13,7 +13,7 @@
 #include "token.h"
 
 static long pp_exp(Poco_cb* pcb);
-extern void pp_say_fatal(Poco_cb* pcb, char* fmt, ...);
+extern void pp_say_fatal(Poco_cb* pcb, const char* fmt, ...);
 
 static bool pp_token(Poco_cb* pcb)
 /*****************************************************************************

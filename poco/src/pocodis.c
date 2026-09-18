@@ -52,7 +52,7 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
 {
 	int op;
 	Func_frame* fuf;
-	Poco_op_table* pta;
+	const Poco_op_table* pta;
 	Popot* pp_code;
 
 	op = ((int*)code)[0];

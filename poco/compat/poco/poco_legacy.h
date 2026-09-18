@@ -28,7 +28,7 @@
 #error "include an Errcode header (errcodes.h or poco_errcodes.h) before <poco/poco_legacy.h>"
 #endif
 
-extern Popot empty_popot;
+extern const Popot empty_popot;
 
 typedef struct string_ref {
 	Dlnode node;
