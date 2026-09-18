@@ -13,7 +13,7 @@
  * reference counting, and the type coercion rules -- lives in this file so
  * the experiment does not shape the layout of poco.c and runops.c.
  *****************************************************************************/
-#include "poco.h"
+#include "poco_internal.h"
 #include "linklist.h"
 
 #ifdef STRING_EXPERIMENT

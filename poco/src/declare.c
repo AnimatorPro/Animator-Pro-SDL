@@ -95,7 +95,7 @@
  *				Moved var_init() function to its own module, VARINIT.C.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <string.h>
 
 static void dirdcl(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, Symbol** name, Symbol** osym);

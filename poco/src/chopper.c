@@ -24,7 +24,7 @@
  *				the continue statement in the read loop.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <ctype.h>
 #include <string.h>
 

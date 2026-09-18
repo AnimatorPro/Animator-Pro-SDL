@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "poco.h"
+#include "poco_internal.h"
 
 #include "activation.h"
 

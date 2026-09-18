@@ -24,7 +24,7 @@
 #endif
 
 #ifndef POCO_H
-#include "poco.h"
+#include "poco_internal.h"
 #endif
 
 #ifdef _WIN32

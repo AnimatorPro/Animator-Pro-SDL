@@ -28,7 +28,7 @@
  *				Removed NULL checks from calls to memory allocation.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <string.h>
 
 /*****************************************************************************

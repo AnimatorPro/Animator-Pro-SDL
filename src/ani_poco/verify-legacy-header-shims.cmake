@@ -17,7 +17,7 @@ endforeach()
 
 file(READ "${POCO_LEGACY_LIBRARY}" POCO_LEGACY_LIBRARY_TEXT)
 foreach(REQUIRED_TEXT
-        "#include \"poco/poco.h\""
+        "#include <poco/poco.h>"
         "Compatibility-only legacy ABI header"
         "typedef struct poco_lib")
     string(FIND "${POCO_LEGACY_LIBRARY_TEXT}" "${REQUIRED_TEXT}" FOUND_INDEX)

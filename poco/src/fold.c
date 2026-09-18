@@ -25,7 +25,7 @@
  *				Added new routine po_is_static_init_const().
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "activation.h"
 
 void po_fold_const(Poco_cb* pcb, Exp_frame* exp)

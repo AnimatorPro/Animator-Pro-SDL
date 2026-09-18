@@ -101,7 +101,7 @@
 
 #include "filepath.h"
 #include "linklist.h"
-#include "poco.h"
+#include "poco_internal.h"
 #include "stdtypes.h"
 #include <ctype.h>
 #include <string.h>

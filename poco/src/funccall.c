@@ -42,7 +42,7 @@
  *				the lvalue (the call).
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 
 typedef struct ffi_vararg_type {
 	struct ffi_vararg_type* next;

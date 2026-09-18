@@ -22,7 +22,7 @@
 #include "commonst.h"
 #include "filepath.h"
 #include "poco_errcodes.h"
-#include "poco.h"
+#include "poco_internal.h"
 #include "pocoface.h"
 #include "program_internal.h"
 #include "ptrmacro.h"
@@ -69,6 +69,7 @@ Errcode boxf(char* fmt, ...);
 int po_puts(Popot s);
 int po_printf(char* format, ...);
 void po_qtext(char* format, ...);
+bool check_abort(void* nobody);
 
 char* ido_type_to_str(IdoType ido_type);
 void dump_func_frame(const char* name, const Func_frame* frame_in);

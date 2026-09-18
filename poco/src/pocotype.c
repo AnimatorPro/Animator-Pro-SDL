@@ -44,7 +44,7 @@
  *			>	Folded po_is_num_ido() into a macro on the po_ido_table.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <string.h>
 
 struct type_table {

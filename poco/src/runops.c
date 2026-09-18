@@ -62,7 +62,7 @@
  *				pointer opcodes at the moment.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "activation.h"
 #include <limits.h>
 #include <string.h>

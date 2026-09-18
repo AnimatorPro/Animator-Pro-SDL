@@ -9,7 +9,7 @@
  ****************************************************************************/
 
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "poco_errcodes.h"
 #include "ptrmacro.h"
 #include "pocolib.h"

@@ -6,7 +6,7 @@
 
 #include "poco_errcodes.h"
 #include "port.h"
-#include "poco.h"
+#include "poco_internal.h"
 #include "pocolib.h"
 #include "ptrmacro.h"
 #include "standard_library.h"

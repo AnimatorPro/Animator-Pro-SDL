@@ -39,7 +39,7 @@
  *				favor of safer and more general po_pop_off_result()
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "token.h"
 
 #define COMMA_OR_RBRACE "} or ,"

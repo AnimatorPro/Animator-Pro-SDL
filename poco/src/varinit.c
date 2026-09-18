@@ -20,7 +20,7 @@
  *				expressions together.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 
 /*----------------------------------------------------------------------------
  * local datatype to keep parm-passing count smaller during recursion...

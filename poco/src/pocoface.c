@@ -74,7 +74,7 @@
 #include "pocoface.h"
 #include "pocoload.h"
 #include "poco_errcodes.h"
-#include "poco.h"
+#include "poco_internal.h"
 #include "activation.h"
 #include "poco_hash.h"
 #include "program_internal.h"

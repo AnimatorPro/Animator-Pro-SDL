@@ -248,7 +248,7 @@
  *				before it tries to access t.file_stack->line_number.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <limits.h> /* so we can properly determine max int value */
 #include <locale.h>
 #include <stdarg.h>

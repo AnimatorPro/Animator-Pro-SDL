@@ -1,6 +1,8 @@
 /*****************************************************************************
  *
- * poco.h	- Main header file for compiling the Poco compiler.
+ * poco_internal.h	- Main private header file for compiling the Poco compiler.
+ *					  The public embedding API lives in <poco/poco.h>; nothing
+ *					  outside poco/src (and poco's own tests) includes this.
  *
  * MAINENANCE
  *	08/20/90	(Ian)
@@ -86,12 +88,12 @@
  *				like enumerated things.
  ****************************************************************************/
 
+#ifndef POCO_INTERNAL_H
+#define POCO_INTERNAL_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#ifndef POCO_H
-#define POCO_H
 
 /*****************************************************************************
  * Tweakable #define's...
@@ -839,33 +841,14 @@ typedef struct poco_cb {
 
 extern Ido_table po_ido_table[];
 
-/* in pocoface.c */
+/* Byte and string helpers that used to live in the hand-written pocoutil.asm.
+ * There is no assembly module any more; these are plain library calls. */
 
-void poco_set_error(PocoVm* vm, const char* fmt, ...);
-Errcode* poco_vm_builtin_error(PocoVm* vm);
-
-
-/* in pocoutil.asm */
-
-char* po_skip_space(char* line);
-int po_hashfunc(UBYTE* s);
-char* po_chop_csym(char* line, char* word, int maxlen, char** wordnext);
-char* po_cmatch_scan(char* line);
-void poco_copy_bytes(void* s, void* d, int count);
-void poco_zero_bytes(void* d, int count);
-void poco_stuff_bytes(void* d, int value, int count);
-bool po_eqstrcmp(char* s1, char* s2);
-
-#ifdef __WATCOMC__
-#pragma aux poco_zero_bytes "__*__" parm[edi][ecx];
-#pragma aux poco_copy_bytes "__*__" parm[esi][edi][ecx];
-#else
 #define po_cmatch_scan(line) strpbrk((line), "\"'/")
 #define poco_copy_bytes(s, d, c) memcpy((d), (s), (c))
 #define poco_zero_bytes(d, c) memset((d), 0, (c))
 #define poco_stuff_bytes(d, v, c) memset((d), (v), (c))
 #define po_eqstrcmp strcmp
-#endif
 
 /* in bop.c */
 
@@ -876,6 +859,7 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e);
 
 char* po_get_csource_line(Poco_cb* pcb);
 char* po_chop_to(char* line, char* word, char letter);
+char* po_skip_space(char* line);
 
 /* in code.c */
 
@@ -908,10 +892,6 @@ void po_get_typedef(Poco_cb* pcb, Poco_frame* pf);
 void po_get_typename(Poco_cb* pcb, Type_info* ti);
 void po_get_declaration(Poco_cb* pcb, Poco_frame* pf);
 
-/* in escape.c */
-
-int translate_escapes(unsigned char* inbuf, unsigned char* outbuf);
-
 /* in fold.c */
 
 void po_fold_const(Poco_cb* pcb, Exp_frame* exp);
@@ -922,16 +902,6 @@ bool po_is_static_init_const(Poco_cb* pcb, Code_buf* cb);
 
 int po_get_param_size(Poco_cb* pcb, SHORT ido_type, bool allow_struct);
 void po_get_function(Poco_cb* pcb, Exp_frame* e);
-
-/* in linklist.c -- protos are in linklist.h, already #included above */
-
-/* in main.c */
-
-bool check_abort(void* nobody);
-size_t get_errtext(Errcode err, char* buf);
-
-/* in errline.c */
-Errcode errline(Errcode err, char* fmt, ...);
 
 /* in pocmemry.c */
 
@@ -946,6 +916,7 @@ char* po_clone_string(Poco_cb* pcb, char* s);
 
 /* in poco.c */
 
+int po_hashfunc(UBYTE* s);
 void po_say_warning(Poco_cb* pcb, char* fmt, ...);
 void po_say_fatal(Poco_cb* pcb, char* fmt, ...);
 void po_say_internal(Poco_cb* pcb, char* fmt, ...);
@@ -1021,6 +992,8 @@ void po_disassemble_program(Poco_run_env* poco_env, FILE* fp);
 
 /* in pocoface.c */
 
+void poco_set_error(PocoVm* vm, const char* fmt, ...);
+Errcode* poco_vm_builtin_error(PocoVm* vm);
 Errcode print_pocolib(char* filename, Poco_lib* lib);
 Poco_lib* po_open_library(Poco_cb* pcb, char* libname, char* id_str);
 char* po_get_libproto_line(Poco_cb* pcb);
@@ -1051,6 +1024,10 @@ const PocoModuleHooks* poco_vm_module_hooks(PocoVm* vm);
 Errcode init_poco_libs(Poco_lib* lib);
 void po_cleanup_libs(Poco_lib* lib);
 void poco_freez(Popot* pt);
+
+/* Weak fallbacks in pocolib.c; an embedding host (Animator) supplies its own. */
+Errcode errline(Errcode err, char* fmt, ...);
+size_t get_errtext(Errcode err, char* buf);
 
 /* in pocotype.c */
 
@@ -1134,7 +1111,6 @@ void po_print_trace(struct PocoActivation* activation, FILE* tfile, Pt_num* stac
 void po_var_init(Poco_cb* pcb, Exp_frame* e, Symbol* var, SHORT frame_type);
 
 /* in poco_ffi.c */
-void poco_set_error(PocoVm* vm, const char* fmt, ...);
 ffi_type* po_ffi_type_from_ido_type(IdoType ido_type);
 Errcode po_ffi_type_from_struct_info(Po_FFI* binding, const Struct_info* struct_info,
 									 ffi_type** out_type);
@@ -1215,8 +1191,8 @@ char getche(void);
 // kiki additions
 #define plural(x) (x == 1 ? "" : "s")
 
-#endif /* POCO_H */
-
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* POCO_INTERNAL_H */

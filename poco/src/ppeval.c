@@ -7,7 +7,7 @@
  *				pp_log_or(pcb) and pp_log_and(pcb) routines.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <stdio.h>
 #include <ctype.h>
 #include "token.h"

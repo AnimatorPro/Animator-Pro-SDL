@@ -7,7 +7,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "pocolib.h"
 #include "ptrmacro.h"
 #include "poco_errcodes.h"

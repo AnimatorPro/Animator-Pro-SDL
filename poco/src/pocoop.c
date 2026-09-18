@@ -17,7 +17,7 @@
  *		>		Added pointer >= <= > < opcodes.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "ptrmacro.h"
 
 #define FUNCPSZ sizeof(int (*)())           /* sizeof of function ptr	   */

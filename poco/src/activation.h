@@ -7,7 +7,7 @@
 #ifndef POCO_ACTIVATION_H
 #define POCO_ACTIVATION_H
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "standard_library.h"
 
 struct Poco_registered_library;

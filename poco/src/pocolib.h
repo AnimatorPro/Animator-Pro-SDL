@@ -10,7 +10,7 @@
 #ifndef POCOLIB_H
 #define POCOLIB_H
 
-#include "poco/poco.h"
+#include <poco/poco.h>
 
 #include <stddef.h>
 #include <stdint.h>

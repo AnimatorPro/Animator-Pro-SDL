@@ -10,7 +10,7 @@
  *				In po_disasm(), added check for op>0 as well as op<numops.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "pocoop.h"
 
 /*****************************************************************************
