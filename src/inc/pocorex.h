@@ -8,10 +8,11 @@
 #ifndef ANIMATOR_POCOREX_COMPAT_H
 #define ANIMATOR_POCOREX_COMPAT_H
 
-/* Keep legacy module callbacks in Animator's error/type domain. */
+/* Keep legacy module callbacks in Animator's error/type domain.  pocolib.h
+ * pulls in <poco/poco_legacy.h>, which declares Pocorex and Setup_Pocorex
+ * alongside the Poco_lib family they extend. */
 #include "errcodes.h"
 #include "stdtypes.h"
 #include "pocolib.h"
-#include "../../poco/src/pocorex.h"
 
 #endif /* ANIMATOR_POCOREX_COMPAT_H */

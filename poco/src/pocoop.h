@@ -2,9 +2,9 @@
 #ifndef POCOOP_H
 #define POCOOP_H
 
-#ifndef STDTYPES_H
+#ifndef POCO_STDTYPES_H
 #include "stdtypes.h"
-#endif /* STDTYPES_H */
+#endif /* POCO_STDTYPES_H */
 
 /****
  **** The op-codes for our stack-based virtual machine

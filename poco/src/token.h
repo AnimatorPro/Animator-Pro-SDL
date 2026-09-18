@@ -17,7 +17,7 @@
 #define TOKEN_H
 
 #include <stdbool.h>
-#ifndef STDTYPES_H
+#ifndef POCO_STDTYPES_H
 #include "stdtypes.h"
 #endif
 

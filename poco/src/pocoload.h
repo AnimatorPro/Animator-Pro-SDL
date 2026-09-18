@@ -11,7 +11,7 @@
 #ifndef POCOLoad_H
 #define POCOLoad_H
 
-#ifndef STDTYPES_H
+#ifndef POCO_STDTYPES_H
 #include "stdtypes.h"
 #endif
 
@@ -19,11 +19,10 @@
 #include "pocolib.h"
 #endif
 
-/*****************************************************************************
- * Forward declarations
- ****************************************************************************/
-
-typedef struct pocorex Pocorex;
+/* Pocorex and Poco_rexlib_get_func are declared by <poco/poco_legacy.h>,
+ * which pocolib.h above includes.  They used to be forward-declared here as
+ * well; that is a typedef redefinition now that the legacy ABI has a single
+ * definition. */
 
 /*****************************************************************************
  * Entry point function signature for POE modules
@@ -45,8 +44,6 @@ typedef struct pocorex Pocorex;
  *   - Linux/macOS: Use __attribute__((visibility("default"))) or compile with -fvisibility=default
  *   - Windows: Use __declspec(dllexport)
  ****************************************************************************/
-
-typedef Pocorex* (*Poco_rexlib_get_func)(void);
 
 /*****************************************************************************
  * POE Module Requirements

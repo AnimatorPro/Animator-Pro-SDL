@@ -129,9 +129,14 @@ set_target_properties(poco_core PROPERTIES
     # Keep the static archive linkable into shared hosts (frameworks, plugins).
     POSITION_INDEPENDENT_CODE ON
 )
+# compat/ carries the deprecated Poco_lib/Pocorex layouts shared with legacy
+# hosts and native POE modules.  It is BUILD_INTERFACE only and is never
+# installed: <poco/poco.h> remains the whole of Poco's public surface, and an
+# external consumer has no legacy ABI to be compatible with.
 target_include_directories(poco_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/compat>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

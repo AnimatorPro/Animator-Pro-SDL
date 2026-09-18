@@ -8,7 +8,7 @@
 #ifndef POCOFACE_H
 #define POCOFACE_H
 
-#include "commonst.h"
+#include "poco_names.h"
 #ifndef POCOLIB_H
 #include "pocolib.h"
 #endif

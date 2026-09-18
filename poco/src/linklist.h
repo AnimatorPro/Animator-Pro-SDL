@@ -1,23 +1,18 @@
 /*
  * Simple intrusive doubly-linked list helpers for Poco.
  *
- * Dlheader is part of the legacy Poco_lib compatibility ABI.  Keep its
- * three-pointer sentinel layout in sync with Animator while legacy callers
- * still exchange Poco_lib values across the boundary.
+ * Dlnode/Dlheader are part of the legacy Poco_lib compatibility ABI, so their
+ * layout is owned by <poco/poco_legacy_types.h> and shared with Animator
+ * rather than repeated here.  This header adds only Poco's private helpers.
+ *
+ * The guard is POCO_LINKLIST_H, not LINKLIST_H: Animator has a linklist.h of
+ * its own, and the two files sharing one guard used to be the only thing
+ * keeping their definitions apart.
  */
-#ifndef LINKLIST_H
-#define LINKLIST_H
+#ifndef POCO_LINKLIST_H
+#define POCO_LINKLIST_H
 
-typedef struct Dlnode {
-	struct Dlnode* next;
-	struct Dlnode* prev;
-} Dlnode;
-
-typedef struct Dlheader {
-	Dlnode* head;
-	Dlnode* tail;
-	Dlnode* tails_prev;
-} Dlheader;
+#include <poco/poco_legacy_types.h>
 
 #define RNODE_FIELDS \
 	Dlnode node;     \
@@ -53,4 +48,4 @@ static inline void rem_from_list(Dlheader* h, Dlnode* n)
 	rem_node(n);
 }
 
-#endif /* LINKLIST_H */
+#endif /* POCO_LINKLIST_H */

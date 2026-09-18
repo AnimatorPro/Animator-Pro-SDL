@@ -2,8 +2,9 @@
  * Compatibility-only Animator header.
  *
  * Deprecated for new Animator code: use <poco/poco.h>.  Legacy Poco ABI
- * types are defined only by poco/src/pocolib.h; this file retains solely
- * Animator's private library-table declarations for the migration period.
+ * types are defined only by <poco/poco_legacy.h>, reached through Poco::poco
+ * like any other exported header; this file retains solely Animator's private
+ * library-table declarations for the migration period.
  *
  * The Polib* layouts below are the Animator-only native-POE function-table ABI.
  * They are not Poco script-to-C/libffi binding dispatch and must not be
@@ -14,11 +15,17 @@
 #ifndef ANIMATOR_POCOLIB_COMPAT_H
 #define ANIMATOR_POCOLIB_COMPAT_H
 
-/* Keep the Animator error/type domain at this adapter boundary. */
+/* Keep the Animator error/type domain at this adapter boundary.  Animator owns
+ * BYTE/UBYTE/SHORT/USHORT and Dlnode/Dlheader for the whole program -
+ * including builds configured without Poco, which never see a Poco header -
+ * so the legacy compat header is told not to define them again. */
 #include "errcodes.h"
 #include "stdtypes.h"
 #include "linklist.h"
-#include "../../poco/src/pocolib.h"
+
+#define POCO_LEGACY_HOST_SCALAR_TYPES 1
+#define POCO_LEGACY_HOST_LIST_TYPES 1
+#include <poco/poco_legacy.h>
 
 #ifndef PUBLIC_CODE
 

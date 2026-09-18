@@ -73,7 +73,7 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
 						((long*)OPTR(code, sizeof(int)))[0]);
 				break;
 			case OEX_LONG:
-				fprintf(f, "\t%d", ((LONG*)code)[0]);
+				fprintf(f, "\t%ld", ((long*)code)[0]);
 				break;
 			case OEX_POINTER:
 				pp_code = (Popot*)code;
