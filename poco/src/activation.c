@@ -4,13 +4,24 @@
 
 #include "activation.h"
 #include "debug_internal.h"
+#include "poco_errcodes.h"
+#include "pocoface.h"
+#include "pocolib.h"
 #include "pocoload.h"
+#include "pocotype.h"
+#include "program_internal.h"
+#include "runops.h"
+#include "strlib.h"
+#include "vm_api.h"
+#include "vm_diagnostics.h"
 
+#include <float.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "pocoface.h"
+
+static Errcode po_pev_alloc_data(PocoActivation* activation);
 
 static void free_libraries(Poco_lib* library);
 static void free_program_libraries(Poco_program_library* library);
@@ -445,4 +456,674 @@ Func_frame* poco_activation_callback_handle(PocoActivation* activation,
 		}
 	}
 	return NULL;
+}
+
+/*
+ * Copy a run's private diagnostic message into the shared program VM so a host
+ * that inspects the program after the activation returns sees the last error.
+ */
+void po_activation_publish_last_error(PocoActivation* activation)
+{
+	PocoVm* shared;
+
+	if (activation == NULL || activation->vm == NULL || activation->program == NULL) {
+		return;
+	}
+	shared = activation->program->vm;
+	if (shared == NULL || activation->vm->last_error[0] == '\0') {
+		return;
+	}
+	po_vm_diagnostic_lock(shared);
+	memcpy(shared->last_error, activation->vm->last_error, sizeof(shared->last_error));
+	po_vm_diagnostic_unlock(shared);
+}
+
+typedef struct Poco_api_cancel_context {
+	PocoCancelCallback callback;
+	void* user_data;
+} Poco_api_cancel_context;
+
+static bool poco_api_cancel(void* context)
+{
+	Poco_api_cancel_context* cancel_context = context;
+
+	return cancel_context != NULL && cancel_context->callback != NULL &&
+		   cancel_context->callback(cancel_context->user_data) != 0;
+}
+
+static const Symbol* poco_activation_find_global(const PocoActivation* activation, const char* name)
+{
+	const Func_frame* frame;
+	const Symbol* symbol;
+
+	if (activation == NULL || activation->code == NULL || activation->code->functions == NULL ||
+		name == NULL) {
+		return NULL;
+	}
+	for (frame = activation->code->functions; frame != NULL; frame = frame->next) {
+		if (frame->got_code) {
+			continue;
+		}
+		for (symbol = frame->parameters; symbol != NULL; symbol = symbol->link) {
+			if (symbol->tok_type == PTOK_VAR && symbol->storage_scope == SCOPE_GLOBAL &&
+				(symbol->ti->flags & TFL_EXTERN) == 0 && strcmp(symbol->name, name) == 0) {
+				return symbol;
+			}
+		}
+	}
+	return NULL;
+}
+
+static void* poco_activation_global_storage(PocoActivation* activation, const Symbol* symbol,
+											size_t value_size)
+{
+	long offset;
+
+	if (activation == NULL || symbol == NULL || activation->data == NULL ||
+		activation->data_size < 0 || symbol->symval.doff > 0 ||
+		(long)symbol->symval.doff < -activation->data_size) {
+		return NULL;
+	}
+	offset = activation->data_size + (long)symbol->symval.doff;
+	if (value_size > (size_t)(activation->data_size - offset)) {
+		return NULL;
+	}
+	return activation->data + offset;
+}
+
+static int poco_popot_is_bounded(Popot value)
+{
+	uintptr_t current;
+	uintptr_t minimum;
+	uintptr_t maximum;
+
+	if (value.pt == NULL) {
+		return 1;
+	}
+	if (value.min == NULL || value.max == NULL) {
+		return 0;
+	}
+	current = (uintptr_t)value.pt;
+	minimum = (uintptr_t)value.min;
+	maximum = (uintptr_t)value.max;
+	return minimum <= current && current <= maximum;
+}
+
+PocoStatus poco_activation_acquire(PocoProgram* program, PocoActivation** out_activation)
+{
+	Errcode status;
+	PocoVm* vm;
+
+	if (program == NULL || out_activation == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	*out_activation = NULL;
+	vm = program->vm;
+	if (vm == NULL || vm->destroy_requested) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	status = poco_activation_create(program, &program->code, vm, out_activation);
+	return (PocoStatus)status;
+}
+
+PocoStatus poco_activation_reset(PocoActivation* activation)
+{
+	PocoVm* vm;
+
+	if (activation == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	if (activation->program == NULL) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	vm = activation->program->vm;
+	if (vm == NULL || vm->destroy_requested) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	return (PocoStatus)poco_activation_reset_state(activation);
+}
+
+PocoStatus poco_activation_init(PocoActivation* activation)
+{
+	Errcode init_status;
+	long error_line = 0;
+	PocoVm* vm;
+
+	if (activation == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	if (activation->program == NULL || activation->program->vm == NULL) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	vm = activation->program->vm;
+	if (vm->destroy_requested || activation->needs_reset) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	activation->err_line = &error_line;
+	init_status = po_pev_alloc_data(activation);
+	activation->err_line = NULL;
+	po_activation_publish_last_error(activation);
+	if (init_status != Success) {
+		po_vm_report(vm, (PocoStatus)init_status, NULL, error_line, 0,
+					 "Poco global initialization failed");
+	}
+	return (PocoStatus)init_status;
+}
+
+PocoStatus poco_activation_set_global(PocoActivation* activation, const char* name,
+									  PocoCallbackValue value)
+{
+	const Symbol* symbol;
+	const Type_info* type;
+	void* storage;
+
+	if (activation == NULL || name == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	if (activation->program == NULL || activation->program->vm == NULL) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	symbol = poco_activation_find_global(activation, name);
+	if (symbol == NULL) {
+		return POCO_STATUS_NOT_FOUND;
+	}
+	type = symbol->ti;
+	if (type == NULL || po_is_array((Type_info*)type)) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	if (po_is_pointer((Type_info*)type)) {
+		Popot converted;
+
+		if (value.kind != POCO_CALLBACK_VALUE_POPOT ||
+			!poco_popot_is_bounded(value.value.popot_value)) {
+			return POCO_STATUS_PARAMETER_RANGE;
+		}
+		storage = poco_activation_global_storage(activation, symbol, sizeof(Popot));
+		if (storage == NULL) {
+			return POCO_STATUS_PARAMETER_RANGE;
+		}
+		converted = value.value.popot_value;
+		if (converted.pt == NULL) {
+			converted.min = NULL;
+			converted.max = NULL;
+		}
+		memcpy(storage, &converted, sizeof(converted));
+		return POCO_STATUS_OK;
+	}
+	if (type->comp_count != 1) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	switch (type->comp[0]) {
+		case TYPE_CHAR: {
+			char converted;
+			if (value.kind != POCO_CALLBACK_VALUE_INT || value.value.int_value < CHAR_MIN ||
+				value.value.int_value > CHAR_MAX) {
+				return POCO_STATUS_PARAMETER_RANGE;
+			}
+			converted = (char)value.value.int_value;
+			storage = poco_activation_global_storage(activation, symbol, sizeof(converted));
+			if (storage != NULL) {
+				memcpy(storage, &converted, sizeof(converted));
+			}
+			break;
+		}
+		case TYPE_SHORT: {
+			short converted;
+			if (value.kind != POCO_CALLBACK_VALUE_INT || value.value.int_value < SHRT_MIN ||
+				value.value.int_value > SHRT_MAX) {
+				return POCO_STATUS_PARAMETER_RANGE;
+			}
+			converted = (short)value.value.int_value;
+			storage = poco_activation_global_storage(activation, symbol, sizeof(converted));
+			if (storage != NULL) {
+				memcpy(storage, &converted, sizeof(converted));
+			}
+			break;
+		}
+		case TYPE_INT:
+			if (value.kind != POCO_CALLBACK_VALUE_INT) {
+				return POCO_STATUS_PARAMETER_RANGE;
+			}
+			storage =
+				poco_activation_global_storage(activation, symbol, sizeof(value.value.int_value));
+			if (storage != NULL) {
+				memcpy(storage, &value.value.int_value, sizeof(value.value.int_value));
+			}
+			break;
+		case TYPE_LONG:
+			if (value.kind != POCO_CALLBACK_VALUE_LONG) {
+				return POCO_STATUS_PARAMETER_RANGE;
+			}
+			storage =
+				poco_activation_global_storage(activation, symbol, sizeof(value.value.long_value));
+			if (storage != NULL) {
+				memcpy(storage, &value.value.long_value, sizeof(value.value.long_value));
+			}
+			break;
+		case TYPE_FLOAT: {
+			float converted;
+			if (value.kind != POCO_CALLBACK_VALUE_DOUBLE || value.value.double_value < -FLT_MAX ||
+				value.value.double_value > FLT_MAX) {
+				return POCO_STATUS_PARAMETER_RANGE;
+			}
+			converted = (float)value.value.double_value;
+			storage = poco_activation_global_storage(activation, symbol, sizeof(converted));
+			if (storage != NULL) {
+				memcpy(storage, &converted, sizeof(converted));
+			}
+			break;
+		}
+		case TYPE_DOUBLE:
+			if (value.kind != POCO_CALLBACK_VALUE_DOUBLE) {
+				return POCO_STATUS_PARAMETER_RANGE;
+			}
+			storage = poco_activation_global_storage(activation, symbol,
+													 sizeof(value.value.double_value));
+			if (storage != NULL) {
+				memcpy(storage, &value.value.double_value, sizeof(value.value.double_value));
+			}
+			break;
+		default:
+			return POCO_STATUS_PARAMETER_RANGE;
+	}
+	return storage != NULL ? POCO_STATUS_OK : POCO_STATUS_PARAMETER_RANGE;
+}
+
+PocoCallbackValue poco_activation_get_global(PocoActivation* activation, const char* name)
+{
+	PocoCallbackValue value = po_invalid_callback_value();
+	const Symbol* symbol;
+	const Type_info* type;
+	const void* storage;
+
+	if (activation == NULL || name == NULL || activation->program == NULL ||
+		activation->program->vm == NULL) {
+		return value;
+	}
+	symbol = poco_activation_find_global(activation, name);
+	if (symbol == NULL || symbol->ti == NULL || po_is_array(symbol->ti)) {
+		return value;
+	}
+	type = symbol->ti;
+	if (po_is_pointer((Type_info*)type)) {
+		storage =
+			poco_activation_global_storage(activation, symbol, sizeof(value.value.popot_value));
+		if (storage != NULL) {
+			memcpy(&value.value.popot_value, storage, sizeof(value.value.popot_value));
+			if (poco_popot_is_bounded(value.value.popot_value)) {
+				if (value.value.popot_value.pt == NULL) {
+					value.value.popot_value.min = NULL;
+					value.value.popot_value.max = NULL;
+				}
+				value.kind = POCO_CALLBACK_VALUE_POPOT;
+			} else {
+				value = po_invalid_callback_value();
+			}
+		}
+		return value;
+	}
+	if (type->comp_count != 1) {
+		return value;
+	}
+	switch (type->comp[0]) {
+		case TYPE_CHAR: {
+			char stored;
+			storage = poco_activation_global_storage(activation, symbol, sizeof(stored));
+			if (storage != NULL) {
+				memcpy(&stored, storage, sizeof(stored));
+				value.kind = POCO_CALLBACK_VALUE_INT;
+				value.value.int_value = stored;
+			}
+			break;
+		}
+		case TYPE_SHORT: {
+			short stored;
+			storage = poco_activation_global_storage(activation, symbol, sizeof(stored));
+			if (storage != NULL) {
+				memcpy(&stored, storage, sizeof(stored));
+				value.kind = POCO_CALLBACK_VALUE_INT;
+				value.value.int_value = stored;
+			}
+			break;
+		}
+		case TYPE_INT:
+			storage =
+				poco_activation_global_storage(activation, symbol, sizeof(value.value.int_value));
+			if (storage != NULL) {
+				value.kind = POCO_CALLBACK_VALUE_INT;
+				memcpy(&value.value.int_value, storage, sizeof(value.value.int_value));
+			}
+			break;
+		case TYPE_LONG:
+			storage =
+				poco_activation_global_storage(activation, symbol, sizeof(value.value.long_value));
+			if (storage != NULL) {
+				value.kind = POCO_CALLBACK_VALUE_LONG;
+				memcpy(&value.value.long_value, storage, sizeof(value.value.long_value));
+			}
+			break;
+		case TYPE_FLOAT: {
+			float stored;
+			storage = poco_activation_global_storage(activation, symbol, sizeof(stored));
+			if (storage != NULL) {
+				memcpy(&stored, storage, sizeof(stored));
+				value.kind = POCO_CALLBACK_VALUE_DOUBLE;
+				value.value.double_value = stored;
+			}
+			break;
+		}
+		case TYPE_DOUBLE:
+			storage = poco_activation_global_storage(activation, symbol,
+													 sizeof(value.value.double_value));
+			if (storage != NULL) {
+				value.kind = POCO_CALLBACK_VALUE_DOUBLE;
+				memcpy(&value.value.double_value, storage, sizeof(value.value.double_value));
+			}
+			break;
+		default:
+			break;
+	}
+	return value;
+}
+
+static int poco_type_is_exact(const Type_info* type, TypeComp component)
+{
+	return type != NULL && type->comp_count == 1 && type->comp[0] == component;
+}
+
+static int poco_type_is_char_double_pointer(const Type_info* type)
+{
+	return type != NULL && type->comp_count == 3 && type->comp[0] == TYPE_CHAR &&
+		   type->comp[1] == TYPE_POINTER && type->comp[2] == TYPE_POINTER;
+}
+
+PocoStatus poco_activation_run_main(PocoActivation* activation, int argc, char** argv,
+									int32_t* out_result)
+{
+	PocoCallbackValue arguments[2];
+	const Func_frame* main_frame;
+	const Symbol* parameter;
+	PocoStatus status;
+	Pt_num result = {0};
+	Popot marshaled_argv = {NULL, NULL, NULL};
+	long error_line = 0;
+	int returns_int;
+
+	if (activation == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	if (activation->program == NULL || activation->program->vm == NULL ||
+		activation->program->vm->destroy_requested || activation->needs_reset) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	main_frame = po_activation_find_function(activation, "main");
+	if (main_frame == NULL) {
+		return (PocoStatus)Err_no_main;
+	}
+	returns_int = poco_type_is_exact(main_frame->return_type, TYPE_INT);
+	if (!returns_int && !poco_type_is_exact(main_frame->return_type, TYPE_VOID)) {
+		po_vm_report(activation->program->vm, POCO_STATUS_PARAMETER_RANGE, NULL, 0, 0,
+					 "main must return int or void");
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	if (main_frame->pcount == 0 && main_frame->parameters == NULL) {
+		activation->err_line = &error_line;
+		activation->needs_reset = 1;
+		status = (PocoStatus)po_activation_run_entry_values(activation, "main", NULL, 0, &result);
+	} else {
+		parameter = main_frame->parameters;
+		if (main_frame->pcount != 2 || parameter == NULL ||
+			!poco_type_is_exact(parameter->ti, TYPE_INT) || parameter->link == NULL ||
+			!poco_type_is_char_double_pointer(parameter->link->ti) ||
+			parameter->link->link != NULL) {
+			po_vm_report(activation->program->vm, POCO_STATUS_PARAMETER_RANGE, NULL, 0, 0,
+						 "main parameters must be empty or exactly (int, char **)");
+			return POCO_STATUS_PARAMETER_RANGE;
+		}
+		status =
+			(PocoStatus)poco_activation_marshal_main_argv(activation, argc, argv, &marshaled_argv);
+		if (status != POCO_STATUS_OK) {
+			return status;
+		}
+		arguments[0].kind = POCO_CALLBACK_VALUE_INT;
+		arguments[0].value.int_value = argc;
+		arguments[1].kind = POCO_CALLBACK_VALUE_POPOT;
+		arguments[1].value.popot_value = marshaled_argv;
+		activation->err_line = &error_line;
+		activation->needs_reset = 1;
+		status =
+			(PocoStatus)po_activation_run_entry_values(activation, "main", arguments, 2, &result);
+	}
+	activation->err_line = NULL;
+	poco_activation_release_main_argv(activation);
+	po_activation_publish_last_error(activation);
+	if (status != POCO_STATUS_OK) {
+		po_vm_report(activation->program->vm, status, NULL, error_line, 0,
+					 "Poco main execution failed");
+		return status;
+	}
+	if (out_result != NULL) {
+		*out_result = returns_int ? result.i : 0;
+	}
+	return POCO_STATUS_OK;
+}
+
+PocoStatus poco_activation_run(PocoActivation* activation, const PocoRunOptions* options,
+							   int32_t* out_result)
+{
+	Errcode run_status;
+	long error_line = 0;
+	PocoVm* vm;
+	Poco_api_cancel_context cancel_context;
+
+	if (activation == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	if (activation->program == NULL || activation->program->vm == NULL) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	vm = activation->program->vm;
+	if (vm->destroy_requested || activation->needs_reset) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	cancel_context.callback = options != NULL ? options->cancel_callback : NULL;
+	cancel_context.user_data = options != NULL ? options->cancel_user_data : NULL;
+	activation->enable_debug_trace = true;
+	activation->check_abort = cancel_context.callback != NULL ? poco_api_cancel : NULL;
+	activation->check_abort_data = cancel_context.callback != NULL ? &cancel_context : NULL;
+	activation->trace_file = options != NULL ? options->trace_file : NULL;
+	activation->err_line = &error_line;
+	run_status = po_pev_alloc_data(activation);
+	activation->needs_reset = 1;
+	if (run_status == Success) {
+		run_status = po_activation_run_entry(activation, "main");
+	}
+	/* The legacy interpreter formats library errors for its trace and returns
+	 * Err_in_err_file.  Preserve the precise new FFI boundary status at the
+	 * public VM API so a host can distinguish a rejected span from a generic
+	 * reported script failure. */
+	if (run_status == Err_in_err_file && activation->builtin_error == Err_poco_ffi_bounds) {
+		run_status = Err_poco_ffi_bounds;
+	}
+	if (run_status == Success && out_result != NULL) {
+		*out_result = activation->result.i;
+	}
+	po_activation_publish_last_error(activation);
+	if (run_status != Success) {
+		po_vm_report(vm, (PocoStatus)run_status, NULL, error_line, 0,
+					 "Poco program execution failed");
+	}
+	return (PocoStatus)run_status;
+}
+
+void poco_activation_release(PocoActivation* activation)
+{
+	poco_activation_destroy(activation);
+}
+
+/*****************************************************************************
+ * clear an activation's data area.
+ ****************************************************************************/
+static void po_pev_free_data(PocoActivation* activation)
+{
+	if (activation != NULL && activation->data != NULL) {
+		memset(activation->data, 0, (size_t)activation->code->data_size);
+	}
+}
+
+static void po_activation_cleanup_libs(PocoActivation* activation)
+{
+	if (activation == NULL || !activation->libraries_initialized) {
+		return;
+	}
+	po_cleanup_libs(activation->loaded_libraries);
+	po_cleanup_libs(activation->builtin_libraries);
+	activation->libraries_initialized = 0;
+}
+
+static Errcode po_activation_init_libs(PocoActivation* activation)
+{
+	Errcode err;
+
+	if ((err = po_init_libs(activation->builtin_libraries)) < Success) {
+		po_cleanup_libs(activation->builtin_libraries);
+		return err;
+	}
+	if ((err = po_init_libs(activation->loaded_libraries)) < Success) {
+		po_cleanup_libs(activation->loaded_libraries);
+		po_cleanup_libs(activation->builtin_libraries);
+		return err;
+	}
+	activation->libraries_initialized = 1;
+	return Success;
+}
+
+/*****************************************************************************
+ * alloc an activation's stack and data areas. run data init code.
+ * this routine should only be called after a successfull compile.
+ ****************************************************************************/
+static Errcode po_pev_alloc_data(PocoActivation* activation)
+{
+	Errcode err;
+	const Func_frame* frame;
+	size_t unit_index;
+	size_t unit_count = 0;
+
+	po_activation_cleanup_libs(activation);
+	activation->initialized = 0;
+	po_pev_free_data(activation);
+	if ((err = po_activation_init_libs(activation)) < Success) {
+		return err;
+	}
+	for (frame = activation->code->functions; frame != NULL; frame = frame->next) {
+		if (!frame->got_code && frame->unit_index >= unit_count) {
+			unit_count = frame->unit_index + 1;
+		}
+	}
+	for (unit_index = 0; unit_index < unit_count; ++unit_index) {
+		for (frame = activation->code->functions; frame != NULL; frame = frame->next) {
+			if (!frame->got_code && frame->unit_index == unit_index) {
+				err = po_run_ops(activation, frame->code_pt, NULL);
+				if (err < Success) {
+					goto ERR;
+				}
+				break;
+			}
+		}
+	}
+	activation->initialized = 1;
+
+	return Success;
+
+ERR:
+	po_activation_cleanup_libs(activation);
+	po_pev_free_data(activation);
+	return err;
+}
+
+/*****************************************************************************
+ * find a fuf for a function with a given name.
+ * (linear search...slow, slow.  added first-char quick check to help a bit).
+ ****************************************************************************/
+const Func_frame* po_activation_find_function(const PocoActivation* activation, const char* name)
+{
+	const Func_frame* f;
+
+	f = activation->code->functions;
+	while (f != NULL) {
+		if (f->name[0] == *name) {
+			if (po_eqstrcmp(f->name, name) == 0) {
+				break;
+			}
+		}
+		f = f->next;
+	}
+	return (f);
+}
+
+/*****************************************************************************
+ * run a given function from a compiled poco program.
+ * (at this point in development, the 'given function' had better be 'main'!)
+ ****************************************************************************/
+static Errcode run_file(PocoActivation* activation, const char* entry)
+{
+	const Func_frame* f;
+
+	if ((f = po_activation_find_function(activation, entry)) == NULL) {
+		return (Err_no_main);
+	}
+	return po_run_ops(activation, f->code_pt, NULL);
+}
+
+static Errcode run_file_values(PocoActivation* activation, const char* entry,
+							   const PocoCallbackValue* values, size_t value_count, Pt_num* result)
+{
+	const Func_frame* f;
+
+	if ((f = po_activation_find_function(activation, entry)) == NULL) {
+		return Err_no_main;
+	}
+	return po_run_ops_values(activation, f->code_pt, result, values, value_count);
+}
+
+/*****************************************************************************
+ * run a given function from a poco program after init'ing the libs.
+ ****************************************************************************/
+Errcode po_activation_run_entry(PocoActivation* activation, const char* entry)
+{
+	PocoVm* previous_vm = poco_push_active_vm(activation->vm);
+	Errcode err;
+
+	if (!activation->libraries_initialized) {
+		if ((err = po_activation_init_libs(activation)) < Success) {
+			poco_pop_active_vm(previous_vm);
+			return err;
+		}
+	}
+	err = run_file(activation, entry);
+	po_activation_cleanup_libs(activation);
+	poco_pop_active_vm(previous_vm);
+	return (err);
+}
+
+Errcode po_activation_run_entry_values(PocoActivation* activation, const char* entry,
+									   const PocoCallbackValue* values, size_t value_count,
+									   Pt_num* result)
+{
+	PocoVm* previous_vm = poco_push_active_vm(activation->vm);
+	Errcode err;
+	int top_level = activation->run_depth == 0;
+
+	if (!activation->libraries_initialized) {
+		if ((err = po_activation_init_libs(activation)) < Success) {
+			poco_pop_active_vm(previous_vm);
+			return err;
+		}
+	}
+	err = run_file_values(activation, entry, values, value_count, result);
+	if (top_level) {
+		po_activation_cleanup_libs(activation);
+	}
+	poco_pop_active_vm(previous_vm);
+	return err;
 }

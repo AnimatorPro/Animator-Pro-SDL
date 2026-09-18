@@ -51,8 +51,8 @@ char* po_fuf_name(void* fuf);
 #define POCO_ERR_IN_ERR_FILE (-11)
 
 /*----------------------------------------------------------------------------
- * The rest of pocoface.c: VM-scoped diagnostics, the library loader and the
- * compile entry points.
+ * VM-scoped diagnostics (vm_diagnostics.c), the library prototype feed
+ * (libproto.c) and the compile entry points (compile_driver.c).
  *
  * Two of these take the compiler control block and one returns the pointer
  * registry.  Both are named by struct tag rather than by typedef so that this

@@ -159,6 +159,27 @@ void poco_activation_release_main_argv(PocoActivation* activation);
 Func_frame* poco_activation_callback_handle(PocoActivation* activation,
 											const Func_frame* compiled_frame);
 
+/* Copy a finished run's private diagnostic text into the shared program VM. */
+void po_activation_publish_last_error(PocoActivation* activation);
+
+/* Linear lookup of a compiled function by name; NULL when there is none. */
+const Func_frame* po_activation_find_function(const PocoActivation* activation, const char* name);
+
+/* Run a named entry with marshalled arguments, initializing the activation's
+ * libraries first and tearing them down again at the outermost call. */
+Errcode po_activation_run_entry_values(PocoActivation* activation, const char* entry,
+									   const PocoCallbackValue* values, size_t value_count,
+									   Pt_num* result);
+
+/* Inline so the call path that builds a result value per invocation does not
+ * pay a cross-translation-unit call for a two-field struct. */
+static inline PocoCallbackValue po_invalid_callback_value(void)
+{
+	PocoCallbackValue value = {POCO_CALLBACK_VALUE_INVALID, {0}};
+
+	return value;
+}
+
 Errcode po_ffi_activation_calls_create(PocoActivation* activation);
 void po_ffi_activation_calls_reset(PocoActivation* activation);
 void po_ffi_activation_calls_release(PocoActivation* activation);
