@@ -1,41 +1,35 @@
 include(PocoModule)
 
-set(POCO_MODULE_TEST_INSTALL_DIR "tests")
+# Fixtures run from the build tree, never from an install prefix.  Collecting
+# the modules and their scripts in one directory lets the loader resolve each
+# module through the ordinary script-directory search.
+set(POCO_MODULE_API_DIR "${CMAKE_CURRENT_BINARY_DIR}/modules")
+file(MAKE_DIRECTORY "${POCO_MODULE_API_DIR}")
 
-poco_add_module(poco_generic_module
-    SOURCES generic.c
-    INSTALL_DIR "${POCO_MODULE_TEST_INSTALL_DIR}"
-)
+function(add_module_api_fixture TARGET SOURCE)
+    poco_add_module(${TARGET} SOURCES ${SOURCE})
+    set_target_properties(${TARGET} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${POCO_MODULE_API_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY "${POCO_MODULE_API_DIR}"
+    )
+endfunction()
 
-poco_add_module(poco_generic_bad_version
-    SOURCES bad_version.c
-    INSTALL_DIR "${POCO_MODULE_TEST_INSTALL_DIR}"
-)
-
-poco_add_module(poco_generic_empty
-    SOURCES empty.c
-    INSTALL_DIR "${POCO_MODULE_TEST_INSTALL_DIR}"
-)
+add_module_api_fixture(poco_generic_module generic.c)
+add_module_api_fixture(poco_generic_bad_version bad_version.c)
+add_module_api_fixture(poco_generic_empty empty.c)
 
 # This intentionally has neither the generic entry point nor the legacy
 # compatibility entry point.
-poco_add_module(poco_generic_missing_entry
-    SOURCES missing_entry.c
-    INSTALL_DIR "${POCO_MODULE_TEST_INSTALL_DIR}"
-)
+add_module_api_fixture(poco_generic_missing_entry missing_entry.c)
 
-install(FILES
-    generic.poc
-    missing_entry.poc
-    bad_version.poc
-    empty.poc
-    DESTINATION tests
-)
+foreach(script IN ITEMS generic missing_entry bad_version empty)
+    configure_file("${script}.poc" "${POCO_MODULE_API_DIR}/${script}.poc" COPYONLY)
+endforeach()
 
 add_test(
     NAME poco_generic_module_valid
-    COMMAND "${CMAKE_INSTALL_PREFIX}/poco" "${CMAKE_INSTALL_PREFIX}/tests/generic.poc"
-    WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
+    COMMAND $<TARGET_FILE:poco> "${POCO_MODULE_API_DIR}/generic.poc"
+    WORKING_DIRECTORY "${POCO_MODULE_API_DIR}"
 )
 set_tests_properties(poco_generic_module_valid PROPERTIES
     PASS_REGULAR_EXPRESSION "generic module loaded"
@@ -50,8 +44,8 @@ foreach(outcome IN ITEMS missing_entry bad_version empty)
     add_test(
         NAME "poco_generic_module_${outcome}"
         COMMAND "${CMAKE_COMMAND}"
-            "-DPOCO_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/poco"
-            "-DPOCO_SCRIPT=${CMAKE_INSTALL_PREFIX}/tests/${outcome}.poc"
+            "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+            "-DPOCO_SCRIPT=${POCO_MODULE_API_DIR}/${outcome}.poc"
             "-DEXPECTED_TEXT=${POCO_MODULE_OUTCOME_${outcome}}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-outcome.cmake"
     )

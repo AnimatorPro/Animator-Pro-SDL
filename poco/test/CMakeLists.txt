@@ -180,69 +180,20 @@ add_poco_neg_test(type_funcptr_params "neg/type_funcptr_params.poc")
 add_poco_neg_test(undefined_var "neg/undefined_var.poc")
 add_poco_neg_test(void_return_value "neg/void_return_value.poc")
 
-# Library loading error tests - install test files first
-INSTALL(FILES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib01.poc
-    ${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib02.poc
-    ${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib03.poc
-    ${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib04.poc
-    ${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib05.poc
-    DESTINATION tests
-)
-
-# Define tests using installed files
+# Library loading error tests.  A bare WILL_FAIL cannot distinguish the
+# diagnostic under test from a missing fixture, so each test matches the exact
+# loader message instead.  nlib02-nlib05 need a malformed module on the search
+# path and are registered beside those fixtures in poco/poekit/test_libs; only
+# the not-found case is fixture-free.  CMAKE_CURRENT_BINARY_DIR holds no .poe
+# files, so it is a search path on which nothing can resolve.
 add_test(
     NAME "poco_neg_lib01_not_found"
-    COMMAND ${CMAKE_INSTALL_PREFIX}/poco ${CMAKE_INSTALL_PREFIX}/tests/nlib01.poc
-    WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
+    COMMAND $<TARGET_FILE:poco> "${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib01.poc"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 set_tests_properties("poco_neg_lib01_not_found" PROPERTIES
-    WILL_FAIL TRUE
+    PASS_REGULAR_EXPRESSION "'nonexistent_library' not found in search paths"
     TIMEOUT 10
-)
-
-add_test(
-    NAME "poco_neg_lib02_no_entry"
-    COMMAND ${CMAKE_INSTALL_PREFIX}/poco ${CMAKE_INSTALL_PREFIX}/tests/nlib02.poc
-    WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
-)
-set_tests_properties("poco_neg_lib02_no_entry" PROPERTIES
-    WILL_FAIL TRUE
-    TIMEOUT 10
-    DEPENDS test_noentry
-)
-
-add_test(
-    NAME "poco_neg_lib03_null_ret"
-    COMMAND ${CMAKE_INSTALL_PREFIX}/poco ${CMAKE_INSTALL_PREFIX}/tests/nlib03.poc
-    WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
-)
-set_tests_properties("poco_neg_lib03_null_ret" PROPERTIES
-    WILL_FAIL TRUE
-    TIMEOUT 10
-    DEPENDS test_nullret
-)
-
-add_test(
-    NAME "poco_neg_lib04_bad_ver"
-    COMMAND ${CMAKE_INSTALL_PREFIX}/poco ${CMAKE_INSTALL_PREFIX}/tests/nlib04.poc
-    WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
-)
-set_tests_properties("poco_neg_lib04_bad_ver" PROPERTIES
-    WILL_FAIL TRUE
-    TIMEOUT 10
-    DEPENDS test_badver
-)
-
-add_test(
-    NAME "poco_neg_lib05_empty"
-    COMMAND ${CMAKE_INSTALL_PREFIX}/poco ${CMAKE_INSTALL_PREFIX}/tests/nlib05.poc
-    WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
-)
-set_tests_properties("poco_neg_lib05_empty" PROPERTIES
-    WILL_FAIL TRUE
-    TIMEOUT 10
-    DEPENDS test_empty
 )
 
 

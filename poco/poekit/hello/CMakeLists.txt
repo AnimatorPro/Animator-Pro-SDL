@@ -11,10 +11,14 @@ poco_add_module(hello
     INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/tests
 )
 install(FILES hello.poc DESTINATION ${CMAKE_INSTALL_PREFIX}/tests)
+
+# The test runs against the build tree so it does not require `cmake --install`
+# to have been run, and so it cannot silently exercise a stale or foreign
+# module left in the install prefix.
 add_test(
     NAME poco_generic_hello
-    COMMAND ${CMAKE_INSTALL_PREFIX}/poco ${CMAKE_INSTALL_PREFIX}/tests/hello.poc
-    WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+    COMMAND $<TARGET_FILE:poco> "${CMAKE_CURRENT_SOURCE_DIR}/hello.poc"
+    WORKING_DIRECTORY "$<TARGET_FILE_DIR:hello>"
 )
 set_tests_properties(poco_generic_hello PROPERTIES
     PASS_REGULAR_EXPRESSION "Test completed successfully!"

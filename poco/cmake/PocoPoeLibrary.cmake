@@ -12,6 +12,7 @@
 #       [INCLUDES include-dir ...]
 #       [DEPS dependency-target ...]
 #       [OUTPUT_NAME module-file-name]
+#       [NO_INSTALL]
 #       [INSTALL_DIR destination]
 #       [RPATH path]
 #       [TEST_FILE script.poc]
@@ -23,11 +24,16 @@ include(CMakeParseArguments)
 function(add_poe_library TARGET)
     cmake_parse_arguments(
         POE
-        ""
+        "NO_INSTALL"
         "INSTALL_DIR;OUTPUT_NAME;RPATH;TEST_FILE;RUNNER"
         "SOURCES;INCLUDES;DEPS;SCRIPTS"
         ${ARGN}
     )
+
+    if(POE_NO_INSTALL AND POE_INSTALL_DIR)
+        message(FATAL_ERROR
+            "add_poe_library(${TARGET}): NO_INSTALL and INSTALL_DIR are mutually exclusive")
+    endif()
 
     if(NOT POE_SOURCES)
         message(FATAL_ERROR "add_poe_library(${TARGET}): SOURCES is required")
@@ -70,10 +76,14 @@ function(add_poe_library TARGET)
         )
     endif()
 
-    if(NOT POE_INSTALL_DIR)
-        set(POE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/poco")
+    # Loader fixtures exist only to be dlopen()ed out of the build tree, so
+    # they are never part of an installed package.
+    if(NOT POE_NO_INSTALL)
+        if(NOT POE_INSTALL_DIR)
+            set(POE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/poco")
+        endif()
+        install(TARGETS ${TARGET} DESTINATION "${POE_INSTALL_DIR}")
     endif()
-    install(TARGETS ${TARGET} DESTINATION "${POE_INSTALL_DIR}")
 
     if(POE_TEST_FILE)
         install(TARGETS ${TARGET} DESTINATION "${CMAKE_INSTALL_PREFIX}/tests")
