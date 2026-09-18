@@ -28,7 +28,7 @@
 #include "ptrmacro.h"
 
 /* Legacy standalone-host state.  The embeddable library keeps this status in
- * Poco_run_env instead. */
+ * PocoActivation::builtin_error instead. */
 Errcode builtin_err;
 
 #ifdef _MSC_VER

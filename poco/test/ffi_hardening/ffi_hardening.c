@@ -6,6 +6,8 @@
 
 #include "poco.h"
 
+#include "activation.h"
+
 #define FIXTURE_PATH(name) POCO_FFI_HARDENING_FIXTURE_DIR "/" name
 
 static int failures;
@@ -188,6 +190,7 @@ static void test_dynamic_call_storage(void)
 	Symbol variadic_parameters[2] = {0};
 	C_frame binding;
 	Poco_run_env env;
+	PocoActivation activation;
 	Po_FFI* ffi_binding;
 	FixtureStack stack = {0};
 	Po_FFI_Variadic_Descriptor variadic = {0};
@@ -195,6 +198,11 @@ static void test_dynamic_call_storage(void)
 	int index;
 	int expected_sum = 0;
 	size_t offset;
+
+	/* po_ffi_build_structures() reads the compiled program image; po_ffi_call()
+	 * reports into an activation.  Those are separate structs, so the call needs
+	 * its own zeroed activation for builtin_error to be observable. */
+	memset(&activation, 0, sizeof(activation));
 
 	int_type.ido_type = IDO_INT;
 	for (index = 0; index < FIXTURE_DYNAMIC_ARGUMENT_COUNT; ++index) {
@@ -209,9 +217,9 @@ static void test_dynamic_call_storage(void)
 	ffi_binding =
 		build_binding(&env, &binding, "more than sixteen fixed arguments must build safely");
 	if (ffi_binding != NULL) {
-		env.builtin_error = Success;
-		result = po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, NULL, NULL);
-		CHECK(env.builtin_error == Success,
+		activation.builtin_error = Success;
+		result = po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, NULL, &activation);
+		CHECK(activation.builtin_error == Success,
 			  "dynamic fixed-argument call must not set an FFI error");
 		CHECK(result.i == expected_sum, "dynamic fixed-argument call result");
 	}
@@ -236,9 +244,9 @@ static void test_dynamic_call_storage(void)
 				 variadic_parameters, 2);
 	ffi_binding = build_binding(&env, &binding, "fixed-plus-variadic descriptor must build safely");
 	if (ffi_binding != NULL) {
-		env.builtin_error = Success;
-		result = po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, &variadic, NULL);
-		CHECK(env.builtin_error == Success,
+		activation.builtin_error = Success;
+		result = po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, &variadic, &activation);
+		CHECK(activation.builtin_error == Success,
 			  "dynamic fixed-plus-variadic call must not set an FFI error");
 		CHECK(result.i == expected_sum, "dynamic fixed-plus-variadic call result");
 	}
@@ -251,9 +259,9 @@ static void test_dynamic_call_storage(void)
 				 variadic_parameters, 2);
 	ffi_binding = build_binding(&env, &binding, "zero-variadic descriptor must build safely");
 	if (ffi_binding != NULL) {
-		env.builtin_error = Success;
-		(void)po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, &variadic, NULL);
-		CHECK(env.builtin_error == Success,
+		activation.builtin_error = Success;
+		(void)po_ffi_call(ffi_binding, (const Pt_num*)stack.bytes, &variadic, &activation);
+		CHECK(activation.builtin_error == Success,
 			  "zero variadic arguments must not require a hidden stack count");
 	}
 	po_ffi_free_structures(&env);

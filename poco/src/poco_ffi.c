@@ -75,7 +75,7 @@ static ffi_status po_ffi_prepare_fixed_cif(PocoActivation* activation, ffi_cif* 
 										   ffi_type** argument_types)
 {
 	if (activation != NULL) {
-		++activation->ffi_fixed_call_prep_count;
+		++activation->ffi.fixed_call_prep_count;
 	}
 	return ffi_prep_cif(interface, FFI_DEFAULT_ABI, argument_count, result_type, argument_types);
 }
@@ -85,7 +85,7 @@ static ffi_status po_ffi_prepare_variadic_cif(PocoActivation* activation, ffi_ci
 											  ffi_type* result_type, ffi_type** argument_types)
 {
 	if (activation != NULL) {
-		++activation->ffi_variadic_call_prep_count;
+		++activation->ffi.variadic_call_prep_count;
 	}
 	return ffi_prep_cif_var(interface, FFI_DEFAULT_ABI, fixed_count, argument_count, result_type,
 							argument_types);
@@ -1325,7 +1325,6 @@ void po_ffi_free_structures(Poco_run_env* env)
 	if (env == NULL) {
 		return;
 	}
-	po_ffi_variadic_types_release(&env->variadic);
 	if (env->func_map == NULL) {
 		return;
 	}
@@ -1511,13 +1510,13 @@ static bool po_ffi_struct_result_prepare(PocoActivation* activation, const ffi_t
 		return false;
 	}
 	alignment = type->alignment != 0 ? type->alignment : 1;
-	if (activation->ffi_struct_result != NULL &&
-		activation->ffi_struct_result_capacity >= type->size &&
-		(uintptr_t)activation->ffi_struct_result % alignment == 0) {
-		aligned = activation->ffi_struct_result;
+	if (activation->ffi.struct_result != NULL &&
+		activation->ffi.struct_result_capacity >= type->size &&
+		(uintptr_t)activation->ffi.struct_result % alignment == 0) {
+		aligned = activation->ffi.struct_result;
 	} else {
-		requested_capacity = activation->ffi_struct_result_capacity > type->size
-								 ? activation->ffi_struct_result_capacity
+		requested_capacity = activation->ffi.struct_result_capacity > type->size
+								 ? activation->ffi.struct_result_capacity
 								 : type->size;
 		if (alignment - 1 > SIZE_MAX - requested_capacity) {
 			return false;
@@ -1530,10 +1529,10 @@ static bool po_ffi_struct_result_prepare(PocoActivation* activation, const ffi_t
 		address = (uintptr_t)allocation;
 		remainder = address % alignment;
 		aligned = (void*)(address + (remainder == 0 ? 0 : alignment - remainder));
-		free(activation->ffi_struct_result_allocation);
-		activation->ffi_struct_result_allocation = allocation;
-		activation->ffi_struct_result = aligned;
-		activation->ffi_struct_result_capacity = requested_capacity;
+		free(activation->ffi.struct_result_allocation);
+		activation->ffi.struct_result_allocation = allocation;
+		activation->ffi.struct_result = aligned;
+		activation->ffi.struct_result_capacity = requested_capacity;
 	}
 	out_result->pt = aligned;
 	out_result->min = aligned;
@@ -1593,7 +1592,7 @@ static Po_FFI_Call* po_ffi_activation_call_find(PocoActivation* activation, cons
 	if (activation == NULL) {
 		return NULL;
 	}
-	for (cached = activation->ffi_calls; cached != NULL; cached = cached->next) {
+	for (cached = activation->ffi.calls; cached != NULL; cached = cached->next) {
 		if (cached->binding == binding) {
 			return &cached->call;
 		}
@@ -1648,8 +1647,8 @@ Errcode po_ffi_activation_calls_create(PocoActivation* activation)
 		if (context_count != 0) {
 			cached->call.arg_types[binding->arg_count] = &ffi_type_pointer;
 		}
-		cached->next = activation->ffi_calls;
-		activation->ffi_calls = cached;
+		cached->next = activation->ffi.calls;
+		activation->ffi.calls = cached;
 		if (binding->result_ido_type == IDO_STRUCT &&
 			!po_ffi_struct_result_prepare(activation, binding->result_type, &ignored_result)) {
 			po_ffi_activation_calls_release(activation);
@@ -1666,17 +1665,17 @@ void po_ffi_activation_calls_reset(PocoActivation* activation)
 	if (activation == NULL) {
 		return;
 	}
-	for (cached = activation->ffi_calls; cached != NULL; cached = cached->next) {
+	for (cached = activation->ffi.calls; cached != NULL; cached = cached->next) {
 		memset(cached->call.data, 0,
 			   ((size_t)cached->call.arg_count + 1) * sizeof(*cached->call.data));
 		memset(cached->call.pointer_arguments, 0,
 			   ((size_t)cached->call.arg_count + 1) * sizeof(*cached->call.pointer_arguments));
 		memset(&cached->call.result, 0, sizeof(cached->call.result));
 	}
-	activation->ffi_fixed_call_prep_count = 0;
-	activation->ffi_variadic_call_prep_count = 0;
-	activation->ffi_per_call_allocation_count = 0;
-	activation->ffi_fixed_call_cache_hit_count = 0;
+	activation->ffi.fixed_call_prep_count = 0;
+	activation->ffi.variadic_call_prep_count = 0;
+	activation->ffi.per_call_allocation_count = 0;
+	activation->ffi.fixed_call_cache_hit_count = 0;
 }
 
 void po_ffi_activation_calls_release(PocoActivation* activation)
@@ -1686,9 +1685,9 @@ void po_ffi_activation_calls_release(PocoActivation* activation)
 	if (activation == NULL) {
 		return;
 	}
-	while (activation->ffi_calls != NULL) {
-		cached = activation->ffi_calls;
-		activation->ffi_calls = cached->next;
+	while (activation->ffi.calls != NULL) {
+		cached = activation->ffi.calls;
+		activation->ffi.calls = cached->next;
 		po_ffi_call_release(&cached->call);
 		free(cached);
 	}
@@ -1929,15 +1928,16 @@ static bool po_ffi_apply_pointer_return(const Po_FFI* binding, const Po_FFI_Call
 	Returns a Pt_num for acc.ret in runops.c.
 */
 Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
-				   const Po_FFI_Variadic_Descriptor* variadic, PocoActivation* env)
+				   const Po_FFI_Variadic_Descriptor* variadic, PocoActivation* activation)
 {
 	Pt_num result;
 	Po_FFI_Call local_call = {0};
 	Po_FFI_Call* call;
 	const Pt_num* stack = stack_in;
-	PocoPointerRegistry* pointer_registry = env != NULL ? env->pointer_registry : NULL;
+	PocoPointerRegistry* pointer_registry =
+		activation != NULL ? activation->pointer_registry : NULL;
 	Errcode ignored_error = Success;
-	Errcode* builtin_error = env != NULL ? &env->builtin_error : &ignored_error;
+	Errcode* builtin_error = activation != NULL ? &activation->builtin_error : &ignored_error;
 	unsigned int variadic_count = 0;
 	unsigned int total_count;
 	unsigned int context_count;
@@ -1954,9 +1954,10 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 	}
 
 	is_variadic = po_ffi_is_variadic(binding);
-	is_activation = env != NULL && env->ffi_activation_magic == UINT64_C(0x504f434f46464941);
+	is_activation =
+		activation != NULL && activation->ffi.activation_magic == POCO_FFI_ACTIVATION_MAGIC;
 	context_count = (binding->flags & PO_FFI_RUN_CONTEXT) != 0 ? 1u : 0u;
-	if (context_count != 0 && (env == NULL || env->vm == NULL)) {
+	if (context_count != 0 && (activation == NULL || activation->vm == NULL)) {
 		(*builtin_error) = Err_poco_ffi_invalid_binding;
 		return result;
 	}
@@ -1983,7 +1984,7 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 	total_count = binding->arg_count + variadic_count + context_count;
 	if (is_variadic) {
 		if (is_activation) {
-			++env->ffi_per_call_allocation_count;
+			++activation->ffi.per_call_allocation_count;
 		}
 		if (!po_ffi_call_allocate(&local_call, total_count)) {
 			(*builtin_error) = Err_no_memory;
@@ -1992,13 +1993,13 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 		call = &local_call;
 		release_call = true;
 	} else {
-		call = is_activation ? po_ffi_activation_call_find(env, binding) : NULL;
+		call = is_activation ? po_ffi_activation_call_find(activation, binding) : NULL;
 		if (call == NULL) {
 			/* Private descriptor tests and legacy internal callers do not own a
 			 * PocoActivation.  Keep their compatibility path dynamic; compiled
 			 * programs always use the activation cache. */
 			if (is_activation) {
-				++env->ffi_per_call_allocation_count;
+				++activation->ffi.per_call_allocation_count;
 			}
 			if (!po_ffi_call_allocate(&local_call, total_count)) {
 				(*builtin_error) = Err_no_memory;
@@ -2011,7 +2012,7 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 			return result;
 		} else {
 			/* The cached call buffers and prepared cif are reused as-is. */
-			++env->ffi_fixed_call_cache_hit_count;
+			++activation->ffi.fixed_call_cache_hit_count;
 		}
 	}
 
@@ -2057,7 +2058,7 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 					binding->arg_types[index] != NULL ? binding->arg_types[index]->size : 0;
 				if (struct_size == 0 || !po_ffi_popot_capacity(&stack->ppt, &struct_capacity) ||
 					struct_capacity < struct_size) {
-					poco_set_error(env != NULL ? env->vm : NULL,
+					poco_set_error(activation != NULL ? activation->vm : NULL,
 								   "FFI call '%s' struct argument exceeds its Poco bounds.",
 								   binding->name);
 					(*builtin_error) = Err_poco_ffi_bounds;
@@ -2080,7 +2081,7 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 		}
 	}
 	if (!po_ffi_validate_contract(binding, call, pointer_registry)) {
-		poco_set_error(env != NULL ? env->vm : NULL,
+		poco_set_error(activation != NULL ? activation->vm : NULL,
 					   "FFI call '%s' exceeds its contracted pointer span.", binding->name);
 		(*builtin_error) = Err_poco_ffi_bounds;
 		goto CLEANUP;
@@ -2089,7 +2090,7 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 	if (context_count != 0) {
 		const unsigned int context_index = binding->arg_count;
 
-		call->data[context_index].p = env->vm;
+		call->data[context_index].p = activation->vm;
 		call->args[context_index] = &call->data[context_index].p;
 		call->arg_types[context_index] = &ffi_type_pointer;
 	}
@@ -2112,22 +2113,22 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 	call->args[call->arg_count] = NULL;
 	call->arg_types[call->arg_count] = NULL;
 	if (is_variadic) {
-		status = po_ffi_prepare_variadic_cif(is_activation ? env : NULL, &call->interface,
+		status = po_ffi_prepare_variadic_cif(is_activation ? activation : NULL, &call->interface,
 											 binding->arg_count + context_count, call->arg_count,
 											 binding->result_type, call->arg_types);
 	} else {
 		status = FFI_OK;
 	}
 	if (status != FFI_OK) {
-		poco_set_error(env != NULL ? env->vm : NULL,
+		poco_set_error(activation != NULL ? activation->vm : NULL,
 					   "FFI call '%s' could not prepare its call interface: %s.", binding->name,
 					   po_ffi_status_str(status));
 		(*builtin_error) = Err_poco_ffi_invalid_binding;
 		goto CLEANUP;
 	}
 	if (binding->result_ido_type == IDO_STRUCT &&
-		!po_ffi_struct_result_prepare(env, binding->result_type, &result.ppt)) {
-		poco_set_error(env != NULL ? env->vm : NULL,
+		!po_ffi_struct_result_prepare(activation, binding->result_type, &result.ppt)) {
+		poco_set_error(activation != NULL ? activation->vm : NULL,
 					   "FFI call '%s' could not allocate its struct return temp.", binding->name);
 		(*builtin_error) = Err_no_memory;
 		goto CLEANUP;
@@ -2156,7 +2157,7 @@ Pt_num po_ffi_call(const Po_FFI* binding, const Pt_num* stack_in,
 		case IDO_POINTER:
 			if (!po_ffi_apply_pointer_return(binding, call, pointer_registry, call->result.p,
 											 &result.ppt)) {
-				poco_set_error(env != NULL ? env->vm : NULL,
+				poco_set_error(activation != NULL ? activation->vm : NULL,
 							   "FFI call '%s' returned a pointer outside its contract.",
 							   binding->name);
 				(*builtin_error) = Err_poco_ffi_bounds;

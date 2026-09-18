@@ -306,7 +306,7 @@ Errcode poco_activation_create(const PocoProgram* program, const Poco_program_co
 	if (activation->pointer_registry == NULL) {
 		goto OUT_OF_MEMORY;
 	}
-	activation->ffi_activation_magic = UINT64_C(0x504f434f46464941);
+	activation->ffi.activation_magic = POCO_FFI_ACTIVATION_MAGIC;
 
 	stack_size = code->stack_size != 0 ? code->stack_size : POCO_STACKSIZE_DEFAULT;
 	activation->stack_size = stack_size;
@@ -416,7 +416,7 @@ void poco_activation_destroy(PocoActivation* activation)
 	po_ffi_variadic_types_release(&activation->variadic);
 	po_ffi_activation_calls_release(activation);
 	poco_pointer_registry_destroy(activation->pointer_registry);
-	free(activation->ffi_struct_result_allocation);
+	free(activation->ffi.struct_result_allocation);
 	free_callback_frames(activation->callback_frames);
 	free_libraries(activation->loaded_libraries);
 	if (activation->program_libraries != NULL) {

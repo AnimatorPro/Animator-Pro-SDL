@@ -102,9 +102,9 @@ extern "C" {
  * outside CMake get the default-off behaviour by simply not defining it. */
 
 #if 1
-	#ifndef DEVELOPMENT
-		#define DEVELOPMENT /* Include code to check 'cannot happen' cases. */
-	#endif
+#ifndef DEVELOPMENT
+#define DEVELOPMENT /* Include code to check 'cannot happen' cases. */
+#endif
 #endif
 
 #ifndef VRSN_NUM
@@ -115,6 +115,7 @@ extern "C" {
  * #include's used by most everything in poco...
  ****************************************************************************/
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -697,12 +698,17 @@ typedef struct tstack {
 	PoBoolean is_symbol;
 } Tstack;
 
-/* HACK ALERT!
- * logic in pp_expand() in module pp.c requires that line_b1 and line_b2
- * be physically adjacent in memory.  see comments in pp.c for details.
- */
+/*----------------------------------------------------------------------------
+ * preprocessor state: the macro table, the include-file stack, the search
+ * directories and the two line buffers the token chopper works over.  (This
+ * was historically named Token; the actual token is Tstack/PToken_t.)
+ *
+ * pp_expand() in pp.c relies on line_b1 and line_b2 being physically adjacent
+ * so it can treat them as one 2*SZTOKE buffer; see the comments in pp.c.  The
+ * static assertion below is the enforcement of that layout contract.
+ *--------------------------------------------------------------------------*/
 
-typedef struct token {
+typedef struct preprocessor_state {
 	PoBoolean reuse;
 	UBYTE out_of_it;
 	PToken_t toktype;
@@ -719,39 +725,34 @@ typedef struct token {
 	struct text_symbol* define_list[HASH_SIZE];
 	char line_b1[SZTOKE];
 	char line_b2[SZTOKE];
-} Token;
+} PreprocessorState;
+
+_Static_assert(offsetof(PreprocessorState, line_b2) ==
+				   offsetof(PreprocessorState, line_b1) + SZTOKE,
+			   "pp_expand() requires line_b1 and line_b2 to be adjacent");
 
 /*----------------------------------------------------------------------------
- * the run environment structure...
+ * the compiled program image.
+ *
+ * This is what the compiler produces and what Poco_program_code is populated
+ * from; it holds no per-run state.  Everything a running program mutates --
+ * the stack and data areas, the abort hook, the trace settings, the result and
+ * builtin_error, the variadic descriptor and the pointer registry -- lives in
+ * PocoActivation (activation.h) instead.
  *--------------------------------------------------------------------------*/
 
 typedef struct poco_run_env {
-	char* stack;
 	long stack_size;
-	char* data;
 	long data_size;
-	bool (*check_abort)(void* d);
-	void* check_abort_data;
 	Func_frame* fff;
 	Names* literals; /* string constants */
-	char* trace_file;
-	Poco_lib* lib; /* list of arrays of library function info */
-	int unused1;
-	long* err_line;
+	Poco_lib* lib;   /* list of arrays of library function info */
 	Func_frame* protos;
 	Struct_info* struct_infos; /* retained compiler layouts used by FFI descriptors */
 	Poco_lib* loaded_libs;     /* loaded (from disk via pragma) libraries */
 	Po_FuncMap* func_map;      /* for fast lookups of C function calls */
-	PoBoolean enable_debug_trace;
-	Pt_num result;
-
-	Po_FFI_Variadic_Descriptor variadic;
-	PocoPointerRegistry* pointer_registry;
-	PocoVm* vm;            /* owning VM; supplies the active run context */
-	Errcode builtin_error; /* native/interpreter error for this activation */
-	void* compile_pcb;     /* Poco_cb used during compilation; for cleanup */
-
-	char pad[20];
+	PocoVm* vm;                /* owning VM; supplies the active run context */
+	void* compile_pcb;         /* Poco_cb used during compilation; for cleanup */
 } Poco_run_env;
 
 /*----------------------------------------------------------------------------
@@ -759,14 +760,14 @@ typedef struct poco_run_env {
  *--------------------------------------------------------------------------*/
 
 typedef struct poco_cb {
-	Poco_run_env run;
+	Poco_run_env run; /* the program image being emitted */
 	FILE* po_dump_file;
 	void* libfunc;
 	const PocoBindingContract* libcontract;
 	uint32_t libflags;
 	Poco_lib* builtin_lib;
 	char* stack_bottom;
-	Token t;
+	PreprocessorState t;
 	Tstack* curtoken;
 	Tstack* free_tokens;
 	Symbol* fsym;
@@ -1034,8 +1035,7 @@ Errcode compile_poco_buffer_with_vm(PocoVm* vm, void** ppexe, char* source_name,
 Errcode compile_poco_files_with_vm(PocoVm* vm, void** ppexe, const char* const* source_names,
 								   const char* const* physical_source_paths,
 								   const char* const* sources, const size_t* source_lengths,
-								   Names* const* include_dirs,
-								   const size_t* const* use_indices,
+								   Names* const* include_dirs, const size_t* const* use_indices,
 								   const size_t* use_counts, size_t source_count, Poco_lib* lib,
 								   char* err_file, size_t err_file_capacity, long* err_line,
 								   int* err_char, bool verbose);
@@ -1188,7 +1188,8 @@ void po_coerce_to_string_type(Poco_cb* pcb, Exp_frame* e, TypeComp start_type, i
 struct string_ref* po_sr_new(struct PocoActivation* env, int len);
 struct string_ref* po_sr_new_copy(struct PocoActivation* env, char* pt, int len);
 struct string_ref* po_sr_new_string(struct PocoActivation* env, char* pt);
-struct string_ref* po_sr_cat(struct PocoActivation* env, struct string_ref* a, struct string_ref* b);
+struct string_ref* po_sr_cat(struct PocoActivation* env, struct string_ref* a,
+							 struct string_ref* b);
 struct string_ref* po_sr_cat_and_clean(struct PocoActivation* env, struct string_ref* a,
 									   struct string_ref* b);
 void po_sr_inc_ref(struct string_ref* ref);

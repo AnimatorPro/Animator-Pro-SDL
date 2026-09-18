@@ -70,6 +70,27 @@ typedef struct Poco_program_code {
 } Poco_program_code;
 
 /*
+ * Per-activation FFI state: the libffi cif cache, the scratch buffer struct
+ * returns are marshalled through, and the counters the cif-cache tests read.
+ *
+ * activation_magic identifies a PocoActivation to po_ffi_call(), which also
+ * accepts the NULL-activation path used by descriptor-level tests.
+ */
+typedef struct PocoFfiState {
+	uint64_t activation_magic;
+	struct po_ffi_activation_call* calls;
+	void* struct_result_allocation;
+	void* struct_result;
+	size_t struct_result_capacity;
+	size_t fixed_call_prep_count;
+	size_t variadic_call_prep_count;
+	size_t per_call_allocation_count;
+	size_t fixed_call_cache_hit_count;
+} PocoFfiState;
+
+#define POCO_FFI_ACTIVATION_MAGIC UINT64_C(0x504f434f46464941)
+
+/*
  * One independently allocatable execution of a const PocoProgram.
  *
  * Ownership:
@@ -110,15 +131,7 @@ struct PocoActivation {
 	void* main_argv_allocation;
 
 	Po_FFI_Variadic_Descriptor variadic;
-	uint64_t ffi_activation_magic;
-	struct po_ffi_activation_call* ffi_calls;
-	void* ffi_struct_result_allocation;
-	void* ffi_struct_result;
-	size_t ffi_struct_result_capacity;
-	size_t ffi_fixed_call_prep_count;
-	size_t ffi_variadic_call_prep_count;
-	size_t ffi_per_call_allocation_count;
-	size_t ffi_fixed_call_cache_hit_count;
+	PocoFfiState ffi;
 	Func_frame* callback_frames;
 	Poco_lib* builtin_libraries;
 	Poco_lib* loaded_libraries;

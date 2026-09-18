@@ -2724,11 +2724,11 @@ void po_show_basic_sizes()
 			"Func_frame...%5zu\n"
 			"Poco_frame...%5zu\n"
 			"Tstack.......%5zu\n"
-			"Token........%5zu\n"
+			"PreprocessorState%5zu\n"
 			"Poco_cb......%5zu\n",
 			sizeof(Symbol), sizeof(Type_info), sizeof(Code_buf),
 			sizeof(Exp_frame) + HASH_SIZE * sizeof(Symbol*), sizeof(Func_frame), sizeof(Poco_frame),
-			sizeof(Tstack), sizeof(Token), sizeof(Poco_cb));
+			sizeof(Tstack), sizeof(PreprocessorState), sizeof(Poco_cb));
 }
 #endif /* DEBUG */
 
@@ -2769,7 +2769,7 @@ static void gentle_fclose(FILE* f)
 }
 
 /*****************************************************************************
- * free a poco_run_env, and the associate stack and data areas.
+ * clear an activation's data area.
  ****************************************************************************/
 static void po_pev_free_data(PocoActivation* activation)
 {
@@ -2806,7 +2806,7 @@ static Errcode po_activation_init_libs(PocoActivation* activation)
 }
 
 /*****************************************************************************
- * alloc poco_run_env, and stack and data areas. run data init code.
+ * alloc an activation's stack and data areas. run data init code.
  * this routine should only be called after a successfull compile.
  ****************************************************************************/
 static Errcode po_pev_alloc_data(PocoActivation* activation)

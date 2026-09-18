@@ -304,7 +304,7 @@ static double poco_parse_source_double(const char* text)
  ****************************************************************************/
 static void po_say_err(Poco_cb* pcb, char* s)
 {
-	Token* t = &pcb->t;
+	PreprocessorState* t = &pcb->t;
 	File_stack* fs = t->file_stack;
 	char errtxtbuf[128];
 	long line_num = 0;
@@ -1045,7 +1045,6 @@ bool po_eat_rparen(Poco_cb* pcb)
 {
 	return (po_eat_token(pcb, TOK_RPAREN));
 }
-
 
 /******* MODULE VARIABLE stuff to assign and use variables *******/
 
@@ -3411,7 +3410,7 @@ static void free_fuf_list(Func_frame** pff)
 }
 
 /*****************************************************************************
- * free the run environement, and the literals and functions attached to it.
+ * free the compiled program image, and the literals and functions attached to it.
  ****************************************************************************/
 void po_free_run_env(Poco_run_env* pev)
 {
