@@ -158,6 +158,6 @@ PolibTurtle po_libturtle = {
 Poco_lib po_turtle_lib = {
 	NULL,
 	"Turtle Graphics",
-	(Lib_proto*)&po_libturtle,
+	(const Lib_proto*)&po_libturtle,
 	POLIB_TURTLE_SIZE,
 };

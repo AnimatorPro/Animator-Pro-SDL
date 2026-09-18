@@ -78,7 +78,10 @@ typedef struct poco_lib /* Poco library main control structure */
 {
 	struct poco_lib* next;
 	char* name;
-	Lib_proto* lib;
+	/* The prototype table is read-only data shared by every VM that registers
+	 * this library.  Hosts whose tables are not Lib_proto arrays cast to this
+	 * type and declare their own stride; see src/pocolibs.c in Animator. */
+	const Lib_proto* lib;
 	int count;
 	Errcode (*init)(struct poco_lib* lib);
 	void (*cleanup)(struct poco_lib* lib);
@@ -103,6 +106,15 @@ typedef struct rnode /* Used for resource tracking in builtin libs */
 Errcode po_check_formatf(int maxlen, char* fmt, va_list pargs);
 Errcode po_init_libs(Poco_lib* lib);
 void po_cleanup_libs(Poco_lib* lib);
+/*
+ * The spellings without a PocoVm* resolve to the VM running on this thread, as
+ * poco_active_builtin_error() does.  A block belongs to that VM's copy of the
+ * standard memory library and is released when its run ends; the VM-carrying
+ * and VM-less forms of a call are the same function, so a block may be
+ * allocated through one and released through the other.  Called with no run in
+ * progress they fail (Err_no_memory, Err_poco_free) rather than reaching a
+ * process-global list that would outlive the run that filled it.
+ */
 void po_free(void* pt);
 void* po_malloc(int size);
 void* po_calloc(int size_el, int el_count);

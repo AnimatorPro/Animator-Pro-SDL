@@ -1112,6 +1112,6 @@ PolibUser po_libuser = {
 Poco_lib po_user_lib = {
 	NULL,
 	"User Interface",
-	(Lib_proto*)&po_libuser,
+	(const Lib_proto*)&po_libuser,
 	POLIB_USER_SIZE,
 };

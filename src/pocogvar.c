@@ -526,7 +526,7 @@ PolibGlobalv po_libglobalv = {
 Poco_lib po_globalv_lib = {
 	NULL,                        // -> next
 	"Global Variable",           // Library name
-	(Lib_proto*)&po_libglobalv,  // pointer to jumptable/protos
+	(const Lib_proto*)&po_libglobalv,  // pointer to jumptable/protos
 	POLIB_GLOBALV_SIZE,          // number of functions in library
 	NULL,                        // library init routine
 	dump_global_vars,            // library cleanup routine

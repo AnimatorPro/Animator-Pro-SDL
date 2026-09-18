@@ -41,7 +41,7 @@ extern Rnode* po_in_rlist(Dlheader* sfi, void* f);
 /* The .poe loader lives in Poco core (poco/src/pocoload.c); Animator reaches
  * it only through the public VM API, so no loader entry points are declared
  * here. */
-extern int po_findpoe(PocoVm* vm, char* libname, Lib_proto** plibreturn);
+extern int po_findpoe(PocoVm* vm, char* libname, const Lib_proto** plibreturn);
 extern Errcode po_poe_overtime(void* effect, void* data);
 extern Errcode po_poe_oversegment(void* effect, void* data);
 extern Errcode po_poe_overall(void* effect, void* data);
@@ -55,15 +55,15 @@ extern Poco_lib po_blit_lib;
 extern Poco_lib po_alt_lib;
 extern Poco_lib po_cel_lib;
 extern Poco_lib po_user_lib;
-extern Poco_lib po_str_lib;
-extern Poco_lib po_mem_lib;
-extern Poco_lib po_FILE_lib;
+extern const Poco_lib po_str_lib;
+extern const Poco_lib po_mem_lib;
+extern const Poco_lib po_FILE_lib;
 extern Poco_lib po_misc_lib;
 extern Poco_lib po_mode_lib;
 extern Poco_lib po_text_lib;
 extern Poco_lib po_time_lib;
 extern Poco_lib po_dos_lib;
-extern Poco_lib po_math_lib;
+extern const Poco_lib po_math_lib;
 extern Poco_lib po_optics_lib;
 extern Poco_lib po_globalv_lib;
 extern Poco_lib po_title_lib;
@@ -905,7 +905,7 @@ typedef struct porexlib {
 	void* (*pl_ppt2ptr)(Popot ppt);
 	Popot (*pl_ptr2ppt)(void* ptr, int bytes);
 	int (*pl_getmucolors)(Pixel** indicies, struct rgb3** lastrgbs, struct rgb3** idealrgbs);
-	int (*pl_findpoe)(PocoVm* vm, char* poename, Lib_proto** plibreturn);
+	int (*pl_findpoe)(PocoVm* vm, char* poename, const Lib_proto** plibreturn);
 	Errcode (*pl_overtime)(OTFunc* effect, void* data);
 	bool (*pl_checkabort)(void* data);
 	Errcode (*pl_oversegment)(OTFunc* effect, void* data);
@@ -965,7 +965,7 @@ typedef struct porexlib {
 	void* (*pl_ppt2ptr)(Popot ppt);
 	Popot (*pl_ptr2ppt)(void* ptr, int bytes);
 	int (*pl_getmucolors)(Pixel** indicies, struct rgb3** lastrgbs, struct rgb3** idealrgbs);
-	int (*pl_findpoe)(PocoVm* vm, char* poename, Lib_proto** plibreturn);
+	int (*pl_findpoe)(PocoVm* vm, char* poename, const Lib_proto** plibreturn);
 	Errcode (*pl_overtime)(OTFunc* effect, void* data);
 	bool (*pl_checkabort)(void* data);
 	Errcode (*pl_oversegment)(OTFunc* effect, void* data);

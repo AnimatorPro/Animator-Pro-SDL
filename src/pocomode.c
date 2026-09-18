@@ -411,6 +411,6 @@ PolibMode po_libmode = {
 Poco_lib po_mode_lib = {
 	NULL,
 	"Graphics Modes",
-	(Lib_proto*)&po_libmode,
+	(const Lib_proto*)&po_libmode,
 	POLIB_MODE_SIZE,
 };

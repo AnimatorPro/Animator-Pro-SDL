@@ -72,6 +72,6 @@ PolibSwap po_libswap = {
 Poco_lib po_alt_lib = {
 	NULL,
 	"Swap Screen",
-	(Lib_proto*)&po_libswap,
+	(const Lib_proto*)&po_libswap,
 	POLIB_SWAP_SIZE,
 };

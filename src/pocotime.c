@@ -492,6 +492,6 @@ PolibTime po_libtime = {
 Poco_lib po_time_lib = {
 	NULL,
 	"Time Oriented Function",
-	(Lib_proto*)&po_libtime,
+	(const Lib_proto*)&po_libtime,
 	POLIB_TIME_SIZE,
 };

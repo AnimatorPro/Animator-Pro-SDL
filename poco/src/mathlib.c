@@ -13,7 +13,7 @@
 #include "mathlib.h"
 
 
-static Lib_proto mathlib[] = {
+static const Lib_proto mathlib[] = {
 	/* Most of the ansi math library (not bits that use pointers) */
 	{acos, "double  acos(double x);"},
 	{asin, "double  asin(double x);"},
@@ -80,7 +80,7 @@ static const PocoBinding standard_math_bindings[] = {
 //	  return(1);
 //}
 
-Poco_lib po_math_lib = {
+const Poco_lib po_math_lib = {
 	NULL,
 	"(C Standard) Math",
 	mathlib,

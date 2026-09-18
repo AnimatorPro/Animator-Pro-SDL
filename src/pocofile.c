@@ -286,6 +286,6 @@ PolibAAFile po_libaafile = {
 Poco_lib po_load_save_lib = {
 	NULL,
 	"Autodesk Animator File",
-	(Lib_proto*)&po_libaafile,
+	(const Lib_proto*)&po_libaafile,
 	POLIB_AAFILE_SIZE,
 };

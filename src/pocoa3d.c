@@ -564,6 +564,6 @@ PolibOptics po_liboptics = {
 Poco_lib po_optics_lib = {
 	NULL,
 	"Optics",
-	(Lib_proto*)&po_liboptics,
+	(const Lib_proto*)&po_liboptics,
 	POLIB_OPTICS_SIZE,
 };

@@ -7,6 +7,6 @@
 #include "pocolib.h"
 
 /* Legacy Poco_lib descriptor, named directly by the CLI's builtin table. */
-extern Poco_lib po_str_lib;
+extern const Poco_lib po_str_lib;
 
 #endif /* POCO_STRLIB_H */

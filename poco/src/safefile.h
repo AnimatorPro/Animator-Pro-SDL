@@ -9,8 +9,8 @@
 
 /* Legacy Poco_lib descriptors, still named directly by the CLI's builtin
  * library table and by the resource lookups in this module. */
-extern Poco_lib po_FILE_lib;
-extern Poco_lib po_mem_lib;
+extern const Poco_lib po_FILE_lib;
+extern const Poco_lib po_mem_lib;
 
 void po_free(void* pt);
 

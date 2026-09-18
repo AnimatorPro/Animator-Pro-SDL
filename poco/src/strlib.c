@@ -467,7 +467,7 @@ static const PocoBindingContract first_of_two_alias_contract = {
 static const PocoBindingContract mutable_string_alias_contract = {
 	mutable_cstring_span, Array_els(mutable_cstring_span), {POCO_POINTER_RETURN_ALIAS, 0}};
 
-static Lib_proto lib[] = {
+static const Lib_proto lib[] = {
 	/* string stuff */
 	/* sprintf is intentionally legacy/unsafe: use snprintf where capacity is known. */
 	{ po_sprintf, "int     sprintf(char *buf, char *format, ...);", NULL,
@@ -511,7 +511,7 @@ static Lib_proto lib[] = {
 	{po_strerror, "char    *strerror(int errnum);", NULL, POCO_BINDING_RUN_CONTEXT},
 };
 
-Poco_lib po_str_lib = {
+const Poco_lib po_str_lib = {
 	NULL,
 	"(C standard) String",
 	lib,

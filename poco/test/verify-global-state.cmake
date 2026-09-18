@@ -27,24 +27,13 @@ endif()
 # Documented residual mutable globals.  Each entry is explained in
 # GLOBAL_STATE_INVENTORY.md under "Known residue".
 set(POCO_KNOWN_MUTABLE
-    # The legacy Poco_lib control structures: 'next', 'local_data',
-    # 'resources' and 'vm' are written when a library is chained onto a VM.
-    # Draining them means retiring the Poco_lib/Porexlib registration ABI.
-    po_FILE_lib
-    po_math_lib
-    po_mem_lib
-    po_str_lib
-    # Lib_proto prototype tables.  Immutable in fact, but Poco_lib::lib is a
-    # non-const pointer and Animator casts unrelated structs through it, so
-    # const-ifying the tables means const-ifying that field first.
-    filelib
-    lib
-    mathlib
-    memlib
-    poco_path_legacy_bindings
-    # Idempotent one-shot derivations of the tables above into PocoBinding
-    # form.  Every racing writer stores the same value, but the writes are
-    # still writes.
+    # One-shot derivations of the const Lib_proto tables into PocoBinding form.
+    # Two VMs running in sequence on one thread do share these, and the second
+    # one does observe what the first one wrote - but every write stores a value
+    # computed from read-only data, so the cache the second VM inherits is
+    # identical to the one it would have built itself.  No per-VM state reaches
+    # them.  See "Known residue" in GLOBAL_STATE_INVENTORY.md for the drain that
+    # would remove them outright.
     poco_standard_file_library.bindings
     poco_standard_file_library.initialized
     poco_standard_file_library.library

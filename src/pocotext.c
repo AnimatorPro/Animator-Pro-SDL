@@ -496,7 +496,7 @@ PolibText po_libtext = {
 Poco_lib po_text_lib = {
 	NULL,
 	"Text",
-	(Lib_proto*)&po_libtext,
+	(const Lib_proto*)&po_libtext,
 	POLIB_TEXT_SIZE,
 };
 
@@ -531,6 +531,6 @@ PolibTitle po_libtitle = {
 Poco_lib po_title_lib = {
 	NULL,
 	"Title",
-	(Lib_proto*)&po_libtitle,
+	(const Lib_proto*)&po_libtitle,
 	POLIB_TITLE_SIZE,
 };

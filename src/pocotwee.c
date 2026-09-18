@@ -566,6 +566,6 @@ ErrCode po_tween_load(Popot pop_file_name) ErrCode
 Poco_lib po_tween_lib = {
 	NULL,
 	"Tween",
-	(Lib_proto*)&po_libtween,
+	(const Lib_proto*)&po_libtween,
 	POLIB_TWEEN_SIZE,
 };

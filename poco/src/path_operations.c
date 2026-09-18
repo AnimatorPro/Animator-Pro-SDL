@@ -207,7 +207,7 @@ static int po_fnmerge(char* path, char* device, char* dir, char* file, char* suf
  * library below and the standalone CLI's legacy library list both draw from
  * this single table so the two registration ABIs stay in step.
  */
-Lib_proto poco_path_legacy_bindings[POCO_PATH_LEGACY_BINDING_COUNT] = {
+const Lib_proto poco_path_legacy_bindings[POCO_PATH_LEGACY_BINDING_COUNT] = {
 	{(void*)po_fnsplit,
 	 "ErrCode fnsplit(char *path, char *device, char *dir, char *file, char *suf);"},
 	{(void*)po_fnmerge,

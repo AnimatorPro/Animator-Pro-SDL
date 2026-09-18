@@ -855,6 +855,28 @@ set_target_properties(poco_vm_scoped_builtin_error PROPERTIES
 )
 add_poco_concurrency_test(poco_vm_scoped_builtin_error poco_vm_scoped_builtin_error)
 
+# The companion to the gate above, for resources rather than status: the
+# standard libraries' resource lists belong to the VM that filled them.  Two
+# VMs run in sequence on one thread and the second is handed a block the first
+# abandoned; it must not own it.  Against a process-global list the release
+# succeeds, which is the second VM freeing the first VM's memory.
+add_executable(poco_serial_vm_library_state
+    serial_vm_library_state/serial_vm_library_state.c
+)
+target_compile_definitions(poco_serial_vm_library_state PRIVATE
+    POCO_SERIAL_VM_LIBRARY_STATE_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/serial_vm_library_state"
+)
+target_include_directories(poco_serial_vm_library_state PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
+)
+target_link_libraries(poco_serial_vm_library_state PRIVATE Poco::poco)
+set_target_properties(poco_serial_vm_library_state PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED YES
+)
+add_test(NAME "poco_serial_vm_library_state" COMMAND poco_serial_vm_library_state)
+set_tests_properties("poco_serial_vm_library_state" PROPERTIES TIMEOUT 60)
+
 # Hosts own activation pooling policy.  This gate compiles one immutable
 # program, concurrently acquires one activation per host thread, and repeatedly
 # runs/reset/reuses those activations against the Phase-1 reference oracle.

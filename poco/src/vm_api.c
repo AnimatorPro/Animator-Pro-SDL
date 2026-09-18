@@ -421,7 +421,7 @@ int po_vm_resolve_serialized_binding(PocoVm* vm, const Poco_lib* loaded_librarie
 			int index;
 
 			for (index = 0; index < registered->legacy_library->count; ++index) {
-				Lib_proto* binding = &registered->legacy_library->lib[index];
+				const Lib_proto* binding = &registered->legacy_library->lib[index];
 
 				if (!poco_api_prototype_names_function(binding->proto, name)) {
 					continue;

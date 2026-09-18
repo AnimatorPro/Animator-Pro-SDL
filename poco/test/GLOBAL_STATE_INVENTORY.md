@@ -83,6 +83,8 @@ CTest above is the check that cannot be fooled this way.
 | [x] | `main.c` | `Names incdirs[]` (IAN / JIM / default variants) | Present, exported, writable | Deleted. Nothing in the repository read it; the three variants were DOS-era personal include paths (`\paa\resource\`, `c:\tc\include\`) behind `IAN`/`JIM` macros that no build defines. |
 | [x] | `runops.c` | `FILE* po_trace_file`, `bool po_trace_flag` | Present under `DEVELOPMENT`, exported, writable | Removed; the instruction-trace destination is `PocoActivation::instruction_trace`, set per run through `PocoRunOptions::instruction_trace`. The CLI's `-t` holds its own `FILE*` local in `main()`. Two activations on two threads now trace independently. |
 | [x] | `vm_api.c` | `int po_version_number` | Exported and writable | `const int`. `poco/src/pocoface.h:21` and Animator's `src/inc/pocolib.h:39` were changed together so the declarations agree. |
+| [x] | `safefile.c`, `strlib.c`, `mathlib.c` | `Poco_lib po_FILE_lib`, `po_mem_lib`, `po_str_lib`, `po_math_lib` | Exported and writable; also the fallback resource list for any VM-less caller | `const Poco_lib`. They are templates a host hands to a VM, which clones them; the clone owns `next`, `resources`, `local_data` and `vm`. The VM-less legacy entry points (`po_malloc`, `po_calloc`, `po_free`, `poco_lmalloc`, `poco_freez`) now resolve through `poco_active_vm()` instead of falling back to the descriptor, so no resource list is reachable without a VM. The CLI chains copies (`main.c:get_poco_libs`) rather than writing `next` into the originals. Gated by `poco_serial_vm_library_state`. |
+| [x] | `safefile.c`, `strlib.c`, `mathlib.c`, `path_operations.c` | `Lib_proto filelib[]`, `memlib[]`, `lib[]`, `mathlib[]`, `poco_path_legacy_bindings[]` | Immutable in fact, writable in type | `const`. `Poco_lib::lib` is `const Lib_proto*`, which also made `po_findpoe()`/`Porexlib::pl_findpoe` take `const Lib_proto**` and `print_one_lib()` take `const Lib_proto*`. Animator's sixteen `(Lib_proto*)&po_lib*` casts are now `(const Lib_proto*)`: they still pun a direct-table ABI onto `Lib_proto`, which `src/pocolibs.c` handles with its own stride, but they no longer launder `const` away. |
 
 `po_run_protos` was compiled only in development builds, but remained in scope
 because it was mutable file-scope state whenever that configuration was
@@ -99,23 +101,26 @@ no text scan over declarations was ever going to catch.
 These are the symbols in `POCO_KNOWN_MUTABLE`. They are writable on purpose or
 because draining them is a larger job than this inventory owns.
 
-- **Legacy `Poco_lib` control structures** — `po_FILE_lib`, `po_math_lib`,
-  `po_mem_lib`, `po_str_lib`. `Poco_lib` carries `next`, `local_data`,
-  `resources` and `vm`, all written when a library is chained onto a VM, so the
-  descriptors cannot be `const` while that registration ABI exists. Resolves
-  with the Pocorex/Porexlib removal, which no node currently owns.
-- **`Lib_proto` prototype tables** — `filelib`, `memlib`, `mathlib`, `lib`
-  (`strlib.c`), `poco_path_legacy_bindings`. Immutable in fact — nothing writes
-  through them — but `Poco_lib::lib` is a plain `Lib_proto*` and Animator casts
-  unrelated per-library structs through that field (`src/pocotur.c`,
-  `src/pococel.c`, `src/pocotime.c` and others). Const-ifying the tables means
-  const-ifying the field first, which is consumer-tree churn.
 - **Lazy standard-library binding caches** — `poco_standard_file_library.*`,
   `poco_standard_memory_library.*`, `poco_standard_path_library.*`,
-  `poco_standard_string_library.*`. One-shot derivations of the `Lib_proto`
-  tables above into `PocoBinding` form. Every racing writer stores the same
-  value from an immutable source, so the race is benign, but the writes are
-  still writes and TSan will report them.
+  `poco_standard_string_library.*`. One-shot derivations of the `const
+  Lib_proto` tables into `PocoBinding` form, held in function-local `static`s.
+
+  Two VMs running in sequence on one thread share these, and the second one
+  does observe what the first one wrote. That is the question this inventory
+  now asks, and the answer here is that the observation is harmless: every
+  write stores a value computed from read-only data, so the cache the second VM
+  inherits is byte-for-byte the one it would have built itself. Nothing per-VM
+  — no resource list, no activation, no VM pointer — reaches them. They are a
+  shared cache of immutable data, not shared state.
+
+  Draining them outright is possible and is deliberately not done here. It
+  needs each binding list to be written once as a macro and expanded into both
+  the `Lib_proto` and the `PocoBinding` form, or `Lib_proto` reordered to be
+  layout-compatible with `PocoBinding` and cast. The first duplicates the
+  expansion of roughly seventy bindings across four files; the second puns a
+  public ABI struct onto a compatibility one. Neither is worth the regression
+  risk for state that carries nothing.
 
 ## Explicitly out of scope
 

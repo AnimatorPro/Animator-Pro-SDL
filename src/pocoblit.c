@@ -480,5 +480,5 @@ PolibScreen po_libscreen = {
 };
 
 Poco_lib po_blit_lib = {
-	NULL, "Screen", (Lib_proto*)&po_libscreen, POLIB_SCREEN_SIZE, NULL, free_allocated_screens,
+	NULL, "Screen", (const Lib_proto*)&po_libscreen, POLIB_SCREEN_SIZE, NULL, free_allocated_screens,
 };

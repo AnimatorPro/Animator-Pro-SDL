@@ -152,41 +152,48 @@ void po_qtext(char* format, ...)
 }
 
 /****************************************************************************/
-static Lib_proto proto_lines[] = {
+static const Lib_proto proto_lines[] = {
 	/*	{tryme, 	"int ptryme(int (*v)(long a, long b, long c));"}, */
 	{puts, "int puts(char *s);"},
 	{printf, "int printf(char *format, ...);"},
 	{po_qtext, "void Qtext(char *format, ...);"},
 };
 
-Poco_lib po_main_lib = {.next = NULL,
-						.name = "Poco Library",
-						.lib = proto_lines,
-						.count = Array_els(proto_lines),
-						.init = NULL,
-						.cleanup = NULL,
-						.local_data = NULL,
-						.resources = {NULL, NULL, NULL},
-						.rexhead = NULL,
-						{0}};
+const Poco_lib po_main_lib = {.next = NULL,
+							  .name = "Poco Library",
+							  .lib = proto_lines,
+							  .count = Array_els(proto_lines),
+							  .init = NULL,
+							  .cleanup = NULL,
+							  .local_data = NULL,
+							  .resources = {NULL, NULL, NULL},
+							  .rexhead = NULL,
+							  {0}};
 
 
-static Poco_lib* poco_libs[] = {
+static const Poco_lib* const poco_libs[] = {
 	&po_main_lib, &po_str_lib, &po_mem_lib, &po_FILE_lib, &po_math_lib, &po_dos_standalone_lib,
 };
 
 /****************************************************************************
+ * Chain the builtin descriptors for this CLI's programs.
  *
+ * The descriptors themselves are read-only templates shared by every host, so
+ * the chain is built out of copies: writing 'next' into the originals would
+ * put per-program state back into process-global objects.  The copies live
+ * here in poco_cli rather than in the embeddable core.
  ***************************************************************************/
 static Poco_lib* get_poco_libs(void)
 {
+	static Poco_lib chain[Array_els(poco_libs)];
 	static Poco_lib* list = NULL;
 	int i;
 
 	if (list == NULL) {
 		for (i = Array_els(poco_libs); --i >= 0;) {
-			poco_libs[i]->next = list;
-			list = poco_libs[i];
+			chain[i] = *poco_libs[i];
+			chain[i].next = list;
+			list = &chain[i];
 		}
 	}
 	return (list);

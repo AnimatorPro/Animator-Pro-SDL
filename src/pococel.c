@@ -285,6 +285,6 @@ PolibCel po_libcel = {
 Poco_lib po_cel_lib = {
 	NULL,
 	"Cel",
-	(Lib_proto*)&po_libcel,
+	(const Lib_proto*)&po_libcel,
 	POLIB_CEL_SIZE,
 };

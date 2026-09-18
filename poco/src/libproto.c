@@ -22,7 +22,7 @@
 /*****************************************************************************
  * print a list of function names in a poco lib.
  ****************************************************************************/
-static Errcode print_one_lib(FILE* f, Lib_proto* lib, int lib_size)
+static Errcode print_one_lib(FILE* f, const Lib_proto* lib, int lib_size)
 {
 	while (--lib_size >= 0) {
 		fprintf(f, "%s\n", lib->proto);
@@ -74,7 +74,7 @@ Errcode print_pocolib(char* filename, Poco_lib* lib)
  *		  IS NOT intended for use by PJ internally -- it can only return
  *		  valid results while a poco program is currently executing!
  ****************************************************************************/
-static int poco_findpoe_in_vm(PocoVm* vm, char* libname, Lib_proto** plibreturn)
+static int poco_findpoe_in_vm(PocoVm* vm, char* libname, const Lib_proto** plibreturn)
 {
 	PocoActivation* activation = vm != NULL ? vm->activation : NULL;
 	Poco_lib* ll;
@@ -145,7 +145,7 @@ GOOD_EXIT:
 	return ll->count;
 }
 
-int po_findpoe(PocoVm* vm, char* libname, Lib_proto** plibreturn)
+int po_findpoe(PocoVm* vm, char* libname, const Lib_proto** plibreturn)
 {
 	return poco_findpoe_in_vm(vm, libname, plibreturn);
 }
@@ -216,7 +216,7 @@ char* po_get_libproto_line(Poco_cb* pcb)
 {
 	File_stack* fs = pcb->t.file_stack;
 	Poco_lib* pl = fs->source.lib;
-	Lib_proto* pp;
+	const Lib_proto* pp;
 
 	if (fs->line_count >= pl->count) {
 		if (NULL != pcb->run.loaded_libs || NULL == (pl = pl->next)) {

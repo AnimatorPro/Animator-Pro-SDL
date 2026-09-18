@@ -6,6 +6,6 @@
 
 #include "pocolib.h"
 
-extern Poco_lib po_dos_standalone_lib;
+extern const Poco_lib po_dos_standalone_lib;
 
 #endif /* POCO_POCODOS_STANDALONE_H */

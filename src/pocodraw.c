@@ -793,6 +793,6 @@ PolibDraw po_libdraw = {
 Poco_lib po_draw_lib = {
 	NULL,
 	"Graphics",
-	(Lib_proto*)&po_libdraw,
+	(const Lib_proto*)&po_libdraw,
 	POLIB_DRAW_SIZE,
 };

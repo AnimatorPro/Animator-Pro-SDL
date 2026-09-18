@@ -1001,7 +1001,7 @@ PolibFlicPlay po_libflicplay = {
 Poco_lib po_flicplay_lib = {
 	NULL,
 	"Flic Playback",
-	(Lib_proto*)&po_libflicplay,
+	(const Lib_proto*)&po_libflicplay,
 	POLIB_FLICPLAY_SIZE,
 	NOFUNC,            /* init func */
 	do_flic_close_all, /* cleanup func */

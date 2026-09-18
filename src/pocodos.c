@@ -233,6 +233,6 @@ PolibDos po_libdos = {
 Poco_lib po_dos_lib = {
 	NULL,
 	"DOS",
-	(Lib_proto*)&po_libdos,
+	(const Lib_proto*)&po_libdos,
 	POLIB_DOS_SIZE,
 };

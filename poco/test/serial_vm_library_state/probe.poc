@@ -1,0 +1,6 @@
+/* Runs in the second VM and asks the standard memory library to release the
+ * block the first VM abandoned.  Returns the Errcode the release reported. */
+main()
+{
+	return release_stale_block();
+}
