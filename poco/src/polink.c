@@ -7,6 +7,7 @@
  ******************************************************************************/
 
 #include "poco_internal.h"
+#include "bytecode_iter.h"
 #include "pocmemry.h"
 #include "pocoop.h"
 #include "pocotype.h"
@@ -69,30 +70,29 @@ static bool patch_link_references(Poco_cb* pcb)
 	Func_frame* frame;
 
 	for (frame = pcb->run.fff; frame != NULL; frame = frame->next) {
-		UBYTE* cursor = frame->code_pt;
-		UBYTE* end = cursor + frame->code_size;
+		PoCodeIter iter;
+		PoCodeIns ins;
+		PoCodeIterStatus status;
 
-		while (cursor < end) {
-			int op;
-			const Poco_op_table* entry;
-			UBYTE* operand;
+		po_code_iter_init(&iter, frame->code_pt, frame->code_size);
 
-			if ((size_t)(end - cursor) < sizeof(op)) {
+		while ((status = po_code_iter_next(&iter, &ins)) != PO_CODE_ITER_END) {
+			int op = ins.op;
+			const Poco_op_table* entry = ins.entry;
+			UBYTE* operand = (UBYTE*)ins.operand;
+
+			if (status == PO_CODE_ITER_TRUNCATED_OP) {
 				po_say_internal(pcb, "truncated instruction while linking %s", frame->name);
 				return false;
 			}
-			memcpy(&op, cursor, sizeof(op));
-			cursor += sizeof(op);
-			if (op < 0 || op >= po_ins_table_els) {
+			if (status == PO_CODE_ITER_BAD_OPCODE) {
 				po_say_internal(pcb, "invalid opcode while linking %s", frame->name);
 				return false;
 			}
-			entry = &po_ins_table[op];
-			if ((size_t)(end - cursor) < (size_t)entry->op_size) {
+			if (status == PO_CODE_ITER_TRUNCATED_OPERAND) {
 				po_say_internal(pcb, "truncated operand while linking %s", frame->name);
 				return false;
 			}
-			operand = cursor;
 			if (entry->op_ext == OEX_FUNCTION) {
 				Func_frame* reference;
 				Func_frame* definition;
@@ -155,8 +155,7 @@ static bool patch_link_references(Poco_cb* pcb)
 					}
 				}
 			}
-patched_global:
-			cursor += entry->op_size;
+patched_global:;
 		}
 	}
 	return true;

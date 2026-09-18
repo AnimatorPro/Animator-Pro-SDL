@@ -66,51 +66,79 @@ add_subdirectory(third_party/libffi)
 add_subdirectory(third_party/hashmap)
 add_subdirectory(third_party/blake3)
 
+# Listed in pipeline order rather than alphabetically, so the list reads as a
+# table of contents for src/README.md.  Add a new source to its stage.
 set(POCO_CORE_SOURCES
-	activation.c
-    bcutil.c
-    bytecode_container.c
-    bop.c
+    # Front end: lines, preprocessing, tokens.
     chopper.c
-    code.c
-	declare.c
-	debug.c
-    path_operations.c
-    fold.c
-    funccall.c
-    mathlib.c
-    pocmemry.c
-    poco.c
-    podiag.c
-    poexpr.c
-    polink.c
-    posymbol.c
-    porunenv.c
-    potokface.c
-    povar.c
-    port.c
-    pocodis.c
-    pocoface.c
-    pocolib.c
-    pocoload.c
-    pocoop.c
-    pocotype.c
-    postring.c
-    poco_ffi.c
-    poco_hash.c
-    program_image.c
     pp.c
     ppeval.c
-    runops.c
-    safefile.c
-	serialization.c
+    token.c
+    bcutil.c
+    potokface.c
+
+    # Compile driver, parser and code emission.
+    compile_driver.c
+    use_graph.c
+    poco.c
     statemen.c
+    declare.c
+    pocotype.c
+    struct.c
+    varinit.c
+    poexpr.c
+    bop.c
+    povar.c
+    funccall.c
+    fold.c
+    code.c
+
+    # Compiler support: symbols, diagnostics, compile-time memory.
+    posymbol.c
+    podiag.c
+    pocmemry.c
+
+    # Cross-unit resolution.
+    polink.c
+
+    # Public boundary and program/activation lifetime.
+    vm_api.c
+    vm_diagnostics.c
+    poco_call.c
+    activation.c
+    porunenv.c
+
+    # The interpreter and the native call path.
+    runops.c
+    pocoop.c
+    poco_ffi.c
+    postring.c
+
+    # Debug information, tracing, disassembly.
+    debug.c
+    trace.c
+    pocodis.c
+
+    # Serialized programs.
+    serialization.c
+    program_image.c
+    bytecode_container.c
+    bytecode_iter.c
+    poco_hash.c
+
+    # Native bindings and module loading.
+    pocolib.c
+    libproto.c
     standard_library.c
     strlib.c
-    struct.c
-    token.c
-    trace.c
-    varinit.c
+    mathlib.c
+    safefile.c
+    path_operations.c
+    pocoload.c
+
+    # Portability.
+    port.c
+    poco_lock.c
 )
 list(TRANSFORM POCO_CORE_SOURCES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 
