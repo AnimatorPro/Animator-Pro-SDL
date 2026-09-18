@@ -18,7 +18,7 @@
 #define POCO_STACKSIZE_MAX (256 * 1024L)
 #define POCO_STACKSIZE_DEFAULT (64 * 1024L) /* default poco runtime stacksize */
 
-extern int po_version_number; /* added 10/30/90, poco's version number */
+extern const int po_version_number; /* added 10/30/90, poco's version number */
 
 void po_free_executable(void** ppev);
 /* po_free_executable: free up the executable returned by the

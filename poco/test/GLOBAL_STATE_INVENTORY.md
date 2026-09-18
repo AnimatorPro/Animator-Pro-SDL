@@ -21,7 +21,7 @@ The section names matter: a `const` table holding pointers needs relocation, so
 it lands in `__DATA,__const` — read-only once the dynamic linker is done, but
 indistinguishable from real data under plain `nm`, which calls both `S`. The
 `__common` case matters too, because a tentative definition such as
-`FILE* po_trace_file;` is neither `D` nor `B`. On non-Apple hosts the script
+`FILE* some_stream;` is neither `D` nor `B`. On non-Apple hosts the script
 falls back to GNU `nm` symbol types, which already separate `.rodata` (`r`/`R`)
 from `.data`, `.bss` and common.
 
@@ -81,6 +81,8 @@ CTest above is the check that cannot be fooled this way.
 | [x] | `bop.c` | `static Bop_info bi_table[]` | Present | `const`, and its `ido_ops` field is `const Op_type*`. |
 | [x] | `strlib.c` | `static char errmsg[ERRTEXT_SIZE]` in `po_strerror()` | Discovered by the symbol scan | Removed; the buffer is `PocoVm::strerror_text`, reached through `poco_vm_errtext_buffer()`. Two VMs returning error text on two threads no longer overwrite each other's result between the callee's return and the caller's read. |
 | [x] | `main.c` | `Names incdirs[]` (IAN / JIM / default variants) | Present, exported, writable | Deleted. Nothing in the repository read it; the three variants were DOS-era personal include paths (`\paa\resource\`, `c:\tc\include\`) behind `IAN`/`JIM` macros that no build defines. |
+| [x] | `runops.c` | `FILE* po_trace_file`, `bool po_trace_flag` | Present under `DEVELOPMENT`, exported, writable | Removed; the instruction-trace destination is `PocoActivation::instruction_trace`, set per run through `PocoRunOptions::instruction_trace`. The CLI's `-t` holds its own `FILE*` local in `main()`. Two activations on two threads now trace independently. |
+| [x] | `vm_api.c` | `int po_version_number` | Exported and writable | `const int`. `poco/src/pocoface.h:21` and Animator's `src/inc/pocolib.h:39` were changed together so the declarations agree. |
 
 `po_run_protos` was compiled only in development builds, but remained in scope
 because it was mutable file-scope state whenever that configuration was
@@ -114,14 +116,6 @@ because draining them is a larger job than this inventory owns.
   tables above into `PocoBinding` form. Every racing writer stores the same
   value from an immutable source, so the race is benign, but the writes are
   still writes and TSan will report them.
-- **`po_version_number`** — Animator declares it `extern int` in
-  `src/inc/pocolib.h:39` and reads it from `src/pocofunc.c:72`. It cannot become
-  `const` on poco's side alone without the two declarations disagreeing.
-- **`po_trace_file`, `po_trace_flag`** (`runops.c:136-137`, under
-  `DEVELOPMENT`) — interpreter tracing, written only by `poco/src/main.c`'s
-  `-t` option. This is CLI state living in the core: two VMs on two threads
-  share one trace destination and one on/off switch. It belongs on `PocoVm`
-  (or on the CLI side of the boundary), which means editing `runops.c`.
 
 ## Explicitly out of scope
 

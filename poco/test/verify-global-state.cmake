@@ -54,14 +54,6 @@ set(POCO_KNOWN_MUTABLE
     poco_standard_path_library.initialized
     poco_standard_string_library.bindings
     poco_standard_string_library.initialized
-    # Declared 'extern int' by Animator's src/inc/pocolib.h, so it cannot
-    # become const on poco's side alone.
-    po_version_number
-    # CLI-only interpreter tracing, compiled under DEVELOPMENT and set only by
-    # poco/src/main.c's -t option.  Belongs on the CLI side of the boundary,
-    # not in the core.
-    po_trace_file
-    po_trace_flag
 )
 
 if(APPLE)

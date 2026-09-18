@@ -147,13 +147,13 @@ NEED_MORE:
 
 	if (line_pos == NULL) /* handle EOF */
 	{
-		ts->type = TOK_EOF;
+		ts->type = po_ptoken(TOK_EOF);
 		ts->line_num = 0;
 		ts->char_num = 0;
 		ts->ctoke[0] = '\0';
 		prev_ts = ts;
 		ts = ts->next = new_token(pcb);
-		ts->type = TOK_EOF;
+		ts->type = po_ptoken(TOK_EOF);
 		ts->line_num = 0;
 		ts->char_num = 0;
 		ts->ctoke[0] = '\0';
@@ -204,7 +204,7 @@ NEED_MORE:
 				}
 
 				if (ts->val.num > INT_MAX) {
-					ts->type = TOK_LONG;
+					ts->type = po_ptoken(TOK_LONG);
 				}
 
 				break;
@@ -223,7 +223,7 @@ NEED_MORE:
 					}
 				}
 				ts->val.num = (unsigned char)(ts->ctoke[0]);
-				ts->type = TOK_INT;
+				ts->type = po_ptoken(TOK_INT);
 				break;
 
 			case TOK_QUO:
@@ -322,7 +322,7 @@ void po_lookup_freshtoken(Poco_cb* pcb)
 			ts->type = s->tok_type;
 			if (ts->type == PTOK_ENUMCONST) {
 				ts->val.num = s->symval.i;
-				ts->type = TOK_INT;
+				ts->type = po_ptoken(TOK_INT);
 			} else {
 				ts->val.symbol = s;
 				if (ts->type == PTOK_VAR || ts->type == PTOK_LABEL || ts->type == PTOK_UNDEF) {

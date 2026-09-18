@@ -134,12 +134,6 @@ typedef struct {
 	long data[32];
 } Parmdata;
 
-#ifdef DEVELOPMENT
-/* variables for runops tracing */
-FILE* po_trace_file;
-bool po_trace_flag = false;
-#endif /* DEVELOPMENT */
-
 /*****************************************************************************
  * used as a dummy check_abort function when none is provided.
  ****************************************************************************/
@@ -2259,8 +2253,10 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 			p->debug_hook(p, (Code*)state.ip, stack_area, state.base);
 		}
 #ifdef DEVELOPMENT
-		if (po_trace_flag) {
-			po_disasm(po_trace_file, state.ip, (C_frame*)p->code->prototypes);
+		/* Trace destination is per-activation (PocoRunOptions::instruction_trace),
+		 * so concurrent runs do not share one stream or one on/off switch. */
+		if (p->instruction_trace != NULL) {
+			po_disasm(p->instruction_trace, state.ip, (C_frame*)p->code->prototypes);
 		}
 #endif /* DEVELOPMENT */
 

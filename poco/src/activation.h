@@ -123,6 +123,8 @@ struct PocoActivation {
 	bool (*check_abort)(void* data);
 	void* check_abort_data;
 	const char* trace_file;
+	/* Borrowed destination for the DEVELOPMENT instruction trace; NULL = off. */
+	FILE* instruction_trace;
 	long* err_line;
 	PoBoolean enable_debug_trace;
 	Pt_num result;

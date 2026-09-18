@@ -431,7 +431,16 @@ typedef int (*PocoCancelCallback)(void* user_data);
 typedef struct PocoRunOptions {
 	PocoCancelCallback cancel_callback;
 	void* cancel_user_data;
+	/* Path for the error trace written when a run fails; NULL means stdout. */
 	const char* trace_file;
+	/*
+	 * Destination for the per-instruction disassembly trace, or NULL for no
+	 * trace.  The stream is borrowed for the duration of the run and never
+	 * closed by Poco.  Honoured only by a build configured with DEVELOPMENT;
+	 * other builds ignore it.  Per-run, not global, so two activations on two
+	 * threads can trace to two destinations.
+	 */
+	FILE* instruction_trace;
 } PocoRunOptions;
 
 /*

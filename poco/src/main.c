@@ -443,11 +443,15 @@ static void report_binary_load_error(PocoVm* vm, PocoStatus status)
  * statuses have CLI-specific diagnostics because they are otherwise outside
  * the legacy compiler error domain handled by report_status below.
  ***************************************************************************/
-static PocoStatus run_binary(PocoVm* vm, FILE* input, bool run_program, bool with_builtin_libs)
+static PocoStatus run_binary(PocoVm* vm, FILE* input, bool run_program, bool with_builtin_libs,
+							 FILE* instruction_trace)
 {
 	PocoProgram* program = NULL;
 	PocoStatus status;
+	PocoRunOptions run_options = {0};
 	int32_t result = 0;
+
+	run_options.instruction_trace = instruction_trace;
 
 	if (with_builtin_libs) {
 		status = poco_vm_register_standard_library(vm);
@@ -461,7 +465,7 @@ static PocoStatus run_binary(PocoVm* vm, FILE* input, bool run_program, bool wit
 		return status;
 	}
 	if (run_program) {
-		status = poco_vm_run(vm, program, NULL, &result);
+		status = poco_vm_run(vm, program, &run_options, &result);
 		if (status == POCO_STATUS_OK) {
 			fprintf(stderr, "Return value: %d\n", (int)result);
 		}
@@ -509,11 +513,15 @@ static PocoStatus run_debugger(PocoVm* vm, const char* const* filenames, size_t 
 }
 
 static PocoStatus run_source_files(PocoVm* vm, const char* const* filenames, size_t source_count,
-								   bool run_program, bool with_builtin_libs, bool debug_dump)
+								   bool run_program, bool with_builtin_libs, bool debug_dump,
+								   FILE* instruction_trace)
 {
 	PocoProgram* program = NULL;
 	PocoStatus status;
+	PocoRunOptions run_options = {0};
 	int32_t result = 0;
+
+	run_options.instruction_trace = instruction_trace;
 
 	if (with_builtin_libs) {
 		status = poco_vm_register_standard_library(vm);
@@ -538,7 +546,7 @@ static PocoStatus run_source_files(PocoVm* vm, const char* const* filenames, siz
 		}
 	}
 	if (status == POCO_STATUS_OK && run_program) {
-		status = poco_vm_run(vm, program, NULL, &result);
+		status = poco_vm_run(vm, program, &run_options, &result);
 		if (status == POCO_STATUS_OK) {
 			fprintf(stderr, "Return value: %d\n", (int)result);
 		}
@@ -566,6 +574,9 @@ int main(int argc, char* argv[])
 	bool verbose = false;
 	bool emit_debug_info = false;
 	bool debug_mode = false;
+	/* -t destination.  A local, not a global: it is CLI state, and the VM now
+	 * takes it per run through PocoRunOptions. */
+	FILE* instruction_trace = NULL;
 	bool parse_options = true;
 	const char* argp;
 	int counter;
@@ -630,8 +641,7 @@ int main(int argc, char* argv[])
 			builtin_libs = NULL;
 #ifdef DEVELOPMENT
 		} else if (parse_options && strcmp(argp, "-t") == 0) {
-			po_trace_flag = true;
-			po_trace_file = stdout;
+			instruction_trace = stdout;
 #endif /* DEVELOPMENT */
 		} else if (parse_options && argp[0] == '-' && argp[1] != '\0') {
 			fprintf(stderr, "poco: unknown option '%s'\n", argp);
@@ -695,7 +705,8 @@ int main(int argc, char* argv[])
 		}
 		err = (int)(debug_mode ? run_debugger(vm, input_filenames, 1, input_file, true,
 											  builtin_libs != NULL)
-							   : run_binary(vm, input_file, runflag, builtin_libs != NULL));
+							   : run_binary(vm, input_file, runflag, builtin_libs != NULL,
+											instruction_trace));
 		fclose(input_file);
 		input_file = NULL;
 		goto report_status;
@@ -717,7 +728,7 @@ int main(int argc, char* argv[])
 		goto report_status;
 	}
 	err = (int)run_source_files(vm, (const char* const*)input_filenames, input_count, runflag,
-								builtin_libs != NULL, do_debug_dump);
+								builtin_libs != NULL, do_debug_dump, instruction_trace);
 
 report_status:
 	if (input_file != NULL) {

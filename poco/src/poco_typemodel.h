@@ -133,6 +133,19 @@ typedef enum ptoken_t {
 	PTOK_MAX, /* this must be last! */
 } PToken_t;
 
+/*
+ * poco_token_t and ptoken_t are two halves of one contiguous token space:
+ * ptoken_t starts at TOK_TOK_MAX, exactly where poco_token_t stops, so a
+ * poco_token_t value is always a valid PToken_t.  Token fields are typed
+ * PToken_t (see Tstack::type), which makes every store of a lexer token an
+ * enum-to-enum conversion.  Route those through this helper so the crossing
+ * is explicit and the shared numbering stays documented in one place.
+ */
+static inline PToken_t po_ptoken(Token_t token)
+{
+	return (PToken_t)token;
+}
+
 /*----------------------------------------------------------------------------
  * symbol flags...
  *--------------------------------------------------------------------------*/

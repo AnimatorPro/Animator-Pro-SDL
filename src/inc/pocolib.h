@@ -36,7 +36,7 @@
 /* Typed legacy callback entry declared by Poco's compatibility header. */
 extern char* po_fuf_name(void* fuf);
 extern void* po_fuf_code(void* fuf);
-extern int po_version_number;
+extern const int po_version_number;
 extern Rnode* po_in_rlist(Dlheader* sfi, void* f);
 /* The .poe loader lives in Poco core (poco/src/pocoload.c); Animator reaches
  * it only through the public VM API, so no loader entry points are declared

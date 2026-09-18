@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int po_version_number = VRSN_NUM; /* Global version number for PJ's use.    */
+const int po_version_number = VRSN_NUM; /* Compile-time constant; read by hosts. */
 
 typedef enum Poco_registered_library_kind {
 	POCO_REGISTERED_PUBLIC_LIBRARY,

@@ -513,11 +513,12 @@ static Errcode po_compile_source(Poco_cb* pcb, char* name, const char* source,
 	Struct_info* struct_tail;
 	Errcode err = Success;
 
-	pcb->current_unit_name = po_clone_string(pcb, name);
-	if (pcb->current_unit_name == NULL) {
-		return Err_no_memory;
-	}
-
+	/*
+	 * These validate static tables, not this compilation unit, and they bail
+	 * out with a bare return rather than through BADOUT.  Run them before the
+	 * first per-unit allocation so there is nothing for that early return to
+	 * strand.
+	 */
 #ifdef DEVELOPMENT
 	if (!po_check_instr_table(pcb)) {
 		po_say_internal(pcb, "instruction table failed self-check\n");
@@ -532,6 +533,11 @@ static Errcode po_compile_source(Poco_cb* pcb, char* name, const char* source,
 		PO_CHECK_ABORT(pcb, compile_failure_code(pcb));
 	}
 #endif
+
+	pcb->current_unit_name = po_clone_string(pcb, name);
+	if (pcb->current_unit_name == NULL) {
+		return Err_no_memory;
+	}
 
 	po_init_qbop_table(pcb);
 

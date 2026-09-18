@@ -123,15 +123,24 @@ endif()
 
 
 ## main
-add_subdirectory(src)
+## Gated so -DWITH_ANI=0 really does switch Animator off.  src/CMakeLists.txt
+## adds all fourteen Animator static libraries at top level, so leaving this
+## ungated built the whole host even for a poco-only configure.
+if (WITH_ANI)
+	add_subdirectory(src)
+endif()
 
 ## POE modules (must come AFTER src so native .poe installs are not
-## overwritten by the src/resource directory copy)
+## overwritten by the src/resource directory copy).  The loader fixtures
+## inside build without Animator; the Ani-native modules are gated on
+## WITH_ANI in src/poekit/CMakeLists.txt.
 if (WITH_POCO)
 	add_subdirectory(src/poekit)
 endif()
 
 ## tests
-if (APPLE)
+## These link Animator's static libraries (trdfile, gfxlib, trdutil), so they
+## exist only when Animator does.
+if (APPLE AND WITH_ANI)
 	add_subdirectory(tests)
 endif()

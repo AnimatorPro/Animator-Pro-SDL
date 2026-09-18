@@ -387,6 +387,7 @@ Errcode poco_activation_reset_state(PocoActivation* activation)
 	activation->check_abort = NULL;
 	activation->check_abort_data = NULL;
 	activation->trace_file = NULL;
+	activation->instruction_trace = NULL;
 	activation->err_line = NULL;
 	activation->enable_debug_trace = true;
 	memset(&activation->result, 0, sizeof(activation->result));
@@ -932,6 +933,7 @@ PocoStatus poco_activation_run(PocoActivation* activation, const PocoRunOptions*
 	activation->check_abort = cancel_context.callback != NULL ? poco_api_cancel : NULL;
 	activation->check_abort_data = cancel_context.callback != NULL ? &cancel_context : NULL;
 	activation->trace_file = options != NULL ? options->trace_file : NULL;
+	activation->instruction_trace = options != NULL ? options->instruction_trace : NULL;
 	activation->err_line = &error_line;
 	run_status = po_pev_alloc_data(activation);
 	activation->needs_reset = 1;
