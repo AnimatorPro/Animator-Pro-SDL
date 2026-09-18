@@ -1070,7 +1070,15 @@ if(POCO_ENABLE_EXTRACTION_BOUNDARY_TEST)
             "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-extraction-boundary.cmake"
     )
-    set_tests_properties("poco_extraction_boundary" PROPERTIES TIMEOUT 300)
+    # The gate runs two nested CMake builds and a whole CTest suite of its own.
+    # Sharing a machine with seven other tests made it miss its old 300s budget
+    # and, once, fail an inner test outright, so it gets the host to itself and
+    # a budget that survives a cold build.
+    set_tests_properties("poco_extraction_boundary" PROPERTIES
+        TIMEOUT 900
+        RUN_SERIAL TRUE
+        PROCESSORS 4
+    )
 endif()
 
 # This is deliberately separate from the copied-tree gate: it confirms the
