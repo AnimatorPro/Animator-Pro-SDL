@@ -377,6 +377,7 @@ target_link_libraries(
 				-DANI_EXECUTABLE=$<TARGET_FILE:ani>
 				-DANI_REGISTRATION_EXECUTABLE=$<TARGET_FILE:ani_poco_registration>
 				-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>
+				-DANI_SECOND_MODULE_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/poekit/pstamp/pstamp_load.poc
 				-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-configurations.cmake
 		)
 		set_tests_properties(ani_poco_configurations PROPERTIES

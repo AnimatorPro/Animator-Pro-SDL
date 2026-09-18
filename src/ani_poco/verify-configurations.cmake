@@ -2,7 +2,7 @@ if(NOT DEFINED BASELINE_MANIFEST OR NOT EXISTS "${BASELINE_MANIFEST}")
     message(FATAL_ERROR "BASELINE_MANIFEST must name the Phase 1 binding baseline")
 endif()
 foreach(required_variable BUILD_DIR INSTALL_PREFIX ANI_EXECUTABLE
-        ANI_REGISTRATION_EXECUTABLE POCO_EXECUTABLE)
+        ANI_REGISTRATION_EXECUTABLE POCO_EXECUTABLE ANI_SECOND_MODULE_SCRIPT)
     if(NOT DEFINED ${required_variable} OR "${${required_variable}}" STREQUAL "")
         message(FATAL_ERROR "${required_variable} is required")
     endif()
@@ -121,7 +121,8 @@ foreach(required_pair
     "generic Poco module script|${generic_script}"
     "Animator-native module|${ani_module}"
     "Animator-native module script|${ani_script}"
-    "second Animator-native module|${ani_second_module}")
+    "second Animator-native module|${ani_second_module}"
+    "second Animator-native module script|${ANI_SECOND_MODULE_SCRIPT}")
     string(REPLACE "|" ";" pair "${required_pair}")
     list(GET pair 0 label)
     list(GET pair 1 path)
@@ -131,6 +132,13 @@ run_checked_in("installed generic module load" "${INSTALL_PREFIX}"
     "${POCO_EXECUTABLE}" "${generic_script}")
 run_checked_in("installed Animator-native module load" "${INSTALL_PREFIX}"
     "${ANI_REGISTRATION_EXECUTABLE}" "${ani_script}")
+
+# Existence is not load: pstamp.poe has to resolve from the resource directory
+# and register its prototypes through the legacy POE path, or a module
+# relocation that only moved the install rule would still look green here.
+run_checked_in("installed second Animator-native module load"
+    "${INSTALL_PREFIX}/resource"
+    "${ANI_REGISTRATION_EXECUTABLE}" "${ANI_SECOND_MODULE_SCRIPT}")
 
 message(STATUS
     "Animator Poco verification passed: representative bindings, separate "
