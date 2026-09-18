@@ -280,7 +280,9 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 
 	for (;;) {
 		if (p->debug_hook != NULL) {
-			p->debug_hook(p, ip, stack_area, base);
+			/* The hook takes the instruction pointer as a byte address; the
+			 * interpreter walks it as Pt_num.  Same address, different view. */
+			p->debug_hook(p, (Code*)ip, stack_area, base);
 		}
 #ifdef DEVELOPMENT
 		{

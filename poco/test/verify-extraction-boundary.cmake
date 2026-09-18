@@ -22,9 +22,15 @@ macro(record_command_failure _label _stage _result_var _stdout_var _stderr_var)
     set(_details "${${_stdout_var}}\n${${_stderr_var}}")
     string(STRIP "${_details}" _details)
     string(LENGTH "${_details}" _details_length)
-    if(_details_length GREATER 1600)
-        string(SUBSTRING "${_details}" 0 1600 _details)
-        string(APPEND _details "\n[output truncated]")
+    # Keep both ends.  A configure or build failure explains itself near the
+    # top, but ctest names the tests that failed only in its closing summary,
+    # and head-only truncation threw that away -- which made every failure of
+    # the copied tree's suite report nothing but its first dozen passes.
+    if(_details_length GREATER 4000)
+        string(SUBSTRING "${_details}" 0 1200 _details_head)
+        math(EXPR _details_tail_start "${_details_length} - 2800")
+        string(SUBSTRING "${_details}" ${_details_tail_start} -1 _details_tail)
+        set(_details "${_details_head}\n[... output elided ...]\n${_details_tail}")
     endif()
     string(REPLACE "\n" "\n    " _details "${_details}")
     list(APPEND _gate_failures
@@ -248,6 +254,10 @@ string(SUBSTRING "${_sandbox_hash}" 0 16 _sandbox_suffix)
 set(_sandbox "${_temporary_root}/poco-extraction-boundary-${_sandbox_suffix}")
 file(REMOVE_RECURSE "${_sandbox}")
 file(MAKE_DIRECTORY "${_sandbox}")
+# TMPDIR is a symlink on macOS (/var -> /private/var).  Tests inside the copied
+# tree compare paths they report against the paths they were given, and the
+# tools resolve symlinks, so hand the sandbox on already resolved.
+get_filename_component(_sandbox "${_sandbox}" REALPATH)
 
 set(_copied_poco_source "${_sandbox}/poco")
 file(COPY "${POCO_SOURCE_DIR}" DESTINATION "${_sandbox}")

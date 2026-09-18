@@ -37,8 +37,18 @@ file(GLOB_RECURSE BUILD_METADATA LIST_DIRECTORIES FALSE
     "${ANIMATOR_SOURCE_DIR}/*.bat"
 )
 foreach(metadata_file IN LISTS BUILD_METADATA)
+    # CMakeFiles/ holds CMake's own generated bookkeeping, including the
+    # TryCompile scratch projects other tests create and delete while this one
+    # runs.  Globbing them in made this test fail at random under `ctest -j`,
+    # and they are not build metadata anyone authored anyway.
     if(metadata_file MATCHES "/thirdparty/" OR
+       metadata_file MATCHES "/CMakeFiles/" OR
        metadata_file STREQUAL "${CMAKE_CURRENT_LIST_FILE}")
+        continue()
+    endif()
+
+    # The glob is a snapshot; a concurrently generated file can be gone by now.
+    if(NOT EXISTS "${metadata_file}")
         continue()
     endif()
 
