@@ -30,19 +30,45 @@ endforeach()
 # dependency on the retired Rex or Poekit artifacts.  Do not inspect source
 # examples: rexentry.asm is retained historical source but is not a CMake
 # input, whereas this gate is specifically about supported build paths.
+# Normalize the root before globbing: the skip rules below are expressed
+# against paths relative to it, and a caller passing a trailing slash or an
+# unnormalized path would leave every path absolute after the prefix strip.
+get_filename_component(ANIMATOR_SOURCE_ROOT "${ANIMATOR_SOURCE_DIR}" REALPATH)
+
 file(GLOB_RECURSE BUILD_METADATA LIST_DIRECTORIES FALSE
-    "${ANIMATOR_SOURCE_DIR}/CMakeLists.txt"
-    "${ANIMATOR_SOURCE_DIR}/*.cmake"
-    "${ANIMATOR_SOURCE_DIR}/*.sh"
-    "${ANIMATOR_SOURCE_DIR}/*.bat"
+    "${ANIMATOR_SOURCE_ROOT}/CMakeLists.txt"
+    "${ANIMATOR_SOURCE_ROOT}/*.cmake"
+    "${ANIMATOR_SOURCE_ROOT}/*.sh"
+    "${ANIMATOR_SOURCE_ROOT}/*.bat"
 )
 foreach(metadata_file IN LISTS BUILD_METADATA)
+    # Judge the path relative to the source root: an absolute path can pick up
+    # a "_" or ".git" segment from wherever the checkout happens to live, which
+    # would silently skip every file and leave the gate testing nothing.
+    string(REPLACE "${ANIMATOR_SOURCE_ROOT}/" "" relative_metadata_file "${metadata_file}")
+    if(relative_metadata_file STREQUAL metadata_file)
+        # The strip failed, so the skip rules would be matching absolute paths.
+        # Fail loudly rather than degrade into an unreliable gate.
+        message(FATAL_ERROR
+            "Cannot express ${metadata_file} relative to ANIMATOR_SOURCE_DIR "
+            "(${ANIMATOR_SOURCE_ROOT}); the artifact scan would be unreliable")
+    endif()
+
     # CMakeFiles/ holds CMake's own generated bookkeeping, including the
     # TryCompile scratch projects other tests create and delete while this one
     # runs.  Globbing them in made this test fail at random under `ctest -j`,
     # and they are not build metadata anyone authored anyway.
-    if(metadata_file MATCHES "/thirdparty/" OR
-       metadata_file MATCHES "/CMakeFiles/" OR
+    #
+    # Build and scratch trees are skipped for the same reason: the root
+    # .gitignore reserves "_*" for them (_build, _install, throwaway worktree
+    # copies and sandbox trees), so nothing under such a directory is authored
+    # build metadata.  Without this the glob reaches into a build or scratch
+    # tree's copy of the sources and reports a hit against text that copy
+    # brought with it.
+    if(relative_metadata_file MATCHES "(^|/)thirdparty/" OR
+       relative_metadata_file MATCHES "(^|/)CMakeFiles/" OR
+       relative_metadata_file MATCHES "(^|/)_[^/]*/" OR
+       relative_metadata_file MATCHES "(^|/)\\.git/" OR
        metadata_file STREQUAL "${CMAKE_CURRENT_LIST_FILE}")
         continue()
     endif()
