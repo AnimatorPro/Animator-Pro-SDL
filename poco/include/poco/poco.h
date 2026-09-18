@@ -442,8 +442,7 @@ typedef struct PocoRunOptions {
  * compilation, library/path registration, and VM teardown.  Distinct
  * activations of one immutable program may run concurrently as documented
  * below.  The VM/program lifecycle and this header are the public embedding
- * boundary; compile_poco(), Poco_lib, and related compatibility headers are
- * not.
+ * boundary; Poco_lib and the remaining compatibility headers are not.
  */
 PocoStatus poco_vm_create(const PocoVmOptions* options, PocoVm** out_vm);
 void poco_vm_destroy(PocoVm* vm);

@@ -3,7 +3,6 @@
 #include "errcodes.h"
 #include "fli.h"
 #include "flicel.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "palchunk.h"
 #include "textedit.h"

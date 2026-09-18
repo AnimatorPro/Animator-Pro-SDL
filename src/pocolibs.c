@@ -14,7 +14,6 @@
 #include "rexlib.h"
 #include "pocorex.h"
 #include "pocolib.h"
-#include "pocoface.h"
 #include "poly.h"
 #include "ani_poco_adapter.h"
 

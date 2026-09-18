@@ -2,7 +2,6 @@
 
 #include "errcodes.h"
 #include "jimk.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "a3d.h"
 #include "auto.h"

@@ -6,11 +6,10 @@ set(POCO_LEGACY_LIBRARY "${POCO_SOURCE_DIR}/src/pocolib.h")
 set(POCO_LEGACY_FACE "${POCO_SOURCE_DIR}/src/pocoface.h")
 set(POCO_LEGACY_REX "${POCO_SOURCE_DIR}/src/pocorex.h")
 set(ANIMATOR_LEGACY_LIBRARY "${ANIMATOR_SOURCE_DIR}/src/inc/pocolib.h")
-set(ANIMATOR_LEGACY_FACE "${ANIMATOR_SOURCE_DIR}/src/inc/pocoface.h")
 set(ANIMATOR_LEGACY_REX "${ANIMATOR_SOURCE_DIR}/src/inc/pocorex.h")
 
 foreach(HEADER IN LISTS POCO_LEGACY_LIBRARY POCO_LEGACY_FACE POCO_LEGACY_REX
-        ANIMATOR_LEGACY_LIBRARY ANIMATOR_LEGACY_FACE ANIMATOR_LEGACY_REX)
+        ANIMATOR_LEGACY_LIBRARY ANIMATOR_LEGACY_REX)
     if(NOT EXISTS "${HEADER}")
         message(FATAL_ERROR "Missing compatibility header: ${HEADER}")
     endif()
@@ -28,7 +27,7 @@ foreach(REQUIRED_TEXT
     endif()
 endforeach()
 
-foreach(HEADER IN ITEMS "${ANIMATOR_LEGACY_LIBRARY}" "${ANIMATOR_LEGACY_FACE}" "${ANIMATOR_LEGACY_REX}")
+foreach(HEADER IN ITEMS "${ANIMATOR_LEGACY_LIBRARY}" "${ANIMATOR_LEGACY_REX}")
     file(READ "${HEADER}" HEADER_TEXT)
     string(FIND "${HEADER_TEXT}" "Compatibility-only Animator header" FOUND_INDEX)
     if(FOUND_INDEX EQUAL -1)
@@ -49,12 +48,9 @@ foreach(DUPLICATE_DEFINITION
     endif()
 endforeach()
 
-foreach(HEADER IN ITEMS "${ANIMATOR_LEGACY_FACE}" "${ANIMATOR_LEGACY_REX}")
+foreach(HEADER IN ITEMS "${ANIMATOR_LEGACY_REX}")
     file(READ "${HEADER}" HEADER_TEXT)
     foreach(DUPLICATE_DEFINITION
-            "Errcode compile_poco"
-            "Errcode run_poco"
-            "void free_poco"
             "typedef struct pocorex_hdr"
             "typedef struct pocorex")
         string(FIND "${HEADER_TEXT}" "${DUPLICATE_DEFINITION}" FOUND_INDEX)
@@ -63,3 +59,25 @@ foreach(HEADER IN ITEMS "${ANIMATOR_LEGACY_FACE}" "${ANIMATOR_LEGACY_REX}")
         endif()
     endforeach()
 endforeach()
+
+# The legacy compile_poco()/run_poco()/free_poco() entry points were retired.
+# They must not reappear in Poco's headers or in an Animator compatibility shim.
+foreach(HEADER IN ITEMS "${POCO_LEGACY_FACE}" "${POCO_LEGACY_LIBRARY}" "${POCO_LEGACY_REX}"
+        "${ANIMATOR_LEGACY_LIBRARY}" "${ANIMATOR_LEGACY_REX}")
+    file(READ "${HEADER}" HEADER_TEXT)
+    foreach(RETIRED_DECLARATION
+            "Errcode compile_poco("
+            "Errcode run_poco("
+            "void free_poco(")
+        string(FIND "${HEADER_TEXT}" "${RETIRED_DECLARATION}" FOUND_INDEX)
+        if(NOT FOUND_INDEX EQUAL -1)
+            message(FATAL_ERROR
+                "${HEADER} re-declares the retired legacy entry point: ${RETIRED_DECLARATION}")
+        endif()
+    endforeach()
+endforeach()
+
+if(EXISTS "${ANIMATOR_SOURCE_DIR}/src/inc/pocoface.h")
+    message(FATAL_ERROR
+        "src/inc/pocoface.h was retired with the legacy compile API and must not return")
+endif()

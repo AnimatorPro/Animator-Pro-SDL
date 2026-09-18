@@ -5,7 +5,6 @@
 #include "ptrmacro.h"
 #include "memory.h"
 #include "jfile.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "menus.h"
 #include "inkaid.h"

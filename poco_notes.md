@@ -46,7 +46,7 @@ Flow when a Poco menu item is selected:
 
 5. Execute (`src/qpoco.c`):
    - `qrun_pocofile()` (line 344) calls `qrun_poco()` (line 233)
-   - `qrun_poco()` compiles the Poco program via `compile_poco()` and runs it via `execute_poco()` (line 256), which calls `run_poco()` from the Poco library
+   - `qrun_poco()` compiles the Poco program via the Ani adapter and `poco_vm_compile_file()`, then runs it via `poco_vm_run()`
 
 In summary: `menu_dopull` → `main_selit` → `run_pull_poco` → `qrun_pocofile` → `qrun_poco` → compiles and executes the Poco program.
 

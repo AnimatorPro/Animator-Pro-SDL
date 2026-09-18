@@ -1022,9 +1022,6 @@ void po_disassemble_program(Poco_run_env* poco_env, FILE* fp);
 Errcode print_pocolib(char* filename, Poco_lib* lib);
 Poco_lib* po_open_library(Poco_cb* pcb, char* libname, char* id_str);
 char* po_get_libproto_line(Poco_cb* pcb);
-Errcode compile_poco(void** ppexe, char* source_name, char* errors, char* dump_name, Poco_lib* lib,
-					 char* err_file, long* err_line, int* err_char, Names* include_dirs,
-					 bool verbose);
 Errcode compile_poco_with_vm(PocoVm* vm, void** ppexe, char* source_name, char* errors,
 							 char* dump_name, Poco_lib* lib, char* err_file, long* err_line,
 							 int* err_char, Names* include_dirs, bool verbose);
@@ -1041,9 +1038,7 @@ Errcode compile_poco_files_with_vm(PocoVm* vm, void** ppexe, const char* const* 
 								   const size_t* use_counts, size_t source_count, Poco_lib* lib,
 								   char* err_file, size_t err_file_capacity, long* err_line,
 								   int* err_char, bool verbose);
-Errcode run_poco(void** ppexe, char* trace_file, bool (*check_abort)(void*), void* check_abort_data,
-				 long* err_line);
-void free_poco(void** ppexe);
+void po_free_executable(void** ppexe);
 char* po_fuf_name(void* fuf);
 void* po_fuf_code(void* fuf);
 Poco_lib* poco_active_library(PocoVm* vm, const char* identity);

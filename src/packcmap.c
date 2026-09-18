@@ -16,7 +16,6 @@
 #include "errcodes.h"
 #include "cmap.h"
 #include "pocolib.h"
-#include "pocoface.h"
 
 extern Errcode builtin_err;
 extern int closestc(const Rgb3* rgb, const Rgb3* cmap, int count);

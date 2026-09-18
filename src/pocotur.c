@@ -4,7 +4,6 @@
 #include "errcodes.h"
 #include <stdio.h>
 #include "pocodraw.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "vpsubs.h"
 #include <math.h>

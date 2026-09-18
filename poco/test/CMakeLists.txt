@@ -987,18 +987,9 @@ add_test(NAME poco_path_operations COMMAND $<TARGET_FILE:poco_path_operations>)
 set_tests_properties(poco_path_operations PROPERTIES TIMEOUT 10)
 
 if(POCO_TEST_HAS_ANIMATOR_SOURCE)
-    # Animator still consumes the legacy compile/run and POE declarations while
-    # it migrates to the embedding API.  Keep that compatibility boundary
-    # compiling against the canonical Poco ABI instead of maintaining duplicate
-    # layouts.
-    add_executable(poco_legacy_animator_headers legacy_animator/headers.c)
-    target_include_directories(poco_legacy_animator_headers BEFORE PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/../../src/inc"
-    )
-    target_link_libraries(poco_legacy_animator_headers PRIVATE Poco::poco)
-    add_test(NAME poco_legacy_animator_headers COMMAND $<TARGET_FILE:poco_legacy_animator_headers>)
-    set_tests_properties(poco_legacy_animator_headers PROPERTIES TIMEOUT 10)
-
+    # Animator still consumes the legacy POE declarations while it migrates to
+    # the embedding API.  Keep that compatibility boundary honest: no duplicate
+    # ABI layouts, and no return of the retired compile/run/free entry points.
     add_test(
         NAME poco_legacy_header_shims
         COMMAND "${CMAKE_COMMAND}"

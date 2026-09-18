@@ -29,6 +29,7 @@
 /* Typed legacy callback entry declared by Poco's compatibility header. */
 extern char* po_fuf_name(void* fuf);
 extern void* po_fuf_code(void* fuf);
+extern int po_version_number;
 extern Rnode* po_in_rlist(Dlheader* sfi, void* f);
 extern Errcode pj_load_pocorex(Poco_lib** lib, const char* script_path, char* name, char* id_str,
 							   bool verbose);

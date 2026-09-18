@@ -23,7 +23,6 @@
 #include "memory.h"
 
 #ifdef WITH_POCO
-#include "pocoface.h"
 #include "qpoco.h"
 #endif  // WITH_POCO
 

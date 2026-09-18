@@ -4,7 +4,6 @@
 #include "jimk.h"
 #include "errcodes.h"
 #include <stdio.h>
-#include "pocoface.h"
 #include "pocolib.h"
 #include "auto.h"
 #include "flx.h"

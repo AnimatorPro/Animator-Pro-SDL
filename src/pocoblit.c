@@ -3,7 +3,6 @@
 
 #include "errcodes.h"
 #include "jimk.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "flicel.h"
 #include "pentools.h"

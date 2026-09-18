@@ -5,7 +5,6 @@
 #include <time.h>
 #include "jimk.h"
 #include "fli.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "errcodes.h"
 #include "options.h"

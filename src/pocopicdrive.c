@@ -15,7 +15,6 @@
 #include "filepath.h"
 #include "picdrive.h"
 #include "pocolib.h"
-#include "pocoface.h"
 
 #include <string.h>
 

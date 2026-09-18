@@ -14,7 +14,6 @@
 #include "jimk.h"
 #include "palmenu.h"
 #include "pocodraw.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "poly.h"
 #include "inks.h"

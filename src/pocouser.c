@@ -9,7 +9,6 @@
 #include "linklist.h"
 #include "jimk.h"
 #include "poly.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "reqlib.h"
 #include "softmenu.h"

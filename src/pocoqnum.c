@@ -2,7 +2,6 @@
 
 #include "jimk.h"
 #include "errcodes.h"
-#include "pocoface.h"
 #include "pocolib.h"
 
 typedef struct upddata {

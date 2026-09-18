@@ -2,7 +2,6 @@
 #include "errcodes.h"
 #include "ptrmacro.h"
 #include "flicel.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "render.h"
 

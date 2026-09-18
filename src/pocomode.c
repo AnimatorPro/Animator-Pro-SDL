@@ -6,7 +6,6 @@
 
 #include "jimk.h"
 #include "errcodes.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "options.h"
 #include "util.h"
