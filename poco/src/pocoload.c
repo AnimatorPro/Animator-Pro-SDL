@@ -1,3 +1,11 @@
+/*******************************************************************************
+ * pocoload.c - Native module loader.
+ * Resolves a '#pragma poco library' name to a platform shared object, opens
+ * it, calls its entry point and adapts what comes back into the binding list
+ * the compiler sees.  Handles both the modern PocoModuleDescriptor modules and
+ * the deprecated poco_rexlib_get() ABI, and owns their unload and per-run
+ * cleanup.
+ ******************************************************************************/
 
 #include <poco/poco.h>
 

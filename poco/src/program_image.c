@@ -1,3 +1,11 @@
+/*******************************************************************************
+ * program_image.c - Flattens a compiled program into sections and rebuilds it.
+ * Owns what a serialized image contains: function frames, code, literals,
+ * struct layouts, debug line and live-range tables, and the external library
+ * manifest a reload has to match.  bytecode_container.c wraps the result;
+ * serialization.c is the public face of both.
+ ******************************************************************************/
+
 #include "program_image.h"
 
 #include "bytecode_iter.h"

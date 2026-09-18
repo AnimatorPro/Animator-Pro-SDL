@@ -1,3 +1,11 @@
+/*******************************************************************************
+ * port.c - Portability runtime.
+ * Poco-owned allocation, string and file-deletion primitives that the legacy
+ * sources reach for under their historical pj_* spellings (see port.h for the
+ * aliases).  Keeping them here lets Poco link beside an Animator host without
+ * either side capturing the other's symbols.
+ ******************************************************************************/
+
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>

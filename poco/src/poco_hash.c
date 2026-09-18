@@ -1,3 +1,9 @@
+/*******************************************************************************
+ * poco_hash.c - The one BLAKE3 digest Poco uses.
+ * Backs both source-content addressing and serialized-image integrity, so
+ * both answer to the same hash and the same constant-time comparison.
+ ******************************************************************************/
+
 #include "poco_hash.h"
 
 #include <blake3.h>

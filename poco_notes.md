@@ -142,7 +142,7 @@ During loading (`src/rexlib/rexhost/rexlib.c`):
 ### Flow
 1. Parser recognizes `#pragma poco library "filename.poe"`
 2. Resolves file path via include directories (line 1157)
-3. Calls `po_open_library()` (`poco/src/pocoface.c:367`)
+3. Calls `po_open_library()` (`poco/src/libproto.c`)
 4. `po_open_library()` calls `pj_load_pocorex()` (`poco/src/pocoload.c`)
 5. `pj_load_pocorex()` calls `pj_rexlib_load()` which:
    - Loads binary via `pj_rex_load()`
@@ -153,7 +153,7 @@ During loading (`src/rexlib/rexhost/rexlib.c`):
 7. Preprocessor treats library as file stack entry (line 1185)
 
 ### During Compilation
-- `po_get_libproto_line()` (`pocoface.c:420`) returns prototype strings from loaded libraries
+- `po_get_libproto_line()` (`libproto.c`) returns prototype strings from loaded libraries
 - Each prototype pairs with function pointer (`pcb->libfunc`)
 - `func_proto()` (`declare.c:385`) associates function pointer with prototype during parsing
 
@@ -215,5 +215,5 @@ Use OS-native shared libraries:
 - **Rex library manager**: `src/rexlib/rexhost/rexlib.c` - High-level loading and hostlib resolution
 - **Module loader**: `poco/src/pocoload.c` - the one .poe loader; Animator adds only its resource directory, through `poco_vm_add_library_path()`
 - **Pragma handler**: `poco/src/pp.c` - Parses `#pragma poco library`
-- **Library opening**: `poco/src/pocoface.c` - `po_open_library()` function
+- **Library opening**: `poco/src/libproto.c` - `po_open_library()` function
 - **Header definitions**: `src/rexlib/inc/rexlib.h`, `src/rexlib/inc/pocorex.h`

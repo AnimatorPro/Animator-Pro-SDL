@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- * pocomemry.c - Memory management routines for compile-time phase of poco.
+ * pocmemry.c - Memory management routines for compile-time phase of poco.
  *
  * MAINTENANCE
  *	08/27/90	(Ian)

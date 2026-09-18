@@ -1,3 +1,9 @@
+/*******************************************************************************
+ * bcutil.c - Tokenizer helper: chop the next C symbol out of a line buffer.
+ * Lives apart from token.c because the preprocessor's own scanner needs it
+ * before the tokenizer proper is in play.
+ ******************************************************************************/
+
 #include <ctype.h>
 #include "token.h"
 

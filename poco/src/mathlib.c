@@ -1,3 +1,8 @@
+/*******************************************************************************
+ * mathlib.c - Native math bindings.
+ * The pointer-free part of the ANSI math library, plus the errno/signal
+ * trapping that turns a domain or range error into a Poco runtime error.
+ ******************************************************************************/
 
 #include "pocolib.h"
 #include <math.h>

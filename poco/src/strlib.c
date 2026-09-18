@@ -1,3 +1,10 @@
+/*******************************************************************************
+ * strlib.c - Native string, formatting and conversion bindings.
+ * Wraps the C string library for scripts, checking each Popot argument
+ * against the caller's memory before it dereferences it, and carries the
+ * bounds contracts and owned-return policy for the pointers it hands back.
+ ******************************************************************************/
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
