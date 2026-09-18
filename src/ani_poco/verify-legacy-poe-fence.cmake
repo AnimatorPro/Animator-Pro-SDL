@@ -49,10 +49,18 @@ foreach(forbidden PolibUser _plptr _a_a_pocolib)
 endforeach()
 
 require_literal("${POCO_PUBLIC_HEADER}" "allow_legacy_poe")
-require_literal("${POCO_PUBLIC_HEADER}" "does not provide Animator symbols or function tables")
+#
+# The fence evidence below is deliberately host-neutral.  Poco's public header
+# documents the legacy-POE opt-in without naming Animator: the opt-in must be
+# described as exposing no host symbols or function tables, whoever the host
+# is.  Requiring Animator's name here would make this audit the reason poco/
+# still mentions Animator.
+require_literal("${POCO_PUBLIC_HEADER}" "exposes no host symbols or function tables")
+require_absent_literal("${POCO_PUBLIC_HEADER}" "Animator")
 require_literal("${POCO_LOADER}" "allow_legacy_poe")
 require_literal("${POCO_LOADER}" "legacy native-POE module")
-require_literal("${POCO_MODULE_HELPER}" "no Animator include paths")
+require_literal("${POCO_MODULE_HELPER}" "no host include paths")
+require_absent_literal("${POCO_MODULE_HELPER}" "Animator")
 require_literal("${ANI_ADAPTER_POLICY}" ".allow_legacy_poe = 1")
 require_literal("${ANI_ADAPTER_POLICY}" "animhost_ensure_pocolib")
 require_absent_literal("${ANI_POLICY_HOST}" "animhost_ensure_pocolib")

@@ -252,6 +252,23 @@ endif()
 string(SHA256 _sandbox_hash "${POCO_SOURCE_DIR};${CMAKE_CURRENT_LIST_FILE}")
 string(SUBSTRING "${_sandbox_hash}" 0 16 _sandbox_suffix)
 set(_sandbox "${_temporary_root}/poco-extraction-boundary-${_sandbox_suffix}")
+
+# The sandbox name is deliberately deterministic: one reusable directory per
+# source tree, wiped on entry rather than accumulated in TMPDIR.  That makes it
+# a shared resource.  RUN_SERIAL keeps one ctest run from overlapping itself,
+# but it says nothing about two ctest processes over the same tree -- and this
+# gate is slow enough that overlapping runs are normal when more than one agent
+# or shell is building.  Without a lock the second entrant's REMOVE_RECURSE
+# deletes the first's sandbox mid-build, which surfaces as a different inner
+# test failing each time plus a cascade of "Failed to change working directory"
+# for build directories that vanished.  Serialize instead.
+set(_sandbox_lock "${_sandbox}.lock")
+file(LOCK "${_sandbox_lock}" GUARD PROCESS TIMEOUT 1800 RESULT_VARIABLE _lock_result)
+if(NOT "${_lock_result}" STREQUAL "0")
+    message(FATAL_ERROR
+        "Could not acquire the extraction-boundary sandbox lock ${_sandbox_lock}: ${_lock_result}")
+endif()
+
 file(REMOVE_RECURSE "${_sandbox}")
 file(MAKE_DIRECTORY "${_sandbox}")
 # TMPDIR is a symlink on macOS (/var -> /private/var).  Tests inside the copied

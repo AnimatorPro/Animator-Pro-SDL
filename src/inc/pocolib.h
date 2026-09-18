@@ -71,8 +71,6 @@ extern Poco_lib po_tween_lib;
 extern Poco_lib po_flicplay_lib;
 extern Poco_lib po_picdrive_lib;
 
-extern Errcode builtin_err;
-
 /* ndef PUBLIC_CODE */ #endif
 
 #ifndef POCO_H /* the poco subsytem doesn't want to see all the following... */

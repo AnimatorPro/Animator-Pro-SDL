@@ -91,7 +91,6 @@ typedef struct vbasics_cb {
 
 extern Vbcb vb; /* in pjhigh.lib(startup.c) */
 extern char resource_dir[PATH_SIZE];
-extern Errcode builtin_err; /* in pocolib(pocoface.c) */
 
 /***** initializer functions ******/
 

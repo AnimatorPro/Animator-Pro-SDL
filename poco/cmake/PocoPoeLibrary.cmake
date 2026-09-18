@@ -3,8 +3,9 @@
 # Build an in-tree native Poco module that depends only on Poco and on
 # dependencies explicitly supplied by its caller.  This helper is not
 # installed as an external-package API; external generic modules use
-# poco_add_module().  Animator-native modules use the separate helper owned by
-# src/ani_poco, never this helper plus implicit Animator dependencies.
+# poco_add_module().  A host whose modules link against the host's own
+# libraries supplies its own helper in the host tree, rather than extending
+# this one with implicit host dependencies.
 #
 # Usage:
 #   add_poe_library(name
