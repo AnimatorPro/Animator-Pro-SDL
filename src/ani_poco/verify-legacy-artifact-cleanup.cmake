@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
-if(NOT DEFINED POCO_SOURCE_DIR)
-    message(FATAL_ERROR "POCO_SOURCE_DIR is required")
-endif()
-
-get_filename_component(ANIMATOR_SOURCE_DIR "${POCO_SOURCE_DIR}/.." ABSOLUTE)
+foreach(required_variable POCO_SOURCE_DIR ANIMATOR_SOURCE_DIR)
+    if(NOT DEFINED ${required_variable})
+        message(FATAL_ERROR "${required_variable} is required")
+    endif()
+endforeach()
 
 set(LEGACY_ARTIFACTS
     "${ANIMATOR_SOURCE_DIR}/src/rexlib/rexhost/REXENTRY.I"

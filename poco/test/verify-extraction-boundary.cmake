@@ -260,40 +260,22 @@ else()
     set(_generator_args)
 endif()
 
-# Reject parent-owned dependencies and Animator paths from the standalone
-# CMake surface.  PocoModule is the sole installed helper; the legacy poekit
-# helper remains outside the standalone package.
-set(_cmake_files
-    "${POCO_SOURCE_DIR}/CMakeLists.txt"
-    "${POCO_SOURCE_DIR}/cmake/PocoModule.cmake"
+# Reject parent-owned dependencies and consumer paths from the whole source
+# tree, not just the top-level CMake surface: poekit/ and test/ reach-throughs
+# escaped the two-file scan this gate used to run.  The scan is its own script
+# so it can also run as a cheap standalone test.
+execute_process(
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPOCO_SOURCE_DIR=${POCO_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/verify-source-boundary.cmake"
+    RESULT_VARIABLE _boundary_result
+    OUTPUT_VARIABLE _boundary_stdout
+    ERROR_VARIABLE _boundary_stderr
 )
-
-foreach(_cmake_file IN LISTS _cmake_files)
-    if(NOT EXISTS "${_cmake_file}")
-        continue()
-    endif()
-    file(READ "${_cmake_file}" _cmake_contents)
-
-    foreach(_target IN ITEMS ffi_static hashmap trdutil)
-        string(REGEX MATCH
-            "target_link_libraries[ \t\r\n]*\\([^\\)]*([ \t\r\n])${_target}([ \t\r\n\\)])"
-            _target_match
-            "${_cmake_contents}")
-        if(NOT "${_target_match}" STREQUAL "")
-            list(APPEND _gate_failures
-                "Poco CMake links the parent-owned target '${_target}' in ${_cmake_file}")
-        endif()
-    endforeach()
-
-    string(REGEX MATCH
-        "CMAKE_SOURCE_DIR[^\n\r]*(src/inc|poco/include)"
-        _animator_path_match
-        "${_cmake_contents}")
-    if(NOT "${_animator_path_match}" STREQUAL "")
-        list(APPEND _gate_failures
-            "Poco CMake reaches through the consumer source root in ${_cmake_file}: ${_animator_path_match}")
-    endif()
-endforeach()
+if(NOT "${_boundary_result}" STREQUAL "0")
+    record_command_failure("Poco source tree" "boundary scan"
+        _boundary_result _boundary_stdout _boundary_stderr)
+endif()
 
 # Keep the fixture contract deliberately narrow.  Both consumers must use the
 # public API to register one native function and run a script, rather than

@@ -40,8 +40,6 @@
  *--------------------------------------------------------------------------*/
 
 #include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
 extern int snprintf(char*, unsigned long, const char*, ...);
 #define PUBLIC_CODE
 #include "stdtypes.h"
@@ -414,23 +412,6 @@ void init_pstamp_screen(void* screen)
 	pj_cmap_load(rast, rast->cmap);
 	pj_set_rast(rast, 0);
 
-	// #region agent log
-	{
-		int _fd = open("/Users/kiki/dev/animatorpro/.cursor/debug.log",
-					   O_WRONLY | O_CREAT | O_APPEND, 0644);
-		if (_fd >= 0) {
-			char _b[256];
-			int _n =
-				snprintf(_b, sizeof(_b),
-						 "{\"hypothesisId\":\"H20\",\"runId\":\"post-fix\",\"location\":\"pstamp.c:"
-						 "init_pstamp_screen\",\"message\":\"pre-GetPicScreen\",\"data\":{\"rast\":"
-						 "\"%p\",\"_plptr\":\"%p\",\"fn\":\"%p\"}}\n",
-						 (void*)rast, (void*)_plptr, (void*)(_plptr ? _plptr->pl_getpicscreen : 0));
-			write(_fd, _b, _n);
-			close(_fd);
-		}
-	}
-	// #endregion
 	if (rast == GetPicScreen()) {
 		poePicDirtied();
 	}
@@ -442,22 +423,6 @@ void init_pstamp_screen(void* screen)
  ****************************************************************************/
 void cleanup_pstamp_screen(void* screen)
 {
-	// #region agent log
-	{
-		int _fd = open("/Users/kiki/dev/animatorpro/.cursor/debug.log",
-					   O_WRONLY | O_CREAT | O_APPEND, 0644);
-		if (_fd >= 0) {
-			char _b[256];
-			int _n = snprintf(_b, sizeof(_b),
-							  "{\"hypothesisId\":\"H20\",\"runId\":\"post-fix\",\"location\":"
-							  "\"pstamp.c:cleanup\",\"message\":\"pre-GetPicScreen\",\"data\":{"
-							  "\"screen\":\"%p\",\"_plptr\":\"%p\"}}\n",
-							  (void*)screen, (void*)_plptr);
-			write(_fd, _b, _n);
-			close(_fd);
-		}
-	}
-	// #endregion
 	if (screen == GetPicScreen()) {
 		poePicDirtied();
 	}

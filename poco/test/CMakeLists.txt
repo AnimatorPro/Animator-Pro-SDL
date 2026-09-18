@@ -2,13 +2,8 @@ cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
 find_package(Threads REQUIRED)
 
-# Poco can be configured as its own top-level source tree.  Keep Animator
-# compatibility audits in the parent build, where the Animator source exists,
-# so the copied-tree test suite remains independently runnable.
-set(POCO_TEST_HAS_ANIMATOR_SOURCE FALSE)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../src/CMakeLists.txt")
-    set(POCO_TEST_HAS_ANIMATOR_SOURCE TRUE)
-endif()
+# Nothing in this suite may read the consumer's source tree.  Animator
+# compatibility audits live in src/ani_poco, where the Animator source is.
 
 # Function to add a positive test (expects successful execution)
 # Usage: add_poco_pos_test(test_name relative_path_to_poc_file)
@@ -16,7 +11,7 @@ function(add_poco_pos_test TEST_NAME POC_FILE)
     set(TEST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${POC_FILE}")
     add_test(
         NAME "poco_pos_${TEST_NAME}"
-        COMMAND $<TARGET_FILE:poco> "${TEST_FILE}"
+        COMMAND $<TARGET_FILE:poco_cli> "${TEST_FILE}"
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
     # Positive tests should succeed (return 0)
@@ -32,7 +27,7 @@ function(add_poco_neg_test TEST_NAME POC_FILE)
     set(TEST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${POC_FILE}")
     add_test(
         NAME "poco_neg_${TEST_NAME}"
-        COMMAND $<TARGET_FILE:poco> "${TEST_FILE}"
+        COMMAND $<TARGET_FILE:poco_cli> "${TEST_FILE}"
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
     # Negative tests should fail (non-zero return code or error message)
@@ -48,7 +43,7 @@ function(add_poco_test TEST_NAME POC_FILE)
     set(TEST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${POC_FILE}")
     add_test(
         NAME "poco_${TEST_NAME}"
-        COMMAND $<TARGET_FILE:poco> "${TEST_FILE}"
+        COMMAND $<TARGET_FILE:poco_cli> "${TEST_FILE}"
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
     set_tests_properties("poco_${TEST_NAME}" PROPERTIES
@@ -188,7 +183,7 @@ add_poco_neg_test(void_return_value "neg/void_return_value.poc")
 # files, so it is a search path on which nothing can resolve.
 add_test(
     NAME "poco_neg_lib01_not_found"
-    COMMAND $<TARGET_FILE:poco> "${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib01.poc"
+    COMMAND $<TARGET_FILE:poco_cli> "${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib01.poc"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 set_tests_properties("poco_neg_lib01_not_found" PROPERTIES
@@ -211,7 +206,7 @@ add_poco_test(ffi_01 "po_ffi_01.poc")
 add_test(
     NAME poco_cli_compile_to_binary
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/cli_compile/compile_to_binary.poc"
         "-DPOCO_INVALID_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/cli_compile/invalid.poc"
         "-DPOCO_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli_compile/compile_to_binary.pex"
@@ -225,7 +220,7 @@ set_tests_properties(poco_cli_compile_to_binary PROPERTIES TIMEOUT 10)
 add_test(
     NAME poco_cli_detect_and_run_binary
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/cli_binary/detect_and_run.poc"
         "-DPOCO_FIXTURE_DIR=${CMAKE_CURRENT_BINARY_DIR}/cli_binary"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_binary/verify-detect-and-run.cmake"
@@ -346,7 +341,7 @@ set_tests_properties(poco_multi_unit_compile PROPERTIES
 
 add_test(
     NAME poco_pragma_use_cli
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${CMAKE_CURRENT_SOURCE_DIR}/multi_unit_compile/use_root.poc"
 )
 set_tests_properties(poco_pragma_use_cli PROPERTIES
@@ -364,7 +359,7 @@ set(POCO_LINKING_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/linking_matrix")
 add_test(
     NAME poco_linking_compile_header
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_MAIN=${POCO_LINKING_FIXTURES}/listed_main.poc"
         "-DPOCO_LIBRARY=${POCO_LINKING_FIXTURES}/library.poc"
         "-DPOCO_FIXTURE_DIR=${CMAKE_CURRENT_BINARY_DIR}/linking_matrix/compile"
@@ -373,7 +368,7 @@ add_test(
 
 add_test(
     NAME poco_linking_direct_list
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/listed_main.poc"
         "${POCO_LINKING_FIXTURES}/library.poc"
 )
@@ -383,7 +378,7 @@ set_tests_properties(poco_linking_direct_list PROPERTIES
 
 add_test(
     NAME poco_linking_use_no_header
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/use_no_header.poc"
 )
 set_tests_properties(poco_linking_use_no_header PROPERTIES
@@ -392,7 +387,7 @@ set_tests_properties(poco_linking_use_no_header PROPERTIES
 
 add_test(
     NAME poco_linking_use_matching_header
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/use_matching_header.poc"
 )
 set_tests_properties(poco_linking_use_matching_header PROPERTIES
@@ -401,14 +396,14 @@ set_tests_properties(poco_linking_use_matching_header PROPERTIES
 
 add_test(
     NAME poco_linking_use_mismatched_header
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/use_mismatched_header.poc"
 )
 set_tests_properties(poco_linking_use_mismatched_header PROPERTIES WILL_FAIL TRUE)
 
 add_test(
     NAME poco_linking_duplicate_external
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/duplicate_a.poc"
         "${POCO_LINKING_FIXTURES}/duplicate_b.poc"
 )
@@ -416,7 +411,7 @@ set_tests_properties(poco_linking_duplicate_external PROPERTIES WILL_FAIL TRUE)
 
 add_test(
     NAME poco_linking_same_named_static
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/static_main.poc"
         "${POCO_LINKING_FIXTURES}/static_library.poc"
 )
@@ -426,7 +421,7 @@ set_tests_properties(poco_linking_same_named_static PROPERTIES
 
 add_test(
     NAME poco_linking_zero_main_run
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/library_only_a.poc"
         "${POCO_LINKING_FIXTURES}/library_only_b.poc"
 )
@@ -434,14 +429,14 @@ set_tests_properties(poco_linking_zero_main_run PROPERTIES WILL_FAIL TRUE)
 
 add_test(
     NAME poco_linking_library_check
-    COMMAND $<TARGET_FILE:poco> -c
+    COMMAND $<TARGET_FILE:poco_cli> -c
         "${POCO_LINKING_FIXTURES}/library_only_a.poc"
         "${POCO_LINKING_FIXTURES}/library_only_b.poc"
 )
 
 add_test(
     NAME poco_linking_multiple_main
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/main_a.poc"
         "${POCO_LINKING_FIXTURES}/main_b.poc"
 )
@@ -450,7 +445,7 @@ set_tests_properties(poco_linking_multiple_main PROPERTIES WILL_FAIL TRUE)
 add_test(
     NAME poco_linking_multifile_debugger
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_MAIN=${POCO_LINKING_FIXTURES}/debug_main.poc"
         "-DPOCO_LIBRARY=${POCO_LINKING_FIXTURES}/debug_library.poc"
         "-DPOCO_HEADER=${POCO_LINKING_FIXTURES}/debug_library.h"
@@ -461,14 +456,14 @@ add_test(
 
 add_test(
     NAME poco_linking_use_cycle
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/cycle_a.poc"
 )
 set_tests_properties(poco_linking_use_cycle PROPERTIES WILL_FAIL TRUE)
 
 add_test(
     NAME poco_linking_use_list_dedup
-    COMMAND $<TARGET_FILE:poco>
+    COMMAND $<TARGET_FILE:poco_cli>
         "${POCO_LINKING_FIXTURES}/dedup_root.poc"
         "${POCO_LINKING_FIXTURES}/dedup_library.poc"
 )
@@ -549,7 +544,7 @@ set_tests_properties(poco_debug_inspection PROPERTIES TIMEOUT 10)
 add_test(
     NAME poco_cli_interactive_debugger
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/cli_debugger/interactive_debugger.poc"
         "-DPOCO_COMMANDS=${CMAKE_CURRENT_SOURCE_DIR}/cli_debugger/commands.txt"
         "-DPOCO_FIXTURE_DIR=${CMAKE_CURRENT_BINARY_DIR}/cli_debugger"
@@ -560,7 +555,7 @@ set_tests_properties(poco_cli_interactive_debugger PROPERTIES TIMEOUT 15)
 add_test(
     NAME poco_cli_debug_level
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/debug_metadata/debug_metadata.poc"
         "-DPOCO_FIXTURE_DIR=${CMAKE_CURRENT_BINARY_DIR}/debug_metadata"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/debug_metadata/verify-cli-debug-level.cmake"
@@ -986,20 +981,6 @@ target_link_libraries(poco_path_operations PRIVATE Poco::poco)
 add_test(NAME poco_path_operations COMMAND $<TARGET_FILE:poco_path_operations>)
 set_tests_properties(poco_path_operations PROPERTIES TIMEOUT 10)
 
-if(POCO_TEST_HAS_ANIMATOR_SOURCE)
-    # Animator still consumes the legacy POE declarations while it migrates to
-    # the embedding API.  Keep that compatibility boundary honest: no duplicate
-    # ABI layouts, and no return of the retired compile/run/free entry points.
-    add_test(
-        NAME poco_legacy_header_shims
-        COMMAND "${CMAKE_COMMAND}"
-            "-DPOCO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/.."
-            "-DANIMATOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../.."
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-legacy-header-shims.cmake"
-    )
-    set_tests_properties(poco_legacy_header_shims PROPERTIES TIMEOUT 10)
-endif()
-
 # Generic modules use only the canonical public header and Poco::poco.  The
 # fixture validates the successful load path and the module-loader outcomes
 # that a host can diagnose without the legacy Animator POE ABI.
@@ -1037,20 +1018,6 @@ add_test(
 )
 set_tests_properties("poco_public_header" PROPERTIES TIMEOUT 60)
 
-if(POCO_TEST_HAS_ANIMATOR_SOURCE)
-    # Characterization gate: keep the pre-refactor registration and callback
-    # inventory reviewable as the binding ownership changes in later tasks.
-    add_test(
-        NAME "poco_binding_baseline"
-        COMMAND "${CMAKE_COMMAND}"
-            "-DPOCO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/.."
-            "-DANIMATOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../.."
-            "-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/binding-baseline.json"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-binding-baseline.cmake"
-    )
-    set_tests_properties("poco_binding_baseline" PROPERTIES TIMEOUT 10)
-endif()
-
 # Standalone Poco must not compile the legacy dummy catalog or advertise
 # Animator-only APIs.  The fixture verifies both the source graph and the
 # diagnostic produced when a script asks for one of those unavailable APIs.
@@ -1058,40 +1025,39 @@ add_test(
     NAME "poco_binding_cleanup"
     COMMAND "${CMAKE_COMMAND}"
         "-DPOCO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/.."
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DUNAVAILABLE_API_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/neg/animator_api_unavailable.poc"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-binding-cleanup.cmake"
 )
 set_tests_properties("poco_binding_cleanup" PROPERTIES TIMEOUT 20)
 
-if(POCO_TEST_HAS_ANIMATOR_SOURCE)
-    # Every active C-varargs binding must use the result type declared to the
-    # Poco compiler.  The script also runs a mixed integer/floating/null/string
-    # /pointer call through the standalone registry so default promotions reach
-    # libffi with their native C representation.
-    add_test(
-        NAME "poco_live_variadic_bindings"
-        COMMAND "${CMAKE_COMMAND}"
-            "-DPOCO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/.."
-            "-DANIMATOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../.."
-            "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-live-variadic-bindings.cmake"
-    )
-    set_tests_properties("poco_live_variadic_bindings" PROPERTIES TIMEOUT 20)
-endif()
+# Mixed integer/floating/null/string/pointer calls through the standalone
+# registry, so the default promotions reach libffi with their native C
+# representation.  The static audit of the declared result types is an
+# Animator-side test (ani_poco_live_variadic_bindings).
+add_poco_pos_test(live_variadic_bindings pos/live_variadic_bindings.poc)
 
-if(POCO_TEST_HAS_ANIMATOR_SOURCE)
-    # Current module builds use the generic and Animator-specific CMake helpers.
-    # Keep the retired Rex assembly inputs and DOS-era Poekit packaging metadata
-    # out of all supported build paths.
-    add_test(
-        NAME "poco_legacy_artifact_cleanup"
-        COMMAND "${CMAKE_COMMAND}"
-            "-DPOCO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/.."
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-legacy-artifact-cleanup.cmake"
-    )
-    set_tests_properties("poco_legacy_artifact_cleanup" PROPERTIES TIMEOUT 20)
-endif()
+# Nothing under poco/ may read the consumer's source tree.  This static scan
+# is cheap enough to run unconditionally, unlike the full extraction gate.
+add_test(
+    NAME "poco_source_boundary"
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPOCO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/.."
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-source-boundary.cmake"
+)
+set_tests_properties("poco_source_boundary" PROPERTIES TIMEOUT 30)
+
+# The String experiment is compiled by no other configuration, so without this
+# it goes back to rotting the moment someone edits the code around it.
+add_test(
+    NAME "poco_string_experiment_compiles"
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPOCO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/.."
+        "-DPOCO_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/string-experiment-build"
+        "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-string-experiment-build.cmake"
+)
+set_tests_properties("poco_string_experiment_compiles" PROPERTIES TIMEOUT 600)
 
 # Extraction gate: the copied standalone tree configures, builds, installs,
 # and runs its own tests, then verifies source and package consumers.  It is
@@ -1112,7 +1078,7 @@ endif()
 add_test(
     NAME "poco_animator_integration_control"
     COMMAND "${CMAKE_COMMAND}"
-        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco>"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
         "-DPOCO_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/hello.poc"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify-animator-integration.cmake"
 )

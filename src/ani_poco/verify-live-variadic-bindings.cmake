@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
-foreach(required_variable POCO_SOURCE_DIR ANIMATOR_SOURCE_DIR POCO_EXECUTABLE)
+# Static audit only.  The matching runtime fixture is a plain Poco positive
+# test (poco_pos_live_variadic_bindings) so the standalone tree keeps its own
+# promotion coverage without reaching into the Animator source.
+foreach(required_variable POCO_SOURCE_DIR ANIMATOR_SOURCE_DIR)
     if(NOT DEFINED ${required_variable})
         message(FATAL_ERROR "${required_variable} is required")
     endif()
@@ -78,18 +81,3 @@ require_literal("${POLIB_USER}" "int (*plUdQnumber)(int* inum, int min, int max,
 # libffi's exact int and void result descriptors.
 require_literal("${POCO_FFI}" "case IDO_INT:\n\t\t\treturn &ffi_type_sint;")
 require_literal("${POCO_FFI}" "case IDO_VOID:\n\t\t\treturn &ffi_type_void;")
-
-execute_process(
-    COMMAND "${POCO_EXECUTABLE}" "${POCO_SOURCE_DIR}/test/pos/live_variadic_bindings.poc"
-    WORKING_DIRECTORY "${POCO_SOURCE_DIR}/test"
-    RESULT_VARIABLE run_result
-    OUTPUT_VARIABLE run_output
-    ERROR_VARIABLE run_error
-)
-file(REMOVE "${POCO_SOURCE_DIR}/test/live_variadic_bindings.tmp")
-if(NOT run_result EQUAL 0 OR NOT run_output MATCHES "Success")
-    message(FATAL_ERROR
-        "Live variadic promotion fixture failed (status ${run_result}).\n"
-        "stdout:\n${run_output}\n"
-        "stderr:\n${run_error}")
-endif()
