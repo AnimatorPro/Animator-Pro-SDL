@@ -81,6 +81,13 @@ set(POCO_CORE_SOURCES
     mathlib.c
     pocmemry.c
     poco.c
+    podiag.c
+    poexpr.c
+    polink.c
+    posymbol.c
+    porunenv.c
+    potokface.c
+    povar.c
     port.c
     pocodis.c
     pocoface.c
