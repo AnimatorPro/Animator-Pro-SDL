@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
-# Current POE inventory.  Source-only entries are retained as historical
-# examples; no modern target consumes them.
+# Current POE inventory.  Every entry below is built by this directory.
 set(POEKIT_GENERIC_MODULES
     hello
 )
@@ -14,15 +13,6 @@ set(POEKIT_TEST_ONLY_MODULES
     test_libs/nullret
     test_libs/badver
     test_libs/empty
-)
-set(POEKIT_LEGACY_DEAD_MODULES
-    cycle
-    eco
-    flicplay
-    lookup
-    otdemo
-    skeleton
-    vscreen
 )
 
 # Host-neutral descriptor module.

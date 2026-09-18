@@ -61,11 +61,7 @@ require_absent_literal("${GENERIC_HELLO_MODULE}" "pocorex.h")
 require_absent_literal("${GENERIC_HELLO_MODULE}" "pocolib.h")
 
 foreach(module_source IN ITEMS
-        "flicplay/flicplay.c;poeQerror"
-        "pstamp/pstamp.c;poeQerror"
-        "eco/eco.c;poeQerror"
-        "lookup/lookup.c;poeQtext"
-        "otdemo/otdemo.c;poeQquestion")
+        "pstamp/pstamp.c;poeQerror")
     set(module_parts ${module_source})
     list(GET module_parts 0 relative_path)
     list(GET module_parts 1 required_evidence)

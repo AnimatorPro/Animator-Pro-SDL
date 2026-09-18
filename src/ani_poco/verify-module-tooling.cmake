@@ -60,9 +60,15 @@ file(READ "${POEKIT_CMAKE_FILE}" _poekit_cmake)
 foreach(_classification
     "POEKIT_GENERIC_MODULES"
     "POEKIT_ANI_MODULES"
-    "POEKIT_TEST_ONLY_MODULES"
-    "POEKIT_LEGACY_DEAD_MODULES")
+    "POEKIT_TEST_ONLY_MODULES")
     if(NOT _poekit_cmake MATCHES "${_classification}")
         message(FATAL_ERROR "poekit classification is missing ${_classification}")
     endif()
 endforeach()
+
+# The legacy source-only modules were deleted; nothing may reintroduce a
+# classification for modules this directory does not build.
+if(_poekit_cmake MATCHES "POEKIT_LEGACY_DEAD_MODULES")
+    message(FATAL_ERROR
+        "poekit must not carry unbuilt legacy modules (POEKIT_LEGACY_DEAD_MODULES)")
+endif()

@@ -130,11 +130,7 @@ foreach(vtable_entry plprintf plQtext plQchoice plQquestion plQerror plUdQnumber
 endforeach()
 
 foreach(poe_source
-    "${POCO_SOURCE_DIR}/poekit/flicplay/flicplay.c"
-    "${POCO_SOURCE_DIR}/poekit/pstamp/pstamp.c"
-    "${POCO_SOURCE_DIR}/poekit/eco/eco.c"
-    "${POCO_SOURCE_DIR}/poekit/lookup/lookup.c"
-    "${POCO_SOURCE_DIR}/poekit/otdemo/otdemo.c")
+    "${POCO_SOURCE_DIR}/poekit/pstamp/pstamp.c")
     require_file("${poe_source}")
 endforeach()
 require_literal("${POCO_SOURCE_DIR}/poekit/CMakeLists.txt" "add_subdirectory(pstamp)")

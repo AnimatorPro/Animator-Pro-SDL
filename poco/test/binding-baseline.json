@@ -81,11 +81,7 @@
       {"field": "plUdQnumber", "prototype": "bool (*plUdQnumber)(int* inum, int min, int max, void* update, void* data, char* fmt, ...)"}
     ],
     "users": [
-      {"module": "flicplay", "source": "poco/poekit/flicplay/flicplay.c", "state": "legacy source-only", "evidence": "poeQerror"},
-      {"module": "pstamp", "source": "poco/poekit/pstamp/pstamp.c", "state": "built by poco/poekit/CMakeLists.txt", "evidence": "poeQerror"},
-      {"module": "eco", "source": "poco/poekit/eco/eco.c", "state": "legacy source-only", "evidence": "poeQerror, poeQquestion, poeprintf"},
-      {"module": "lookup", "source": "poco/poekit/lookup/lookup.c", "state": "legacy source-only", "evidence": "poeQtext"},
-      {"module": "otdemo", "source": "poco/poekit/otdemo/otdemo.c", "state": "legacy source-only", "evidence": "poeQquestion and OverTime"}
+      {"module": "pstamp", "source": "poco/poekit/pstamp/pstamp.c", "state": "built by poco/poekit/CMakeLists.txt", "evidence": "poeQerror"}
     ]
   },
   "behavior_fixtures": [
