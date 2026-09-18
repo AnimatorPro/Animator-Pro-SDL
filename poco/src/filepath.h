@@ -1,7 +1,3 @@
-#ifndef FILEPATH_H
-#define FILEPATH_H
-
-#endif /* FILEPATH_H */
 #ifndef POCO_FILEPATH_H
 #define POCO_FILEPATH_H
 

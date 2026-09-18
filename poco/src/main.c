@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "aaconfig.h"
 #include "cli_debugger.h"
 #include "commonst.h"
 #include "filepath.h"
@@ -57,12 +56,6 @@ Names incdirs[] = {
 #else
 Names incdirs[] = {{&incdirs[1], ""}, {NULL, "\\paa\\resource\\"}};
 #endif
-
-/*
- * In PJ this lives in config.c, but since we don't want to pull that file
- * in here for now, declare a local memory space for the config.
- */
-AA_config vconfg;
 
 /****************************************************************************
  * some memory management routines...

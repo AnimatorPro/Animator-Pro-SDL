@@ -2,11 +2,11 @@
  *
  * pocoface.c - interface between poco and programs calling poco.
  *
- *	Routine to compile a source file and pass back an executable
- *	memory structure (compile_poco),  execute that structure (run_poco)
- *	and free it up (free_poco).   Most of the work of this module
- *	is converting the function library passed into compile_poco into
- *	the rather complex type-structures used internally.
+ *	Routines to compile a source file and pass back an executable
+ *	memory structure (the compile_poco_*_with_vm family), execute that
+ *	structure (poco_vm_run) and free it up (po_free_executable).  Most of
+ *	the work of this module is converting the function library passed into
+ *	the compiler into the rather complex type-structures used internally.
  *
  * MAINTENANCE:
  *	08/18/90	(Ian)
@@ -69,7 +69,6 @@
  *				this existed in the tokenizer, but it wasn't being used.
  ****************************************************************************/
 
-#include "jfile.h"
 #include "filepath.h"
 #include <poco/poco.h>
 #include "pocoface.h"
@@ -1238,7 +1237,7 @@ static PocoStatus poco_vm_compile_sources(PocoVm* vm, const char* const* source_
 		poco_api_report(vm, public_status, error_source, error_line, error_column,
 						poco_get_last_error(vm));
 		if (program->executable != NULL) {
-			free_poco(&program->executable);
+			po_free_executable(&program->executable);
 		}
 		poco_api_free_program_libraries(program->libraries);
 		free(program->source_path);
@@ -1269,7 +1268,7 @@ static PocoStatus poco_vm_compile_sources(PocoVm* vm, const char* const* source_
 		}
 		if (!poco_api_hide_compiled_source_path(program->executable,
 												physical_source_paths[source_index], unit_name)) {
-			free_poco(&program->executable);
+			po_free_executable(&program->executable);
 			poco_api_free_program_libraries(program->libraries);
 			free(program->source_path);
 			free(program->source_name);
@@ -2688,7 +2687,7 @@ void poco_program_destroy(PocoProgram* program)
 	}
 	vm = program->vm;
 	if (program->executable != NULL) {
-		free_poco(&program->executable);
+		po_free_executable(&program->executable);
 	}
 	poco_api_free_program_libraries(program->libraries);
 	if (program->sources != NULL) {
@@ -3263,7 +3262,7 @@ OUT:
 	gentle_fclose(pcb->t.err_file);
 
 	/* A successfully compiled program retains pcb as its owner for the
-	 * compiler/runtime allocation arena.  free_poco() releases that arena after
+	 * compiler/runtime allocation arena.  po_free_executable() releases that arena after
 	 * execution; releasing it here leaves a dangling compile_pcb and causes a
 	 * second free during program destruction. */
 	if (err != Success) {
@@ -3292,7 +3291,7 @@ OUT:
 	if (err == Success) {
 		err = po_ffi_build_structures(pev);
 		if (err != Success) {
-			free_poco(ppexe);
+			po_free_executable(ppexe);
 		}
 	}
 
@@ -3353,80 +3352,10 @@ Errcode compile_poco_files_with_vm(PocoVm* vm, void** ppexe, const char* const* 
 										err_line, err_char, verbose);
 }
 
-Errcode compile_poco(void** ppexe,        /* returns executable pexe on Success */
-					 char* source_name,   /* name of source file */
-					 char* errors_name,   /* error file or NULL for stderr */
-					 char* dump_name,     /* disassembly file or NULL for none */
-					 Poco_lib* lib,       /* for built-in function library */
-					 char* err_file,      /* file where error detected */
-					 long* err_line,      /* line where error detected */
-					 int* err_char,       /* character in line where err detected */
-					 Names* include_dirs, /* include search path */
-					 bool verbose         /* enable verbose debug output */
-)
-{
-	return compile_poco_with_vm(NULL, ppexe, source_name, errors_name, dump_name, lib, err_file,
-								err_line, err_char, include_dirs, verbose);
-}
-
-/*****************************************************************************
- * run a poco program compiled earlier using compile_poco. exe entry from PJ.
- ****************************************************************************/
-Errcode run_poco(void** ppexe, char* trace_file, bool (*check_abort)(void*), void* check_abort_data,
-				 long* err_line)
-{
-	PocoVm legacy_vm = {0};
-	PocoVm* vm;
-	Poco_run_env* executable;
-	Poco_program_code code;
-	PocoActivation* activation = NULL;
-	Errcode run_err;
-	bool uses_legacy_vm = false;
-
-	if (ppexe == NULL || (executable = *ppexe) == NULL) {
-		return (Err_not_found);
-	}
-
-	vm = executable->vm;
-	if (vm == NULL) {
-		vm = &legacy_vm;
-		uses_legacy_vm = true;
-	}
-	memset(&code, 0, sizeof(code));
-	code.stack_size = executable->stack_size;
-	code.data_size = executable->data_size;
-	code.functions = executable->fff;
-	code.literals = executable->literals;
-	code.prototypes = executable->protos;
-	code.ffi_bindings = executable->func_map;
-	code.builtin_libraries = executable->lib;
-	code.loaded_libraries = executable->loaded_libs;
-	code.allocation_owner = executable->compile_pcb;
-	run_err = poco_activation_create(NULL, &code, vm, &activation);
-	if (run_err < Success) {
-		return run_err;
-	}
-	activation->enable_debug_trace = true;
-	activation->check_abort = check_abort;
-	activation->check_abort_data = check_abort_data;
-	activation->trace_file = trace_file;
-	activation->err_line = err_line;
-	run_err = po_pev_alloc_data(activation);
-	if (run_err >= Success) {
-		run_err = po_activation_run_entry(activation, "main");
-	}
-	/* Legacy callers inspect this field after run_poco(). */
-	executable->result = activation->result;
-	poco_activation_destroy(activation);
-	(void)uses_legacy_vm;
-
-	return run_err;
-}
-
 /*****************************************************************************
  * free runtime resources used by a poco program.
  ****************************************************************************/
-void free_poco(void** ppexe)
+void po_free_executable(void** ppexe)
 {
 	Poco_run_env* pp;
 	Poco_cb* compile_pcb = NULL;
