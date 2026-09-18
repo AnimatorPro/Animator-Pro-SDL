@@ -178,9 +178,14 @@ add_poco_neg_test(void_return_value "neg/void_return_value.poc")
 # Library loading error tests.  A bare WILL_FAIL cannot distinguish the
 # diagnostic under test from a missing fixture, so each test matches the exact
 # loader message instead.  nlib02-nlib05 need a malformed module on the search
-# path and are registered beside those fixtures in poco/poekit/test_libs; only
+# path and are registered beside those fixtures in src/poekit/test_libs; only
 # the not-found case is fixture-free.  CMAKE_CURRENT_BINARY_DIR holds no .poe
 # files, so it is a search path on which nothing can resolve.
+#
+# Those fixtures are built from Animator's legacy Pocorex headers, so a
+# standalone `-S poco` configure registers nlib01 only.  The generic half of
+# that coverage is legacy_poe_fence and external_library_image, which do run
+# standalone.
 add_test(
     NAME "poco_neg_lib01_not_found"
     COMMAND $<TARGET_FILE:poco_cli> "${CMAKE_CURRENT_SOURCE_DIR}/neg/nlib01.poc"
@@ -996,7 +1001,7 @@ add_subdirectory(module_hooks)
 add_subdirectory(poe_search_path)
 add_subdirectory(external_library_image)
 
-# The final external-library CLI gate compiles the canonical poekit hello
+# The final external-library CLI gate compiles the canonical hello example
 # script to a source-less image, reloads its module by unresolved name, and
 # substitutes invalid modules under that same name for load-time diagnostics.
 add_subdirectory(cli_external_library)
@@ -1093,7 +1098,7 @@ add_test(
 set_tests_properties("poco_animator_integration_control" PROPERTIES TIMEOUT 30)
 
 # The generic hello module test is registered in
-# poco/poekit/hello/CMakeLists.txt as "poco_generic_hello".  It remains
+# poco/examples/hello/CMakeLists.txt as "poco_generic_hello".  It remains
 # distinct from this directory's historical hello script smoke test.
 
 # Add more general tests as needed:

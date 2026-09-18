@@ -53,7 +53,7 @@ if (WITH_POCO AND WITH_ANI)
 		COMMAND ${CMAKE_COMMAND}
 			-DPOCO_POE_HELPER=${CMAKE_SOURCE_DIR}/poco/cmake/PocoPoeLibrary.cmake
 			-DANI_POE_HELPER=${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/AniPocoPoeLibrary.cmake
-			-DPOEKIT_CMAKE_FILE=${CMAKE_SOURCE_DIR}/poco/poekit/CMakeLists.txt
+			-DPOEKIT_CMAKE_FILE=${CMAKE_CURRENT_SOURCE_DIR}/poekit/CMakeLists.txt
 			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-module-tooling.cmake
 	)
 	set_tests_properties(ani_poco_module_tooling PROPERTIES TIMEOUT 10)

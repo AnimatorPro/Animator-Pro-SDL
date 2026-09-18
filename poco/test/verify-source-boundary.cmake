@@ -21,19 +21,10 @@ get_filename_component(POCO_SOURCE_DIR "${POCO_SOURCE_DIR}" REALPATH)
 # entry must still be violating something: an entry that has gone clean is
 # reported as stale so the exception list cannot outlive its reason.
 #
-# poekit/ modules reach into the parent for the Animator POE helper and for
-# Animator's include directory.  Removing that is the relocate-poekit task,
-# which moves the Animator modules beside src/ani_poco and hello/ into
-# poco/examples.  Delete these entries when it lands.
-set(_known_pending
-    "poekit/colorutl/CMakeLists.txt"
-    "poekit/pstamp/CMakeLists.txt"
-    "poekit/hello/CMakeLists.txt"
-    "poekit/test_libs/badver/CMakeLists.txt"
-    "poekit/test_libs/empty/CMakeLists.txt"
-    "poekit/test_libs/noentry/CMakeLists.txt"
-    "poekit/test_libs/nullret/CMakeLists.txt"
-)
+# The list is empty, and that is the intended end state.  The Animator-owned
+# POE modules that used to populate it now live in the consumer tree under
+# src/poekit, and the one host-neutral module is poco/examples/hello.
+set(_known_pending)
 
 # The two boundary scanners quote the very spellings they forbid.
 set(_self_excluded
@@ -190,4 +181,4 @@ list(LENGTH _pending_hits _pending_count)
 message(STATUS
     "Poco source boundary passed: no untracked file under poco/ reaches into the consumer tree "
     "(${_cmake_count} CMake and ${_source_count} C files scanned; "
-    "${_pending_count} files still tracked as pending relocate-poekit).")
+    "${_pending_count} files still tracked as known pending reach-throughs).")

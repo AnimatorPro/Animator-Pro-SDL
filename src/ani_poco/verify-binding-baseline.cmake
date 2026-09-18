@@ -130,10 +130,10 @@ foreach(vtable_entry plprintf plQtext plQchoice plQquestion plQerror plUdQnumber
 endforeach()
 
 foreach(poe_source
-    "${POCO_SOURCE_DIR}/poekit/pstamp/pstamp.c")
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/pstamp/pstamp.c")
     require_file("${poe_source}")
 endforeach()
-require_literal("${POCO_SOURCE_DIR}/poekit/CMakeLists.txt" "add_subdirectory(pstamp)")
+require_literal("${ANIMATOR_SOURCE_DIR}/src/poekit/CMakeLists.txt" "add_subdirectory(pstamp)")
 
 foreach(fixture
     "${POCO_SOURCE_DIR}/test/pos/sprintf_variadic.poc"

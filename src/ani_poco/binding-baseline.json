@@ -81,7 +81,7 @@
       {"field": "plUdQnumber", "prototype": "bool (*plUdQnumber)(int* inum, int min, int max, void* update, void* data, char* fmt, ...)"}
     ],
     "users": [
-      {"module": "pstamp", "source": "poco/poekit/pstamp/pstamp.c", "state": "built by poco/poekit/CMakeLists.txt", "evidence": "poeQerror"}
+      {"module": "pstamp", "source": "src/poekit/pstamp/pstamp.c", "state": "built by src/poekit/CMakeLists.txt", "evidence": "poeQerror"}
     ]
   },
   "behavior_fixtures": [

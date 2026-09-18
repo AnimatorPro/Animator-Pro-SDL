@@ -271,7 +271,7 @@ else()
 endif()
 
 # Reject parent-owned dependencies and consumer paths from the whole source
-# tree, not just the top-level CMake surface: poekit/ and test/ reach-throughs
+# tree, not just the top-level CMake surface: examples/ and test/ reach-throughs
 # escaped the two-file scan this gate used to run.  The scan is its own script
 # so it can also run as a cheap standalone test.
 execute_process(

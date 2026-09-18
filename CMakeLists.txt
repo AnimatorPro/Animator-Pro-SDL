@@ -138,7 +138,7 @@ add_subdirectory(src)
 ## POE modules (must come AFTER src so native .poe installs are not
 ## overwritten by the src/resource directory copy)
 if (WITH_POCO)
-	add_subdirectory(poco/poekit)
+	add_subdirectory(src/poekit)
 endif()
 
 ## tests

@@ -246,11 +246,15 @@ install(EXPORT PocoTargets
     DESTINATION "${POCO_CMAKE_INSTALL_DIR}"
 )
 
-# poekit (legacy POE modules) is added only by the parent Animator project.
-# It is not part of add_subdirectory(poco)'s public API.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(POCO_BUILD_EXAMPLES)
     add_subdirectory(examples/snake)
+endif()
+# hello is the canonical generic-module example and doubles as the module-ABI
+# smoke test, so it is built for a test-only configure as well.  Unlike snake
+# it needs nothing but Poco itself.
+if(POCO_BUILD_EXAMPLES OR POCO_BUILD_TESTS)
+    add_subdirectory(examples/hello)
 endif()
 if(POCO_BUILD_TESTS)
     add_subdirectory(test)

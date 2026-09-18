@@ -107,11 +107,12 @@ compare_inventory("${inventory_file}" "${BASELINE_MANIFEST}")
 run_checked("Animator representative binding script"
     "${ANI_REGISTRATION_EXECUTABLE}")
 
-# Generic modules live with Poco test modules, while Animator-native modules
-# are installed in the Animator resource directory.  Load one of each class
-# from its installed location and also require the second retained Ani module.
-set(generic_module "${INSTALL_PREFIX}/tests/hello.poe")
-set(generic_script "${INSTALL_PREFIX}/tests/hello.poc")
+# Generic modules are Poco's own and install under Poco's example layout,
+# while Animator-native modules are installed in the Animator resource
+# directory.  Load one of each class from its installed location and also
+# require the second retained Ani module.
+set(generic_module "${INSTALL_PREFIX}/examples/hello/hello.poe")
+set(generic_script "${INSTALL_PREFIX}/examples/hello/hello.poc")
 set(ani_module "${INSTALL_PREFIX}/resource/colorutl.poe")
 set(ani_script "${INSTALL_PREFIX}/tests/COLTEST.POC")
 set(ani_second_module "${INSTALL_PREFIX}/resource/pstamp.poe")

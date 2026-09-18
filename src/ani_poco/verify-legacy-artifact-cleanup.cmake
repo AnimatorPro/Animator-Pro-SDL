@@ -9,15 +9,15 @@ endforeach()
 set(LEGACY_ARTIFACTS
     "${ANIMATOR_SOURCE_DIR}/src/rexlib/rexhost/REXENTRY.I"
     "${ANIMATOR_SOURCE_DIR}/src/rexlib/rexhost/MAKEFILE"
-    "${POCO_SOURCE_DIR}/poekit/FORMIKE.INC"
-    "${POCO_SOURCE_DIR}/poekit/INCFILES.INC"
-    "${POCO_SOURCE_DIR}/poekit/KITFILES.INC"
-    "${POCO_SOURCE_DIR}/poekit/KIT_OBJS.INC"
-    "${POCO_SOURCE_DIR}/poekit/LIBFILES.INC"
-    "${POCO_SOURCE_DIR}/poekit/MAKE.BAT"
-    "${POCO_SOURCE_DIR}/poekit/MAKEKIT.BAT"
-    "${POCO_SOURCE_DIR}/poekit/TESTMAKE.BAT"
-    "${POCO_SOURCE_DIR}/poekit/VERSION.TXT"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/FORMIKE.INC"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/INCFILES.INC"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/KITFILES.INC"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/KIT_OBJS.INC"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/LIBFILES.INC"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/MAKE.BAT"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/MAKEKIT.BAT"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/TESTMAKE.BAT"
+    "${ANIMATOR_SOURCE_DIR}/src/poekit/VERSION.TXT"
 )
 
 foreach(artifact IN LISTS LEGACY_ARTIFACTS)
