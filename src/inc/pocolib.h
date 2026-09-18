@@ -31,12 +31,9 @@ extern char* po_fuf_name(void* fuf);
 extern void* po_fuf_code(void* fuf);
 extern int po_version_number;
 extern Rnode* po_in_rlist(Dlheader* sfi, void* f);
-extern Errcode pj_load_pocorex(Poco_lib** lib, const char* script_path, char* name, char* id_str,
-							   bool verbose);
-extern void pj_free_pocorexes(Poco_lib** libs);
-extern void format_poco_lib_error(Errcode err, const char* libname, const char* lib_path,
-								  const char* sys_error, int expected_version, int actual_version,
-								  int count, bool verbose);
+/* The .poe loader lives in Poco core (poco/src/pocoload.c); Animator reaches
+ * it only through the public VM API, so no loader entry points are declared
+ * here. */
 extern int po_findpoe(PocoVm* vm, char* libname, Lib_proto** plibreturn);
 extern Errcode po_poe_overtime(void* effect, void* data);
 extern Errcode po_poe_oversegment(void* effect, void* data);

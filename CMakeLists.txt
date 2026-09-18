@@ -100,16 +100,6 @@ if (WITH_POCO)
 	# Build animhost first (needed by POE modules)
 	add_subdirectory(src/animhost)
 
-	# poco_core defaults to a static archive, but the Animator host still ships
-	# its own copy of the .poe loader entry points in src/pocorex.c
-	# (pj_load_pocorex, pj_free_pocorexes, format_poco_lib_error).  A static
-	# poco_core exposes the same symbols from poco/src/pocoload.c and the two
-	# collide at link time, so link Poco as a shared library for the host build.
-	# Downstream embedders keep the static default.
-	if (WITH_ANI)
-		set(POCO_BUILD_SHARED ON)
-	endif()
-
 	# Poco builds its test suite only when it is the top-level project.  This
 	# repository is Poco's home, so ask for it explicitly; foreign hosts that
 	# embed poco/ get a test-free configure.

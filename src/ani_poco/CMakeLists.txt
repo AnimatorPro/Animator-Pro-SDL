@@ -18,7 +18,6 @@ set(ANI_POCO_ADAPTER_SOURCES
 	"${CMAKE_CURRENT_LIST_DIR}/../pocolibs.c"
 	"${CMAKE_CURRENT_LIST_DIR}/../pocomode.c"
 	"${CMAKE_CURRENT_LIST_DIR}/../pocoqnum.c"
-	"${CMAKE_CURRENT_LIST_DIR}/../pocorex.c"
 	"${CMAKE_CURRENT_LIST_DIR}/../pocotext.c"
 	"${CMAKE_CURRENT_LIST_DIR}/../pocotime.c"
 	"${CMAKE_CURRENT_LIST_DIR}/../pocotur.c"

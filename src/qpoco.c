@@ -102,6 +102,22 @@ static const char* const* get_poco_include_paths(void)
 }
 
 /*****************************************************************************
+ * Animator's own .poe resolution rule.
+ *
+ * Poco core searches the script directory, the working directory and the
+ * executable directory.  Animator additionally ships its modules in the
+ * resource directory, which only the host knows about, so it registers that
+ * directory with the VM instead of Poco carrying an Animator-shaped path.
+ ****************************************************************************/
+static PocoStatus install_animator_module_path(PocoVm* vm)
+{
+	if (resource_dir[0] == '\0') {
+		return POCO_STATUS_OK;
+	}
+	return poco_vm_add_library_path(vm, resource_dir);
+}
+
+/*****************************************************************************
  * Remove <cr>'s and truncate string after 5 lines.
  ****************************************************************************/
 static void trunc_to_5_lines(char* source)
@@ -253,6 +269,9 @@ static Errcode compile_animator_program(const char* source_name, PocoVm** out_vm
 	options.diagnostic_user_data = diagnostic;
 	ani_poco_configure_legacy_poe(&options);
 	status = poco_vm_create(&options, out_vm);
+	if (status == POCO_STATUS_OK) {
+		status = install_animator_module_path(*out_vm);
+	}
 	if (status == POCO_STATUS_OK) {
 		status = ani_poco_register_libraries(*out_vm);
 	}

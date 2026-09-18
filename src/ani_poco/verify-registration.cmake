@@ -37,12 +37,20 @@ endif()
 
 foreach(required_vm_call
 	poco_vm_create ani_poco_register_libraries poco_vm_compile_file poco_vm_run
-	poco_program_destroy poco_vm_destroy)
+	poco_program_destroy poco_vm_destroy poco_vm_add_library_path)
 	if(NOT runner_source MATCHES "${required_vm_call}")
 		message(FATAL_ERROR
 			"Animator runner must use ${required_vm_call} through the adapter")
 	endif()
 endforeach()
+
+# Poco core searches script, working and executable directories.  Animator's
+# own .poe location -- the resource directory -- is host knowledge, so the
+# runner supplies it rather than Poco carrying an Animator-shaped path.
+if(NOT runner_source MATCHES "poco_vm_add_library_path[ \t\r\n]*\\([ \t\r\n]*vm,[ \t\r\n]*resource_dir")
+	message(FATAL_ERROR
+		"Animator runner must register resource_dir as the host .poe search path")
+endif()
 
 foreach(forbidden_legacy_call compile_poco run_poco free_poco get_poco_libs)
 	if(runner_source MATCHES "(^|[^A-Za-z0-9_])${forbidden_legacy_call}[ \\t\\r\\n]*\\(")

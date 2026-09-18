@@ -28,7 +28,7 @@ endforeach()
 foreach(binding_source
 	pocoa3d.c pocoalt.c pocoblit.c pococel.c pococolo.c pocodos.c
 	pocodraw.c pocofile.c pocoflic.c pocofunc.c pocogvar.c pocolibs.c
-	pocomode.c pocoqnum.c pocorex.c pocotext.c pocotime.c pocotur.c
+	pocomode.c pocoqnum.c pocotext.c pocotime.c pocotur.c
 	pocotwee.c pocouser.c pocopicdrive.c packcmap.c qpoco.c qpocoed.c)
 	string(FIND "${adapter_cmake}" "${binding_source}" adapter_source_index)
 	if(adapter_source_index EQUAL -1)
@@ -58,6 +58,23 @@ if(poco_core_cmake MATCHES "animhost" OR poco_core_cmake MATCHES "src/inc")
 	message(FATAL_ERROR
 		"Poco core must not acquire Animator build dependencies")
 endif()
+
+# The .poe loader has exactly one definition, and it lives in Poco core.
+# Animator used to carry a second copy in src/pocorex.c; the duplicate symbols
+# collided with poco/src/pocoload.c and were the only reason the host had to
+# link Poco as a shared library.
+get_filename_component(animator_source_dir "${ANI_SOURCE_CMAKE_FILE}" DIRECTORY)
+file(GLOB_RECURSE animator_sources "${animator_source_dir}/*.c")
+foreach(animator_source IN LISTS animator_sources)
+	file(READ "${animator_source}" animator_source_text)
+	if(animator_source_text MATCHES "Errcode[ \t\r\n]+pj_load_pocorex[ \t\r\n]*\\(" OR
+		animator_source_text MATCHES "void[ \t\r\n]+pj_free_pocorexes[ \t\r\n]*\\(" OR
+		animator_source_text MATCHES "void[ \t\r\n]+format_poco_lib_error[ \t\r\n]*\\(")
+		message(FATAL_ERROR
+			"the .poe loader belongs to Poco core alone, but Animator redefines it: "
+			"${animator_source}")
+	endif()
+endforeach()
 
 file(GLOB_RECURSE poco_core_sources
 	"${POCO_CORE_SOURCE_DIR}/*.c"

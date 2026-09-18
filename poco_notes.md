@@ -143,7 +143,7 @@ During loading (`src/rexlib/rexhost/rexlib.c`):
 1. Parser recognizes `#pragma poco library "filename.poe"`
 2. Resolves file path via include directories (line 1157)
 3. Calls `po_open_library()` (`poco/src/pocoface.c:367`)
-4. `po_open_library()` calls `pj_load_pocorex()` (`src/pocorex.c:7`)
+4. `po_open_library()` calls `pj_load_pocorex()` (`poco/src/pocoload.c`)
 5. `pj_load_pocorex()` calls `pj_rexlib_load()` which:
    - Loads binary via `pj_rex_load()`
    - Verifies type and version
@@ -181,7 +181,7 @@ Use OS-native shared libraries:
    }
    ```
 
-2. **Host Loading** (`src/pocorex.c`):
+2. **Host Loading** (`poco/src/pocoload.c`):
    ```c
    Errcode pj_load_pocorex_modern(Poco_lib **lib, char *name, char *id_string) {
        void *handle = dlopen(name, RTLD_LAZY);
@@ -213,7 +213,7 @@ Use OS-native shared libraries:
 
 - **Rex loader**: `src/rexlib/rexhost/rexload.c` - Low-level binary loading
 - **Rex library manager**: `src/rexlib/rexhost/rexlib.c` - High-level loading and hostlib resolution
-- **Poco wrapper**: `src/pocorex.c` - Poco-specific wrapper around Rex
+- **Module loader**: `poco/src/pocoload.c` - the one .poe loader; Animator adds only its resource directory, through `poco_vm_add_library_path()`
 - **Pragma handler**: `poco/src/pp.c` - Parses `#pragma poco library`
 - **Library opening**: `poco/src/pocoface.c` - `po_open_library()` function
 - **Header definitions**: `src/rexlib/inc/rexlib.h`, `src/rexlib/inc/pocorex.h`
