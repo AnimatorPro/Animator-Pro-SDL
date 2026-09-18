@@ -4,6 +4,9 @@
 #include "errcodes.h"
 #include "pocolib.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 typedef struct upddata {
 	void* code;
 	Popot data;

@@ -5,6 +5,9 @@
 #include "pocolib.h"
 #include "render.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern Flicel* thecel;
 extern Errcode cel_from_rect(Rectangle* rect, bool render_only);
 extern Errcode clip_cel(void);

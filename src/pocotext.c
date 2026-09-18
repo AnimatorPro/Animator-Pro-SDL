@@ -15,6 +15,9 @@
 #include "palmenu.h"
 #include "pentools.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 void get_uvfont_name(char* buf);
 void qfont_text();

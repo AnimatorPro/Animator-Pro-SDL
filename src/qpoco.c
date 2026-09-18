@@ -25,6 +25,9 @@
 #include "poco_turtle.h"
 #include "poco_tween.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 /* Animator-specific runner policy lives in this adapter-owned source. */
 extern void po_init_abort_control(int abortable, void* handler);

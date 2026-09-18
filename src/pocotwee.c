@@ -8,6 +8,9 @@
 #define POCO_TWEEN_INTERNALS
 #include "poco_tween.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 /* pocotwee.c - Poco library functions for the tweening system.
  */
 

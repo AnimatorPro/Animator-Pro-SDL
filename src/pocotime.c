@@ -9,7 +9,9 @@
 #include "flx.h"
 #include "render.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 void next_frame();
 void prev_frame();

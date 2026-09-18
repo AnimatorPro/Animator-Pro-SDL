@@ -17,6 +17,9 @@
 #include "poly.h"
 #include "ani_poco_adapter.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern bool po_check_abort(void* data);
 extern Errcode clone_ppoints(Poly* s, Poly* d);  // from polytool.c
 
@@ -457,10 +460,22 @@ void* po_ppt2ptr(Popot ppt)
 /*****************************************************************************
  *
  ****************************************************************************/
+/*
+ * Status slot handed to legacy .poe modules through the Porexlib table.
+ *
+ * The table is a single process-wide structure whose pl_builtin_err is a bare
+ * pointer captured once at load, so unlike the in-process Animator bindings it
+ * cannot follow the running activation.  It keeps its own slot here rather than
+ * aliasing one VM's.  Legacy .poe modules stay single-VM either way: they are
+ * already bound to the one-per-process _a_a_* Hostlib singletons, and they
+ * report failures to the interpreter through their return value, not this slot.
+ */
+static Errcode legacy_poe_builtin_err;
+
 Porexlib aa_pocolib = {
 	/* header */
 	{sizeof(Porexlib), AA_POCOLIB, AA_POCOLIB_VERSION},
-	&builtin_err,
+	&legacy_poe_builtin_err,
 	get_pic_screen,
 	po_ppt2ptr,
 	po_ptr2ppt,

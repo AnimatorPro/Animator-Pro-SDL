@@ -8,7 +8,9 @@
 #include "textedit.h"
 #include "mask.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 extern Errcode save_fli(char* name);       // from savefli.c
 extern Errcode load_the_pic(char* title);  // from vpaint.c

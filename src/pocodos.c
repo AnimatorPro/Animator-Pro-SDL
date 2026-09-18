@@ -11,6 +11,9 @@
 #include "resource.h"
 #include "wildlist.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern Poco_lib po_dos_lib;
 extern char po_current_program_path[]; /* defined in qpoco.c */
 

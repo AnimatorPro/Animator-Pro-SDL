@@ -6,7 +6,6 @@
 #include "ptrmacro.h"
 #include "standard_library.h"
 
-extern Errcode builtin_err;
 
 static Lib_proto mathlib[] = {
 	/* Most of the ansi math library (not bits that use pointers) */

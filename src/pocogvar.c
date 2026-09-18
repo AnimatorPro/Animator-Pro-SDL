@@ -48,6 +48,9 @@
 #include "filepath.h"
 #include "resource.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 /*----------------------------------------------------------------------------
  * data and constants...
  *--------------------------------------------------------------------------*/

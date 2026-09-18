@@ -8,7 +8,9 @@
 #include "vpsubs.h"
 #include <math.h>
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 /** Turtle graphics **/
 static double xtur, ytur, atur;

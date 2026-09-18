@@ -12,8 +12,10 @@
 #include "redo.h"
 #include "render.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern char po_chainto_program_path[];  // in qpoco.c
-extern Errcode builtin_err;
 Errcode resize_default_temps(SHORT width, SHORT height);
 void kill_seq(void);
 void zoom_unundo(void);

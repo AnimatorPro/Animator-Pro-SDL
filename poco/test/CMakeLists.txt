@@ -825,6 +825,26 @@ target_include_directories(poco_reference_fixtures PRIVATE
 target_link_libraries(poco_reference_fixtures PRIVATE Poco::poco Threads::Threads)
 add_poco_concurrency_test(poco_reference_fixtures poco_reference_fixtures)
 
+# Bindings that take no PocoVm* (the Animator shape) report through
+# poco_active_builtin_error().  This gate proves that slot follows the running
+# activation: two VMs stamp it concurrently without crosstalk, and a failure
+# reported from one lands on that VM's run alone.
+add_executable(poco_vm_scoped_builtin_error
+    vm_scoped_builtin_error/vm_scoped_builtin_error.c
+)
+target_compile_definitions(poco_vm_scoped_builtin_error PRIVATE
+    POCO_VM_SCOPED_BUILTIN_ERROR_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/vm_scoped_builtin_error"
+)
+target_include_directories(poco_vm_scoped_builtin_error PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
+)
+target_link_libraries(poco_vm_scoped_builtin_error PRIVATE Poco::poco Threads::Threads)
+set_target_properties(poco_vm_scoped_builtin_error PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED YES
+)
+add_poco_concurrency_test(poco_vm_scoped_builtin_error poco_vm_scoped_builtin_error)
+
 # Hosts own activation pooling policy.  This gate compiles one immutable
 # program, concurrently acquires one activation per host thread, and repeatedly
 # runs/reset/reuses those activations against the Phase-1 reference oracle.

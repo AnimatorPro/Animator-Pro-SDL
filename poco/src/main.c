@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "cli_debugger.h"
-#include "commonst.h"
+#include "poco_names.h"
 #include "filepath.h"
 #include "poco_errcodes.h"
 #include "poco_internal.h"
@@ -27,9 +27,9 @@
 #include "program_internal.h"
 #include "ptrmacro.h"
 
-/* Legacy standalone-host state.  The embeddable library keeps this status in
- * PocoActivation::builtin_error instead. */
-Errcode builtin_err;
+/* Builtin status reporting is per-activation; this host writes the slot of
+ * whichever VM is running on this thread. */
+#define builtin_err (*poco_active_builtin_error())
 
 #ifdef _MSC_VER
 #include <float.h>

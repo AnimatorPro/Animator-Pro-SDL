@@ -3,12 +3,8 @@
 #include "jimk.h"
 #include "ani_poco_adapter.h"
 
-/* Legacy Animator bindings still communicate through this host-owned slot.
- * Full Animator provides the strong definition in pjhigh/startup.c; adapter
- * fixtures use this weak fallback.  Poco core neither defines nor reads it. */
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((weak)) Errcode builtin_err;
-#endif
+/* The Animator bindings report through the running activation now
+ * (src/ani_poco/ani_builtin_err.h), so no host-owned global slot is needed. */
 
 /* This Animator-private fallback remains invisible to Poco core. */
 extern void animhost_ensure_pocolib(void);

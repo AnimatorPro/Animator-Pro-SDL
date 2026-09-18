@@ -13,7 +13,9 @@
 #include "inks.h"
 #include "brush.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 extern void set_ccycle(bool newcyc);
 

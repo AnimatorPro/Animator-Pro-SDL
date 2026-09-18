@@ -266,6 +266,50 @@ Errcode* poco_vm_builtin_error(PocoVm* vm)
 	return vm != NULL && vm->activation != NULL ? &vm->activation->builtin_error : NULL;
 }
 
+/*
+ * Active-VM tracking.
+ *
+ * Builtin bindings that predate the embedding API take no PocoVm parameter, so
+ * they cannot reach their caller's activation through an argument.  The VM that
+ * is currently executing on this thread is recorded here instead, which keeps
+ * their status reporting per-activation and lets two VMs run concurrently on
+ * different threads.  The slot is thread-local, never process-wide.
+ */
+static POCO_THREAD_LOCAL PocoVm* poco_thread_active_vm;
+
+/* Written only when no activation is live (a binding called outside a run). */
+static POCO_THREAD_LOCAL Errcode poco_thread_detached_builtin_error;
+
+PocoVm* poco_active_vm(void)
+{
+	return poco_thread_active_vm;
+}
+
+PocoVm* poco_push_active_vm(PocoVm* vm)
+{
+	PocoVm* previous = poco_thread_active_vm;
+
+	poco_thread_active_vm = vm;
+	return previous;
+}
+
+void poco_pop_active_vm(PocoVm* previous)
+{
+	poco_thread_active_vm = previous;
+}
+
+/*
+ * Status slot for the legacy no-vm-parameter bindings.  Resolves to the
+ * activation running on this thread; falls back to a thread-local scratch slot
+ * so a stray call outside a run cannot corrupt another VM or crash.
+ */
+Errcode* poco_active_builtin_error(void)
+{
+	Errcode* slot = poco_vm_builtin_error(poco_thread_active_vm);
+
+	return slot != NULL ? slot : &poco_thread_detached_builtin_error;
+}
+
 const PocoModuleHooks* poco_vm_module_hooks(PocoVm* vm)
 {
 	return vm != NULL ? &vm->module_hooks : NULL;
@@ -2898,15 +2942,18 @@ static Errcode run_file_values(PocoActivation* activation, const char* entry,
  ****************************************************************************/
 Errcode po_activation_run_entry(PocoActivation* activation, const char* entry)
 {
+	PocoVm* previous_vm = poco_push_active_vm(activation->vm);
 	Errcode err;
 
 	if (!activation->libraries_initialized) {
 		if ((err = po_activation_init_libs(activation)) < Success) {
+			poco_pop_active_vm(previous_vm);
 			return err;
 		}
 	}
 	err = run_file(activation, entry);
 	po_activation_cleanup_libs(activation);
+	poco_pop_active_vm(previous_vm);
 	return (err);
 }
 
@@ -2914,11 +2961,13 @@ static Errcode po_activation_run_entry_values(PocoActivation* activation, const 
 											  const PocoCallbackValue* values, size_t value_count,
 											  Pt_num* result)
 {
+	PocoVm* previous_vm = poco_push_active_vm(activation->vm);
 	Errcode err;
 	int top_level = activation->run_depth == 0;
 
 	if (!activation->libraries_initialized) {
 		if ((err = po_activation_init_libs(activation)) < Success) {
+			poco_pop_active_vm(previous_vm);
 			return err;
 		}
 	}
@@ -2926,6 +2975,7 @@ static Errcode po_activation_run_entry_values(PocoActivation* activation, const 
 	if (top_level) {
 		po_activation_cleanup_libs(activation);
 	}
+	poco_pop_active_vm(previous_vm);
 	return err;
 }
 

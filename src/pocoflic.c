@@ -8,6 +8,9 @@
 #include "pocolib.h"
 #include "jimk.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 /*----------------------------------------------------------------------------
  * Local types and data...
  *--------------------------------------------------------------------------*/

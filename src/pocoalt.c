@@ -4,6 +4,9 @@
 
 #include "alt.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 /*****************************************************************************
  * Boolean SwapExists(void);
  ****************************************************************************/

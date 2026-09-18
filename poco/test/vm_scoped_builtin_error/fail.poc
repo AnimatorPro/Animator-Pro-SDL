@@ -1,0 +1,7 @@
+/* A vm-less binding reports a failure.  The interpreter reads the running
+ * activation's slot, so this run must not reach the return. */
+main()
+{
+	ani_fail();
+	return 7;
+}

@@ -125,7 +125,7 @@ extern "C" {
 #define stricmp strcasecmp
 #endif
 
-#ifndef STDTYPES_H
+#ifndef POCO_STDTYPES_H
 #include "stdtypes.h"
 #endif
 
@@ -143,7 +143,7 @@ extern "C" {
 #include "poco_errcodes.h"
 #endif
 
-#ifndef PTRMACRO_H
+#ifndef POCO_PTRMACRO_H
 #include "ptrmacro.h"
 #endif
 
@@ -151,7 +151,7 @@ extern "C" {
 #include "pocoop.h"
 #endif
 
-#ifndef LINKLIST_H
+#ifndef POCO_LINKLIST_H
 #include "linklist.h"
 #endif
 
@@ -161,6 +161,17 @@ extern "C" {
 
 #ifndef LIBFFI_H
 #include <ffi.h>
+#endif
+
+/* Thread-local storage class, spelled for the compilers this builds under. */
+#if defined(_MSC_VER)
+#define POCO_THREAD_LOCAL __declspec(thread)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define POCO_THREAD_LOCAL _Thread_local
+#elif defined(__GNUC__) || defined(__clang__)
+#define POCO_THREAD_LOCAL __thread
+#else
+#define POCO_THREAD_LOCAL
 #endif
 
 /*****************************************************************************
@@ -532,7 +543,6 @@ typedef union po_ffi_data /* Overlap popular datatypes in the same space */
 	UBYTE* bpt;
 	char c;
 	long l;
-	ULONG ul;
 	float f;
 	double d;
 	void* p;
@@ -994,6 +1004,10 @@ void po_disassemble_program(Poco_run_env* poco_env, FILE* fp);
 
 void poco_set_error(PocoVm* vm, const char* fmt, ...);
 Errcode* poco_vm_builtin_error(PocoVm* vm);
+Errcode* poco_active_builtin_error(void);
+PocoVm* poco_active_vm(void);
+PocoVm* poco_push_active_vm(PocoVm* vm);
+void poco_pop_active_vm(PocoVm* previous);
 Errcode print_pocolib(char* filename, Poco_lib* lib);
 Poco_lib* po_open_library(Poco_cb* pcb, char* libname, char* id_str);
 char* po_get_libproto_line(Poco_cb* pcb);

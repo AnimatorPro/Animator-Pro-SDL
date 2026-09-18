@@ -6,7 +6,9 @@
 #include "a3d.h"
 #include "auto.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 Popot poco_lmalloc(long size);
 void po_free(void* pt);
 Errcode po_poly_to_arrays(Poly* p, Popot* x, Popot* y);

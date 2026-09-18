@@ -8,6 +8,9 @@
 #include "pentools.h"
 #include "zoom.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern Poco_lib po_blit_lib;
 extern Flicel* thecel;
 
