@@ -1,3 +1,10 @@
+/*******************************************************************************
+ * bytecode_container.c - On-disk envelope for a serialized program.
+ * Reads and writes the versioned header, section table and BLAKE3 integrity
+ * digest that wrap a program image.  It knows nothing about what the sections
+ * contain; program_image.c owns that.
+ ******************************************************************************/
+
 #include "bytecode_container.h"
 
 #include "poco_endian.h"

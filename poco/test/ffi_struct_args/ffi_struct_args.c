@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "poco.h"
+#include "poco_internal.h"
+#include "poco_ffi.h"
+#include "pocotype.h"
 
 typedef struct vec3d {
 	double x;

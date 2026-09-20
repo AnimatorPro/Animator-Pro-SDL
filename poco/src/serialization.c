@@ -1,3 +1,11 @@
+/*******************************************************************************
+ * serialization.c - Public save/load of a compiled program.
+ * Implements poco_program_serialize_* and poco_vm_deserialize_*: drives
+ * program_image.c to flatten or rebuild the image, wraps it in the
+ * bytecode_container.c envelope, and maps the internal failure codes onto
+ * PocoStatus.
+ ******************************************************************************/
+
 #include <poco/poco.h>
 
 #include "bytecode_container.h"

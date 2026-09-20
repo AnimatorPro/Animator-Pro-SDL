@@ -5,8 +5,8 @@
  * Poco's stable embedding API.
  *
  * This header is self-contained: a host only needs the installed Poco include
- * directory to compile against it.  Internal compiler and Animator headers
- * are deliberately not part of this interface.
+ * directory to compile against it.  Internal compiler headers and host
+ * headers are deliberately not part of this interface.
  */
 
 #include <stddef.h>
@@ -332,7 +332,7 @@ typedef struct PocoModuleHost PocoModuleHost;
 /*
  * The loader supplies these services to module initialization.  get_service
  * returns an optional host-defined service whose requested ABI version must
- * match; it returns NULL when the service is unavailable.  No Animator
+ * match; it returns NULL when the service is unavailable.  No host-specific
  * symbols, vtables, or globals are part of this contract.
  */
 typedef void (*PocoModuleReportDiagnostic)(const PocoModuleHost* host,
@@ -355,7 +355,8 @@ typedef void (*PocoModuleCleanup)(void* module_data);
  * once after descriptor validation; cleanup runs once before the dynamic
  * module is unloaded.  A module may use report_diagnostic during initialize
  * and may query host-defined services only through PocoModuleHost.  Generic
- * modules must not require Animator headers, globals, or Polib* tables.
+ * modules must not require host headers, host globals, or host function
+ * tables.
  */
 typedef struct PocoModuleDescriptor {
 	uint32_t abi_version;
@@ -395,10 +396,10 @@ typedef struct PocoModuleHooks {
 	PocoModuleUnloadHook on_unload;
 	void* user_data;
 	/*
-	 * Disabled by default.  Set this only in an Animator-owned compatibility
-	 * host that deliberately loads a legacy poco_rexlib_get() POE module.
-	 * It does not provide Animator symbols or function tables; the Ani host's
-	 * on_load callback remains solely responsible for installing that ABI.
+	 * Disabled by default.  Set this only in a compatibility host that
+	 * deliberately loads a legacy poco_rexlib_get() POE module.  It provides
+	 * no host symbols or function tables of its own; the host's on_load
+	 * callback remains solely responsible for installing that ABI.
 	 * Generic PocoModuleDescriptor modules neither need nor receive it.
 	 */
 	int allow_legacy_poe;
@@ -407,9 +408,9 @@ typedef struct PocoModuleHooks {
 /*
  * Compatibility-only native modules export poco_rexlib_get() and return a
  * Pocorex from the legacy pocoload.h/pocorex.h headers.  The loader rejects
- * that format by default: an Animator-owned host must explicitly set
+ * that format by default: a host that wants them must explicitly set
  * PocoModuleHooks.allow_legacy_poe and install its native table from on_load.
- * That opt-in does not provide Animator symbols or function tables to generic
+ * That opt-in exposes no host symbols or function tables to generic
  * modules.  New modules must export POCO_MODULE_ENTRY_POINT and use
  * PocoModuleDescriptor instead.
  */
@@ -430,7 +431,16 @@ typedef int (*PocoCancelCallback)(void* user_data);
 typedef struct PocoRunOptions {
 	PocoCancelCallback cancel_callback;
 	void* cancel_user_data;
+	/* Path for the error trace written when a run fails; NULL means stdout. */
 	const char* trace_file;
+	/*
+	 * Destination for the per-instruction disassembly trace, or NULL for no
+	 * trace.  The stream is borrowed for the duration of the run and never
+	 * closed by Poco.  Honoured only by a build configured with DEVELOPMENT;
+	 * other builds ignore it.  Per-run, not global, so two activations on two
+	 * threads can trace to two destinations.
+	 */
+	FILE* instruction_trace;
 } PocoRunOptions;
 
 /*
@@ -442,8 +452,7 @@ typedef struct PocoRunOptions {
  * compilation, library/path registration, and VM teardown.  Distinct
  * activations of one immutable program may run concurrently as documented
  * below.  The VM/program lifecycle and this header are the public embedding
- * boundary; compile_poco(), Poco_lib, and related compatibility headers are
- * not.
+ * boundary; Poco_lib and the remaining compatibility headers are not.
  */
 PocoStatus poco_vm_create(const PocoVmOptions* options, PocoVm** out_vm);
 void poco_vm_destroy(PocoVm* vm);

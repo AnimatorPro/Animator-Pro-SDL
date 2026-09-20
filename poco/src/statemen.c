@@ -39,38 +39,20 @@
  *				favor of safer and more general po_pop_off_result()
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "token.h"
+#include "code.h"
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "declare.h"
+#include "trace.h"
+#include "postring.h"
 
 #define COMMA_OR_RBRACE "} or ,"
 
 static void statement(Poco_cb* pcb, Poco_frame* pf);
-Loop_frame* po_get_top_switch(Poco_cb* pcb);
+static Loop_frame* po_get_top_switch(Poco_cb* pcb);
 
-#ifdef DEADWOOD
-
-/* Type structure for simple integer */
-static TypeComp ity_comp[1] = {
-	TYPE_INT,
-};
-static LONG ity_dims[1] = {
-	0,
-};
-static Type_info ity = {
-	ity_comp, (Pt_long*)ity_dims, 1, 1, IDO_INT,
-};
-
-/* Type structure for ... in function parameters */
-static TypeComp ely_comp[1] = {
-	TYPE_ELLIPSIS,
-};
-static LONG ely_dims[1] = {
-	0,
-};
-static Type_info ely = {
-	ely_comp, (Pt_long*)ely_dims, 1, 1, IDO_BAD,
-};
-#endif /* DEADWOOD */
 
 /*****************************************************************************
  * if the next token is a semicolon eat it, else complain and 'insert' one.
@@ -471,7 +453,7 @@ OUT:
 /*****************************************************************************
  * return pointer to loop_frame associated with innermost switch statement.
  ****************************************************************************/
-Loop_frame* po_get_top_switch(Poco_cb* pcb)
+static Loop_frame* po_get_top_switch(Poco_cb* pcb)
 {
 	Loop_frame* lf;
 
@@ -777,7 +759,7 @@ static void get_continue(Poco_cb* pcb, Poco_frame* pf)
  * (Note to self: need to investigate replacing po_need_local_symbol with the
  * routine everyone else uses for finding/making local symbols.)
  ****************************************************************************/
-void po_get_goto(Poco_cb* pcb, Poco_frame* pf)
+static void po_get_goto(Poco_cb* pcb, Poco_frame* pf)
 {
 	Symbol* lsym;
 	Code_label* cl;

@@ -1,5 +1,14 @@
+/*******************************************************************************
+ * program_image.c - Flattens a compiled program into sections and rebuilds it.
+ * Owns what a serialized image contains: function frames, code, literals,
+ * struct layouts, debug line and live-range tables, and the external library
+ * manifest a reload has to match.  bytecode_container.c wraps the result;
+ * serialization.c is the public face of both.
+ ******************************************************************************/
+
 #include "program_image.h"
 
+#include "bytecode_iter.h"
 #include "poco_endian.h"
 #include "program_internal.h"
 #include "pocoload.h"
@@ -7,6 +16,8 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pocmemry.h"
+#include "pocoface.h"
 
 #define PO_IMAGE_VERSION_MULTI_SOURCE 3u
 #define PO_IMAGE_MINIMAL_SECTION_COUNT 5u
@@ -515,27 +526,20 @@ static PoProgramImageStatus po_decode_type(PoReader* reader, Poco_cb* owner, Fun
 static PoProgramImageStatus po_encode_code_frame(PoWriter* writer, const Func_frame* frame,
 												 const PoFrameSet* frames, const Names* literals)
 {
-	const uint8_t* cursor = (const uint8_t*)frame->code_pt;
-	const uint8_t* end = cursor + frame->code_size;
+	PoCodeIter iter;
+	PoCodeIns ins;
+	PoCodeIterStatus status;
 
-	while (cursor < end) {
-		int op;
-		const Poco_op_table* entry;
-		const uint8_t* operand;
+	po_code_iter_init(&iter, frame->code_pt, frame->code_size);
 
-		if ((size_t)(end - cursor) < sizeof(op)) {
+	while ((status = po_code_iter_next(&iter, &ins)) != PO_CODE_ITER_END) {
+		int op = ins.op;
+		const Poco_op_table* entry = ins.entry;
+		const uint8_t* operand = (const uint8_t*)ins.operand;
+
+		if (status != PO_CODE_ITER_OK) {
 			return PO_PROGRAM_IMAGE_MALFORMED;
 		}
-		memcpy(&op, cursor, sizeof(op));
-		cursor += sizeof(op);
-		if (op < 0 || op >= po_ins_table_els) {
-			return PO_PROGRAM_IMAGE_MALFORMED;
-		}
-		entry = &po_ins_table[op];
-		if ((size_t)(end - cursor) < (size_t)entry->op_size) {
-			return PO_PROGRAM_IMAGE_MALFORMED;
-		}
-		operand = cursor;
 		if (!po_writer_u32(writer, (uint32_t)op)) {
 			return PO_PROGRAM_IMAGE_OUT_OF_MEMORY;
 		}
@@ -644,9 +648,9 @@ static PoProgramImageStatus po_encode_code_frame(PoWriter* writer, const Func_fr
 			default:
 				return PO_PROGRAM_IMAGE_UNSUPPORTED;
 		}
-		cursor += entry->op_size;
 	}
-	return cursor == end ? PO_PROGRAM_IMAGE_OK : PO_PROGRAM_IMAGE_MALFORMED;
+	return po_code_iter_offset(&iter) == (size_t)frame->code_size ? PO_PROGRAM_IMAGE_OK
+																  : PO_PROGRAM_IMAGE_MALFORMED;
 }
 
 static PoProgramImageStatus po_encode_code(PoWriter* section, const PoFrameSet* frames,
@@ -791,37 +795,25 @@ static PoProgramImageStatus po_encode_symbols(PoWriter* section, const PoFrameSe
 static PoProgramImageStatus po_native_offset_to_instruction(const Func_frame* frame, long offset,
 															uint64_t* out_instruction)
 {
-	const uint8_t* cursor = (const uint8_t*)frame->code_pt;
-	const uint8_t* end = cursor + frame->code_size;
-	uint64_t instruction = 0;
+	PoCodeIter iter;
+	PoCodeIns ins;
+	PoCodeIterStatus status;
 
 	if (offset < 0 || offset > frame->code_size) {
 		return PO_PROGRAM_IMAGE_MALFORMED;
 	}
-	while (cursor < end) {
-		int op;
-		const Poco_op_table* entry;
-		if ((long)(cursor - (const uint8_t*)frame->code_pt) == offset) {
-			*out_instruction = instruction;
+	po_code_iter_init(&iter, frame->code_pt, frame->code_size);
+	while ((status = po_code_iter_next(&iter, &ins)) != PO_CODE_ITER_END) {
+		if (ins.offset == (size_t)offset) {
+			*out_instruction = ins.index;
 			return PO_PROGRAM_IMAGE_OK;
 		}
-		if ((size_t)(end - cursor) < sizeof(op)) {
+		if (status != PO_CODE_ITER_OK) {
 			return PO_PROGRAM_IMAGE_MALFORMED;
 		}
-		memcpy(&op, cursor, sizeof(op));
-		cursor += sizeof(op);
-		if (op < 0 || op >= po_ins_table_els) {
-			return PO_PROGRAM_IMAGE_MALFORMED;
-		}
-		entry = &po_ins_table[op];
-		if ((size_t)(end - cursor) < (size_t)entry->op_size) {
-			return PO_PROGRAM_IMAGE_MALFORMED;
-		}
-		cursor += entry->op_size;
-		++instruction;
 	}
 	if (offset == frame->code_size) {
-		*out_instruction = instruction;
+		*out_instruction = po_code_iter_count(&iter);
 		return PO_PROGRAM_IMAGE_OK;
 	}
 	return PO_PROGRAM_IMAGE_MALFORMED;
@@ -830,33 +822,23 @@ static PoProgramImageStatus po_native_offset_to_instruction(const Func_frame* fr
 static PoProgramImageStatus po_instruction_to_native_offset(const Func_frame* frame,
 															uint64_t instruction, long* out_offset)
 {
-	const uint8_t* cursor = (const uint8_t*)frame->code_pt;
-	const uint8_t* start = cursor;
-	const uint8_t* end = cursor + frame->code_size;
-	uint64_t current = 0;
+	PoCodeIter iter;
+	PoCodeIns ins;
 
-	while (current < instruction && cursor < end) {
-		int op;
-		const Poco_op_table* entry;
-		if ((size_t)(end - cursor) < sizeof(op)) {
+	po_code_iter_init(&iter, frame->code_pt, frame->code_size);
+	while (po_code_iter_count(&iter) < instruction) {
+		PoCodeIterStatus status = po_code_iter_next(&iter, &ins);
+		if (status == PO_CODE_ITER_END) {
+			break;
+		}
+		if (status != PO_CODE_ITER_OK) {
 			return PO_PROGRAM_IMAGE_MALFORMED;
 		}
-		memcpy(&op, cursor, sizeof(op));
-		cursor += sizeof(op);
-		if (op < 0 || op >= po_ins_table_els) {
-			return PO_PROGRAM_IMAGE_MALFORMED;
-		}
-		entry = &po_ins_table[op];
-		if ((size_t)(end - cursor) < (size_t)entry->op_size) {
-			return PO_PROGRAM_IMAGE_MALFORMED;
-		}
-		cursor += entry->op_size;
-		++current;
 	}
-	if (current != instruction) {
+	if (po_code_iter_count(&iter) != instruction) {
 		return PO_PROGRAM_IMAGE_MALFORMED;
 	}
-	*out_offset = (long)(cursor - start);
+	*out_offset = (long)po_code_iter_offset(&iter);
 	return PO_PROGRAM_IMAGE_OK;
 }
 
@@ -1840,7 +1822,7 @@ static PoProgramImageStatus po_decode_code_frame(PoReader* encoded, Poco_cb* own
 	while (encoded->offset < encoded->size) {
 		uint32_t op_value;
 		int op;
-		Poco_op_table* entry;
+		const Poco_op_table* entry;
 		if (!po_reader_u32(encoded, &op_value) || op_value >= (uint32_t)po_ins_table_els) {
 			status = PO_PROGRAM_IMAGE_MALFORMED;
 			goto CLEANUP;

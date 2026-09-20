@@ -10,7 +10,8 @@
  *				In po_disasm(), added check for op>0 as well as op<numops.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
+#include "bytecode_iter.h"
 #include "pocoop.h"
 
 /*****************************************************************************
@@ -46,61 +47,74 @@ char* find_c_name(C_frame* list, void* fpt)
 }
 
 /*****************************************************************************
- * disassemble a single instruction.
+ * print one decoded instruction.
+ ****************************************************************************/
+static void print_instruction(FILE* f, PoCodeIterStatus status, const PoCodeIns* ins,
+							  C_frame* cframes)
+{
+	const Poco_op_table* pta;
+	Func_frame* fuf;
+	Popot* pp_code;
+	void* code;
+
+	if (status != PO_CODE_ITER_OK) {
+		fprintf(f, "Wild op 0x%d\n", ins->op);
+		return;
+	}
+	pta = ins->entry;
+	code = ins->operand;
+	fprintf(f, "\t%-15s\t", pta->op_name);
+	switch (pta->op_ext) {
+		case OEX_NONE:
+			break;
+		case OEX_VAR:
+		case OEX_INT:
+		case OEX_LABEL:
+			fprintf(f, "\t%d", ((int*)code)[0]);
+			break;
+		case OEX_ADDRESS:
+			fprintf(f, "\tvar %d size %ld", ((int*)OPTR(code, 0))[0],
+					((long*)OPTR(code, sizeof(int)))[0]);
+			break;
+		case OEX_LONG:
+			fprintf(f, "\t%ld", ((long*)code)[0]);
+			break;
+		case OEX_POINTER:
+			pp_code = (Popot*)code;
+			fprintf(f,
+					//						"\tmin %p max %p pt %p (%llu bytes)",
+					"\tpointer: %p (%lu bytes)", pp_code->pt, pp_code->max - pp_code->min);
+			break;
+		case OEX_DOUBLE:
+			fprintf(f, "\t%f", ((double*)code)[0]);
+			break;
+		case OEX_FUNCTION:
+			fuf = ((Func_frame**)code)[0];
+			fprintf(f, "\t%s", fuf->name);
+			break;
+		case OEX_CFUNCTION:
+			if (cframes != NULL) {
+				fprintf(f, "\t%s", find_c_name(cframes, ((void**)code)[0]));
+			}
+			break;
+	}
+	fprintf(f, "\n");
+}
+
+/*****************************************************************************
+ * disassemble a single instruction.  The caller holds an instruction pointer
+ * without the length of the code behind it, so the walk is unbounded.
  ****************************************************************************/
 void* po_disasm(FILE* f, void* code, C_frame* cframes)
 {
-	int op;
-	Func_frame* fuf;
-	Poco_op_table* pta;
-	Popot* pp_code;
+	PoCodeIter iter;
+	PoCodeIns ins;
+	PoCodeIterStatus status;
 
-	op = ((int*)code)[0];
-	code = OPTR(code, sizeof(op));
-	if (op >= 0 && op < po_ins_table_els) {
-		pta = po_ins_table + op;
-		fprintf(f, "\t%-15s\t", pta->op_name);
-		switch (pta->op_ext) {
-			case OEX_NONE:
-				break;
-			case OEX_VAR:
-			case OEX_INT:
-			case OEX_LABEL:
-				fprintf(f, "\t%d", ((int*)code)[0]);
-				break;
-			case OEX_ADDRESS:
-				fprintf(f, "\tvar %d size %ld", ((int*)OPTR(code, 0))[0],
-						((long*)OPTR(code, sizeof(int)))[0]);
-				break;
-			case OEX_LONG:
-				fprintf(f, "\t%d", ((LONG*)code)[0]);
-				break;
-			case OEX_POINTER:
-				pp_code = (Popot*)code;
-				fprintf(f,
-						//						"\tmin %p max %p pt %p (%llu bytes)",
-						"\tpointer: %p (%lu bytes)", pp_code->pt, pp_code->max - pp_code->min);
-				break;
-			case OEX_DOUBLE:
-				fprintf(f, "\t%f", ((double*)code)[0]);
-				break;
-			case OEX_FUNCTION:
-				fuf = ((Func_frame**)code)[0];
-				fprintf(f, "\t%s", fuf->name);
-				break;
-			case OEX_CFUNCTION:
-				if (cframes != NULL) {
-					fprintf(f, "\t%s", find_c_name(cframes, ((void**)code)[0]));
-				}
-				break;
-		}
-		code = OPTR(code, pta->op_size);
-		fprintf(f, "\n");
-	} else {
-		fprintf(f, "Wild op 0x%d\n", op);
-		code = OPTR(code, sizeof(op));
-	}
-	return code;
+	po_code_iter_init_unbounded(&iter, code);
+	status = po_code_iter_next(&iter, &ins);
+	print_instruction(f, status, &ins, cframes);
+	return po_code_iter_cursor(&iter);
 }
 
 /*****************************************************************************
@@ -108,10 +122,16 @@ void* po_disasm(FILE* f, void* code, C_frame* cframes)
  ****************************************************************************/
 void po_disassemble_code(Poco_run_env* poco_env, FILE* file, void* code, long csize)
 {
-	void* end;
-	end = OPTR(code, csize);
-	while (code < end) {
-		code = po_disasm(file, code, (C_frame*)(poco_env->protos));
+	PoCodeIter iter;
+	PoCodeIns ins;
+	PoCodeIterStatus status;
+
+	po_code_iter_init(&iter, code, csize);
+	while ((status = po_code_iter_next(&iter, &ins)) != PO_CODE_ITER_END) {
+		print_instruction(file, status, &ins, (C_frame*)(poco_env->protos));
+		if (status != PO_CODE_ITER_OK) {
+			break;
+		}
 	}
 	fflush(file);
 }

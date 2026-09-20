@@ -5,12 +5,14 @@
 #include "ptrmacro.h"
 #include "memory.h"
 #include "jfile.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "menus.h"
 #include "inkaid.h"
 #include "resource.h"
 #include "wildlist.h"
+
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
 
 extern Poco_lib po_dos_lib;
 extern char po_current_program_path[]; /* defined in qpoco.c */
@@ -231,6 +233,6 @@ PolibDos po_libdos = {
 Poco_lib po_dos_lib = {
 	NULL,
 	"DOS",
-	(Lib_proto*)&po_libdos,
+	(const Lib_proto*)&po_libdos,
 	POLIB_DOS_SIZE,
 };

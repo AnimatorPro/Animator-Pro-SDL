@@ -3,13 +3,14 @@
 #include "errcodes.h"
 #include "fli.h"
 #include "flicel.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "palchunk.h"
 #include "textedit.h"
 #include "mask.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 extern Errcode save_fli(char* name);       // from savefli.c
 extern Errcode load_the_pic(char* title);  // from vpaint.c
@@ -285,6 +286,6 @@ PolibAAFile po_libaafile = {
 Poco_lib po_load_save_lib = {
 	NULL,
 	"Autodesk Animator File",
-	(Lib_proto*)&po_libaafile,
+	(const Lib_proto*)&po_libaafile,
 	POLIB_AAFILE_SIZE,
 };

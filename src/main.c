@@ -23,7 +23,6 @@
 #include "memory.h"
 
 #ifdef WITH_POCO
-#include "pocoface.h"
 #include "qpoco.h"
 #endif  // WITH_POCO
 
@@ -32,7 +31,6 @@ static Errcode resize_pencel(bool err_on_abort, bool reset);
 
 USHORT program_id = 0;
 USHORT program_version = 0;
-extern Errcode builtin_err;
 
 #ifdef WITH_POCO
 extern Errcode po_file_to_stdout(char* name);

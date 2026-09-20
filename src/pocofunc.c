@@ -5,7 +5,6 @@
 #include <time.h>
 #include "jimk.h"
 #include "fli.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "errcodes.h"
 #include "options.h"
@@ -13,8 +12,10 @@
 #include "redo.h"
 #include "render.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern char po_chainto_program_path[];  // in qpoco.c
-extern Errcode builtin_err;
 Errcode resize_default_temps(SHORT width, SHORT height);
 void kill_seq(void);
 void zoom_unundo(void);
@@ -200,6 +201,6 @@ PolibMisc po_libmisc = {
 Poco_lib po_misc_lib = {
 	NULL,
 	"Misc. Functions",
-	(Lib_proto*)&po_libmisc,
+	(const Lib_proto*)&po_libmisc,
 	POLIB_MISC_SIZE,
 };

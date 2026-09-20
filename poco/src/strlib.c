@@ -1,3 +1,10 @@
+/*******************************************************************************
+ * strlib.c - Native string, formatting and conversion bindings.
+ * Wraps the C string library for scripts, checking each Popot argument
+ * against the caller's memory before it dereferences it, and carries the
+ * bounds contracts and owned-return policy for the pointers it hands back.
+ ******************************************************************************/
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,10 +13,11 @@
 
 #include "poco_errcodes.h"
 #include "port.h"
-#include "poco.h"
+#include "poco_internal.h"
 #include "pocolib.h"
 #include "ptrmacro.h"
 #include "standard_library.h"
+#include "pocoface.h"
 
 #define builtin_err (*poco_vm_builtin_error(vm))
 
@@ -362,7 +370,10 @@ static char* po_strupr(char* d, PocoVm* vm)
  ****************************************************************************/
 static char* po_strerror(int err, PocoVm* vm)
 {
-	static char errmsg[ERRTEXT_SIZE];
+	/* The text lives on the VM, not in a file-scope buffer: two VMs on two
+	 * threads must not overwrite each other's strerror() result.  This is a
+	 * POCO_BINDING_RUN_CONTEXT binding, so vm is always the running VM. */
+	char* errmsg = poco_vm_errtext_buffer(vm);
 
 	get_errtext(err, errmsg);
 	return errmsg;
@@ -456,7 +467,7 @@ static const PocoBindingContract first_of_two_alias_contract = {
 static const PocoBindingContract mutable_string_alias_contract = {
 	mutable_cstring_span, Array_els(mutable_cstring_span), {POCO_POINTER_RETURN_ALIAS, 0}};
 
-static Lib_proto lib[] = {
+static const Lib_proto lib[] = {
 	/* string stuff */
 	/* sprintf is intentionally legacy/unsafe: use snprintf where capacity is known. */
 	{ po_sprintf, "int     sprintf(char *buf, char *format, ...);", NULL,
@@ -500,7 +511,7 @@ static Lib_proto lib[] = {
 	{po_strerror, "char    *strerror(int errnum);", NULL, POCO_BINDING_RUN_CONTEXT},
 };
 
-Poco_lib po_str_lib = {
+const Poco_lib po_str_lib = {
 	NULL,
 	"(C standard) String",
 	lib,

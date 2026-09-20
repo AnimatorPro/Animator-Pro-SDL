@@ -3,11 +3,13 @@
 
 #include "errcodes.h"
 #include "jimk.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "flicel.h"
 #include "pentools.h"
 #include "zoom.h"
+
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
 
 extern Poco_lib po_blit_lib;
 extern Flicel* thecel;
@@ -478,5 +480,5 @@ PolibScreen po_libscreen = {
 };
 
 Poco_lib po_blit_lib = {
-	NULL, "Screen", (Lib_proto*)&po_libscreen, POLIB_SCREEN_SIZE, NULL, free_allocated_screens,
+	NULL, "Screen", (const Lib_proto*)&po_libscreen, POLIB_SCREEN_SIZE, NULL, free_allocated_screens,
 };

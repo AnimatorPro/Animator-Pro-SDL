@@ -2,8 +2,9 @@
  * Compatibility-only Animator header.
  *
  * Deprecated for new Animator code: use <poco/poco.h>.  Legacy Poco ABI
- * types are defined only by poco/src/pocolib.h; this file retains solely
- * Animator's private library-table declarations for the migration period.
+ * types are defined only by <poco/poco_legacy.h>, reached through Poco::poco
+ * like any other exported header; this file retains solely Animator's private
+ * library-table declarations for the migration period.
  *
  * The Polib* layouts below are the Animator-only native-POE function-table ABI.
  * They are not Poco script-to-C/libffi binding dispatch and must not be
@@ -14,11 +15,17 @@
 #ifndef ANIMATOR_POCOLIB_COMPAT_H
 #define ANIMATOR_POCOLIB_COMPAT_H
 
-/* Keep the Animator error/type domain at this adapter boundary. */
+/* Keep the Animator error/type domain at this adapter boundary.  Animator owns
+ * BYTE/UBYTE/SHORT/USHORT and Dlnode/Dlheader for the whole program -
+ * including builds configured without Poco, which never see a Poco header -
+ * so the legacy compat header is told not to define them again. */
 #include "errcodes.h"
 #include "stdtypes.h"
 #include "linklist.h"
-#include "../../poco/src/pocolib.h"
+
+#define POCO_LEGACY_HOST_SCALAR_TYPES 1
+#define POCO_LEGACY_HOST_LIST_TYPES 1
+#include <poco/poco_legacy.h>
 
 #ifndef PUBLIC_CODE
 
@@ -29,14 +36,12 @@
 /* Typed legacy callback entry declared by Poco's compatibility header. */
 extern char* po_fuf_name(void* fuf);
 extern void* po_fuf_code(void* fuf);
+extern const int po_version_number;
 extern Rnode* po_in_rlist(Dlheader* sfi, void* f);
-extern Errcode pj_load_pocorex(Poco_lib** lib, const char* script_path, char* name, char* id_str,
-							   bool verbose);
-extern void pj_free_pocorexes(Poco_lib** libs);
-extern void format_poco_lib_error(Errcode err, const char* libname, const char* lib_path,
-								  const char* sys_error, int expected_version, int actual_version,
-								  int count, bool verbose);
-extern int po_findpoe(PocoVm* vm, char* libname, Lib_proto** plibreturn);
+/* The .poe loader lives in Poco core (poco/src/pocoload.c); Animator reaches
+ * it only through the public VM API, so no loader entry points are declared
+ * here. */
+extern int po_findpoe(PocoVm* vm, char* libname, const Lib_proto** plibreturn);
 extern Errcode po_poe_overtime(void* effect, void* data);
 extern Errcode po_poe_oversegment(void* effect, void* data);
 extern Errcode po_poe_overall(void* effect, void* data);
@@ -50,23 +55,21 @@ extern Poco_lib po_blit_lib;
 extern Poco_lib po_alt_lib;
 extern Poco_lib po_cel_lib;
 extern Poco_lib po_user_lib;
-extern Poco_lib po_str_lib;
-extern Poco_lib po_mem_lib;
-extern Poco_lib po_FILE_lib;
+extern const Poco_lib po_str_lib;
+extern const Poco_lib po_mem_lib;
+extern const Poco_lib po_FILE_lib;
 extern Poco_lib po_misc_lib;
 extern Poco_lib po_mode_lib;
 extern Poco_lib po_text_lib;
 extern Poco_lib po_time_lib;
 extern Poco_lib po_dos_lib;
-extern Poco_lib po_math_lib;
+extern const Poco_lib po_math_lib;
 extern Poco_lib po_optics_lib;
 extern Poco_lib po_globalv_lib;
 extern Poco_lib po_title_lib;
 extern Poco_lib po_tween_lib;
 extern Poco_lib po_flicplay_lib;
 extern Poco_lib po_picdrive_lib;
-
-extern Errcode builtin_err;
 
 /* ndef PUBLIC_CODE */ #endif
 
@@ -902,7 +905,7 @@ typedef struct porexlib {
 	void* (*pl_ppt2ptr)(Popot ppt);
 	Popot (*pl_ptr2ppt)(void* ptr, int bytes);
 	int (*pl_getmucolors)(Pixel** indicies, struct rgb3** lastrgbs, struct rgb3** idealrgbs);
-	int (*pl_findpoe)(PocoVm* vm, char* poename, Lib_proto** plibreturn);
+	int (*pl_findpoe)(PocoVm* vm, char* poename, const Lib_proto** plibreturn);
 	Errcode (*pl_overtime)(OTFunc* effect, void* data);
 	bool (*pl_checkabort)(void* data);
 	Errcode (*pl_oversegment)(OTFunc* effect, void* data);
@@ -962,7 +965,7 @@ typedef struct porexlib {
 	void* (*pl_ppt2ptr)(Popot ppt);
 	Popot (*pl_ptr2ppt)(void* ptr, int bytes);
 	int (*pl_getmucolors)(Pixel** indicies, struct rgb3** lastrgbs, struct rgb3** idealrgbs);
-	int (*pl_findpoe)(PocoVm* vm, char* poename, Lib_proto** plibreturn);
+	int (*pl_findpoe)(PocoVm* vm, char* poename, const Lib_proto** plibreturn);
 	Errcode (*pl_overtime)(OTFunc* effect, void* data);
 	bool (*pl_checkabort)(void* data);
 	Errcode (*pl_oversegment)(OTFunc* effect, void* data);

@@ -100,14 +100,17 @@ if (WITH_POCO)
 	# Build animhost first (needed by POE modules)
 	add_subdirectory(src/animhost)
 
-	# poco_core defaults to a static archive, but the Animator host still ships
-	# its own copy of the .poe loader entry points in src/pocorex.c
-	# (pj_load_pocorex, pj_free_pocorexes, format_poco_lib_error).  A static
-	# poco_core exposes the same symbols from poco/src/pocoload.c and the two
-	# collide at link time, so link Poco as a shared library for the host build.
-	# Downstream embedders keep the static default.
-	if (WITH_ANI)
-		set(POCO_BUILD_SHARED ON)
+	# Poco builds its test suite only when it is the top-level project.  This
+	# repository is Poco's home, so ask for it explicitly; foreign hosts that
+	# embed poco/ get a test-free configure.
+	set(POCO_BUILD_TESTS ON)
+
+	# The examples are off for every embedder by default.  This tree already
+	# built SDL3 above (thirdparty/sdl3), so opt in explicitly here rather than
+	# letting Poco infer consent from the presence of an SDL3::SDL3 target.
+	# Guarded so -DPOCO_BUILD_EXAMPLES=OFF on this tree's configure still wins.
+	if (NOT DEFINED POCO_BUILD_EXAMPLES)
+		set(POCO_BUILD_EXAMPLES ON)
 	endif()
 
 	# Add new standalone poco subproject
@@ -120,15 +123,24 @@ endif()
 
 
 ## main
-add_subdirectory(src)
+## Gated so -DWITH_ANI=0 really does switch Animator off.  src/CMakeLists.txt
+## adds all fourteen Animator static libraries at top level, so leaving this
+## ungated built the whole host even for a poco-only configure.
+if (WITH_ANI)
+	add_subdirectory(src)
+endif()
 
 ## POE modules (must come AFTER src so native .poe installs are not
-## overwritten by the src/resource directory copy)
+## overwritten by the src/resource directory copy).  The loader fixtures
+## inside build without Animator; the Ani-native modules are gated on
+## WITH_ANI in src/poekit/CMakeLists.txt.
 if (WITH_POCO)
-	add_subdirectory(poco/poekit)
+	add_subdirectory(src/poekit)
 endif()
 
 ## tests
-if (APPLE)
+## These link Animator's static libraries (trdfile, gfxlib, trdutil), so they
+## exist only when Animator does.
+if (APPLE AND WITH_ANI)
 	add_subdirectory(tests)
 endif()

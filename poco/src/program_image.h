@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "poco/poco.h"
+#include <poco/poco.h>
 
 typedef enum PoProgramImageStatus {
 	PO_PROGRAM_IMAGE_OK = 0,

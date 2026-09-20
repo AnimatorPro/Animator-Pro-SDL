@@ -46,8 +46,12 @@
  *				OP_xPUSH, we'd glitch out completely; so now we don't try.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <string.h>
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "trace.h"
+#include "postring.h"
 
 #define EXPANDCBUF 2 /* Make code buffer 2 times larger on re-alloc */
 

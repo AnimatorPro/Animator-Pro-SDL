@@ -1,11 +1,15 @@
+# No default: Poco does not vendor SDL3 and must not reach outside its own
+# tree to find one.  The caller either provides an SDL3::SDL3 target or points
+# this at an SDL3 source tree.
 set(POCO_SDL3_SOURCE_DIR
-    "${CMAKE_CURRENT_LIST_DIR}/../../../thirdparty/sdl3"
+    ""
     CACHE PATH
     "Path to the SDL3 source tree used by Poco examples"
 )
 
 if(NOT TARGET SDL3::SDL3)
-    if(NOT EXISTS "${POCO_SDL3_SOURCE_DIR}/CMakeLists.txt")
+    if(POCO_SDL3_SOURCE_DIR STREQUAL ""
+       OR NOT EXISTS "${POCO_SDL3_SOURCE_DIR}/CMakeLists.txt")
         message(FATAL_ERROR
             "POCO_BUILD_EXAMPLES requires SDL3. Set POCO_SDL3_SOURCE_DIR to "
             "an SDL3 source tree, or provide an SDL3::SDL3 target before "

@@ -6,7 +6,7 @@
 #include <termios.h>
 #include <stdio.h>
 
-#include "poco.h"
+#include "poco_internal.h"
 
 static struct termios old, new;
 

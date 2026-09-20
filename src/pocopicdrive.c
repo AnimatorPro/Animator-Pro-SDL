@@ -15,11 +15,12 @@
 #include "filepath.h"
 #include "picdrive.h"
 #include "pocolib.h"
-#include "pocoface.h"
 
 #include <string.h>
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 /*----------------------------------------------------------------------------
  * module-level state (mirrors the old pdracces.c static data)
@@ -262,7 +263,7 @@ extern Errcode po_pack_colortable(int* source, int source_count, int* dest, int 
  * library protos — these become built-in Poco functions
  *--------------------------------------------------------------------------*/
 
-static Lib_proto po_picdrive_protos[] = {
+static const Lib_proto po_picdrive_protos[] = {
 	{po_pic_driver_clear, "void    PicDriverUnload(void);"},
 	{po_pic_driver_set, "Errcode PicDriverSet(char *pdrname);"},
 	{po_pic_driver_detect, "Errcode PicDriverDetect(char *picpath);"},

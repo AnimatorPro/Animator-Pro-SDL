@@ -6,7 +6,6 @@
 
 #include "jimk.h"
 #include "errcodes.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "options.h"
 #include "util.h"
@@ -14,7 +13,9 @@
 #include "inks.h"
 #include "brush.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 extern void set_ccycle(bool newcyc);
 
@@ -410,6 +411,6 @@ PolibMode po_libmode = {
 Poco_lib po_mode_lib = {
 	NULL,
 	"Graphics Modes",
-	(Lib_proto*)&po_libmode,
+	(const Lib_proto*)&po_libmode,
 	POLIB_MODE_SIZE,
 };

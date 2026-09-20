@@ -26,11 +26,20 @@ endfunction()
 require_absent_path("${POCO_SOURCE_DIR}/src/dummylib.c")
 foreach(source
     "${POCO_SOURCE_DIR}/CMakeLists.txt"
-    "${POCO_SOURCE_DIR}/src/main.c"
-    "${POCO_SOURCE_DIR}/src/POCO.LNK"
-    "${POCO_SOURCE_DIR}/src/POCFILES.INC")
+    "${POCO_SOURCE_DIR}/src/main.c")
     require_absent_literal("${source}" "dummylib")
     require_absent_literal("${source}" "po_dummy_lib")
+endforeach()
+
+# The DOS-era link scripts that used to carry the dummy binding catalog are
+# gone along with the rest of the MS-DOS build; they must not come back.
+foreach(dos_artifact
+    "${POCO_SOURCE_DIR}/src/POCO.LNK"
+    "${POCO_SOURCE_DIR}/src/POCO.OBS"
+    "${POCO_SOURCE_DIR}/src/POCFILES.INC")
+    if(EXISTS "${dos_artifact}")
+        message(FATAL_ERROR "Obsolete DOS build script remains: ${dos_artifact}")
+    endif()
 endforeach()
 
 execute_process(

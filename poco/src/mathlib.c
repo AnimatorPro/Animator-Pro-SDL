@@ -1,3 +1,8 @@
+/*******************************************************************************
+ * mathlib.c - Native math bindings.
+ * The pointer-free part of the ANSI math library, plus the errno/signal
+ * trapping that turns a domain or range error into a Poco runtime error.
+ ******************************************************************************/
 
 #include "pocolib.h"
 #include <math.h>
@@ -5,10 +10,10 @@
 #include "poco_errcodes.h"
 #include "ptrmacro.h"
 #include "standard_library.h"
+#include "mathlib.h"
 
-extern Errcode builtin_err;
 
-static Lib_proto mathlib[] = {
+static const Lib_proto mathlib[] = {
 	/* Most of the ansi math library (not bits that use pointers) */
 	{acos, "double  acos(double x);"},
 	{asin, "double  asin(double x);"},
@@ -75,7 +80,7 @@ static const PocoBinding standard_math_bindings[] = {
 //	  return(1);
 //}
 
-Poco_lib po_math_lib = {
+const Poco_lib po_math_lib = {
 	NULL,
 	"(C Standard) Math",
 	mathlib,

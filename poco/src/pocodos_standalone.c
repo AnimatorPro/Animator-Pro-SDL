@@ -13,7 +13,7 @@
 #include "pocolib.h"
 #include "path_operations.h"
 
-Poco_lib po_dos_standalone_lib = {
+const Poco_lib po_dos_standalone_lib = {
 	NULL,
 	"DOS",
 	poco_path_legacy_bindings,

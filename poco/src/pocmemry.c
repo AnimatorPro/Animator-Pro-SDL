@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- * pocomemry.c - Memory management routines for compile-time phase of poco.
+ * pocmemry.c - Memory management routines for compile-time phase of poco.
  *
  * MAINTENANCE
  *	08/27/90	(Ian)
@@ -12,8 +12,9 @@
  *				(for, if, while, do) are using it now.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <string.h>
+#include "pocmemry.h"
 
 /*----------------------------------------------------------------------------
  * Tweakable defines...
@@ -216,15 +217,6 @@ void po_freemem(void* pt)
 			pc->cookie_val = MBLK_FREED;
 			break;
 
-#ifdef DEVELOPEMENT
-
-		case MBLK_FREED:
-			fprintf(stdout, "\npoc_freemem: freeing memory twice!!!\n");
-			break;
-		default:
-			fprintf(stdout, "\npoc_freemem: unknown magic cookie!!!\n");
-			break;
-#endif
 	}
 }
 

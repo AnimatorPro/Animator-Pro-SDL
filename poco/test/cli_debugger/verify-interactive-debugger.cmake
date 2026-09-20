@@ -4,6 +4,10 @@ if(NOT DEFINED POCO_EXECUTABLE OR NOT DEFINED POCO_SOURCE OR
 endif()
 
 file(MAKE_DIRECTORY "${POCO_FIXTURE_DIR}")
+# The debugger reports resolved paths, so compare against a resolved fixture
+# directory: a build tree under a symlink (/tmp -> /private/tmp) otherwise
+# fails every "Stopped at <file>:" match.
+get_filename_component(POCO_FIXTURE_DIR "${POCO_FIXTURE_DIR}" REALPATH)
 set(source_copy "${POCO_FIXTURE_DIR}/interactive_debugger.poc")
 set(binary "${POCO_FIXTURE_DIR}/interactive_debugger.pex")
 file(COPY_FILE "${POCO_SOURCE}" "${source_copy}" ONLY_IF_DIFFERENT)

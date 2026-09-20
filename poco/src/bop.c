@@ -24,7 +24,11 @@
  *				Added code generation for pointer difference.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
+#include "code.h"
+#include "fold.h"
+#include "pocotype.h"
+#include "postring.h"
 
 #define PREC_COUNT 11 /* This needs to be big enough to hold one for each */
 					  /* level of precedence, plus one */
@@ -61,11 +65,11 @@ static SHORT enforce_simple(Poco_cb* pcb, Type_info* ti)
 
 typedef struct bop_info {
 	SHORT precedence;
-	Op_type* ido_ops;
+	const Op_type* ido_ops;
 	SHORT (*enforcer)(Poco_cb* pcb, Type_info* ti); /*  type enforcer */
 } Bop_info;
 
-static Bop_info bi_table[] = {
+static const Bop_info bi_table[] = {
 	{0, NULL, NULL},
 	{10, po_mul_ops, po_force_num_exp},
 	{10, po_div_ops, po_force_num_exp},
@@ -141,9 +145,9 @@ void po_get_binop_expression(Poco_cb* pcb, Exp_frame* e)
 {
 	PO_CHECK_ABORT_VOID(pcb);
 	Exp_frame *exp_buf[PREC_COUNT], **exp_stack;
-	Bop_info *bop_buf[PREC_COUNT], **bop_stack;
+	const Bop_info *bop_buf[PREC_COUNT], **bop_stack;
 	Exp_frame *exp0, *exp1;
-	Bop_info* bi;
+	const Bop_info* bi;
 	int stack_size;
 	SHORT dot0, /* ido_types of binary components */
 		dot1;

@@ -16,9 +16,10 @@
 #include "errcodes.h"
 #include "cmap.h"
 #include "pocolib.h"
-#include "pocoface.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern int closestc(const Rgb3* rgb, const Rgb3* cmap, int count);
 extern int color_dif(const Rgb3* c1, const Rgb3* c2);
 

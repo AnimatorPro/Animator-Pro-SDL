@@ -1,9 +1,11 @@
 #include "jimk.h"
 #include "errcodes.h"
-#include "pocoface.h"
 #include "pocolib.h"
 
 #include "alt.h"
+
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
 
 /*****************************************************************************
  * Boolean SwapExists(void);
@@ -70,6 +72,6 @@ PolibSwap po_libswap = {
 Poco_lib po_alt_lib = {
 	NULL,
 	"Swap Screen",
-	(Lib_proto*)&po_libswap,
+	(const Lib_proto*)&po_libswap,
 	POLIB_SWAP_SIZE,
 };

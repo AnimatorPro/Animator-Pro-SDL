@@ -2,9 +2,11 @@
 #include "errcodes.h"
 #include "ptrmacro.h"
 #include "flicel.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "render.h"
+
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
 
 extern Flicel* thecel;
 extern Errcode cel_from_rect(Rectangle* rect, bool render_only);
@@ -283,6 +285,6 @@ PolibCel po_libcel = {
 Poco_lib po_cel_lib = {
 	NULL,
 	"Cel",
-	(Lib_proto*)&po_libcel,
+	(const Lib_proto*)&po_libcel,
 	POLIB_CEL_SIZE,
 };

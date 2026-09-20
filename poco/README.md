@@ -4,28 +4,31 @@ Poco is a standalone C embedding library.  An external host needs one public
 header, `<poco/poco.h>`, and one CMake target, `Poco::poco`; it never needs an
 Animator header, target, or private Poco dependency.  The complete embedding
 and Animator-maintainer migration guide is in
-[`docs/poco-embedding.md`](../docs/poco-embedding.md).
+[`docs/poco-embedding.md`](docs/poco-embedding.md).
 
 ## Build and install
 
-Build Poco by itself from this directory, or select it from the Animator root:
+Poco is a self-contained CMake project.  Build and install it from this
+directory with any generator:
 
 ```sh
-cmake -S poco -B build/poco -G Ninja
-cmake --build build/poco
-cmake --install build/poco --prefix /opt/poco
+cmake -S . -B build -G Ninja
+cmake --build build
+cmake --install build --prefix /opt/poco
 ```
 
-```sh
-pixi run cmake -B _build -S . -G Ninja -DWITH_ANI=OFF -DWITH_POCO=ON
-pixi run cmake --build _build --target install
-```
+Useful options:
 
-The distribution is a bundled shared Poco library (`libpoco` on Unix/macOS)
-plus the `poco` CLI.  Poco links its vendored libffi and hashmap implementation
-targets privately, and exports neither target nor their headers.  `Poco::poco`
-is deliberately the only consumer-facing target; no supported install provides
-a manually linked or merged static Poco archive.
+| Option | Default | Effect |
+|---|---|---|
+| `POCO_BUILD_SHARED` | `OFF` | Build `poco_core` as a shared library instead of a static archive |
+| `POCO_BUILD_TESTS` | ON when Poco is the top-level project | Build the Poco test suite |
+| `POCO_BUILD_EXAMPLES` | `OFF` | Build the SDL3 examples under `examples/` |
+
+The distribution is one Poco library plus the `poco` CLI.  Poco links its
+vendored libffi, hashmap, and blake3 targets privately and exports neither
+those targets nor their headers, so `Poco::poco` is deliberately the only
+consumer-facing target.
 
 ## Embed a host
 
@@ -269,11 +272,12 @@ calls while they migrate to `PocoModuleDescriptor`; new modules must not use
 
 ## Compatibility status
 
-`pocoface.h`, `pocolib.h`, `pocorex.h`, `compile_poco()`, `run_poco()`,
-`free_poco()`, `Poco_lib`, and `Pocorex` are retained only for current Animator
-and legacy-POE source compatibility.  They are not an alternate embedding API.
-`poco_cont_ops()` and the old dummy binding catalog are already removed; a
+`pocolib.h`, `pocorex.h`, `Poco_lib`, and `Pocorex` are retained only for
+current Animator and legacy-POE source compatibility.  They are not an
+alternate embedding API.  `compile_poco()`, `run_poco()`, `free_poco()`,
+`pocoface.h` as a host-facing header, and `poco_cont_ops()` together with the
+old dummy binding catalog are already removed; a
 standalone host must register a real binding or receive an undefined-API
 diagnostic.  See the migration table in
-[`docs/poco-embedding.md`](../docs/poco-embedding.md) for each compatibility
+[`docs/poco-embedding.md`](docs/poco-embedding.md) for each compatibility
 layer, its replacement, and the condition for removing it.

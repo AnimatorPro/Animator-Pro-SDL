@@ -1,18 +1,14 @@
 /*
- * Compatibility-only legacy compiler API.
+ * Poco-internal compiler/runtime declarations.
  *
- * Deprecated for new hosts: use <poco/poco.h> and the PocoVm/PocoProgram
- * lifecycle.  compile_poco(), run_poco(), and free_poco() preserve the
- * existing ABI solely for Animator and legacy callers during migration.
+ * External hosts must use <poco/poco.h> and the PocoVm/PocoProgram lifecycle.
+ * The legacy compile_poco()/run_poco()/free_poco() entry points have been
+ * removed; nothing outside poco/src should include this header.
  */
 #ifndef POCOFACE_H
 #define POCOFACE_H
 
-#ifndef POCO_LEGACY_NAMES_TYPE
-#include "commonst.h"
-#define POCO_LEGACY_NAMES_TYPE Names
-#define POCO_UNDEF_LEGACY_NAMES_TYPE
-#endif
+#include "poco_names.h"
 #ifndef POCOLIB_H
 #include "pocolib.h"
 #endif
@@ -22,31 +18,11 @@
 #define POCO_STACKSIZE_MAX (256 * 1024L)
 #define POCO_STACKSIZE_DEFAULT (64 * 1024L) /* default poco runtime stacksize */
 
-extern int po_version_number; /* added 10/30/90, poco's version number */
+extern const int po_version_number; /* added 10/30/90, poco's version number */
 
-Errcode compile_poco(void** ppev,       /* returns executable pexe on Success */
-					 char* source_name, /* name of source file */
-					 char* errors,      /* error file or NULL for stderr */
-					 char* dump_name,   /* disassembly file or NULL for none */
-					 /* for built-in function library */
-					 Poco_lib* lib,
-					 /* stuff for location of 1'st error */
-					 char* err_fname, /* file where error detected */
-					 long* err_line,  /* line where error detected */
-					 int* err_char,   /* character in line where err detected */
-					 POCO_LEGACY_NAMES_TYPE* include_dirs, /* include search path */
-					 bool verbose                          /* enable verbose debug output */
-);
-/* Compile poco function.  Leave error messages in a file named errors.
-   Otherwise build up executable structure in *ppev */
-
-Errcode run_poco(void** ppev, /* value from compile_poco */
-				 char* trace_name, bool (*check_abort)(void*), void* check_abort_data,
-				 long* err_line);
-/* run_poco:  execute *ppev starting at main() */
-
-void free_poco(void** ppev);
-/* free_poco: free up ppev returned by compile_poco and set *pev to NULL */
+void po_free_executable(void** ppev);
+/* po_free_executable: free up the executable returned by the
+   compile_poco_*_with_vm family and set *ppev to NULL */
 
 /* Internal main/named-entry execution path.  This deliberately does not run
  * the program's global initializer or clear its data segment. */
@@ -74,9 +50,47 @@ char* po_fuf_name(void* fuf);
  * whose numeric value differs between the two errcodes.h files. */
 #define POCO_ERR_IN_ERR_FILE (-11)
 
-#ifdef POCO_UNDEF_LEGACY_NAMES_TYPE
-#undef POCO_UNDEF_LEGACY_NAMES_TYPE
-#undef POCO_LEGACY_NAMES_TYPE
-#endif
+/*----------------------------------------------------------------------------
+ * VM-scoped diagnostics (vm_diagnostics.c), the library prototype feed
+ * (libproto.c) and the compile entry points (compile_driver.c).
+ *
+ * Two of these take the compiler control block and one returns the pointer
+ * registry.  Both are named by struct tag rather than by typedef so that this
+ * header stays independent of poco_internal.h: test and host translation units
+ * include pocoface.h without libffi on their include path.
+ *--------------------------------------------------------------------------*/
+
+struct poco_cb;
+struct poco_pointer_registry;
+
+void poco_set_error(PocoVm* vm, const char* fmt, ...);
+Errcode* poco_vm_builtin_error(PocoVm* vm);
+char* poco_vm_errtext_buffer(PocoVm* vm);
+Errcode* poco_active_builtin_error(void);
+PocoVm* poco_active_vm(void);
+PocoVm* poco_push_active_vm(PocoVm* vm);
+void poco_pop_active_vm(PocoVm* previous);
+Errcode print_pocolib(char* filename, Poco_lib* lib);
+Poco_lib* po_open_library(struct poco_cb* pcb, char* libname, char* id_str);
+char* po_get_libproto_line(struct poco_cb* pcb);
+Errcode compile_poco_with_vm(PocoVm* vm, void** ppexe, char* source_name, char* errors,
+							 char* dump_name, Poco_lib* lib, char* err_file, long* err_line,
+							 int* err_char, Names* include_dirs, bool verbose);
+Errcode compile_poco_buffer_with_vm(PocoVm* vm, void** ppexe, char* source_name,
+									const char* physical_source_path, const char* source,
+									size_t source_length, char* dump_name, Poco_lib* lib,
+									char* err_file, size_t err_file_capacity, long* err_line,
+									int* err_char, Names* include_dirs, bool verbose);
+Errcode compile_poco_files_with_vm(PocoVm* vm, void** ppexe, const char* const* source_names,
+								   const char* const* physical_source_paths,
+								   const char* const* sources, const size_t* source_lengths,
+								   Names* const* include_dirs, const size_t* const* use_indices,
+								   const size_t* use_counts, size_t source_count, Poco_lib* lib,
+								   char* err_file, size_t err_file_capacity, long* err_line,
+								   int* err_char, bool verbose);
+Poco_lib* poco_active_library(PocoVm* vm, const char* identity);
+struct poco_pointer_registry* poco_active_pointer_registry(PocoVm* vm);
+const PocoModuleHooks* poco_vm_module_hooks(PocoVm* vm);
+Errcode po_file_to_stdout(char* name);
 
 #endif /* POCOFACE_H */

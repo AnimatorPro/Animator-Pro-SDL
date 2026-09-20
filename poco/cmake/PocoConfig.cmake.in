@@ -1,6 +1,35 @@
 @PACKAGE_INIT@
 
+# Poco's linkage is fixed when the package is built, not when it is consumed.
+set(Poco_SHARED @POCO_BUILD_SHARED@)
+
 include("${CMAKE_CURRENT_LIST_DIR}/PocoTargets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PocoModule.cmake")
+
+if(NOT Poco_SHARED)
+    # libpoco.a carries no libffi/hashmap/blake3 objects, so the install ships
+    # those archives in a private subdirectory and they are appended behind
+    # Poco::poco here.  They stay an implementation detail: a consumer names
+    # only Poco::poco and must not reference these paths.
+    set_and_check(_poco_private_libdir "@PACKAGE_POCO_PRIVATE_LIBDIR@")
+    set(_poco_private_libs "")
+    foreach(_poco_private_name IN ITEMS poco_ffi poco_hashmap poco_blake3)
+        set(_poco_private_path
+            "${_poco_private_libdir}/${CMAKE_STATIC_LIBRARY_PREFIX}${_poco_private_name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        if(NOT EXISTS "${_poco_private_path}")
+            set(Poco_FOUND FALSE)
+            set(Poco_NOT_FOUND_MESSAGE
+                "Static Poco install is incomplete: missing private dependency archive ${_poco_private_path}")
+            return()
+        endif()
+        list(APPEND _poco_private_libs "${_poco_private_path}")
+    endforeach()
+    set_property(TARGET Poco::poco APPEND PROPERTY
+        INTERFACE_LINK_LIBRARIES ${_poco_private_libs})
+    unset(_poco_private_name)
+    unset(_poco_private_path)
+    unset(_poco_private_libs)
+    unset(_poco_private_libdir)
+endif()
 
 check_required_components(Poco)

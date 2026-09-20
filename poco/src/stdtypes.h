@@ -2,26 +2,25 @@
 #define POCO_STDTYPES_H
 
 /*
-	Unfortunately, there're two copies of an "stdtypes.h" file
-	in the project.  This is likely related to the splitting
-	of the poco library from the main project; it can be fixed
-	a a later date by converting all these defines into regular
-	C standard types, using stdint.h and stdbool.h.
+	Poco's DOS-era scalar spellings.  The four that cross the legacy ABI
+	boundary (BYTE, UBYTE, SHORT, USHORT) are owned by
+	<poco/poco_legacy_types.h> and shared with Animator; the rest are private
+	to Poco and defined here.
+
+	This file used to skip its typedefs whenever the consumer's STDTYPES_H was
+	already defined, which made the meaning of ULONG depend on include order.
+	It no longer does: no Animator header reaches into poco/src, and LONG and
+	ULONG are gone.  Poco spelled them long/unsigned long and Animator spells
+	them int32_t/uint32_t, and nothing needed either one - write the C type,
+	or a fixed-width type from <stdint.h>, directly.
 */
 
-
-/* If the main project's stdtypes has already been included, avoid redefining. */
-#ifndef STDTYPES_H
 #include <stddef.h>
 
-typedef unsigned char UBYTE;
-typedef signed char BYTE;
-typedef unsigned short USHORT;
-typedef short SHORT;
+#include <poco/poco_legacy_types.h>
+
 typedef unsigned int UINT;
 typedef int INT;
-typedef unsigned long ULONG;
-typedef long LONG;
 typedef int Boolean;
 
 #ifndef true
@@ -30,7 +29,5 @@ typedef int Boolean;
 #ifndef false
 #define false 0
 #endif
-
-#endif /* STDTYPES_H */
 
 #endif /* POCO_STDTYPES_H */

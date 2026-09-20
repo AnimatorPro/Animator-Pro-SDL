@@ -3,8 +3,9 @@
 # Build an in-tree native Poco module that depends only on Poco and on
 # dependencies explicitly supplied by its caller.  This helper is not
 # installed as an external-package API; external generic modules use
-# poco_add_module().  Animator-native modules use the separate helper owned by
-# src/ani_poco, never this helper plus implicit Animator dependencies.
+# poco_add_module().  A host whose modules link against the host's own
+# libraries supplies its own helper in the host tree, rather than extending
+# this one with implicit host dependencies.
 #
 # Usage:
 #   add_poe_library(name
@@ -12,22 +13,30 @@
 #       [INCLUDES include-dir ...]
 #       [DEPS dependency-target ...]
 #       [OUTPUT_NAME module-file-name]
+#       [NO_INSTALL]
 #       [INSTALL_DIR destination]
-#       [RPATH path]
-#       [TEST_FILE script.poc]
-#       [SCRIPTS script.poc ...]
-#       [RUNNER poco])
+#       [RPATH path])
+#
+# Test deployment is deliberately absent: where a module's scripts are
+# installed and which interpreter runs them is the embedding host's layout
+# decision, not Poco's.  Register those tests beside the module that needs
+# them.
 
 include(CMakeParseArguments)
 
 function(add_poe_library TARGET)
     cmake_parse_arguments(
         POE
-        ""
-        "INSTALL_DIR;OUTPUT_NAME;RPATH;TEST_FILE;RUNNER"
-        "SOURCES;INCLUDES;DEPS;SCRIPTS"
+        "NO_INSTALL"
+        "INSTALL_DIR;OUTPUT_NAME;RPATH"
+        "SOURCES;INCLUDES;DEPS"
         ${ARGN}
     )
+
+    if(POE_NO_INSTALL AND POE_INSTALL_DIR)
+        message(FATAL_ERROR
+            "add_poe_library(${TARGET}): NO_INSTALL and INSTALL_DIR are mutually exclusive")
+    endif()
 
     if(NOT POE_SOURCES)
         message(FATAL_ERROR "add_poe_library(${TARGET}): SOURCES is required")
@@ -70,36 +79,12 @@ function(add_poe_library TARGET)
         )
     endif()
 
-    if(NOT POE_INSTALL_DIR)
-        set(POE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/poco")
-    endif()
-    install(TARGETS ${TARGET} DESTINATION "${POE_INSTALL_DIR}")
-
-    if(POE_TEST_FILE)
-        install(TARGETS ${TARGET} DESTINATION "${CMAKE_INSTALL_PREFIX}/tests")
-    endif()
-    foreach(script IN LISTS POE_SCRIPTS)
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${script}"
-            DESTINATION "${CMAKE_INSTALL_PREFIX}/tests")
-    endforeach()
-
-    if(POE_TEST_FILE)
-        get_filename_component(_test_filename "${POE_TEST_FILE}" NAME)
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${POE_TEST_FILE}"
-            DESTINATION "${CMAKE_INSTALL_PREFIX}/tests")
-        if(NOT POE_RUNNER)
-            set(POE_RUNNER "poco")
+    # Loader fixtures exist only to be dlopen()ed out of the build tree, so
+    # they are never part of an installed package.
+    if(NOT POE_NO_INSTALL)
+        if(NOT POE_INSTALL_DIR)
+            set(POE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/poco")
         endif()
-        if(POE_RUNNER STREQUAL "poco")
-            add_test(
-                NAME "poco_${TARGET}"
-                COMMAND ${CMAKE_INSTALL_PREFIX}/poco
-                    ${CMAKE_INSTALL_PREFIX}/tests/${_test_filename}
-                WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-            )
-        else()
-            message(FATAL_ERROR
-                "add_poe_library(${TARGET}): RUNNER '${POE_RUNNER}' is not available to generic modules")
-        endif()
+        install(TARGETS ${TARGET} DESTINATION "${POE_INSTALL_DIR}")
     endif()
 endfunction()

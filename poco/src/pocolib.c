@@ -9,7 +9,7 @@
  ****************************************************************************/
 
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "poco_errcodes.h"
 #include "ptrmacro.h"
 #include "pocolib.h"
@@ -122,7 +122,7 @@ POCO_STANDALONE_FALLBACK size_t get_errtext(Errcode err, char* buf)
 	return strlen(buf);
 }
 
-Popot empty_popot = {NULL, NULL, NULL};
+const Popot empty_popot = {NULL, NULL, NULL};
 
 Errcode po_init_libs(Poco_lib* lib)
 /*****************************************************************************

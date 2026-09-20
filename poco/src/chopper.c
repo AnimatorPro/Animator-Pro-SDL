@@ -24,9 +24,10 @@
  *				the continue statement in the read loop.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <ctype.h>
 #include <string.h>
+#include "chopper.h"
 
 /*****************************************************************************
  * is_all_white - Decide whether string is all whitespace.
@@ -71,13 +72,13 @@ static char* po_read_source_line(File_stack* source, char* buffer, int buffer_si
  ****************************************************************************/
 char* po_get_csource_line(Poco_cb* pcb)
 {
-	bool splice = false;                /* Are we splicing lines?		*/
-	bool mlcomment = false;             /* Are we doing ml comment? 	*/
-	int buflen = SZTOKE - 1;            /* Max logical line size.		*/
-	int icount = 0;                     /* Significant character counter*/
-	Token* t = &pcb->t;                 /* -> Token struct in pcb		*/
+	bool splice = false;     /* Are we splicing lines?		*/
+	bool mlcomment = false;  /* Are we doing ml comment? 	*/
+	int buflen = SZTOKE - 1; /* Max logical line size.		*/
+	int icount = 0;          /* Significant character counter*/
+	PreprocessorState* t = &pcb->t;
 	File_stack* fstack = t->file_stack; /* -> File_stack struct in pcb	*/
-	char* lbuf = t->line_b1;            /* -> Line buffer in Token		*/
+	char* lbuf = t->line_b1;            /* -> Line buffer in pp state  */
 	char* buf = lbuf;                   /* -> Cur I/O location in buf	*/
 	char* subbuf;                       /* -> Cur scan location in buf	*/
 	char* endcomment;                   /* -> End of inline comment 	*/

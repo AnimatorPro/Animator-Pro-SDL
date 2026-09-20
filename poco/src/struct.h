@@ -1,13 +1,13 @@
+/*
+ * struct.c - struct, union and enum declaration parsing.
+ */
+#ifndef POCO_STRUCT_H
+#define POCO_STRUCT_H
 
-/*****************************************************************************
- *
- * 08/19/90 - This file eliminated, all protos now in poco.h.  (Ian)
- *
- ****************************************************************************/
+#include "poco_internal.h"
 
-#ifndef STRUCT_H
-#define STRUCT_H
+void po_free_sif_list(Struct_info** psif);
+void po_move_sifs_to_parent(Poco_cb* pcb);
+Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf, SHORT ttype);
 
-Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf);
-
-#endif /* STRUCT_H */
+#endif /* POCO_STRUCT_H */

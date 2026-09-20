@@ -25,33 +25,28 @@ so its native functions are available while Poco resolves the script.
 
 ## Building
 
-In the full Animator Pro tree, SDL3 already exists and the Snake target is
-enabled automatically:
+The example needs SDL3 and is opt-in. Enable `POCO_BUILD_EXAMPLES` on a Poco
+configure and build the `snake` target:
 
 ```sh
-pixi run build
-cmake --build _build --target snake
-```
-
-For a Poco-only source build from the repository, explicitly enable examples.
-The example will add the vendored `thirdparty/sdl3` tree because no SDL target
-has been provided:
-
-```sh
-pixi run cmake -S poco -B _build-poco-examples \
+cmake -S <poco-dir> -B build-examples \
   -DPOCO_BUILD_EXAMPLES=ON \
   -DCMAKE_C_FLAGS=-Wno-incompatible-pointer-types
-pixi run cmake --build _build-poco-examples --target snake
+cmake --build build-examples --target snake
 ```
 
-The compatibility flag is required by the repository's Pixi Clang toolchain
-for retained legacy Poco pointer signatures; the full-tree configure applies
-the same compatibility setting.
+The compatibility flag suppresses warnings from retained legacy Poco pointer
+signatures under Clang; a host tree that already builds Poco normally applies
+the same setting.
 
-`POCO_SDL3_SOURCE_DIR` can point at a different SDL3 source tree. Embedders that
-already define `SDL3::SDL3` can add Poco without adding SDL a second time. A
-normal standalone Poco configure leaves `POCO_BUILD_EXAMPLES` off, so Poco's
-no-SDL build and test suite are unchanged.
+If the enclosing project already defines an `SDL3::SDL3` target, the example
+uses it and does not add SDL a second time. Otherwise it adds an SDL3 source
+tree: set `POCO_SDL3_SOURCE_DIR` to that tree. It has no default -- Poco does
+not vendor SDL3 and does not reach outside its own tree for one -- so the
+configure fails with an explicit message when neither an `SDL3::SDL3` target
+nor `POCO_SDL3_SOURCE_DIR` is available. `POCO_BUILD_EXAMPLES` is off by
+default for every caller, including hosts that already define `SDL3::SDL3`, so
+the library build and test suite stay dependency-free.
 
 Run `snake` without arguments to use the source-tree `snake.poc`, or pass a
 different script path as the first argument.

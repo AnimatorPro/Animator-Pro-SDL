@@ -76,19 +76,19 @@ static int run_program(PocoProgram* program, int32_t expected, size_t expected_n
 		return 0;
 	}
 	activation = (struct PocoActivation*)public_activation;
-	ok &= check(activation->ffi_fixed_call_prep_count == 0 &&
-					activation->ffi_variadic_call_prep_count == 0 &&
-					activation->ffi_per_call_allocation_count == 0 &&
-					activation->ffi_fixed_call_cache_hit_count == 0,
+	ok &= check(activation->ffi.fixed_call_prep_count == 0 &&
+					activation->ffi.variadic_call_prep_count == 0 &&
+					activation->ffi.per_call_allocation_count == 0 &&
+					activation->ffi.fixed_call_cache_hit_count == 0,
 				"new activation counters were not clear");
 	status = poco_activation_run(public_activation, NULL, &result);
 	ok &= check(status == POCO_STATUS_OK && result == expected, "native call result changed");
 	if (expect_variadic_work) {
-		ok &= check(activation->ffi_variadic_call_prep_count == expected_native_calls,
+		ok &= check(activation->ffi.variadic_call_prep_count == expected_native_calls,
 					"variadic call did not prepare its cif per call");
-		ok &= check(activation->ffi_per_call_allocation_count == expected_native_calls,
+		ok &= check(activation->ffi.per_call_allocation_count == expected_native_calls,
 					"variadic call did not allocate its per-call buffers");
-		ok &= check(activation->ffi_fixed_call_cache_hit_count == 0,
+		ok &= check(activation->ffi.fixed_call_cache_hit_count == 0,
 					"variadic call took the fixed cache path");
 	} else {
 		/*
@@ -97,13 +97,13 @@ static int run_program(PocoProgram* program, int32_t expected, size_t expected_n
 		 * preparation or heap allocation. A regression to per-call preparation
 		 * or allocation moves these counts off their expected values.
 		 */
-		ok &= check(activation->ffi_fixed_call_cache_hit_count == expected_native_calls,
+		ok &= check(activation->ffi.fixed_call_cache_hit_count == expected_native_calls,
 					"fixed calls did not reuse the cached cif and buffers");
-		ok &= check(activation->ffi_fixed_call_prep_count == 0,
+		ok &= check(activation->ffi.fixed_call_prep_count == 0,
 					"fixed call prepared a cif during execution");
-		ok &= check(activation->ffi_variadic_call_prep_count == 0,
+		ok &= check(activation->ffi.variadic_call_prep_count == 0,
 					"fixed call entered the variadic prep path");
-		ok &= check(activation->ffi_per_call_allocation_count == 0,
+		ok &= check(activation->ffi.per_call_allocation_count == 0,
 					"fixed call allocated per-call buffers");
 	}
 	poco_activation_release(public_activation);

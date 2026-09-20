@@ -1,0 +1,18 @@
+/* Repeatedly round-trips this run's tag through the builtin status slot.
+ * Returns the number of times the slot came back holding someone else's tag,
+ * so a process-global slot shows up as a non-zero result. */
+main()
+{
+	int i;
+	int tag;
+	int mismatches;
+
+	tag = ani_tag();
+	mismatches = 0;
+	for (i = 0; i < 2000; ++i) {
+		if (ani_stamp(tag) != tag) {
+			mismatches += 1;
+		}
+	}
+	return mismatches;
+}

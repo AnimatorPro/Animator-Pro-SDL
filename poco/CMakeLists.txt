@@ -2,9 +2,28 @@ cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
 project(Poco VERSION 2.0.0 LANGUAGES C)
 
-include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+
+# An embedding host that does add_subdirectory(poco) has no use for Poco's own
+# test tree: it brings ~50 extra targets, ~150 ctest registrations, a hard
+# Threads dependency and CTest's Experimental/Nightly machinery.  Build the
+# suite only when Poco is the top-level project, or when a host asks for it.
+if(DEFINED PROJECT_IS_TOP_LEVEL)
+    set(_poco_is_top_level ${PROJECT_IS_TOP_LEVEL})
+elseif(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_poco_is_top_level ON)
+else()
+    set(_poco_is_top_level OFF)
+endif()
+option(POCO_BUILD_TESTS "Build the Poco test suite" ${_poco_is_top_level})
+
+# The `poco` command-line interpreter is Poco's own deliverable, not part of
+# the embedding contract.  A host that does add_subdirectory(poco) and then
+# `cmake --install` should not find a stray interpreter in its install tree,
+# so ship it only when Poco is the top-level project or a host asks for it.
+option(POCO_INSTALL_CLI "Install the poco command-line interpreter" ${_poco_is_top_level})
+unset(_poco_is_top_level)
 
 # This end-to-end gate copies, builds, installs, and tests Poco independently,
 # so keep it opt-in for normal project test runs.
@@ -13,24 +32,28 @@ option(POCO_ENABLE_EXTRACTION_BOUNDARY_TEST
     OFF
 )
 
+if(POCO_BUILD_TESTS)
+    include(CTest)
+endif()
+
 # Static linkage is the primary Apple embedding deliverable, so it is the
 # default.  A shared library remains available for hosts that prefer to load
 # Poco at runtime.  This is a dedicated switch rather than BUILD_SHARED_LIBS so
 # an embedding project's global choice does not silently flip Poco's linkage.
 option(POCO_BUILD_SHARED "Build poco_core as a shared library instead of static" OFF)
 
-# The parent Animator tree provides SDL3 before adding Poco, so make the
-# graphical examples follow that availability by default.  A standalone Poco
-# build stays dependency-free unless the caller explicitly enables examples;
-# the example then adds the repository's vendored SDL3 itself.
-if(TARGET SDL3::SDL3)
-    set(_poco_build_examples_default ON)
-else()
-    set(_poco_build_examples_default OFF)
-endif()
-option(POCO_BUILD_EXAMPLES "Build Poco examples that require SDL3"
-    ${_poco_build_examples_default})
-unset(_poco_build_examples_default)
+# The examples are demonstrations, not part of the library.  They stay off by
+# default for every caller, including a host that already defines SDL3::SDL3 --
+# having SDL3 around is not a request for an extra executable and its install
+# rules.  A host that wants them sets POCO_BUILD_EXAMPLES before adding Poco.
+option(POCO_BUILD_EXAMPLES "Build Poco examples that require SDL3" OFF)
+
+# The 1991 String type experiment.  It is off by default -- it was never a
+# production feature and nothing in the shipping language depends on it -- but
+# it is retained deliberately, not deleted, and the option is what keeps it
+# selectable.  A configuration with this ON is compiled by the test suite so
+# the branch cannot silently rot again.
+option(POCO_STRING_EXPERIMENT "Compile the experimental Poco String type" OFF)
 
 # The parent Animator build uses directory-wide include paths.  Clear the
 # inherited property before creating Poco targets so standalone and embedded
@@ -43,45 +66,79 @@ add_subdirectory(third_party/libffi)
 add_subdirectory(third_party/hashmap)
 add_subdirectory(third_party/blake3)
 
+# Listed in pipeline order rather than alphabetically, so the list reads as a
+# table of contents for src/README.md.  Add a new source to its stage.
 set(POCO_CORE_SOURCES
-	activation.c
-    bcutil.c
-    bytecode_container.c
-    bop.c
+    # Front end: lines, preprocessing, tokens.
     chopper.c
-    code.c
-	declare.c
-	debug.c
-    path_operations.c
-    fold.c
-    funccall.c
-    linklist.c
-    mathlib.c
-    pocmemry.c
-    poco.c
-    port.c
-    pocodis.c
-    pocoface.c
-    pocolib.c
-    pocoload.c
-    pocoop.c
-    pocotype.c
-    postring.c
-    poco_ffi.c
-    poco_hash.c
-    program_image.c
     pp.c
     ppeval.c
-    runops.c
-    safefile.c
-	serialization.c
+    token.c
+    bcutil.c
+    potokface.c
+
+    # Compile driver, parser and code emission.
+    compile_driver.c
+    use_graph.c
+    poco.c
     statemen.c
+    declare.c
+    pocotype.c
+    struct.c
+    varinit.c
+    poexpr.c
+    bop.c
+    povar.c
+    funccall.c
+    fold.c
+    code.c
+
+    # Compiler support: symbols, diagnostics, compile-time memory.
+    posymbol.c
+    podiag.c
+    pocmemry.c
+
+    # Cross-unit resolution.
+    polink.c
+
+    # Public boundary and program/activation lifetime.
+    vm_api.c
+    vm_diagnostics.c
+    poco_call.c
+    activation.c
+    porunenv.c
+
+    # The interpreter and the native call path.
+    runops.c
+    pocoop.c
+    poco_ffi.c
+    postring.c
+
+    # Debug information, tracing, disassembly.
+    debug.c
+    trace.c
+    pocodis.c
+
+    # Serialized programs.
+    serialization.c
+    program_image.c
+    bytecode_container.c
+    bytecode_iter.c
+    poco_hash.c
+
+    # Native bindings and module loading.
+    pocolib.c
+    libproto.c
     standard_library.c
     strlib.c
-    struct.c
-    token.c
-    trace.c
-    varinit.c
+    mathlib.c
+    safefile.c
+    path_operations.c
+    pocoload.c
+
+    # Portability.
+    port.c
+    poco_lock.c
 )
 list(TRANSFORM POCO_CORE_SOURCES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 
@@ -107,9 +164,14 @@ set_target_properties(poco_core PROPERTIES
     # Keep the static archive linkable into shared hosts (frameworks, plugins).
     POSITION_INDEPENDENT_CODE ON
 )
+# compat/ carries the deprecated Poco_lib/Pocorex layouts shared with legacy
+# hosts and native POE modules.  It is BUILD_INTERFACE only and is never
+# installed: <poco/poco.h> remains the whole of Poco's public surface, and an
+# external consumer has no legacy ABI to be compatible with.
 target_include_directories(poco_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/compat>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -130,6 +192,12 @@ endif()
 if(CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug$")
     target_compile_definitions(poco_core PRIVATE DEVELOPMENT=1 DEBUG=1)
 endif()
+# PUBLIC: poco.h is compiled by the CLI and by embedding hosts that reach for
+# the private compiler headers, and the String type changes struct layouts, so
+# every translation unit in a build has to agree on it.
+if(POCO_STRING_EXPERIMENT)
+    target_compile_definitions(poco_core PUBLIC STRING_EXPERIMENT=1)
+endif()
 
 set(POCO_CLI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cli_debugger.c"
@@ -139,27 +207,38 @@ set(POCO_CLI_SOURCES
 if(APPLE OR UNIX)
     list(APPEND POCO_CLI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/poco_unix.c")
 endif()
-add_executable(poco ${POCO_CLI_SOURCES})
+# The target is poco_cli, not poco: `poco` is a name an embedding host is
+# entitled to use for its own target, and add_subdirectory() would collide with
+# it.  The produced binary is still named poco.
+add_executable(poco_cli ${POCO_CLI_SOURCES})
 # The CLI compiles legacy private compiler headers, so it needs libffi's build
 # include path while compiling.  This remains an internal relationship; an
 # embedding project links only Poco::poco.
-target_link_libraries(poco PRIVATE Poco::poco poco_ffi)
-set_target_properties(poco PROPERTIES
+target_link_libraries(poco_cli PRIVATE Poco::poco poco_ffi)
+set_target_properties(poco_cli PROPERTIES
+    OUTPUT_NAME poco
     C_STANDARD 99
     C_STANDARD_REQUIRED YES
     C_EXTENSIONS YES
 )
 if(APPLE)
-    set_target_properties(poco PROPERTIES INSTALL_RPATH "@loader_path/lib")
+    set_target_properties(poco_cli PROPERTIES INSTALL_RPATH "@loader_path/lib")
 elseif(UNIX)
-    set_target_properties(poco PROPERTIES INSTALL_RPATH "$ORIGIN/lib")
+    set_target_properties(poco_cli PROPERTIES INSTALL_RPATH "$ORIGIN/lib")
 endif()
 
 set(POCO_CMAKE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/Poco")
+# A shared poco_core absorbs libffi/hashmap/blake3 at link time, so the install
+# is one file.  A static one cannot: libpoco.a would reach the consumer with
+# undefined ffi_*/hashmap_*/blake3_* symbols.  Install those archives into a
+# private subdirectory of libdir and let PocoConfig append them behind
+# Poco::poco, so the consumer still names exactly one target.
+set(POCO_PRIVATE_LIBDIR "${CMAKE_INSTALL_LIBDIR}/poco")
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/PocoConfig.cmake"
     INSTALL_DESTINATION "${POCO_CMAKE_INSTALL_DIR}"
+    PATH_VARS POCO_PRIVATE_LIBDIR
 )
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/PocoConfigVersion.cmake"
@@ -174,7 +253,23 @@ install(TARGETS poco_core
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-install(TARGETS poco RUNTIME DESTINATION .)
+if(NOT POCO_BUILD_SHARED)
+    install(TARGETS poco_hashmap poco_blake3
+        ARCHIVE DESTINATION "${POCO_PRIVATE_LIBDIR}"
+    )
+    if(NOT POCO_FFI_STATIC_LIBRARY)
+        message(FATAL_ERROR
+            "A static Poco install needs the private libffi archive, but "
+            "POCO_FFI_STATIC_LIBRARY was not set by third_party/libffi.")
+    endif()
+    install(FILES "${POCO_FFI_STATIC_LIBRARY}"
+        DESTINATION "${POCO_PRIVATE_LIBDIR}"
+        RENAME "${CMAKE_STATIC_LIBRARY_PREFIX}poco_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    )
+endif()
+if(POCO_INSTALL_CLI)
+    install(TARGETS poco_cli RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/poco/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/poco"
     FILES_MATCHING PATTERN "*.h"
@@ -191,10 +286,16 @@ install(EXPORT PocoTargets
     DESTINATION "${POCO_CMAKE_INSTALL_DIR}"
 )
 
-# poekit (legacy POE modules) is added only by the parent Animator project.
-# It is not part of add_subdirectory(poco)'s public API.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(POCO_BUILD_EXAMPLES)
     add_subdirectory(examples/snake)
 endif()
-add_subdirectory(test)
+# hello is the canonical generic-module example and doubles as the module-ABI
+# smoke test, so it is built for a test-only configure as well.  Unlike snake
+# it needs nothing but Poco itself.
+if(POCO_BUILD_EXAMPLES OR POCO_BUILD_TESTS)
+    add_subdirectory(examples/hello)
+endif()
+if(POCO_BUILD_TESTS)
+    add_subdirectory(test)
+endif()

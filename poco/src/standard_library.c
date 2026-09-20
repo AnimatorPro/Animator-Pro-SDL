@@ -1,3 +1,10 @@
+/*******************************************************************************
+ * standard_library.c - Console bindings, and the catalog's console entry.
+ * The rest of the host-neutral catalog registered by
+ * poco_vm_register_standard_library() lives in strlib.c, mathlib.c,
+ * safefile.c and path_operations.c; standard_library.h lists the whole set.
+ ******************************************************************************/
+
 #include <stdio.h>
 
 #include "standard_library.h"

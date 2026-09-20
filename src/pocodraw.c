@@ -14,7 +14,6 @@
 #include "jimk.h"
 #include "palmenu.h"
 #include "pocodraw.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "poly.h"
 #include "inks.h"
@@ -23,7 +22,9 @@
 #include "flood.h"
 #include "sep.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern Poly working_poly;
 
 
@@ -792,6 +793,6 @@ PolibDraw po_libdraw = {
 Poco_lib po_draw_lib = {
 	NULL,
 	"Graphics",
-	(Lib_proto*)&po_libdraw,
+	(const Lib_proto*)&po_libdraw,
 	POLIB_DRAW_SIZE,
 };

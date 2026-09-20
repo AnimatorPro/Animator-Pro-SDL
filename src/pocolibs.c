@@ -14,9 +14,11 @@
 #include "rexlib.h"
 #include "pocorex.h"
 #include "pocolib.h"
-#include "pocoface.h"
 #include "poly.h"
 #include "ani_poco_adapter.h"
+
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
 
 extern bool po_check_abort(void* data);
 extern Errcode clone_ppoints(Poly* s, Poly* d);  // from polytool.c
@@ -36,10 +38,34 @@ typedef struct AniPocoLegacyBinding {
 	char* prototype;
 } AniPocoLegacyBinding;
 
+/*
+ * Poco's own standard descriptors are read-only templates shared by every host.
+ * The VM clones the Poco_lib and the clone owns the resource list the bindings
+ * fill, so their cleanup has to be registered as a runtime cleanup: that is the
+ * hook Poco hands the clone rather than the template.  Animator's own libraries
+ * keep running init/cleanup against their own descriptors, which is also where
+ * the blit library's screen list still lives (src/pocoblit.c).
+ */
+typedef enum AniPocoDescriptorKind {
+	ANI_POCO_ANIMATOR_DESCRIPTOR,
+	ANI_POCO_SHARED_TEMPLATE
+} AniPocoDescriptorKind;
+
 typedef struct AniPocoLibrarySource {
-	Poco_lib* library;
+	const Poco_lib* library;
 	size_t binding_stride;
+	AniPocoDescriptorKind kind;
 } AniPocoLibrarySource;
+
+/*
+ * Declared here rather than included: Poco's standard-library catalog header is
+ * private to poco/src, and this file already reaches the legacy entry points by
+ * extern declaration (see poco_lmalloc/po_free below).
+ */
+typedef void (*AniPocoRuntimeCleanup)(Poco_lib* library);
+extern PocoStatus poco_vm_register_library_with_runtime_cleanup(PocoVm* vm,
+																const PocoLibrary* library,
+																AniPocoRuntimeCleanup cleanup);
 
 /*
  * Polib* tables are a compatibility ABI of alternating function/prototype
@@ -60,10 +86,10 @@ static const AniPocoLibrarySource animator_libraries[] = {
 	{&po_blit_lib, sizeof(AniPocoLegacyBinding)},
 	{&po_misc_lib, sizeof(AniPocoLegacyBinding)},
 	{&po_load_save_lib, sizeof(AniPocoLegacyBinding)},
-	{&po_FILE_lib, sizeof(Lib_proto)},
-	{&po_str_lib, sizeof(Lib_proto)},
-	{&po_mem_lib, sizeof(Lib_proto)},
-	{&po_math_lib, sizeof(Lib_proto)},
+	{&po_FILE_lib, sizeof(Lib_proto), ANI_POCO_SHARED_TEMPLATE},
+	{&po_str_lib, sizeof(Lib_proto), ANI_POCO_SHARED_TEMPLATE},
+	{&po_mem_lib, sizeof(Lib_proto), ANI_POCO_SHARED_TEMPLATE},
+	{&po_math_lib, sizeof(Lib_proto), ANI_POCO_SHARED_TEMPLATE},
 	{&po_dos_lib, sizeof(AniPocoLegacyBinding)},
 	{&po_globalv_lib, sizeof(AniPocoLegacyBinding)},
 	{&po_title_lib, sizeof(AniPocoLegacyBinding)},
@@ -75,18 +101,18 @@ static const AniPocoLibrarySource animator_libraries[] = {
 static void get_animator_binding(const AniPocoLibrarySource* source, int index,
 								 PocoBinding* binding)
 {
-	char* entry;
+	const char* entry;
 
-	entry = (char*)source->library->lib + (size_t)index * source->binding_stride;
+	entry = (const char*)source->library->lib + (size_t)index * source->binding_stride;
 	if (source->binding_stride == sizeof(Lib_proto)) {
-		Lib_proto* legacy_binding = (Lib_proto*)entry;
+		const Lib_proto* legacy_binding = (const Lib_proto*)entry;
 
 		binding->prototype = legacy_binding->proto;
 		binding->function = (PocoNativeFunction)legacy_binding->func;
 		binding->contract = legacy_binding->contract;
 		binding->flags = legacy_binding->flags;
 	} else {
-		AniPocoLegacyBinding* legacy_binding = (AniPocoLegacyBinding*)entry;
+		const AniPocoLegacyBinding* legacy_binding = (const AniPocoLegacyBinding*)entry;
 
 		binding->prototype = legacy_binding->prototype;
 		binding->function = legacy_binding->function;
@@ -219,10 +245,20 @@ static PocoStatus register_animator_library(PocoVm* vm, const AniPocoLibrarySour
 	library.identity = legacy_library->name;
 	library.bindings = bindings;
 	library.binding_count = (size_t)binding_count;
-	library.initialize = initialize_animator_library;
-	library.cleanup = cleanup_animator_library;
-	library.user_data = legacy_library;
-	status = poco_vm_register_library(vm, &library);
+	if (source->kind == ANI_POCO_SHARED_TEMPLATE) {
+		library.initialize = NULL;
+		library.cleanup = NULL;
+		library.user_data = NULL;
+		status = poco_vm_register_library_with_runtime_cleanup(vm, &library,
+															   legacy_library->cleanup);
+	} else {
+		library.initialize = initialize_animator_library;
+		library.cleanup = cleanup_animator_library;
+		/* Animator's own descriptors are this tree's mutable objects; only the
+		 * shared templates above are const. */
+		library.user_data = (Poco_lib*)(uintptr_t)legacy_library;
+		status = poco_vm_register_library(vm, &library);
+	}
 	free_animator_binding_prototypes(bindings, binding_count);
 	free(bindings);
 	return status;
@@ -458,10 +494,22 @@ void* po_ppt2ptr(Popot ppt)
 /*****************************************************************************
  *
  ****************************************************************************/
+/*
+ * Status slot handed to legacy .poe modules through the Porexlib table.
+ *
+ * The table is a single process-wide structure whose pl_builtin_err is a bare
+ * pointer captured once at load, so unlike the in-process Animator bindings it
+ * cannot follow the running activation.  It keeps its own slot here rather than
+ * aliasing one VM's.  Legacy .poe modules stay single-VM either way: they are
+ * already bound to the one-per-process _a_a_* Hostlib singletons, and they
+ * report failures to the interpreter through their return value, not this slot.
+ */
+static Errcode legacy_poe_builtin_err;
+
 Porexlib aa_pocolib = {
 	/* header */
 	{sizeof(Porexlib), AA_POCOLIB, AA_POCOLIB_VERSION},
-	&builtin_err,
+	&legacy_poe_builtin_err,
 	get_pic_screen,
 	po_ppt2ptr,
 	po_ptr2ppt,

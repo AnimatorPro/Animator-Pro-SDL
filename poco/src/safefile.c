@@ -7,52 +7,79 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "pocolib.h"
 #include "ptrmacro.h"
 #include "poco_errcodes.h"
 #include "linklist.h"
 #include "standard_library.h"
+#include "safefile.h"
+#include "poco_ffi.h"
+#include "pocoface.h"
 
-void po_free(void* pt);
+/*
+ * A binding called without a PocoVm* still has a status slot: the one belonging
+ * to the VM running on this thread, or a thread-local scratch slot outside a
+ * run.  Resolving here is what makes a failure reported by po_free() visible to
+ * the caller that provoked it instead of silently dropped.
+ */
+static Errcode* builtin_error_slot(PocoVm* vm)
+{
+	Errcode* target = vm != NULL ? poco_vm_builtin_error(vm) : NULL;
 
-extern Poco_lib po_FILE_lib, po_mem_lib;
+	return target != NULL ? target : poco_active_builtin_error();
+}
 
 static Errcode poco_record_builtin_error(PocoVm* vm, Errcode err)
 {
-	Errcode* target = poco_vm_builtin_error(vm);
-
-	if (target != NULL) {
-		*target = err;
-	}
+	*builtin_error_slot(vm) = err;
 	return err;
 }
 
 static Errcode poco_current_builtin_error(PocoVm* vm)
 {
-	Errcode* target = poco_vm_builtin_error(vm);
+	return *builtin_error_slot(vm);
+}
 
-	return target != NULL ? *target : Success;
+/* No PocoVm* argument means the VM running on this thread. */
+static PocoVm* effective_vm(PocoVm* vm)
+{
+	return vm != NULL ? vm : poco_active_vm();
+}
+
+/*
+ * Resource lists live on the VM's own copy of a standard library, never on the
+ * process-global descriptor it was cloned from.  po_FILE_lib and po_mem_lib
+ * below are templates: a host hands one to a VM, the VM clones it
+ * (activation.c:clone_libraries) and the clone owns the list.
+ *
+ * There is no VM-less fallback.  A resource list reachable without a VM is a
+ * list that outlives the run that filled it, which is how a block left behind
+ * by one VM became visible to the next one on the same thread.  Outside a run
+ * this returns NULL and its callers report a failure rather than touching
+ * shared state.  Registrations are matched by the canonical identity first and
+ * by the legacy descriptor name second, because Animator registers these
+ * libraries under their old names.
+ */
+static Poco_lib* current_standard_library(PocoVm* vm, const char* identity, const char* legacy_name)
+{
+	Poco_lib* library;
+
+	vm = effective_vm(vm);
+	if ((library = poco_active_library(vm, identity)) == NULL) {
+		library = poco_active_library(vm, legacy_name);
+	}
+	return library;
 }
 
 static Poco_lib* current_file_library(PocoVm* vm)
 {
-	Poco_lib* library = poco_active_library(vm, POCO_STANDARD_FILE_LIBRARY_ID);
-	if (library == NULL && vm != NULL) {
-		library = poco_active_library(vm, po_FILE_lib.name);
-	}
-
-	return library != NULL ? library : &po_FILE_lib;
+	return current_standard_library(vm, POCO_STANDARD_FILE_LIBRARY_ID, po_FILE_lib.name);
 }
 
 static Poco_lib* current_memory_library(PocoVm* vm)
 {
-	Poco_lib* library = poco_active_library(vm, POCO_STANDARD_MEMORY_LIBRARY_ID);
-	if (library == NULL && vm != NULL) {
-		library = poco_active_library(vm, po_mem_lib.name);
-	}
-
-	return library != NULL ? library : &po_mem_lib;
+	return current_standard_library(vm, POCO_STANDARD_MEMORY_LIBRARY_ID, po_mem_lib.name);
 }
 
 /*****************************************************************************
@@ -96,11 +123,14 @@ Rnode* po_in_rlist(Dlheader* sfi, void* f)
  ****************************************************************************/
 static Errcode safe_file_check(PocoVm* vm, void* f, void* buf, size_t size)
 {
+	Poco_lib* library;
+
 	(void)size;
 	if (f == NULL) {
 		return poco_record_builtin_error(vm, Err_null_ref);
 	}
-	if (po_in_rlist(&current_file_library(vm)->resources, f) == NULL) {
+	library = current_file_library(vm);
+	if (library == NULL || po_in_rlist(&library->resources, f) == NULL) {
 		return poco_record_builtin_error(vm, Err_invalid_FILE);
 	}
 	if (buf == NULL && size > 0) {
@@ -136,11 +166,16 @@ static size_t po_fwrite(void* buf, unsigned size, unsigned n, FILE* f, PocoVm* v
  ****************************************************************************/
 static FILE* po_fopen(char* name, char* mode, PocoVm* vm)
 {
+	Poco_lib* library;
 	Rnode* sn;
 	FILE* f;
 
 	if (name == NULL || mode == NULL) {
 		poco_record_builtin_error(vm, Err_null_ref);
+		return NULL;
+	}
+	if ((library = current_file_library(vm)) == NULL) {
+		poco_record_builtin_error(vm, Err_invalid_FILE);
 		return NULL;
 	}
 	if ((f = fopen(name, mode)) == NULL) {
@@ -151,7 +186,7 @@ static FILE* po_fopen(char* name, char* mode, PocoVm* vm)
 		poco_record_builtin_error(vm, Err_no_memory);
 		return NULL;
 	}
-	add_head(&current_file_library(vm)->resources, &sn->node);
+	add_head(&library->resources, &sn->node);
 	sn->resource = f;
 	return f;
 }
@@ -161,18 +196,19 @@ static FILE* po_fopen(char* name, char* mode, PocoVm* vm)
  ****************************************************************************/
 static void po_fclose(FILE* f, PocoVm* vm)
 {
+	Poco_lib* library = current_file_library(vm);
 	Rnode* sn;
 
 	if (f == NULL) {
 		poco_record_builtin_error(vm, Err_null_ref);
 		return;
 	}
-	if ((sn = po_in_rlist(&current_file_library(vm)->resources, f)) == NULL) {
+	if (library == NULL || (sn = po_in_rlist(&library->resources, f)) == NULL) {
 		poco_record_builtin_error(vm, Err_invalid_FILE);
 		return;
 	}
 	fclose(f);
-	rem_from_list(&current_file_library(vm)->resources, (Dlnode*)sn);
+	rem_from_list(&library->resources, (Dlnode*)sn);
 	pj_free(sn);
 }
 
@@ -318,10 +354,16 @@ typedef struct mem_node {
 Popot poco_lmalloc_for_vm(PocoVm* vm, long size)
 {
 	Popot pp = {NULL, NULL, NULL};
+	Poco_lib* library = current_memory_library(vm);
 	Mem_node* sn;
 
+	vm = effective_vm(vm);
 	if (size <= 0) {
 		poco_record_builtin_error(vm, Err_zero_malloc);
+		return pp;
+	}
+	if (library == NULL) {
+		poco_record_builtin_error(vm, Err_no_memory);
 		return pp;
 	}
 	if ((sn = pj_zalloc(sizeof(*sn))) == NULL) {
@@ -330,13 +372,14 @@ Popot poco_lmalloc_for_vm(PocoVm* vm, long size)
 	if ((sn->resource = pp.min = pp.max = pp.pt = pj_zalloc((long)size)) != NULL) {
 		pp.max = OPTR(pp.max, size - 1);
 		sn->size = size;
-		add_head(&current_memory_library(vm)->resources, &sn->node);
+		add_head(&library->resources, &sn->node);
 	} else {
 		pj_free(sn);
 	}
 	return pp;
 }
 
+/* The VM-less spelling Animator's bindings use: the running VM owns the block. */
 Popot poco_lmalloc(long size)
 {
 	return poco_lmalloc_for_vm(NULL, size);
@@ -393,35 +436,28 @@ void poco_standard_memory_cleanup(Poco_lib* lib)
 
 /*****************************************************************************
  * void free(void *pt)
+ *
+ * The VM-less spelling is the same function as po_free_for_vm(), not a variant
+ * of it: a block's allocating and releasing library must be the same one, and
+ * both spellings resolve to the library the running VM owns.
  ****************************************************************************/
 void po_free(void* pt)
 {
-	PocoVm* vm = NULL;
-	Mem_node* sn;
-
-	if (pt == NULL) {
-		poco_record_builtin_error(vm, Err_free_null);
-		return;
-	}
-
-	if ((sn = (Mem_node*)po_in_rlist(&current_memory_library(NULL)->resources, pt)) == NULL) {
-		poco_record_builtin_error(vm, Err_poco_free);
-	} else {
-		poco_zero_bytes(sn->resource, sn->size);
-		poco_pointer_registry_release_owned(NULL, pt);
-		pj_free(pt);
-		rem_from_list(&current_memory_library(NULL)->resources, (Dlnode*)sn);
-		pj_free(sn);
-	}
+	po_free_for_vm(NULL, pt);
 }
 
 void po_free_for_vm(PocoVm* vm, void* pt)
 {
-	Mem_node* sn;
 	Poco_lib* library = current_memory_library(vm);
+	Mem_node* sn;
 
+	vm = effective_vm(vm);
 	if (pt == NULL) {
 		poco_record_builtin_error(vm, Err_free_null);
+		return;
+	}
+	if (library == NULL) {
+		poco_record_builtin_error(vm, Err_poco_free);
 		return;
 	}
 	if ((sn = (Mem_node*)po_in_rlist(&library->resources, pt)) == NULL) {
@@ -641,7 +677,7 @@ static const PocoBindingContract memset_contract = {
 static const PocoBindingContract memchr_contract = {
 	memory_find_span, Array_els(memory_find_span), {POCO_POINTER_RETURN_ALIAS, 0}};
 
-static Lib_proto filelib[] = {
+static const Lib_proto filelib[] = {
 	{po_fopen, "FILE    *fopen(char *name, char *mode);", NULL, POCO_BINDING_RUN_CONTEXT},
 	{po_fclose, "void    fclose(FILE *f);", NULL, POCO_BINDING_RUN_CONTEXT},
 	{po_fread, "int     fread(void *buf, int size, int count, FILE *f);", &fread_contract,
@@ -666,7 +702,7 @@ static Lib_proto filelib[] = {
 
 };
 
-Poco_lib po_FILE_lib = {
+const Poco_lib po_FILE_lib = {
 	NULL, "(C Standard) FILE", filelib, Array_els(filelib), NULL, poco_standard_file_cleanup,
 };
 
@@ -674,7 +710,7 @@ Poco_lib po_FILE_lib = {
  * protos for memory functions...
  *--------------------------------------------------------------------------*/
 
-static Lib_proto memlib[] = {
+static const Lib_proto memlib[] = {
 	{po_malloc_in_vm, "void    *malloc(int size);", &malloc_contract, POCO_BINDING_RUN_CONTEXT},
 	{po_calloc_in_vm, "void    *calloc(int size_el, int el_count);", &calloc_contract,
 	 POCO_BINDING_RUN_CONTEXT},
@@ -691,7 +727,7 @@ static Lib_proto memlib[] = {
 	 POCO_BINDING_RUN_CONTEXT},
 };
 
-Poco_lib po_mem_lib = {
+const Poco_lib po_mem_lib = {
 	NULL, "(C Standard) Memory Manager", memlib, Array_els(memlib),
 	NULL, poco_standard_memory_cleanup,
 };
@@ -744,21 +780,3 @@ const PocoLibrary* poco_standard_memory_library(void)
 	return &library;
 }
 
-#ifdef DEADWOOD
-
-Errcode po_file_to_stdout(char* name)
-{
-	FILE* f;
-	int c;
-
-	if ((f = fopen(name, "r")) == NULL) {
-		return Err_create;
-	}
-	while ((c = fgetc(f)) != EOF) {
-		fputc(c, stdout);
-	}
-	fclose(f);
-	return Success;
-}
-
-#endif /* DEADWOOD */

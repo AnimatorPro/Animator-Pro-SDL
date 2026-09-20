@@ -1,0 +1,6 @@
+/* Allocates a block through the VM-less legacy entry point and abandons it.
+ * The block is the first VM's property; nothing after this run may see it. */
+main()
+{
+	return leak_block();
+}

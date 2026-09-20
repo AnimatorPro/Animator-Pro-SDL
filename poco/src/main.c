@@ -18,19 +18,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "aaconfig.h"
 #include "cli_debugger.h"
-#include "commonst.h"
+#include "poco_names.h"
 #include "filepath.h"
 #include "poco_errcodes.h"
-#include "poco.h"
+#include "poco_internal.h"
 #include "pocoface.h"
+#include "pocodos_standalone.h"
+#include "mathlib.h"
 #include "program_internal.h"
 #include "ptrmacro.h"
+#include "runops.h"
+#include "safefile.h"
+#include "pocodis.h"
+#include "poco_unix.h"
+#include "strlib.h"
 
-/* Legacy standalone-host state.  The embeddable library keeps this status in
- * Poco_run_env instead. */
-Errcode builtin_err;
+/* Builtin status reporting is per-activation; this host writes the slot of
+ * whichever VM is running on this thread. */
+#define builtin_err (*poco_active_builtin_error())
 
 #ifdef _MSC_VER
 #include <float.h>
@@ -42,27 +48,6 @@ static void _fpreset(void)
 {
 }
 #endif
-
-#if defined(IAN) /* Where Ian keeps poco source */
-Names incdirs[] = {
-	{&incdirs[1], ""},
-	{NULL, "\\paa\\resource\\"},
-};
-#elif defined(JIM) /* Where Jim keeps poco source */
-Names incdirs[] = {
-	{&incdirs[1], ""},
-	{&incdirs[2], "\\paa\\resource\\"},
-	{NULL, "c:\\tc\\include\\"},
-};
-#else
-Names incdirs[] = {{&incdirs[1], ""}, {NULL, "\\paa\\resource\\"}};
-#endif
-
-/*
- * In PJ this lives in config.c, but since we don't want to pull that file
- * in here for now, declare a local memory space for the config.
- */
-AA_config vconfg;
 
 /****************************************************************************
  * some memory management routines...
@@ -76,6 +61,7 @@ Errcode boxf(char* fmt, ...);
 int po_puts(Popot s);
 int po_printf(char* format, ...);
 void po_qtext(char* format, ...);
+bool check_abort(void* nobody);
 
 char* ido_type_to_str(IdoType ido_type);
 void dump_func_frame(const char* name, const Func_frame* frame_in);
@@ -166,46 +152,48 @@ void po_qtext(char* format, ...)
 }
 
 /****************************************************************************/
-static Lib_proto proto_lines[] = {
+static const Lib_proto proto_lines[] = {
 	/*	{tryme, 	"int ptryme(int (*v)(long a, long b, long c));"}, */
 	{puts, "int puts(char *s);"},
 	{printf, "int printf(char *format, ...);"},
 	{po_qtext, "void Qtext(char *format, ...);"},
 };
 
-Poco_lib po_main_lib = {.next = NULL,
-						.name = "Poco Library",
-						.lib = proto_lines,
-						.count = Array_els(proto_lines),
-						.init = NULL,
-						.cleanup = NULL,
-						.local_data = NULL,
-						.resources = {NULL, NULL, NULL},
-						.rexhead = NULL,
-						{0}};
+const Poco_lib po_main_lib = {.next = NULL,
+							  .name = "Poco Library",
+							  .lib = proto_lines,
+							  .count = Array_els(proto_lines),
+							  .init = NULL,
+							  .cleanup = NULL,
+							  .local_data = NULL,
+							  .resources = {NULL, NULL, NULL},
+							  .rexhead = NULL,
+							  {0}};
 
-extern Poco_lib po_mem_lib;
-extern Poco_lib po_FILE_lib;
-extern Poco_lib po_math_lib;
-extern Poco_lib po_str_lib;
-extern Poco_lib po_dos_standalone_lib;
 
-static Poco_lib* poco_libs[] = {
+static const Poco_lib* const poco_libs[] = {
 	&po_main_lib, &po_str_lib, &po_mem_lib, &po_FILE_lib, &po_math_lib, &po_dos_standalone_lib,
 };
 
 /****************************************************************************
+ * Chain the builtin descriptors for this CLI's programs.
  *
+ * The descriptors themselves are read-only templates shared by every host, so
+ * the chain is built out of copies: writing 'next' into the originals would
+ * put per-program state back into process-global objects.  The copies live
+ * here in poco_cli rather than in the embeddable core.
  ***************************************************************************/
 static Poco_lib* get_poco_libs(void)
 {
+	static Poco_lib chain[Array_els(poco_libs)];
 	static Poco_lib* list = NULL;
 	int i;
 
 	if (list == NULL) {
 		for (i = Array_els(poco_libs); --i >= 0;) {
-			poco_libs[i]->next = list;
-			list = poco_libs[i];
+			chain[i] = *poco_libs[i];
+			chain[i].next = list;
+			list = &chain[i];
 		}
 	}
 	return (list);
@@ -213,8 +201,6 @@ static Poco_lib* get_poco_libs(void)
 
 #ifdef DEVELOPMENT
 /* variables for runops tracing */
-extern FILE* po_trace_file;
-extern bool po_trace_flag;
 #endif /* DEVELOPMENT */
 
 
@@ -464,11 +450,15 @@ static void report_binary_load_error(PocoVm* vm, PocoStatus status)
  * statuses have CLI-specific diagnostics because they are otherwise outside
  * the legacy compiler error domain handled by report_status below.
  ***************************************************************************/
-static PocoStatus run_binary(PocoVm* vm, FILE* input, bool run_program, bool with_builtin_libs)
+static PocoStatus run_binary(PocoVm* vm, FILE* input, bool run_program, bool with_builtin_libs,
+							 FILE* instruction_trace)
 {
 	PocoProgram* program = NULL;
 	PocoStatus status;
+	PocoRunOptions run_options = {0};
 	int32_t result = 0;
+
+	run_options.instruction_trace = instruction_trace;
 
 	if (with_builtin_libs) {
 		status = poco_vm_register_standard_library(vm);
@@ -482,7 +472,7 @@ static PocoStatus run_binary(PocoVm* vm, FILE* input, bool run_program, bool wit
 		return status;
 	}
 	if (run_program) {
-		status = poco_vm_run(vm, program, NULL, &result);
+		status = poco_vm_run(vm, program, &run_options, &result);
 		if (status == POCO_STATUS_OK) {
 			fprintf(stderr, "Return value: %d\n", (int)result);
 		}
@@ -530,11 +520,15 @@ static PocoStatus run_debugger(PocoVm* vm, const char* const* filenames, size_t 
 }
 
 static PocoStatus run_source_files(PocoVm* vm, const char* const* filenames, size_t source_count,
-								   bool run_program, bool with_builtin_libs, bool debug_dump)
+								   bool run_program, bool with_builtin_libs, bool debug_dump,
+								   FILE* instruction_trace)
 {
 	PocoProgram* program = NULL;
 	PocoStatus status;
+	PocoRunOptions run_options = {0};
 	int32_t result = 0;
+
+	run_options.instruction_trace = instruction_trace;
 
 	if (with_builtin_libs) {
 		status = poco_vm_register_standard_library(vm);
@@ -559,7 +553,7 @@ static PocoStatus run_source_files(PocoVm* vm, const char* const* filenames, siz
 		}
 	}
 	if (status == POCO_STATUS_OK && run_program) {
-		status = poco_vm_run(vm, program, NULL, &result);
+		status = poco_vm_run(vm, program, &run_options, &result);
 		if (status == POCO_STATUS_OK) {
 			fprintf(stderr, "Return value: %d\n", (int)result);
 		}
@@ -587,6 +581,9 @@ int main(int argc, char* argv[])
 	bool verbose = false;
 	bool emit_debug_info = false;
 	bool debug_mode = false;
+	/* -t destination.  A local, not a global: it is CLI state, and the VM now
+	 * takes it per run through PocoRunOptions. */
+	FILE* instruction_trace = NULL;
 	bool parse_options = true;
 	const char* argp;
 	int counter;
@@ -651,8 +648,7 @@ int main(int argc, char* argv[])
 			builtin_libs = NULL;
 #ifdef DEVELOPMENT
 		} else if (parse_options && strcmp(argp, "-t") == 0) {
-			po_trace_flag = true;
-			po_trace_file = stdout;
+			instruction_trace = stdout;
 #endif /* DEVELOPMENT */
 		} else if (parse_options && argp[0] == '-' && argp[1] != '\0') {
 			fprintf(stderr, "poco: unknown option '%s'\n", argp);
@@ -716,7 +712,8 @@ int main(int argc, char* argv[])
 		}
 		err = (int)(debug_mode ? run_debugger(vm, input_filenames, 1, input_file, true,
 											  builtin_libs != NULL)
-							   : run_binary(vm, input_file, runflag, builtin_libs != NULL));
+							   : run_binary(vm, input_file, runflag, builtin_libs != NULL,
+											instruction_trace));
 		fclose(input_file);
 		input_file = NULL;
 		goto report_status;
@@ -738,7 +735,7 @@ int main(int argc, char* argv[])
 		goto report_status;
 	}
 	err = (int)run_source_files(vm, (const char* const*)input_filenames, input_count, runflag,
-								builtin_libs != NULL, do_debug_dump);
+								builtin_libs != NULL, do_debug_dump, instruction_trace);
 
 report_status:
 	if (input_file != NULL) {

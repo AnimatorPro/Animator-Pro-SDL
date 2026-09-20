@@ -1,3 +1,11 @@
+/*******************************************************************************
+ * pocoload.c - Native module loader.
+ * Resolves a '#pragma poco library' name to a platform shared object, opens
+ * it, calls its entry point and adapts what comes back into the binding list
+ * the compiler sees.  Handles both the modern PocoModuleDescriptor modules and
+ * the deprecated poco_rexlib_get() ABI, and owns their unload and per-run
+ * cleanup.
+ ******************************************************************************/
 
 #include <poco/poco.h>
 
@@ -24,7 +32,7 @@
 #endif
 
 #ifndef POCO_H
-#include "poco.h"
+#include "poco_internal.h"
 #endif
 
 #ifdef _WIN32
@@ -307,7 +315,7 @@ void format_poco_lib_error(Errcode err, const char* libname, const char* lib_pat
 					POCO_MODULE_ENTRY_POINT);
 			fprintf(stderr,
 					"  New modules must export '%s'. Legacy native-POE modules require an explicit "
-					"Animator compatibility policy.\n",
+					"host compatibility policy.\n",
 					POCO_MODULE_ENTRY_POINT);
 			break;
 
@@ -713,10 +721,10 @@ Errcode pj_load_pocorex(Poco_lib** lib, const char* script_path, char* name, cha
 		return Success;
 	}
 
-	/* Compatibility path only: existing Animator/POE modules may continue to
+	/* Compatibility path only: existing legacy POE modules may continue to
 	 * export poco_rexlib_get while they migrate to PocoModuleDescriptor.  The
-	 * generic loader never creates an Animator function table, so an explicit
-	 * Ani-owned policy must both opt in and install that table from on_load. */
+	 * generic loader never creates a host function table, so an explicit
+	 * host-owned policy must both opt in and install that table from on_load. */
 	get_func = (Poco_rexlib_get_func)poco_dlsym(handle, "poco_rexlib_get");
 	if (get_func == NULL) {
 		format_poco_lib_error(Err_poco_lib_no_entry, name, lib_path, NULL, 0, 0, -1, verbose);
@@ -726,7 +734,7 @@ Errcode pj_load_pocorex(Poco_lib** lib, const char* script_path, char* name, cha
 	if (!hooks->allow_legacy_poe || hooks->on_load == NULL) {
 		fprintf(stderr,
 				"Error: Poco library '%s' is a legacy native-POE module; "
-				"generic Poco requires an explicit Animator compatibility policy\n",
+				"generic Poco requires an explicit host compatibility policy\n",
 				name);
 		err = Err_poco_lib_no_entry;
 		goto error;

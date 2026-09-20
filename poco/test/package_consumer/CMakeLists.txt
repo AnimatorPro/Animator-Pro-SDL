@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
 project(poco_package_consumer LANGUAGES C)
 
-find_package(Poco 1 CONFIG REQUIRED)
+find_package(Poco 2 CONFIG REQUIRED)
 
 if(NOT COMMAND poco_add_module)
     message(FATAL_ERROR "Poco's installed module helper was not loaded")

@@ -1,9 +1,6 @@
 Changes made in each Poco version...
-  (Pre-170 versions documented in versnold.doc)
-
- Version    Date    Changes
-
-Changes made in each Poco version...
+  (This file is the whole history; it absorbed the DOS-era versions.doc and
+   versnold.doc, which have been deleted.)
 
  Version    Date    Changes
 
@@ -713,3 +710,35 @@ Changes made in each Poco version...
                       trickery
                     > Performed the first steps towards separating Poco out into
                       its own library for use in other projects.
+    191  09/17/26   > Poco is now a standalone, embeddable scripting VM with a
+                      public <poco/poco.h> API (PocoVm, PocoProgram,
+                      PocoActivation) and a generic native-module ABI; the old
+                      Animator-internal entry points survive as legacy shims.
+                    > The runtime is de-globalized and reentrant.  Activations
+                      come from an acquire/reset/release pool, sources can be
+                      compiled from memory, and .poe modules are found through
+                      a search path.
+                    > FFI hardening: by-value struct types, a cached cif with
+                      preallocated call storage, correct float marshaling, and
+                      bounded pointer/span contracts.  Bindings are split into
+                      curated trusted and untrusted tiers.
+                    > Bytecode is written to an architecture-portable,
+                      BLAKE3-addressed container.  Binaries carry no source;
+                      the loader validates what it is handed.
+                    > Reworked CLI (long options, compile-to-binary,
+                      detect-and-run) plus an opcode/line interactive debugger
+                      that reads external source.
+                    > Hosts can drive a program by name: global get/set,
+                      main(argc, argv), and named calls with coerced arguments
+                      and bounded span arguments.
+                    > Several .poc sources can be linked together through a file
+                      list or #pragma poco use, with a flat namespace, per-file
+                      static privacy, and per-file debug identity.
+                    > Animator Pro now links libpoco plus animhost instead of
+                      embedding the interpreter directly.
+                    > The MS-DOS build leftovers (poco.lnk, poco.obs,
+                      pocfiles.inc, the src/test tree, versions.doc,
+                      versnold.doc, and the Turbo C / Watcom makefiles) were
+                      deleted.
+                    > libpoco itself is unversioned; the public API is
+                      POCO_API_VERSION 2.0.0.

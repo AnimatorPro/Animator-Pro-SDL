@@ -5,6 +5,10 @@ if(NOT DEFINED POCO_EXECUTABLE OR NOT DEFINED POCO_MAIN OR
 endif()
 
 file(MAKE_DIRECTORY "${POCO_FIXTURE_DIR}")
+# The debugger reports resolved paths, so compare against a resolved fixture
+# directory: a build tree under a symlink (/tmp -> /private/tmp) otherwise
+# fails every "Stopped at <file>:" match.
+get_filename_component(POCO_FIXTURE_DIR "${POCO_FIXTURE_DIR}" REALPATH)
 set(main_copy "${POCO_FIXTURE_DIR}/debug_main.poc")
 set(library_copy "${POCO_FIXTURE_DIR}/debug_library.poc")
 set(header_copy "${POCO_FIXTURE_DIR}/debug_library.h")

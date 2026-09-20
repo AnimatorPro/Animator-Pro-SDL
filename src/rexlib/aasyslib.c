@@ -14,9 +14,6 @@
 #include "reqlib.h"
 #include "jimk.h"
 
-// the global error
-Errcode builtin_err;
-
 extern int rexlib_boxf(char* fmt, ...);  // from stdiolib.c
 
 /*

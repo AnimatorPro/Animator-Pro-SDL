@@ -27,5 +27,12 @@ _*
 .serena/
 .tmp/
 
+# scratch files written by Poco tests that run in their source directory
+poco/test/*.tmp
+
+# images the vendored SDL3_image test writes beside its own sources
+thirdparty/sdl3_image/test/save.*
+thirdparty/sdl3_image/test/saveRwops.*
+
 # libffi ExternalProject build output (source lives in poco/third_party/libffi)
 thirdparty/libffi/

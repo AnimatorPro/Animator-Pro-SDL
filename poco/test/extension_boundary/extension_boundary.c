@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "poco.h"
+#include "poco_internal.h"
+
+#include "activation.h"
 
 #define FIXTURE_PATH(name) POCO_EXTENSION_BOUNDARY_FIXTURE_DIR "/" name
 
@@ -196,9 +198,15 @@ static void test_raw_pointer_abi(void)
 	Symbol parameter = {0};
 	C_frame binding;
 	Poco_run_env environment;
+	PocoActivation activation;
 	Po_FFI* ffi_binding;
 	Pt_num argument = {0};
 	Pt_num result;
+
+	/* po_ffi_build_structures() consumes the compiled program image; po_ffi_call()
+	 * runs against an activation.  The two are separate structs, so the call needs
+	 * its own zeroed activation to report builtin_error into. */
+	memset(&activation, 0, sizeof(activation));
 
 	int_type.ido_type = IDO_INT;
 	pointer_type.ido_type = IDO_CPT;
@@ -208,9 +216,9 @@ static void test_raw_pointer_abi(void)
 		  "raw pointer return descriptor must build");
 	ffi_binding = po_ffi_find_binding_by_name(&environment, "raw_pointer_result");
 	if (ffi_binding != NULL) {
-		environment.builtin_error = Success;
-		result = po_ffi_call(ffi_binding, NULL, NULL, &environment);
-		CHECK(environment.builtin_error == Success, "raw pointer return must not set an FFI error");
+		activation.builtin_error = Success;
+		result = po_ffi_call(ffi_binding, NULL, NULL, &activation);
+		CHECK(activation.builtin_error == Success, "raw pointer return must not set an FFI error");
 		CHECK(result.p == raw_pointer_result(), "raw pointer return mapping");
 	}
 	po_ffi_free_structures(&environment);
@@ -224,9 +232,9 @@ static void test_raw_pointer_abi(void)
 	ffi_binding = po_ffi_find_binding_by_name(&environment, "raw_pointer_argument");
 	if (ffi_binding != NULL) {
 		argument.p = &raw_pointer_payload;
-		environment.builtin_error = Success;
-		result = po_ffi_call(ffi_binding, &argument, NULL, &environment);
-		CHECK(environment.builtin_error == Success,
+		activation.builtin_error = Success;
+		result = po_ffi_call(ffi_binding, &argument, NULL, &activation);
+		CHECK(activation.builtin_error == Success,
 			  "raw pointer argument must not set an FFI error");
 		CHECK(result.i == 1, "raw pointer argument mapping");
 	}

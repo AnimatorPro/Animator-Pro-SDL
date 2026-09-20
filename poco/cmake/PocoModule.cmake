@@ -1,7 +1,7 @@
 # PocoModule.cmake
 #
 # Build a host-neutral native Poco module.  The module ABI is declared in
-# <poco/poco.h>; this helper deliberately provides no Animator include paths,
+# <poco/poco.h>; this helper deliberately provides no host include paths,
 # libraries, compiler definitions, runtime policy, installation RPATH, or
 # deployment layout.  It is installed with the Poco package and is the only
 # supported helper for an external generic module.

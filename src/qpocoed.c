@@ -5,7 +5,6 @@
 #include "jimk.h"
 #include "textedit.h"
 #include "menus.h"
-#include "pocoface.h"
 #include "wordwrap.h"
 
 

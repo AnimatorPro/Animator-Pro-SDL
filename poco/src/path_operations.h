@@ -25,6 +25,6 @@ int poco_path_merge(char* path, size_t path_capacity, const char* device, const 
  * table so the two registration ABIs stay in step.
  */
 #define POCO_PATH_LEGACY_BINDING_COUNT 2
-extern Lib_proto poco_path_legacy_bindings[POCO_PATH_LEGACY_BINDING_COUNT];
+extern const Lib_proto poco_path_legacy_bindings[POCO_PATH_LEGACY_BINDING_COUNT];
 
 #endif /* POCO_PATH_OPERATIONS_H */

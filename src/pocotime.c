@@ -4,13 +4,14 @@
 #include "jimk.h"
 #include "errcodes.h"
 #include <stdio.h>
-#include "pocoface.h"
 #include "pocolib.h"
 #include "auto.h"
 #include "flx.h"
 #include "render.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 void next_frame();
 void prev_frame();
@@ -491,6 +492,6 @@ PolibTime po_libtime = {
 Poco_lib po_time_lib = {
 	NULL,
 	"Time Oriented Function",
-	(Lib_proto*)&po_libtime,
+	(const Lib_proto*)&po_libtime,
 	POLIB_TIME_SIZE,
 };

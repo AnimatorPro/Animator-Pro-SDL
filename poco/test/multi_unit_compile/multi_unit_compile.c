@@ -1,6 +1,6 @@
-#include "poco/poco.h"
+#include <poco/poco.h>
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "program_internal.h"
 
 #include <stdio.h>

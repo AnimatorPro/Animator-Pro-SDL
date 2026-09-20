@@ -9,7 +9,6 @@
 #include "linklist.h"
 #include "jimk.h"
 #include "poly.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "reqlib.h"
 #include "softmenu.h"
@@ -20,10 +19,12 @@
 #include "scroller.h"
 #include "poco_array.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 extern bool hide_mouse(void);
 extern bool show_mouse(void);
 extern int qcolor();
-extern Errcode builtin_err;
 extern void disp_line_alot(Short_xy* v);
 void cleanup_toptext();
 Errcode po_poly_to_arrays(Poly* p, Popot* x, Popot* y);
@@ -1111,6 +1112,6 @@ PolibUser po_libuser = {
 Poco_lib po_user_lib = {
 	NULL,
 	"User Interface",
-	(Lib_proto*)&po_libuser,
+	(const Lib_proto*)&po_libuser,
 	POLIB_USER_SIZE,
 };

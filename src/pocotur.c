@@ -4,12 +4,13 @@
 #include "errcodes.h"
 #include <stdio.h>
 #include "pocodraw.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "vpsubs.h"
 #include <math.h>
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 /** Turtle graphics **/
 static double xtur, ytur, atur;
@@ -157,6 +158,6 @@ PolibTurtle po_libturtle = {
 Poco_lib po_turtle_lib = {
 	NULL,
 	"Turtle Graphics",
-	(Lib_proto*)&po_libturtle,
+	(const Lib_proto*)&po_libturtle,
 	POLIB_TURTLE_SIZE,
 };

@@ -1,0 +1,6 @@
+/* Allocates and releases inside a single run: the control that keeps the two
+ * cross-VM checks from passing because release never works at all. */
+main()
+{
+	return allocate_and_release_block();
+}

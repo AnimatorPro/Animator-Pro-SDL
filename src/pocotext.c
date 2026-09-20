@@ -15,6 +15,9 @@
 #include "palmenu.h"
 #include "pentools.h"
 
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 
 void get_uvfont_name(char* buf);
 void qfont_text();
@@ -493,7 +496,7 @@ PolibText po_libtext = {
 Poco_lib po_text_lib = {
 	NULL,
 	"Text",
-	(Lib_proto*)&po_libtext,
+	(const Lib_proto*)&po_libtext,
 	POLIB_TEXT_SIZE,
 };
 
@@ -528,6 +531,6 @@ PolibTitle po_libtitle = {
 Poco_lib po_title_lib = {
 	NULL,
 	"Title",
-	(Lib_proto*)&po_libtitle,
+	(const Lib_proto*)&po_libtitle,
 	POLIB_TITLE_SIZE,
 };

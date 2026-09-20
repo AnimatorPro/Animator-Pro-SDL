@@ -53,10 +53,67 @@ if (WITH_POCO AND WITH_ANI)
 		COMMAND ${CMAKE_COMMAND}
 			-DPOCO_POE_HELPER=${CMAKE_SOURCE_DIR}/poco/cmake/PocoPoeLibrary.cmake
 			-DANI_POE_HELPER=${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/AniPocoPoeLibrary.cmake
-			-DPOEKIT_CMAKE_FILE=${CMAKE_SOURCE_DIR}/poco/poekit/CMakeLists.txt
+			-DPOEKIT_CMAKE_FILE=${CMAKE_CURRENT_SOURCE_DIR}/poekit/CMakeLists.txt
 			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-module-tooling.cmake
 	)
 	set_tests_properties(ani_poco_module_tooling PROPERTIES TIMEOUT 10)
+
+	# The audits below read both source trees, so they belong to Animator and
+	# not to poco/test: a standalone Poco checkout has no parent to inspect.
+	set(ANI_POCO_AUDIT_ARGS
+		-DPOCO_SOURCE_DIR=${CMAKE_SOURCE_DIR}/poco
+		-DANIMATOR_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+	)
+
+	# Animator still consumes the legacy POE declarations while it migrates to
+	# the embedding API.  Keep that compatibility boundary honest: no duplicate
+	# ABI layouts, and no return of the retired compile/run/free entry points.
+	add_test(
+		NAME ani_poco_legacy_header_shims
+		COMMAND ${CMAKE_COMMAND} ${ANI_POCO_AUDIT_ARGS}
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-legacy-header-shims.cmake
+	)
+	set_tests_properties(ani_poco_legacy_header_shims PROPERTIES TIMEOUT 10)
+
+	# Characterization gate: keep the pre-refactor registration and callback
+	# inventory reviewable as the binding ownership changes in later tasks.
+	add_test(
+		NAME ani_poco_binding_baseline
+		COMMAND ${CMAKE_COMMAND} ${ANI_POCO_AUDIT_ARGS}
+			-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/binding-baseline.json
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-binding-baseline.cmake
+	)
+	set_tests_properties(ani_poco_binding_baseline PROPERTIES TIMEOUT 10)
+
+	# Every active C-varargs binding must use the result type it declares to
+	# the Poco compiler.  The matching runtime promotion fixture is a plain
+	# Poco positive test.
+	add_test(
+		NAME ani_poco_live_variadic_bindings
+		COMMAND ${CMAKE_COMMAND} ${ANI_POCO_AUDIT_ARGS}
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-live-variadic-bindings.cmake
+	)
+	set_tests_properties(ani_poco_live_variadic_bindings PROPERTIES TIMEOUT 20)
+
+	# Current module builds use the generic and Animator-specific CMake
+	# helpers.  Keep the retired Rex assembly inputs and DOS-era Poekit
+	# packaging metadata out of all supported build paths.
+	add_test(
+		NAME ani_poco_legacy_artifact_cleanup
+		COMMAND ${CMAKE_COMMAND} ${ANI_POCO_AUDIT_ARGS}
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-legacy-artifact-cleanup.cmake
+	)
+	set_tests_properties(ani_poco_legacy_artifact_cleanup PROPERTIES TIMEOUT 20)
+
+	# Legacy POE modules use Animator's native function-table ABI.  The
+	# runtime fence fixture lives in poco/test; this is its source-level half,
+	# which also inspects the Animator adapter's module policy.
+	add_test(
+		NAME ani_poco_legacy_poe_fence_source
+		COMMAND ${CMAKE_COMMAND} ${ANI_POCO_AUDIT_ARGS}
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-legacy-poe-fence.cmake
+	)
+	set_tests_properties(ani_poco_legacy_poe_fence_source PROPERTIES TIMEOUT 10)
 endif() ## WITH_POCO
 
 set(PJMAIN_SRC_FILES
@@ -314,12 +371,13 @@ target_link_libraries(
 		add_test(
 			NAME ani_poco_configurations
 			COMMAND ${CMAKE_COMMAND}
-				-DBASELINE_MANIFEST=${CMAKE_SOURCE_DIR}/poco/test/binding-baseline.json
+				-DBASELINE_MANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/binding-baseline.json
 				-DBUILD_DIR=${CMAKE_BINARY_DIR}
 				-DINSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
 				-DANI_EXECUTABLE=$<TARGET_FILE:ani>
 				-DANI_REGISTRATION_EXECUTABLE=$<TARGET_FILE:ani_poco_registration>
-				-DPOCO_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/poco${CMAKE_EXECUTABLE_SUFFIX}
+				-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>
+				-DANI_SECOND_MODULE_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/poekit/pstamp/pstamp_load.poc
 				-P ${CMAKE_CURRENT_SOURCE_DIR}/ani_poco/verify-configurations.cmake
 		)
 		set_tests_properties(ani_poco_configurations PROPERTIES

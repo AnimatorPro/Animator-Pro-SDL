@@ -2,7 +2,7 @@ if(NOT DEFINED BASELINE_MANIFEST OR NOT EXISTS "${BASELINE_MANIFEST}")
     message(FATAL_ERROR "BASELINE_MANIFEST must name the Phase 1 binding baseline")
 endif()
 foreach(required_variable BUILD_DIR INSTALL_PREFIX ANI_EXECUTABLE
-        ANI_REGISTRATION_EXECUTABLE POCO_EXECUTABLE)
+        ANI_REGISTRATION_EXECUTABLE POCO_EXECUTABLE ANI_SECOND_MODULE_SCRIPT)
     if(NOT DEFINED ${required_variable} OR "${${required_variable}}" STREQUAL "")
         message(FATAL_ERROR "${required_variable} is required")
     endif()
@@ -94,7 +94,7 @@ foreach(required_option WITH_ANI WITH_POCO)
 endforeach()
 require_file("built Animator executable" "${ANI_EXECUTABLE}")
 require_file("Animator registration fixture" "${ANI_REGISTRATION_EXECUTABLE}")
-require_file("installed Poco executable" "${POCO_EXECUTABLE}")
+require_file("built Poco executable" "${POCO_EXECUTABLE}")
 
 # The fixture compiles an API from every registered Animator category and runs
 # GetAbort() in the minimal runtime.  Its generated category inventory must
@@ -107,11 +107,12 @@ compare_inventory("${inventory_file}" "${BASELINE_MANIFEST}")
 run_checked("Animator representative binding script"
     "${ANI_REGISTRATION_EXECUTABLE}")
 
-# Generic modules live with Poco test modules, while Animator-native modules
-# are installed in the Animator resource directory.  Load one of each class
-# from its installed location and also require the second retained Ani module.
-set(generic_module "${INSTALL_PREFIX}/tests/hello.poe")
-set(generic_script "${INSTALL_PREFIX}/tests/hello.poc")
+# Generic modules are Poco's own and install under Poco's example layout,
+# while Animator-native modules are installed in the Animator resource
+# directory.  Load one of each class from its installed location and also
+# require the second retained Ani module.
+set(generic_module "${INSTALL_PREFIX}/examples/hello/hello.poe")
+set(generic_script "${INSTALL_PREFIX}/examples/hello/hello.poc")
 set(ani_module "${INSTALL_PREFIX}/resource/colorutl.poe")
 set(ani_script "${INSTALL_PREFIX}/tests/COLTEST.POC")
 set(ani_second_module "${INSTALL_PREFIX}/resource/pstamp.poe")
@@ -120,7 +121,8 @@ foreach(required_pair
     "generic Poco module script|${generic_script}"
     "Animator-native module|${ani_module}"
     "Animator-native module script|${ani_script}"
-    "second Animator-native module|${ani_second_module}")
+    "second Animator-native module|${ani_second_module}"
+    "second Animator-native module script|${ANI_SECOND_MODULE_SCRIPT}")
     string(REPLACE "|" ";" pair "${required_pair}")
     list(GET pair 0 label)
     list(GET pair 1 path)
@@ -130,6 +132,13 @@ run_checked_in("installed generic module load" "${INSTALL_PREFIX}"
     "${POCO_EXECUTABLE}" "${generic_script}")
 run_checked_in("installed Animator-native module load" "${INSTALL_PREFIX}"
     "${ANI_REGISTRATION_EXECUTABLE}" "${ani_script}")
+
+# Existence is not load: pstamp.poe has to resolve from the resource directory
+# and register its prototypes through the legacy POE path, or a module
+# relocation that only moved the install rule would still look green here.
+run_checked_in("installed second Animator-native module load"
+    "${INSTALL_PREFIX}/resource"
+    "${ANI_REGISTRATION_EXECUTABLE}" "${ANI_SECOND_MODULE_SCRIPT}")
 
 message(STATUS
     "Animator Poco verification passed: representative bindings, separate "

@@ -1,0 +1,29 @@
+/* Load-only smoke for the retained pstamp POE.
+ *
+ * Every pstamp entry point needs a live Animator Screen, so this script
+ * cannot call one.  What it does prove is the part the module relocation can
+ * break: pstamp.poe resolves from the installed resource directory, opens
+ * through the legacy allow_legacy_poe path, and publishes its prototypes
+ * without a POCO_STATUS_MODULE_* failure.
+ */
+
+#pragma poco library "pstamp.poe"
+
+#ifndef __POCO__
+  void InitPstampScreen(Screen* s);
+  void CleanupPstampScreen(Screen* s);
+#endif /* __POCO__ */
+
+int main()
+{
+	Screen* s;
+
+	/* Unreachable: compiling the calls proves pstamp's prototypes reached the
+	 * symbol table; running them would need a live screen. */
+	s = GetPicScreen();
+	if (0) {
+		InitPstampScreen(s);
+		CleanupPstampScreen(s);
+	}
+	return 0;
+}

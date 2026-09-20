@@ -1,6 +1,5 @@
 #include "jimk.h"
 #include "errcodes.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "tween.h"
 #include "auto.h"
@@ -8,6 +7,9 @@
 
 #define POCO_TWEEN_INTERNALS
 #include "poco_tween.h"
+
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
 
 /* pocotwee.c - Poco library functions for the tweening system.
  */
@@ -564,6 +566,6 @@ ErrCode po_tween_load(Popot pop_file_name) ErrCode
 Poco_lib po_tween_lib = {
 	NULL,
 	"Tween",
-	(Lib_proto*)&po_libtween,
+	(const Lib_proto*)&po_libtween,
 	POLIB_TWEEN_SIZE,
 };

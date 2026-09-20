@@ -21,7 +21,15 @@ static char default_config_name[] = "aa.cfg";
 int debug; /* and this */
 #endif     /* TESTING */
 
-Errcode builtin_err; /* for poco and other things */
+#ifdef WITH_POCO
+/* The math/FP traps below report through the activation of whichever VM is
+ * running on this thread; see src/ani_poco/ani_builtin_err.h.  Declared here
+ * rather than included so pjhigh keeps no dependency on the adapter's headers. */
+Errcode* poco_active_builtin_error(void);
+#define builtin_err (*poco_active_builtin_error())
+#else
+Errcode builtin_err; /* no VM in this build; the traps still record here */
+#endif
 
 void restore_ivmode(void)
 {

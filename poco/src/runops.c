@@ -62,10 +62,13 @@
  *				pointer opcodes at the moment.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "activation.h"
 #include <limits.h>
 #include <string.h>
+#include "pocodis.h"
+#include "trace.h"
+#include "postring.h"
 
 #define MIN_PCALL_STACK 512  /* we check real often, small is fine. */
 #define MIN_CCALL_STACK 4096 /* we guarantee min 2k to poe users */
@@ -94,9 +97,6 @@
 #define LC_call(s, f) ((long)((*f)(s)))
 #define DC_call(s, f) ((double)((*f)(s)))
 #define PC_call(s, f) ((Popot)((*f)(s)))
-#ifdef STRING_EXPERIMENT
-#define STRING_C_call(s, f) po_string_ccall(s, f)
-#endif
 
 typedef union eax {
 	Func_frame* f;
@@ -134,18 +134,6 @@ typedef struct {
 	long data[32];
 } Parmdata;
 
-#define RECORD_VARIADIC_TYPE(env, type)                                          \
-	do {                                                                         \
-		err = po_ffi_variadic_types_append((env)->vm, &(env)->variadic, (type)); \
-		if (err != Success) goto ERR_IN_FFI;                                     \
-	} while (0)
-
-#ifdef DEVELOPMENT
-/* variables for runops tracing */
-FILE* po_trace_file;
-bool po_trace_flag = false;
-#endif /* DEVELOPMENT */
-
 /*****************************************************************************
  * used as a dummy check_abort function when none is provided.
  ****************************************************************************/
@@ -156,32 +144,2025 @@ static bool nofunc(void* d)
 }
 
 /*****************************************************************************
+ * Interpreter state.
+ *
+ * The dispatch loop used to be one 1800-line function whose machine registers
+ * were plain locals.  The registers now live here so that each opcode family
+ * can be a separate handler; the handlers are force-inlined back into the
+ * loop, so the generated code is the same flat interpreter it always was.
+ ****************************************************************************/
+typedef struct {
+	PocoActivation* p;
+	Pt_num* ip;
+	Pt_num* stack;
+	Pt_num* base;
+	Pt_num* globals;
+	UBYTE* stack_area;
+	Eax* acc; /* kept out of line: the union defeats scalar promotion */
+	Errcode err;
+	size_t debug_depth_floor;
+} PoRunState;
+
+/*
+ * What an opcode handler tells the dispatch loop to do next.  These replace
+ * the gotos that used to jump straight from a case body to the error tails.
+ */
+typedef enum {
+	PO_STEP_NEXT = 0, /* fetch the next instruction */
+	PO_STEP_DONE,     /* OP_END: the instruction stream is finished */
+	PO_STEP_ABORT,
+	PO_STEP_TRAP, /* st->err holds the error code */
+	PO_STEP_ERR_NOTAFUNC,
+	PO_STEP_ERR_NULL,
+	PO_STEP_ERR_SMALL,
+	PO_STEP_ERR_BIG,
+	PO_STEP_ERR_POINTER_ACCESS,
+	PO_STEP_ERR_FPMATH,
+	PO_STEP_ERR_LIBROUTINE,
+	PO_STEP_ERR_FFI
+} PoStep;
+
+#if defined(_MSC_VER)
+#define PO_STEP_HANDLER static __forceinline PoStep
+#define PO_UNREACHABLE() __assume(0)
+#else
+#define PO_STEP_HANDLER static inline __attribute__((always_inline)) PoStep
+#define PO_UNREACHABLE() __builtin_unreachable()
+#endif
+
+/*
+ * One arm of the dispatch table.  The opcode is repeated as an argument so
+ * that the handler's own switch folds away once it is inlined here - passing
+ * the loop's `op` variable instead costs a second jump table per instruction.
+ */
+#define PO_DISPATCH_CASE(opcode, handler) \
+	case opcode:                          \
+		return handler(st, opcode)
+
+#define PO_STACK_OVERFLOW(st, limit) ((UBYTE*)(st)->stack < ((st)->stack_area + (limit)))
+
+#define PO_RECORD_VARIADIC_TYPE(st, type)                                                  \
+	do {                                                                                   \
+		(st)->err = po_ffi_variadic_types_append((st)->p->vm, &(st)->p->variadic, (type)); \
+		if ((st)->err != Success) return PO_STEP_ERR_FFI;                                  \
+	} while (0)
+
+/*****************************************************************************
+ * datatype conversions
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_convert(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_INT_TO_LONG:
+			st->acc->ret.l = st->stack->inty;
+			st->stack = OPTR(st->stack, INT_SIZE - sizeof(long));
+			st->stack->l = st->acc->ret.l;
+			return PO_STEP_NEXT;
+		case OP_LONG_TO_INT:
+			st->acc->ret.inty = (int)st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(long) - INT_SIZE);
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_INT_TO_DOUBLE:
+			st->acc->ret.d = st->stack->inty;
+			st->stack = OPTR(st->stack, INT_SIZE - sizeof(double));
+			st->stack->d = st->acc->ret.d;
+			return PO_STEP_NEXT;
+		case OP_LONG_TO_DOUBLE:
+			st->acc->ret.d = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(long) - sizeof(double));
+			st->stack->d = st->acc->ret.d;
+			return PO_STEP_NEXT;
+		case OP_DOUBLE_TO_LONG:
+			st->acc->ret.l = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(double) - sizeof(long));
+			st->stack->l = st->acc->ret.l;
+			return PO_STEP_NEXT;
+		case OP_DOUBLE_TO_INT:
+			st->acc->ret.inty = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(double) - sizeof(int));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_PPT_TO_CPT:
+			// convert popot pointer to void*
+			st->acc->ret.p = st->stack->ppt.pt;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt) - sizeof(st->stack->ppt.pt));
+			st->stack->p = st->acc->ret.p;
+			return PO_STEP_NEXT;
+		case OP_CPT_TO_PPT:
+			// convert void* to popot pointer
+			/* Expression-tier programs cannot contain a native pointer
+			 * binding, so the compiler cannot normally emit a reachable
+			 * instance of this opcode.  Keep a runtime fence as defense in
+			 * depth for malformed or future serialized code. */
+			if (st->p->vm != NULL && st->p->vm->untrusted_expression_library_registered) {
+				st->err = Err_bad_instruction;
+				return PO_STEP_TRAP;
+			}
+			// NOTE: Since we don't know the size of the C-allocated memory,
+			// we set permissive bounds (min=0, max=max_addr) to allow array
+			// access. This trades safety for C interoperability.
+			st->acc->ret.p = st->stack->p;
+			st->stack = OPTR(st->stack, sizeof(st->stack->p) - sizeof(st->stack->ppt));
+			st->stack->ppt.pt = st->acc->ret.p;
+			st->stack->ppt.min = NULL;
+			st->stack->ppt.max = (void*)~(size_t)0;
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * function entry and exit
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_frame(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_RET:
+			st->ip = st->stack->p;
+			st->stack = OPTR(st->stack, sizeof(st->ip));
+			if (st->p->debug_call_depth > st->debug_depth_floor) {
+				--st->p->debug_call_depth;
+			}
+			return PO_STEP_NEXT;
+		case OP_ADD_STACK:
+			st->stack = OPTR(st->stack, st->ip->doff);
+			st->ip = OPTR(st->ip, sizeof(st->ip->doff));
+			return PO_STEP_NEXT;
+		case OP_ENTER:
+			if (PO_STACK_OVERFLOW(st, st->ip->doff + MIN_PCALL_STACK)) {
+				st->err = Err_stack;
+				return PO_STEP_TRAP;
+			}
+			st->stack = OPTR(st->stack, -sizeof(st->base));
+			st->stack->p = st->base;
+			st->base = st->stack;
+			st->stack = OPTR(st->stack, -st->ip->doff);
+			poco_zero_bytes(st->stack, st->ip->doff);
+			st->ip = OPTR(st->ip, sizeof(st->ip->doff));
+			return PO_STEP_NEXT;
+		case OP_LEAVE:
+			st->stack = st->base;                          /* clear off local vars  */
+			st->base = st->stack->p;                       /* restore parent base	 */
+			st->stack = OPTR(st->stack, sizeof(st->base)); /* clean off parent base */
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * branches
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_branch(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_BRA:
+			if (st->ip->inty < 0) {
+				if ((st->p->check_abort)(st->p->check_abort_data)) {
+					return PO_STEP_ABORT;
+				}
+			}
+			st->ip = OPTR(st->ip, st->ip->inty);
+			return PO_STEP_NEXT;
+		case OP_BEQ:
+			if (st->stack->inty == 0) {
+				if (st->ip->inty < 0) {
+					if ((st->p->check_abort)(st->p->check_abort_data)) {
+						return PO_STEP_ABORT;
+					}
+				}
+				st->ip = OPTR(st->ip, st->ip->inty);
+			} else {
+				st->ip = OPTR(st->ip, sizeof(st->ip->inty));
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			return PO_STEP_NEXT;
+		case OP_BNE:
+			if (st->stack->inty != 0) {
+				if (st->ip->inty < 0) {
+					if ((st->p->check_abort)(st->p->check_abort_data)) {
+						return PO_STEP_ABORT;
+					}
+				}
+				st->ip = OPTR(st->ip, st->ip->inty);
+			} else {
+				st->ip = OPTR(st->ip, sizeof(st->ip->inty));
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * constants and effective addresses
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_push_const(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_ICON: /* push int constant onto data stack */
+			st->stack = OPTR(st->stack, -INT_SIZE);
+			st->stack->inty = st->ip->inty;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LCON: /* push long constant onto stack */
+			st->stack = OPTR(st->stack, -sizeof(long));
+			st->stack->l = st->ip->l;
+			st->ip = OPTR(st->ip, sizeof(long));
+			return PO_STEP_NEXT;
+		case OP_DCON: /* push floating point constant onto stack */
+			st->stack = OPTR(st->stack, -sizeof(double));
+			st->stack->d = st->ip->d;
+			st->ip = OPTR(st->ip, sizeof(double));
+			return PO_STEP_NEXT;
+		case OP_PCON: /* push pointer constant onto stack */
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt = st->ip->ppt;
+			st->ip = OPTR(st->ip, sizeof(st->ip->ppt));
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * LOAD EFFECTIVE ADDRESS
+			 *--------------------------------------------------------------------------*/
+
+		case OP_GLO_ADDRESS:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt.min = st->stack->ppt.max = st->stack->ppt.pt =
+				OPTR(st->globals, st->ip->inty);
+			st->ip = OPTR(st->ip, sizeof(st->ip->inty));
+			st->stack->ppt.max = OPTR(st->stack->ppt.max, st->ip->l);
+			st->ip = OPTR(st->ip, sizeof(st->ip->l));
+			return PO_STEP_NEXT;
+		case OP_LOC_ADDRESS:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt.min = st->stack->ppt.max = st->stack->ppt.pt =
+				OPTR(st->base, st->ip->inty);
+			st->ip = OPTR(st->ip, sizeof(st->ip->inty));
+			st->stack->ppt.max = OPTR(st->stack->ppt.max, st->ip->l);
+			st->ip = OPTR(st->ip, sizeof(st->ip->l));
+			return PO_STEP_NEXT;
+		case OP_CODE_ADDRESS: /* put immediate code address onto stack */
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt.min = st->stack->ppt.max = NULL;
+			st->stack->ppt.pt = poco_activation_callback_handle(st->p, st->ip->p);
+			st->ip = OPTR(st->ip, sizeof(void*));
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * direct variable loads
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_load_direct(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_GLO_CVAR: /* push a global variable onto data stack */
+			st->stack = OPTR(st->stack, -INT_SIZE);
+			st->stack->inty = ((char*)(OPTR(st->globals, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_SVAR: /* push a global variable onto data stack */
+			st->stack = OPTR(st->stack, -INT_SIZE);
+			st->stack->inty = ((short*)(OPTR(st->globals, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_IVAR: /* push a global variable onto data stack */
+			st->stack = OPTR(st->stack, -INT_SIZE);
+			st->stack->inty = ((int*)(OPTR(st->globals, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_LVAR: /* push a global variable onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(long));
+			st->stack->l = ((long*)(OPTR(st->globals, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_PVAR: /* push a global pointer onto data stack */
+		case OP_GLO_VVAR: /* push a global function pointer onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt = ((Popot*)(OPTR(st->globals, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_FVAR: /* push a global variable onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(double));
+			st->stack->d = ((float*)(OPTR(st->globals, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_DVAR: /* push a global variable onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(double));
+			st->stack->d = ((double*)(OPTR(st->globals, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_CVAR: /* push a local variable onto data stack */
+			st->stack = OPTR(st->stack, -INT_SIZE);
+			st->stack->inty = ((char*)(OPTR(st->base, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_SVAR: /* push a local variable onto data stack */
+			st->stack = OPTR(st->stack, -INT_SIZE);
+			st->stack->inty = ((short*)(OPTR(st->base, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_IVAR: /* push a local variable onto data stack */
+			st->stack = OPTR(st->stack, -INT_SIZE);
+			st->stack->inty = ((int*)(OPTR(st->base, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_LVAR: /* push a local variable onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(long));
+			st->stack->l = ((long*)(OPTR(st->base, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_PVAR: /* push a local variable onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt = ((Popot*)(OPTR(st->base, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_FVAR: /* push a local variable onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(double));
+			st->stack->d = ((float*)(OPTR(st->base, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_DVAR: /* push a local variable onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(double));
+			st->stack->d = ((double*)(OPTR(st->base, st->ip->doff)))[0];
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * direct variable stores
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_store_direct(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_GLO_CASS: /* move top of stack to global variable */
+			(((char*)OPTR(st->globals, st->ip->doff))[0]) = st->stack->inty;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_SASS: /* move top of stack to global variable */
+			((short*)(OPTR(st->globals, st->ip->doff)))[0] = st->stack->inty;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_IASS: /* move top of stack to global variable */
+			((int*)(OPTR(st->globals, st->ip->doff)))[0] = st->stack->inty;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_LASS: /* move top of stack to global variable */
+			((long*)(OPTR(st->globals, st->ip->doff)))[0] = st->stack->l;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_PASS: /* move top of stack to global pointer variable */
+			((Popot*)(OPTR(st->globals, st->ip->doff)))[0] = st->stack->ppt;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_FASS: /* move top of stack to global variable */
+			((float*)(OPTR(st->globals, st->ip->doff)))[0] = st->stack->d;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_GLO_DASS: /* move top of stack to global variable */
+			((double*)(OPTR(st->globals, st->ip->doff)))[0] = st->stack->d;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_CASS: /* move top of stack to local variable */
+			((char*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->inty;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_SASS: /* move top of stack to local variable */
+			((short*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->inty;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_IASS: /* move top of stack to local variable */
+			((int*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->inty;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_LASS: /* move top of stack to local variable */
+			((long*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->l;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_PASS: /* move top of stack to local ptr variable */
+			((Popot*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->ppt;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_FASS: /* move top of stack to local variable */
+			((float*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->d;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+		case OP_LOC_DASS: /* move top of stack to local variable */
+			((double*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->d;
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * indirect variable loads
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_CI_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(char),
+													   POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.inty));
+			st->stack->inty = *((char*)(st->acc->ret.ppt.pt));
+			return PO_STEP_NEXT;
+		case OP_SI_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(short),
+													   POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.inty));
+			st->stack->inty = *((short*)(st->acc->ret.ppt.pt));
+			return PO_STEP_NEXT;
+		case OP_II_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(int), POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.inty));
+			st->stack->inty = *((int*)(st->acc->ret.ppt.pt));
+			return PO_STEP_NEXT;
+		case OP_PI_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(Popot),
+													   POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.ppt));
+			st->stack->ppt = *((Popot*)(st->acc->ret.ppt.pt));
+			return PO_STEP_NEXT;
+		case OP_LI_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(long),
+													   POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.l));
+			st->stack->l = *((long*)(st->acc->ret.ppt.pt));
+			return PO_STEP_NEXT;
+		case OP_FI_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(float),
+													   POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.f));
+			st->stack->d = *((float*)(st->acc->ret.ppt.pt));
+			return PO_STEP_NEXT;
+		case OP_DI_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(double),
+													   POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.d));
+			st->stack->d = *((double*)(st->acc->ret.ppt.pt));
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * indirect variable stores
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_CI_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(char),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			((char*)(st->acc->ret.ppt.pt))[0] = st->stack->inty;
+			return PO_STEP_NEXT;
+		case OP_SI_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(short),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			((short*)(st->acc->ret.ppt.pt))[0] = st->stack->inty;
+			return PO_STEP_NEXT;
+		case OP_II_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(int),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			((int*)(st->acc->ret.ppt.pt))[0] = st->stack->inty;
+			return PO_STEP_NEXT;
+		case OP_PI_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(Popot),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			((Popot*)(st->acc->ret.ppt.pt))[0] = st->stack->ppt;
+			return PO_STEP_NEXT;
+		case OP_LI_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(long),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			((long*)(st->acc->ret.ppt.pt))[0] = st->stack->l;
+			return PO_STEP_NEXT;
+		case OP_FI_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(float),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			((float*)(st->acc->ret.ppt.pt))[0] = st->stack->d;
+			return PO_STEP_NEXT;
+		case OP_DI_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(double),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			((double*)(st->acc->ret.ppt.pt))[0] = st->stack->d;
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * arithmetic, negation and modulo
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_arith(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_IADD: /* replace top two elements of stack one result */
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, INT_SIZE);
+			st->stack->inty += st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LADD:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(long));
+			st->stack->l += st->acc->ret.l;
+			return PO_STEP_NEXT;
+		case OP_DADD:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(double));
+			st->stack->d += st->acc->ret.d;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PADD:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->ppt.pt = OPTR(st->stack->ppt.pt, st->acc->ret.inty);
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * SUBTRACTION
+			 *--------------------------------------------------------------------------*/
+
+		case OP_ISUB:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, INT_SIZE);
+			st->stack->inty -= st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LSUB:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(long));
+			st->stack->l -= st->acc->ret.l;
+			return PO_STEP_NEXT;
+		case OP_DSUB:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(double));
+			st->stack->d -= st->acc->ret.d;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PSUB:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->ppt.pt = OPTR(st->stack->ppt.pt, -st->acc->ret.inty);
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * MULTIPLICATION
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IMUL:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, INT_SIZE);
+			st->stack->inty *= st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LMUL:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(long));
+			st->stack->l *= st->acc->ret.l;
+			return PO_STEP_NEXT;
+		case OP_DMUL:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(double));
+			st->stack->d *= st->acc->ret.d;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * DIVISION
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IDIV:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, INT_SIZE);
+			if (st->acc->ret.inty == 0) {
+				st->err = Err_zero_divide;
+				return PO_STEP_TRAP;
+			}
+			st->stack->inty /= st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LDIV:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(long));
+			if (st->acc->ret.l == 0) {
+				st->err = Err_zero_divide;
+				return PO_STEP_TRAP;
+			}
+			st->stack->l /= st->acc->ret.l;
+			return PO_STEP_NEXT;
+		case OP_DDIV:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(double));
+			st->stack->d /= st->acc->ret.d;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * NEGATION
+			 *--------------------------------------------------------------------------*/
+
+		case OP_INEG:
+			st->stack->inty = -st->stack->inty;
+			return PO_STEP_NEXT;
+		case OP_LNEG:
+			st->stack->l = -st->stack->l;
+			return PO_STEP_NEXT;
+		case OP_DNEG:
+			st->stack->d = -st->stack->d;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * MODULO
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IMOD:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty %= st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LMOD:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l %= st->acc->ret.l;
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * comparisons
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_compare(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_IEQ:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = (st->acc->ret.inty == st->stack->inty);
+			return PO_STEP_NEXT;
+		case OP_LEQ:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->acc->ret.inty = (st->acc->ret.l == st->stack->l);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->l) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_DEQ:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(st->stack->d));
+			st->acc->ret.inty = (st->acc->ret.d == st->stack->d);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->d) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PEQ:
+			st->acc->ret.inty =
+				(st->stack->ppt.pt == ((Pt_num*)OPTR(st->stack, sizeof(st->stack->ppt)))->ppt.pt);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->ppt) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * COMPARISONS - NE
+			 *--------------------------------------------------------------------------*/
+
+		case OP_INE:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = (st->acc->ret.inty != st->stack->inty);
+			return PO_STEP_NEXT;
+		case OP_LNE:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->acc->ret.inty = (st->acc->ret.l != st->stack->l);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->l) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_DNE:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(st->stack->d));
+			st->acc->ret.inty = (st->acc->ret.d != st->stack->d);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->d) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PNE:
+			st->acc->ret.inty =
+				(st->stack->ppt.pt != ((Pt_num*)OPTR(st->stack, sizeof(st->stack->ppt)))->ppt.pt);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->ppt) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * COMPARISONS - GE
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IGE:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = (st->stack->inty >= st->acc->ret.inty);
+			return PO_STEP_NEXT;
+		case OP_LGE:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->acc->ret.inty = (st->stack->l >= st->acc->ret.l);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->l) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_DGE:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(st->stack->d));
+			st->acc->ret.inty = (st->stack->d >= st->acc->ret.d);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->d) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PGE:
+			st->acc->ret.ppt = st->stack->ppt;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			st->acc->ret.inty = ((char*)(st->stack->ppt.pt) >= ((char*)st->acc->ret.ppt.pt));
+			st->stack = OPTR(st->stack, (sizeof(st->stack->ppt) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * COMPARISONS - GT
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IGT:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = (st->stack->inty > st->acc->ret.inty);
+			return PO_STEP_NEXT;
+		case OP_LGT:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->acc->ret.inty = (st->stack->l > st->acc->ret.l);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->l) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_DGT:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(st->stack->d));
+			st->acc->ret.inty = (st->stack->d > st->acc->ret.d);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->d) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PGT:
+			st->acc->ret.ppt = st->stack->ppt;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			st->acc->ret.inty = ((char*)(st->stack->ppt.pt) > ((char*)st->acc->ret.ppt.pt));
+			st->stack = OPTR(st->stack, (sizeof(st->stack->ppt) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * COMPARISONS - LE
+			 *--------------------------------------------------------------------------*/
+
+		case OP_ILE:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = (st->stack->inty <= st->acc->ret.inty);
+			return PO_STEP_NEXT;
+		case OP_LLE:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->acc->ret.inty = (st->stack->l <= st->acc->ret.l);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->l) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_DLE:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(st->stack->d));
+			st->acc->ret.inty = (st->stack->d <= st->acc->ret.d);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->d) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PLE:
+			st->acc->ret.ppt = st->stack->ppt;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			st->acc->ret.inty = ((char*)(st->stack->ppt.pt) <= ((char*)st->acc->ret.ppt.pt));
+			st->stack = OPTR(st->stack, (sizeof(st->stack->ppt) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * COMPARISONS - LT
+			 *--------------------------------------------------------------------------*/
+
+		case OP_ILT:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = (st->stack->inty < st->acc->ret.inty);
+			return PO_STEP_NEXT;
+		case OP_LLT:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->acc->ret.inty = (st->stack->l < st->acc->ret.l);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->l) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_DLT:
+			st->acc->ret.d = st->stack->d;
+			st->stack = OPTR(st->stack, sizeof(st->stack->d));
+			st->acc->ret.inty = (st->stack->d < st->acc->ret.d);
+			st->stack = OPTR(st->stack, (sizeof(st->stack->d) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			if (st->p->builtin_error != Success) {
+				return PO_STEP_ERR_FPMATH;
+			}
+			return PO_STEP_NEXT;
+		case OP_PLT:
+			st->acc->ret.ppt = st->stack->ppt;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			st->acc->ret.inty = ((char*)(st->stack->ppt.pt) < ((char*)st->acc->ret.ppt.pt));
+			st->stack = OPTR(st->stack, (sizeof(st->stack->ppt) - sizeof(st->stack->inty)));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * shifts, bitwise and logical operators
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_bitwise(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_ILSHIFT:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty <<= st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LLSHIFT:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l <<= st->acc->ret.l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * SHIFT RIGHT
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IRSHIFT:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty >>= st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LRSHIFT:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l >>= st->acc->ret.l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * BINARY AND
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IBAND:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = st->stack->inty & st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LBAND:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l = st->stack->l & st->acc->ret.l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * BINARY OR
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IBOR:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = st->stack->inty | st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LBOR:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l = st->stack->l | st->acc->ret.l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * BINARY XOR
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IXOR:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = st->stack->inty ^ st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LXOR:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l = st->stack->l ^ st->acc->ret.l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * LOGICAL AND
+			 *--------------------------------------------------------------------------*/
+
+		case OP_ILAND:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = st->stack->inty && st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LLAND:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l = st->stack->l && st->acc->ret.l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * LOGICAL OR
+			 *--------------------------------------------------------------------------*/
+
+		case OP_ILOR:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->inty = st->stack->inty || st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LLOR:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->l = st->stack->l || st->acc->ret.l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * BINARY NOT
+			 *--------------------------------------------------------------------------*/
+
+		case OP_ICOMP:
+			st->stack->inty = ~st->stack->inty;
+			return PO_STEP_NEXT;
+		case OP_LCOMP:
+			st->stack->l = ~st->stack->l;
+			return PO_STEP_NEXT;
+
+			/*----------------------------------------------------------------------------
+			 * LOGICAL NOT
+			 *--------------------------------------------------------------------------*/
+
+		case OP_INOT:
+			st->stack->inty = !st->stack->inty;
+			return PO_STEP_NEXT;
+		case OP_LNOT:
+			st->stack->l = !st->stack->l;
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * accumulator push/pop and stack duplication
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_stack(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_IPUSH:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+		case OP_LPUSH:
+		case OP_CPPUSH:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->l));
+			st->stack->l = st->acc->ret.l;
+			return PO_STEP_NEXT;
+		case OP_DPUSH:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->d));
+			st->stack->d = st->acc->ret.d;
+			return PO_STEP_NEXT;
+		case OP_PPUSH:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt = st->acc->ret.ppt;
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * POP STACK TO ACCUMULATOR (RETURN VALUE)
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IPOP:
+			st->acc->ret.inty = st->stack->inty;
+			st->p->result = st->acc->ret;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			return PO_STEP_NEXT;
+		case OP_LPOP:
+		case OP_CPPOP:
+			st->acc->ret.l = st->stack->l;
+			st->p->result = st->acc->ret;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			return PO_STEP_NEXT;
+		case OP_DPOP:
+			st->acc->ret.d = st->stack->d;
+			st->p->result = st->acc->ret;
+			st->stack = OPTR(st->stack, sizeof(st->stack->d));
+			return PO_STEP_NEXT;
+		case OP_PPOP:
+			st->acc->ret.ppt = st->stack->ppt;
+			st->p->result = st->acc->ret;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			return PO_STEP_NEXT;
+			/*----------------------------------------------------------------------------
+			 * DUPLICATE TOP-OF-STACK ITEM
+			 *--------------------------------------------------------------------------*/
+
+		case OP_IDUPE:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->inty));
+			st->stack->inty = ((int*)(OPTR(st->stack, sizeof(st->stack->inty))))[0];
+			return PO_STEP_NEXT;
+		case OP_LDUPE:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->l));
+			st->stack->l = ((long*)(OPTR(st->stack, sizeof(st->stack->l))))[0];
+			return PO_STEP_NEXT;
+		case OP_DDUPE:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->d));
+			st->stack->d = ((double*)(OPTR(st->stack, sizeof(st->stack->d))))[0];
+			return PO_STEP_NEXT;
+		case OP_PDUPE:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->ppt));
+			st->stack->ppt = ((Popot*)(OPTR(st->stack, sizeof(st->stack->ppt))))[0];
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * pointer arithmetic
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_ptr_math(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_ADD_IOFFSET:
+			st->acc->ret.inty = st->stack->inty;
+			st->stack = OPTR(st->stack, sizeof(st->stack->inty));
+			st->stack->ppt.pt = OPTR(st->stack->ppt.pt, st->acc->ret.inty);
+			return PO_STEP_NEXT;
+		case OP_ADD_LOFFSET:
+			st->acc->ret.l = st->stack->l;
+			st->stack = OPTR(st->stack, sizeof(st->stack->l));
+			st->stack->ppt.pt = OPTR(st->stack->ppt.pt, st->acc->ret.l);
+			return PO_STEP_NEXT;
+		case OP_PTRDIFF: /* subtract two pointers */
+			st->acc->ret.ppt.pt = st->stack->ppt.pt;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			st->acc->ret.l = (char*)st->stack->ppt.pt - (char*)st->acc->ret.ppt.pt;
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt) - sizeof(long));
+			st->stack->l = st->acc->ret.l / st->ip->inty; /* scale result */
+			st->ip = OPTR(st->ip, sizeof(st->ip->inty));
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * block copy and move
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_memory(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_COPY:
+			if (st->ip->l < 0) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_copy_span_has_capacity(&st->stack->ppt, (size_t)st->ip->l) ||
+				!po_copy_span_has_capacity((Popot*)OPTR(st->stack, sizeof(st->stack->ppt)),
+										   (size_t)st->ip->l)) {
+				return PO_STEP_ERR_BIG;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->stack->ppt,
+													   (size_t)st->ip->l,
+													   POCO_POINTER_PERMISSION_READ) ||
+				!po_registered_pointer_access_is_valid(
+					st->p->pointer_registry, (Popot*)OPTR(st->stack, sizeof(st->stack->ppt)),
+					(size_t)st->ip->l, POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			poco_copy_bytes(((Popot*)OPTR(st->stack, sizeof(st->stack->ppt)))->pt,
+							st->stack->ppt.pt, st->ip->l);
+			st->ip = OPTR(st->ip, sizeof(st->ip->l));
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->ppt));
+			return PO_STEP_NEXT;
+		case OP_MOVE:
+			poco_copy_bytes(st->stack->ppt.pt,
+							((Popot*)OPTR(st->stack, sizeof(st->stack->ppt)))->pt, st->ip->l);
+			st->ip = OPTR(st->ip, sizeof(st->ip->l));
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->ppt));
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * libffi variadic type recording
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_ffi_variadic(PoRunState* st, int op)
+{
+	switch (op) {
+		case OP_FFI_POP_ALL:
+			po_ffi_variadic_types_reset(&st->p->variadic);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_POINTER:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_pointer);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_SINT32:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_sint32);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_FLOAT:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_float);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_DOUBLE:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_double);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_UINT8:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_uint8);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_SINT8:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_sint8);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_UINT16:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_uint16);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_SINT16:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_sint16);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_UINT32:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_uint32);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_UINT64:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_uint64);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_SINT64:
+			PO_RECORD_VARIADIC_TYPE(st, &ffi_type_sint64);
+			return PO_STEP_NEXT;
+
+		case OP_FFI_PUSH_VOID:
+		case OP_FFI_PUSH_NULL:
+			st->err = Err_poco_ffi_invalid_binding;
+			return PO_STEP_ERR_FFI;
+	}
+	PO_UNREACHABLE();
+}
+
+/*****************************************************************************
+ * function calls - into C bindings, through a function pointer, or into
+ * another Poco function.
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_call(PoRunState* st, int op)
+{
+	/*
+	 * kiki note:
+	 *
+	 * I switched how this was working a bit so that po_ffi_call
+	 * now returns a Pt_num, making it so we don't have to worry
+	 * as much on this side about the type of the return value.
+	TODO:
+		- if ((st->p->check_abort)(st->p->check_abort_data))
+		  goto ABORT;
+	*/
+	switch (op) {
+		case OP_ICCALL:  /* call int valued C function */
+		case OP_LCCALL:  /* call long valued C function */
+		case OP_DCCALL:  /* call double valued C function */
+		case OP_PCCALL:  /* call (popot) pointer valued C function */
+		case OP_CPCCALL: /* call C pointer valued C function */
+		case OP_CVCCALL: /* call void valued C function */
+		{
+			Po_FFI* binding;
+
+			if (PO_STACK_OVERFLOW(st, MIN_CCALL_STACK)) {
+				st->err = Err_stack;
+				return PO_STEP_TRAP;
+			}
+			binding = po_ffi_find_binding(st->p, st->ip->func);
+			if (st->p->builtin_error < Success) {
+				return PO_STEP_ERR_LIBROUTINE;
+			}
+
+			st->acc->ret = po_ffi_call(binding, st->stack, &st->p->variadic, st->p);
+			if (st->p->builtin_error < Success) {
+				return PO_STEP_ERR_LIBROUTINE;
+			}
+			st->ip = OPTR(st->ip, sizeof(st->ip->func));
+			return PO_STEP_NEXT;
+		}
+
+		case OP_CALLI: /* Call Indirect (via pointer) */
+			if ((st->acc->f = st->stack->ppt.pt) == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (st->acc->f->magic != FUNC_MAGIC) {
+				return PO_STEP_ERR_NOTAFUNC;
+			}
+			switch (st->acc->f->type) {
+				case CFF_C:
+					if (PO_STACK_OVERFLOW(st, MIN_CCALL_STACK)) {
+						st->err = Err_stack;
+						return PO_STEP_TRAP;
+					}
+					st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+					switch (st->acc->f->return_type->ido_type) {
+						// #!FIXME: This!
+						case IDO_INT:
+							//								st->acc->ret.i = IC_call(st->stack,
+							// st->acc->f->code_pt);
+							st->acc->ret.i = 0;
+							break;
+						case IDO_LONG:
+							//								st->acc->ret.l = LC_call(st->stack,
+							// st->acc->f->code_pt);
+							st->acc->ret.l = 0;
+							break;
+						case IDO_DOUBLE:
+							//								st->acc->ret.d = DC_call(st->stack,
+							// st->acc->f->code_pt);
+							st->acc->ret.d = 0.0;
+							break;
+						case IDO_POINTER:
+							//								st->acc->ret.ppt = PC_call(st->stack,
+							// st->acc->f->code_pt);
+							st->acc->ret.ppt = empty_popot;
+							break;
+						case IDO_VOID:
+							//								VC_call(st->stack, st->acc->f->code_pt);
+							break;
+						default:
+							st->err = Err_unimpl;
+							return PO_STEP_TRAP;
+					}
+					if (st->p->builtin_error < Success) {
+						return PO_STEP_ERR_LIBROUTINE;
+					}
+					break;
+				case CFF_POCO:
+					if (PO_STACK_OVERFLOW(st, MIN_PCALL_STACK)) {
+						st->err = Err_stack;
+						return PO_STEP_TRAP;
+					}
+					st->stack = OPTR(st->stack, sizeof(st->stack->ppt) - sizeof(st->stack->p));
+					st->stack->p = st->ip;
+					st->ip = (Pt_num*)st->acc->f->code_pt;
+					++st->p->debug_call_depth;
+					break;
+			}
+			if ((st->p->check_abort)(st->p->check_abort_data)) {
+				return PO_STEP_ABORT;
+			}
+			return PO_STEP_NEXT;
+
+		case OP_PCALL: /* Call Poco function */
+			if (PO_STACK_OVERFLOW(st, MIN_PCALL_STACK)) {
+				st->err = Err_stack;
+				return PO_STEP_TRAP;
+			}
+			st->acc->f = st->ip->p;
+			st->ip = OPTR(st->ip, sizeof(st->acc->f));
+			st->stack = OPTR(st->stack, -sizeof(st->ip));
+			st->stack->p = st->ip;
+			st->ip = (Pt_num*)st->acc->f->code_pt;
+			++st->p->debug_call_depth;
+			if ((st->p->check_abort)(st->p->check_abort_data)) {
+				return PO_STEP_ABORT;
+			}
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+
+#ifdef STRING_EXPERIMENT
+/*****************************************************************************
+ * the String experiment
+ *
+ * Every opcode of the String type lives here, in one guard, rather than
+ * interleaved with the numeric and pointer opcodes it shadows.  Keeping the
+ * experiment in one place is what lets it be read, compiled, or dropped as a
+ * unit.  See postring.c and the POCO_STRING_EXPERIMENT option.
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_string(PoRunState* st, int op)
+{
+	Po_FFI* binding;
+
+	switch (op) {
+		case OP_STRING_TO_CPT:
+			po_sr_dec_ref(st->stack->postring); /* dec ref count but
+												 * don't deallocate yet */
+			st->stack->p = PoStringBuf(&st->stack->postring);
+			return PO_STEP_NEXT;
+
+		case OP_CPT_TO_STRING:
+			st->err = Err_bad_instruction; /* Right now we don't generate
+											* these and so it'd be hard
+											* to test the code required.... */
+			return PO_STEP_TRAP;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_TO_PPT:
+			st->acc->ret.postring = st->stack->postring;
+			po_sr_dec_ref(st->acc->ret.postring); /* dec ref count but
+												   * don't deallocate yet */
+			st->stack = OPTR(st->stack, sizeof(st->stack->postring) - sizeof(st->stack->ppt));
+			st->stack->ppt = st->acc->ret.postring->string;
+			return PO_STEP_NEXT;
+		case OP_PPT_TO_STRING:
+			st->acc->ret.postring =
+				po_sr_new_copy(st->p, st->stack->ppt.pt, (int)Popot_bufsize(&st->stack->ppt));
+			if (st->p->builtin_error < Success) {
+				return PO_STEP_ERR_LIBROUTINE;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt) - sizeof(st->stack->postring));
+			st->stack->postring = st->acc->ret.postring;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_CCALL: /* call string valued C function */
+			if (PO_STACK_OVERFLOW(st, MIN_CCALL_STACK)) {
+				st->err = Err_stack;
+				return PO_STEP_TRAP;
+			}
+			binding = po_ffi_find_binding(st->p, st->ip->func);
+			if (st->p->builtin_error < Success) {
+				return PO_STEP_ERR_LIBROUTINE;
+			}
+			st->acc->ret = po_ffi_call(binding, st->stack, &st->p->variadic, st->p);
+			if (st->p->builtin_error < Success) {
+				return PO_STEP_ERR_LIBROUTINE;
+			}
+			st->ip = OPTR(st->ip, sizeof(st->ip->func));
+			return PO_STEP_NEXT;
+
+		case OP_GLO_STRING_VAR: /* push a global string onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(PoString));
+			st->stack->postring = ((PoString*)(OPTR(st->globals, st->ip->doff)))[0];
+			po_sr_inc_ref(st->stack->postring);
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+
+		case OP_LOC_STRING_VAR: /* push a local string onto data stack */
+			st->stack = OPTR(st->stack, -sizeof(PoString));
+			st->stack->postring = ((PoString*)(OPTR(st->base, st->ip->doff)))[0];
+			po_sr_inc_ref(st->stack->postring);
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+
+		case OP_GLO_STRING_ASS: /* top of stack to global string variable */
+			po_sr_clean_ref(st->p, (((PoString*)(OPTR(st->globals, st->ip->doff)))[0]));
+			((PoString*)(OPTR(st->globals, st->ip->doff)))[0] = st->stack->postring;
+			po_sr_inc_ref(st->stack->postring);
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+
+		case OP_LOC_STRING_ASS: /* top of stack to local string variable */
+			po_sr_clean_ref(st->p, (((PoString*)(OPTR(st->base, st->ip->doff)))[0]));
+			((PoString*)(OPTR(st->base, st->ip->doff)))[0] = st->stack->postring;
+			po_sr_inc_ref(st->stack->postring);
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+
+		case OP_STRING_I_VAR:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(PoString),
+													   POCO_POINTER_PERMISSION_READ)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.postring));
+			st->stack->postring = *((PoString*)(st->acc->ret.ppt.pt));
+			po_sr_inc_ref(st->stack->postring);
+			return PO_STEP_NEXT;
+
+		case OP_STRING_I_ASS:
+			st->acc->ret.ppt = st->stack->ppt;
+			if (st->acc->ret.ppt.pt == NULL) {
+				return PO_STEP_ERR_NULL;
+			}
+			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+													   sizeof(PoString),
+													   POCO_POINTER_PERMISSION_WRITE)) {
+				return PO_STEP_ERR_POINTER_ACCESS;
+			}
+			if (st->acc->ret.ppt.pt < st->acc->ret.ppt.min) {
+				return PO_STEP_ERR_SMALL;
+			}
+			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
+				return PO_STEP_ERR_BIG;
+			}
+			st->stack = OPTR(st->stack, sizeof(st->stack->ppt));
+			po_sr_clean_ref(st->p, ((PoString*)(st->acc->ret.ppt.pt))[0]);
+			((PoString*)(st->acc->ret.ppt.pt))[0] = st->stack->postring;
+			po_sr_inc_ref(st->stack->postring);
+			return PO_STEP_NEXT;
+
+		case OP_STRING_CAT: /* Concatenate top two strings */
+			st->acc->ret.postring = po_sr_cat_and_clean(
+				st->p, ((Pt_num*)OPTR(st->stack, sizeof(st->stack->postring)))->postring,
+				st->stack->postring);
+			st->stack =
+				OPTR(st->stack, 2 * sizeof(st->stack->postring) - sizeof(st->stack->postring));
+			st->stack->postring = st->acc->ret.postring;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_EQ:
+			st->acc->ret.inty = po_sr_eq_and_clean(
+				st->p, st->stack->postring,
+				((Pt_num*)OPTR(st->stack, sizeof(st->stack->postring)))->postring);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->postring) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_NE:
+			st->acc->ret.inty = !po_sr_eq_and_clean(
+				st->p, st->stack->postring,
+				((Pt_num*)OPTR(st->stack, sizeof(st->stack->postring)))->postring);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->postring) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_GE:
+			st->acc->ret.inty = po_sr_ge_and_clean(
+				st->p, ((Pt_num*)OPTR(st->stack, sizeof(st->stack->postring)))->postring,
+				st->stack->postring);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->postring) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_GT:
+			st->acc->ret.inty = !po_sr_le_and_clean(
+				st->p, ((Pt_num*)OPTR(st->stack, sizeof(st->stack->postring)))->postring,
+				st->stack->postring);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->postring) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_LE:
+			st->acc->ret.inty = po_sr_le_and_clean(
+				st->p, ((Pt_num*)OPTR(st->stack, sizeof(st->stack->postring)))->postring,
+				st->stack->postring);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->postring) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_LT:
+			st->acc->ret.inty = !po_sr_ge_and_clean(
+				st->p, ((Pt_num*)OPTR(st->stack, sizeof(st->stack->postring)))->postring,
+				st->stack->postring);
+			st->stack = OPTR(st->stack, 2 * sizeof(st->stack->postring) - sizeof(st->stack->inty));
+			st->stack->inty = st->acc->ret.inty;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_PUSH:
+			st->stack = OPTR(st->stack, -sizeof(st->stack->postring));
+			st->stack->postring = st->acc->ret.postring;
+			return PO_STEP_NEXT;
+
+		case OP_STRING_POP:
+			st->acc->ret.postring = st->stack->postring;
+			st->p->result = st->acc->ret;
+			st->stack = OPTR(st->stack, sizeof(st->stack->postring));
+			return PO_STEP_NEXT;
+		case OP_CLEAN_STRING: /* Pop string and dec reference count */
+			st->acc->ret.postring = st->stack->postring;
+			po_sr_clean_ref(st->p, st->acc->ret.postring);
+			st->p->result = st->acc->ret;
+			st->stack = OPTR(st->stack, sizeof(st->stack->postring));
+			return PO_STEP_NEXT;
+
+		case OP_FREE_STRING:
+			po_sr_clean_ref(st->p, (((PoString*)(OPTR(st->base, st->ip->doff)))[0]));
+			st->ip = OPTR(st->ip, INTY_SIZE);
+			return PO_STEP_NEXT;
+	}
+	PO_UNREACHABLE();
+}
+#endif /* STRING_EXPERIMENT */
+
+/*****************************************************************************
+ * decode one instruction and run it.
+ *
+ * The switch is still the flat 191-label jump table it always was; every arm
+ * hands off to the handler for its opcode family, and every handler is
+ * force-inlined, so this compiles to the same dispatch as the old monolith.
+ ****************************************************************************/
+PO_STEP_HANDLER po_step_dispatch(PoRunState* st, int op)
+{
+	switch (op) {
+		default:
+			st->err = Err_bad_instruction;
+			return PO_STEP_TRAP;
+
+		case OP_END: /* finished instruction stream */
+			return PO_STEP_DONE;
+
+		case OP_NOP:
+			return PO_STEP_NEXT;
+
+			/* datatype conversions */
+			PO_DISPATCH_CASE(OP_INT_TO_LONG, po_step_convert);
+			PO_DISPATCH_CASE(OP_LONG_TO_INT, po_step_convert);
+			PO_DISPATCH_CASE(OP_INT_TO_DOUBLE, po_step_convert);
+			PO_DISPATCH_CASE(OP_LONG_TO_DOUBLE, po_step_convert);
+			PO_DISPATCH_CASE(OP_DOUBLE_TO_LONG, po_step_convert);
+			PO_DISPATCH_CASE(OP_DOUBLE_TO_INT, po_step_convert);
+			PO_DISPATCH_CASE(OP_PPT_TO_CPT, po_step_convert);
+			PO_DISPATCH_CASE(OP_CPT_TO_PPT, po_step_convert);
+
+			/* function calls */
+			PO_DISPATCH_CASE(OP_ICCALL, po_step_call);
+			PO_DISPATCH_CASE(OP_LCCALL, po_step_call);
+			PO_DISPATCH_CASE(OP_DCCALL, po_step_call);
+			PO_DISPATCH_CASE(OP_PCCALL, po_step_call);
+			PO_DISPATCH_CASE(OP_CPCCALL, po_step_call);
+			PO_DISPATCH_CASE(OP_CVCCALL, po_step_call);
+			PO_DISPATCH_CASE(OP_CALLI, po_step_call);
+			PO_DISPATCH_CASE(OP_PCALL, po_step_call);
+
+			/* function entry and exit */
+			PO_DISPATCH_CASE(OP_RET, po_step_frame);
+			PO_DISPATCH_CASE(OP_ADD_STACK, po_step_frame);
+			PO_DISPATCH_CASE(OP_ENTER, po_step_frame);
+			PO_DISPATCH_CASE(OP_LEAVE, po_step_frame);
+
+			/* branches */
+			PO_DISPATCH_CASE(OP_BRA, po_step_branch);
+			PO_DISPATCH_CASE(OP_BEQ, po_step_branch);
+			PO_DISPATCH_CASE(OP_BNE, po_step_branch);
+
+			/* constants and effective addresses */
+			PO_DISPATCH_CASE(OP_ICON, po_step_push_const);
+			PO_DISPATCH_CASE(OP_LCON, po_step_push_const);
+			PO_DISPATCH_CASE(OP_DCON, po_step_push_const);
+			PO_DISPATCH_CASE(OP_PCON, po_step_push_const);
+			PO_DISPATCH_CASE(OP_GLO_ADDRESS, po_step_push_const);
+			PO_DISPATCH_CASE(OP_LOC_ADDRESS, po_step_push_const);
+			PO_DISPATCH_CASE(OP_CODE_ADDRESS, po_step_push_const);
+
+			/* direct variable loads */
+			PO_DISPATCH_CASE(OP_GLO_CVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_GLO_SVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_GLO_IVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_GLO_LVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_GLO_PVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_GLO_VVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_GLO_FVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_GLO_DVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_LOC_CVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_LOC_SVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_LOC_IVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_LOC_LVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_LOC_PVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_LOC_FVAR, po_step_load_direct);
+			PO_DISPATCH_CASE(OP_LOC_DVAR, po_step_load_direct);
+
+			/* direct variable stores */
+			PO_DISPATCH_CASE(OP_GLO_CASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_GLO_SASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_GLO_IASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_GLO_LASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_GLO_PASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_GLO_FASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_GLO_DASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_LOC_CASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_LOC_SASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_LOC_IASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_LOC_LASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_LOC_PASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_LOC_FASS, po_step_store_direct);
+			PO_DISPATCH_CASE(OP_LOC_DASS, po_step_store_direct);
+
+			/* indirect variable loads */
+			PO_DISPATCH_CASE(OP_CI_VAR, po_step_load_indirect);
+			PO_DISPATCH_CASE(OP_SI_VAR, po_step_load_indirect);
+			PO_DISPATCH_CASE(OP_II_VAR, po_step_load_indirect);
+			PO_DISPATCH_CASE(OP_PI_VAR, po_step_load_indirect);
+			PO_DISPATCH_CASE(OP_LI_VAR, po_step_load_indirect);
+			PO_DISPATCH_CASE(OP_FI_VAR, po_step_load_indirect);
+			PO_DISPATCH_CASE(OP_DI_VAR, po_step_load_indirect);
+
+			/* indirect variable stores */
+			PO_DISPATCH_CASE(OP_CI_ASS, po_step_store_indirect);
+			PO_DISPATCH_CASE(OP_SI_ASS, po_step_store_indirect);
+			PO_DISPATCH_CASE(OP_II_ASS, po_step_store_indirect);
+			PO_DISPATCH_CASE(OP_PI_ASS, po_step_store_indirect);
+			PO_DISPATCH_CASE(OP_LI_ASS, po_step_store_indirect);
+			PO_DISPATCH_CASE(OP_FI_ASS, po_step_store_indirect);
+			PO_DISPATCH_CASE(OP_DI_ASS, po_step_store_indirect);
+
+			/* arithmetic, negation and modulo */
+			PO_DISPATCH_CASE(OP_IADD, po_step_arith);
+			PO_DISPATCH_CASE(OP_LADD, po_step_arith);
+			PO_DISPATCH_CASE(OP_DADD, po_step_arith);
+			PO_DISPATCH_CASE(OP_PADD, po_step_arith);
+			PO_DISPATCH_CASE(OP_ISUB, po_step_arith);
+			PO_DISPATCH_CASE(OP_LSUB, po_step_arith);
+			PO_DISPATCH_CASE(OP_DSUB, po_step_arith);
+			PO_DISPATCH_CASE(OP_PSUB, po_step_arith);
+			PO_DISPATCH_CASE(OP_IMUL, po_step_arith);
+			PO_DISPATCH_CASE(OP_LMUL, po_step_arith);
+			PO_DISPATCH_CASE(OP_DMUL, po_step_arith);
+			PO_DISPATCH_CASE(OP_IDIV, po_step_arith);
+			PO_DISPATCH_CASE(OP_LDIV, po_step_arith);
+			PO_DISPATCH_CASE(OP_DDIV, po_step_arith);
+			PO_DISPATCH_CASE(OP_INEG, po_step_arith);
+			PO_DISPATCH_CASE(OP_LNEG, po_step_arith);
+			PO_DISPATCH_CASE(OP_DNEG, po_step_arith);
+			PO_DISPATCH_CASE(OP_IMOD, po_step_arith);
+			PO_DISPATCH_CASE(OP_LMOD, po_step_arith);
+
+			/* comparisons */
+			PO_DISPATCH_CASE(OP_IEQ, po_step_compare);
+			PO_DISPATCH_CASE(OP_LEQ, po_step_compare);
+			PO_DISPATCH_CASE(OP_DEQ, po_step_compare);
+			PO_DISPATCH_CASE(OP_PEQ, po_step_compare);
+			PO_DISPATCH_CASE(OP_INE, po_step_compare);
+			PO_DISPATCH_CASE(OP_LNE, po_step_compare);
+			PO_DISPATCH_CASE(OP_DNE, po_step_compare);
+			PO_DISPATCH_CASE(OP_PNE, po_step_compare);
+			PO_DISPATCH_CASE(OP_IGE, po_step_compare);
+			PO_DISPATCH_CASE(OP_LGE, po_step_compare);
+			PO_DISPATCH_CASE(OP_DGE, po_step_compare);
+			PO_DISPATCH_CASE(OP_PGE, po_step_compare);
+			PO_DISPATCH_CASE(OP_IGT, po_step_compare);
+			PO_DISPATCH_CASE(OP_LGT, po_step_compare);
+			PO_DISPATCH_CASE(OP_DGT, po_step_compare);
+			PO_DISPATCH_CASE(OP_PGT, po_step_compare);
+			PO_DISPATCH_CASE(OP_ILE, po_step_compare);
+			PO_DISPATCH_CASE(OP_LLE, po_step_compare);
+			PO_DISPATCH_CASE(OP_DLE, po_step_compare);
+			PO_DISPATCH_CASE(OP_PLE, po_step_compare);
+			PO_DISPATCH_CASE(OP_ILT, po_step_compare);
+			PO_DISPATCH_CASE(OP_LLT, po_step_compare);
+			PO_DISPATCH_CASE(OP_DLT, po_step_compare);
+			PO_DISPATCH_CASE(OP_PLT, po_step_compare);
+
+			/* shifts, bitwise and logical operators */
+			PO_DISPATCH_CASE(OP_ILSHIFT, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LLSHIFT, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_IRSHIFT, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LRSHIFT, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_IBAND, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LBAND, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_IBOR, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LBOR, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_IXOR, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LXOR, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_ILAND, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LLAND, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_ILOR, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LLOR, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_ICOMP, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LCOMP, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_INOT, po_step_bitwise);
+			PO_DISPATCH_CASE(OP_LNOT, po_step_bitwise);
+
+			/* accumulator push/pop and stack duplication */
+			PO_DISPATCH_CASE(OP_IPUSH, po_step_stack);
+			PO_DISPATCH_CASE(OP_LPUSH, po_step_stack);
+			PO_DISPATCH_CASE(OP_CPPUSH, po_step_stack);
+			PO_DISPATCH_CASE(OP_DPUSH, po_step_stack);
+			PO_DISPATCH_CASE(OP_PPUSH, po_step_stack);
+			PO_DISPATCH_CASE(OP_IPOP, po_step_stack);
+			PO_DISPATCH_CASE(OP_LPOP, po_step_stack);
+			PO_DISPATCH_CASE(OP_CPPOP, po_step_stack);
+			PO_DISPATCH_CASE(OP_DPOP, po_step_stack);
+			PO_DISPATCH_CASE(OP_PPOP, po_step_stack);
+			PO_DISPATCH_CASE(OP_IDUPE, po_step_stack);
+			PO_DISPATCH_CASE(OP_LDUPE, po_step_stack);
+			PO_DISPATCH_CASE(OP_DDUPE, po_step_stack);
+			PO_DISPATCH_CASE(OP_PDUPE, po_step_stack);
+
+			/* pointer arithmetic */
+			PO_DISPATCH_CASE(OP_ADD_IOFFSET, po_step_ptr_math);
+			PO_DISPATCH_CASE(OP_ADD_LOFFSET, po_step_ptr_math);
+			PO_DISPATCH_CASE(OP_PTRDIFF, po_step_ptr_math);
+
+			/* block copy and move */
+			PO_DISPATCH_CASE(OP_COPY, po_step_memory);
+			PO_DISPATCH_CASE(OP_MOVE, po_step_memory);
+
+			/* libffi variadic type recording */
+			PO_DISPATCH_CASE(OP_FFI_POP_ALL, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_POINTER, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_SINT32, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_FLOAT, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_DOUBLE, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_UINT8, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_SINT8, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_UINT16, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_SINT16, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_UINT32, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_UINT64, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_SINT64, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_VOID, po_step_ffi_variadic);
+			PO_DISPATCH_CASE(OP_FFI_PUSH_NULL, po_step_ffi_variadic);
+
+#ifdef STRING_EXPERIMENT
+			/* the String experiment */
+			PO_DISPATCH_CASE(OP_STRING_TO_CPT, po_step_string);
+			PO_DISPATCH_CASE(OP_CPT_TO_STRING, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_TO_PPT, po_step_string);
+			PO_DISPATCH_CASE(OP_PPT_TO_STRING, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_CCALL, po_step_string);
+			PO_DISPATCH_CASE(OP_GLO_STRING_VAR, po_step_string);
+			PO_DISPATCH_CASE(OP_LOC_STRING_VAR, po_step_string);
+			PO_DISPATCH_CASE(OP_GLO_STRING_ASS, po_step_string);
+			PO_DISPATCH_CASE(OP_LOC_STRING_ASS, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_I_VAR, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_I_ASS, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_CAT, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_EQ, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_NE, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_GE, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_GT, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_LE, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_LT, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_PUSH, po_step_string);
+			PO_DISPATCH_CASE(OP_STRING_POP, po_step_string);
+			PO_DISPATCH_CASE(OP_CLEAN_STRING, po_step_string);
+			PO_DISPATCH_CASE(OP_FREE_STRING, po_step_string);
+#endif /* STRING_EXPERIMENT */
+	}
+}
+
+/*****************************************************************************
+ * copy the caller's argument values onto the interpreter stack.
+ ****************************************************************************/
+static Errcode po_push_callback_values(void* stack_top, const PocoCallbackValue* values,
+									   size_t value_count)
+{
+	char* argument_data = stack_top;
+	size_t value_index;
+
+	for (value_index = 0; value_index < value_count; ++value_index) {
+		switch (values[value_index].kind) {
+			case POCO_CALLBACK_VALUE_INT:
+				memcpy(argument_data, &values[value_index].value.int_value,
+					   sizeof(values[value_index].value.int_value));
+				argument_data += sizeof(values[value_index].value.int_value);
+				break;
+			case POCO_CALLBACK_VALUE_LONG:
+				memcpy(argument_data, &values[value_index].value.long_value,
+					   sizeof(values[value_index].value.long_value));
+				argument_data += sizeof(values[value_index].value.long_value);
+				break;
+			case POCO_CALLBACK_VALUE_DOUBLE:
+				memcpy(argument_data, &values[value_index].value.double_value,
+					   sizeof(values[value_index].value.double_value));
+				argument_data += sizeof(values[value_index].value.double_value);
+				break;
+			case POCO_CALLBACK_VALUE_POPOT:
+				memcpy(argument_data, &values[value_index].value.popot_value,
+					   sizeof(values[value_index].value.popot_value));
+				argument_data += sizeof(values[value_index].value.popot_value);
+				break;
+			default:
+				return Err_parameter_range;
+		}
+	}
+	return Success;
+}
+
+/*****************************************************************************
  * interpret code stream - the heart of the runtime interpreter.
  ****************************************************************************/
 static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 								 const PocoCallbackValue* values, size_t value_count)
 {
-	int end_op = OP_END;
 	FILE* tfile = NULL;
-	Pt_num* ip;
-	Pt_num* globals;
-	Errcode err;
-	Pt_num* stack;
-	Pt_num* base;
-	UBYTE* stack_area;
+	PoRunState state;
 	Eax acc;
+	PoStep step;
+	Errcode err;
+	UBYTE* stack_area;
+	Pt_num* stack;
 	int op;
-	Po_FFI* binding = NULL;
+	int end_op = OP_END;
 	size_t argument_bytes = 0;
 	size_t value_index;
-	char* argument_data;
 	bool temporary_stack;
 	size_t saved_debug_call_depth;
 	size_t debug_depth_floor;
-
-
-#define STACK_OVERFLOW(limit) ((UBYTE*)stack < (stack_area + (limit)))
-
 
 	if (p == NULL || code_pt == NULL || pret == NULL || (value_count != 0 && values == NULL)) {
 		return Err_null_ref;
@@ -211,12 +2192,16 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 		}
 		argument_bytes += value_size;
 	}
-	if (p->stack_size <= (long)sizeof(ip) ||
-		argument_bytes > (size_t)(p->stack_size - (long)sizeof(ip))) {
+	if (p->stack_size <= (long)sizeof(state.ip) ||
+		argument_bytes > (size_t)(p->stack_size - (long)sizeof(state.ip))) {
 		return Err_stack;
 	}
-	ip = code_pt;
-	globals = (Pt_num*)(p->data + p->data_size);
+
+	state.p = p;
+	state.ip = code_pt;
+	state.globals = (Pt_num*)(p->data + p->data_size);
+	state.acc = &acc;
+	state.err = Success;
 
 	saved_debug_call_depth = p->debug_call_depth;
 	debug_depth_floor = p->run_depth != 0 ? saved_debug_call_depth + 1 : 0;
@@ -234,43 +2219,23 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 	}
 
 	stack = (Pt_num*)(stack_area + p->stack_size);
+	state.stack_area = stack_area;
 
 	if (argument_bytes > 0) {
 		stack = OPTR(stack, -(long)argument_bytes);
-		argument_data = (char*)stack;
-		for (value_index = 0; value_index < value_count; ++value_index) {
-			switch (values[value_index].kind) {
-				case POCO_CALLBACK_VALUE_INT:
-					memcpy(argument_data, &values[value_index].value.int_value,
-						   sizeof(values[value_index].value.int_value));
-					argument_data += sizeof(values[value_index].value.int_value);
-					break;
-				case POCO_CALLBACK_VALUE_LONG:
-					memcpy(argument_data, &values[value_index].value.long_value,
-						   sizeof(values[value_index].value.long_value));
-					argument_data += sizeof(values[value_index].value.long_value);
-					break;
-				case POCO_CALLBACK_VALUE_DOUBLE:
-					memcpy(argument_data, &values[value_index].value.double_value,
-						   sizeof(values[value_index].value.double_value));
-					argument_data += sizeof(values[value_index].value.double_value);
-					break;
-				case POCO_CALLBACK_VALUE_POPOT:
-					memcpy(argument_data, &values[value_index].value.popot_value,
-						   sizeof(values[value_index].value.popot_value));
-					argument_data += sizeof(values[value_index].value.popot_value);
-					break;
-				default:
-					return Err_parameter_range;
-			}
+		err = po_push_callback_values(stack, values, value_count);
+		if (err != Success) {
+			goto DEALLOC_AND_EXIT;
 		}
 	}
 
 	/* final return address is to an end-op */
 
-	stack = OPTR(stack, -sizeof(ip));
+	stack = OPTR(stack, -sizeof(state.ip));
 	stack->p = &end_op;
-	base = stack;
+	state.stack = stack;
+	state.base = stack;
+	state.debug_depth_floor = debug_depth_floor;
 
 	/* assume a starting condition of success */
 
@@ -283,1597 +2248,53 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 
 	for (;;) {
 		if (p->debug_hook != NULL) {
-			p->debug_hook(p, ip, stack_area, base);
+			/* The hook takes the instruction pointer as a byte address; the
+			 * interpreter walks it as Pt_num.  Same address, different view. */
+			p->debug_hook(p, (Code*)state.ip, stack_area, state.base);
 		}
 #ifdef DEVELOPMENT
-		{
-			extern FILE* po_trace_file;
-			extern bool po_trace_flag;
-			if (po_trace_flag) {
-				po_disasm(po_trace_file, ip, (C_frame*)p->code->prototypes);
-			}
+		/* Trace destination is per-activation (PocoRunOptions::instruction_trace),
+		 * so concurrent runs do not share one stream or one on/off switch. */
+		if (p->instruction_trace != NULL) {
+			po_disasm(p->instruction_trace, state.ip, (C_frame*)p->code->prototypes);
 		}
 #endif /* DEVELOPMENT */
 
-		op = ip->inty;
-		ip = OPTR(ip, OPY_SIZE);
-		switch (op) {
-			default:
-				err = Err_bad_instruction;
-				goto DEBUG_TRACE;
+		op = state.ip->inty;
+		state.ip = OPTR(state.ip, OPY_SIZE);
 
-			case OP_END: /* finished instruction stream */
+		step = po_step_dispatch(&state, op);
+		if (step == PO_STEP_NEXT) {
+			continue;
+		}
+
+		err = state.err;
+		switch (step) {
+			case PO_STEP_DONE:
 				*pret = acc.ret;
 				err = Success;
 				goto DEALLOC_AND_EXIT;
-
-				/*----------------------------------------------------------------------------
-				 * DATATYPE CONVERSIONS
-				 *--------------------------------------------------------------------------*/
-
-			case OP_INT_TO_LONG:
-				acc.ret.l = stack->inty;
-				stack = OPTR(stack, INT_SIZE - sizeof(long));
-				stack->l = acc.ret.l;
-				break;
-			case OP_LONG_TO_INT:
-				acc.ret.inty = (int)stack->l;
-				stack = OPTR(stack, sizeof(long) - INT_SIZE);
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_INT_TO_DOUBLE:
-				acc.ret.d = stack->inty;
-				stack = OPTR(stack, INT_SIZE - sizeof(double));
-				stack->d = acc.ret.d;
-				break;
-			case OP_LONG_TO_DOUBLE:
-				acc.ret.d = stack->l;
-				stack = OPTR(stack, sizeof(long) - sizeof(double));
-				stack->d = acc.ret.d;
-				break;
-			case OP_DOUBLE_TO_LONG:
-				acc.ret.l = stack->d;
-				stack = OPTR(stack, sizeof(double) - sizeof(long));
-				stack->l = acc.ret.l;
-				break;
-			case OP_DOUBLE_TO_INT:
-				acc.ret.inty = stack->d;
-				stack = OPTR(stack, sizeof(double) - sizeof(int));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_PPT_TO_CPT:
-				// convert popot pointer to void*
-				acc.ret.p = stack->ppt.pt;
-				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->ppt.pt));
-				stack->p = acc.ret.p;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_TO_CPT:
-				po_sr_dec_ref(stack->postring); /* dec ref count but
-												 * don't deallocate yet */
-				stack->p = PoStringBuf(&stack->postring);
-				break;
-#endif /* STRING_EXPERIMENT */
-			case OP_CPT_TO_PPT:
-				// convert void* to popot pointer
-				/* Expression-tier programs cannot contain a native pointer
-				 * binding, so the compiler cannot normally emit a reachable
-				 * instance of this opcode.  Keep a runtime fence as defense in
-				 * depth for malformed or future serialized code. */
-				if (p->vm != NULL && p->vm->untrusted_expression_library_registered) {
-					err = Err_bad_instruction;
-					goto DEBUG_TRACE;
-				}
-				// NOTE: Since we don't know the size of the C-allocated memory,
-				// we set permissive bounds (min=0, max=max_addr) to allow array
-				// access. This trades safety for C interoperability.
-				acc.ret.p = stack->p;
-				stack = OPTR(stack, sizeof(stack->p) - sizeof(stack->ppt));
-				stack->ppt.pt = acc.ret.p;
-				stack->ppt.min = NULL;
-				stack->ppt.max = (void*)~(size_t)0;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_CPT_TO_STRING:
-				err = Err_bad_instruction; /* Right now we don't generate
-											* these and so it'd be hard
-											* to test the code required.... */
+			case PO_STEP_ABORT:
+				goto ABORT;
+			case PO_STEP_TRAP:
 				goto DEBUG_TRACE;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_TO_PPT:
-				acc.ret.postring = stack->postring;
-				po_sr_dec_ref(acc.ret.postring); /* dec ref count but
-												  * don't deallocate yet */
-				stack = OPTR(stack, sizeof(stack->postring) - sizeof(stack->ppt));
-				stack->ppt = acc.ret.postring->string;
-				break;
-			case OP_PPT_TO_STRING:
-				acc.ret.postring = po_sr_new_copy(stack->ppt.pt, Popot_bufsize(&stack->ppt));
-				if (p->builtin_error < Success) {
-					goto ERR_IN_LIBROUTINE;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->postring));
-				stack->postring = acc.ret.postring;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * FUNCTION CALLS
-				 *--------------------------------------------------------------------------*/
-
-				/*
-				 * kiki note:
-				 *
-				 * I switched how this was working a bit so that po_ffi_call
-				 * now returns a Pt_num, making it so we don't have to worry
-				 * as much on this side about the type of the return value.
-				TODO:
-					- if ((p->check_abort)(p->check_abort_data))
-					  goto ABORT;
-				*/
-
-			case OP_ICCALL:  /* call int valued C function */
-			case OP_LCCALL:  /* call long valued C function */
-			case OP_DCCALL:  /* call double valued C function */
-			case OP_PCCALL:  /* call (popot) pointer valued C function */
-			case OP_CPCCALL: /* call C pointer valued C function */
-			case OP_CVCCALL: /* call void valued C function */
-				if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
-					err = Err_stack;
-					goto DEBUG_TRACE;
-				}
-				binding = po_ffi_find_binding(p, ip->func);
-				if (p->builtin_error < Success) {
-					goto ERR_IN_LIBROUTINE;
-				}
-
-				acc.ret = po_ffi_call(binding, stack, &p->variadic, p);
-				if (p->builtin_error < Success) {
-					goto ERR_IN_LIBROUTINE;
-				}
-				ip = OPTR(ip, sizeof(ip->func));
-				break;
-
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_CCALL: /* call string valued C function */
-				if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
-					err = Err_stack;
-					goto DEBUG_TRACE;
-				}
-				STRING_C_call(stack, ip->func);
-				if (p->builtin_error < Success) {
-					goto ERR_IN_LIBROUTINE;
-				}
-				ip = OPTR(ip, sizeof(ip->func));
-				break;
-#endif /* STRING_EXPERIMENT */
-
-			case OP_CALLI: /* Call Indirect (via pointer) */
-				if ((acc.f = stack->ppt.pt) == NULL) {
-					goto ERR_NULL;
-				}
-				if (acc.f->magic != FUNC_MAGIC) {
-					goto ERR_NOTAFUNC;
-				}
-				switch (acc.f->type) {
-					case CFF_C:
-						if (STACK_OVERFLOW(MIN_CCALL_STACK)) {
-							err = Err_stack;
-							goto DEBUG_TRACE;
-						}
-						stack = OPTR(stack, sizeof(stack->ppt));
-						switch (acc.f->return_type->ido_type) {
-							// #!FIXME: This!
-							case IDO_INT:
-								//								acc.ret.i = IC_call(stack,
-								// acc.f->code_pt);
-								acc.ret.i = 0;
-								break;
-							case IDO_LONG:
-								//								acc.ret.l = LC_call(stack,
-								// acc.f->code_pt);
-								acc.ret.l = 0;
-								break;
-							case IDO_DOUBLE:
-								//								acc.ret.d = DC_call(stack,
-								// acc.f->code_pt);
-								acc.ret.d = 0.0;
-								break;
-							case IDO_POINTER:
-								//								acc.ret.ppt = PC_call(stack,
-								// acc.f->code_pt);
-								acc.ret.ppt = empty_popot;
-								break;
-							case IDO_VOID:
-								//								VC_call(stack, acc.f->code_pt);
-								break;
-							default:
-								err = Err_unimpl;
-								goto DEBUG_TRACE;
-						}
-						if (p->builtin_error < Success) {
-							goto ERR_IN_LIBROUTINE;
-						}
-						break;
-					case CFF_POCO:
-						if (STACK_OVERFLOW(MIN_PCALL_STACK)) {
-							err = Err_stack;
-							goto DEBUG_TRACE;
-						}
-						stack = OPTR(stack, sizeof(stack->ppt) - sizeof(stack->p));
-						stack->p = ip;
-						ip = (Pt_num*)acc.f->code_pt;
-						++p->debug_call_depth;
-						break;
-				}
-				if ((p->check_abort)(p->check_abort_data)) {
-					goto ABORT;
-				}
-				break;
-			case OP_PCALL: /* Call Poco function */
-				if (STACK_OVERFLOW(MIN_PCALL_STACK)) {
-					err = Err_stack;
-					goto DEBUG_TRACE;
-				}
-				acc.f = ip->p;
-				ip = OPTR(ip, sizeof(acc.f));
-				stack = OPTR(stack, -sizeof(ip));
-				stack->p = ip;
-				ip = (Pt_num*)acc.f->code_pt;
-				++p->debug_call_depth;
-				if ((p->check_abort)(p->check_abort_data)) {
-					goto ABORT;
-				}
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * FUNCTION ENTRY/EXIT
-				 *--------------------------------------------------------------------------*/
-
-			case OP_RET:
-				ip = stack->p;
-				stack = OPTR(stack, sizeof(ip));
-				if (p->debug_call_depth > debug_depth_floor) {
-					--p->debug_call_depth;
-				}
-				break;
-			case OP_ADD_STACK:
-				stack = OPTR(stack, ip->doff);
-				ip = OPTR(ip, sizeof(ip->doff));
-				break;
-			case OP_ENTER:
-				if (STACK_OVERFLOW(ip->doff + MIN_PCALL_STACK)) {
-					err = Err_stack;
-					goto DEBUG_TRACE;
-				}
-				stack = OPTR(stack, -sizeof(base));
-				stack->p = base;
-				base = stack;
-				stack = OPTR(stack, -ip->doff);
-				poco_zero_bytes(stack, ip->doff);
-				ip = OPTR(ip, sizeof(ip->doff));
-				break;
-			case OP_LEAVE:
-				stack = base;                      /* clear off local vars  */
-				base = stack->p;                   /* restore parent base	 */
-				stack = OPTR(stack, sizeof(base)); /* clean off parent base */
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * BRANCHES
-				 *--------------------------------------------------------------------------*/
-
-			case OP_BRA:
-				if (ip->inty < 0) {
-					if ((p->check_abort)(p->check_abort_data)) {
-						goto ABORT;
-					}
-				}
-				ip = OPTR(ip, ip->inty);
-				break;
-			case OP_BEQ:
-				if (stack->inty == 0) {
-					if (ip->inty < 0) {
-						if ((p->check_abort)(p->check_abort_data)) {
-							goto ABORT;
-						}
-					}
-					ip = OPTR(ip, ip->inty);
-				} else {
-					ip = OPTR(ip, sizeof(ip->inty));
-				}
-				stack = OPTR(stack, sizeof(stack->inty));
-				break;
-			case OP_BNE:
-				if (stack->inty != 0) {
-					if (ip->inty < 0) {
-						if ((p->check_abort)(p->check_abort_data)) {
-							goto ABORT;
-						}
-					}
-					ip = OPTR(ip, ip->inty);
-				} else {
-					ip = OPTR(ip, sizeof(ip->inty));
-				}
-				stack = OPTR(stack, sizeof(stack->inty));
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * PUSH CONSTANTS
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ICON: /* push int constant onto data stack */
-				stack = OPTR(stack, -INT_SIZE);
-				stack->inty = ip->inty;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LCON: /* push long constant onto stack */
-				stack = OPTR(stack, -sizeof(long));
-				stack->l = ip->l;
-				ip = OPTR(ip, sizeof(long));
-				break;
-			case OP_DCON: /* push floating point constant onto stack */
-				stack = OPTR(stack, -sizeof(double));
-				stack->d = ip->d;
-				ip = OPTR(ip, sizeof(double));
-				break;
-			case OP_PCON: /* push pointer constant onto stack */
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt = ip->ppt;
-				ip = OPTR(ip, sizeof(ip->ppt));
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * LOAD EFFECTIVE ADDRESS
-				 *--------------------------------------------------------------------------*/
-
-			case OP_GLO_ADDRESS:
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt.min = stack->ppt.max = stack->ppt.pt = OPTR(globals, ip->inty);
-				ip = OPTR(ip, sizeof(ip->inty));
-				stack->ppt.max = OPTR(stack->ppt.max, ip->l);
-				ip = OPTR(ip, sizeof(ip->l));
-				break;
-			case OP_LOC_ADDRESS:
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt.min = stack->ppt.max = stack->ppt.pt = OPTR(base, ip->inty);
-				ip = OPTR(ip, sizeof(ip->inty));
-				stack->ppt.max = OPTR(stack->ppt.max, ip->l);
-				ip = OPTR(ip, sizeof(ip->l));
-				break;
-			case OP_CODE_ADDRESS: /* put immediate code address onto stack */
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt.min = stack->ppt.max = NULL;
-				stack->ppt.pt = poco_activation_callback_handle(p, ip->p);
-				ip = OPTR(ip, sizeof(void*));
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * LOAD A VARIABLE (DIRECT)
-				 *--------------------------------------------------------------------------*/
-
-			case OP_GLO_CVAR: /* push a global variable onto data stack */
-				stack = OPTR(stack, -INT_SIZE);
-				stack->inty = ((char*)(OPTR(globals, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_SVAR: /* push a global variable onto data stack */
-				stack = OPTR(stack, -INT_SIZE);
-				stack->inty = ((short*)(OPTR(globals, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_IVAR: /* push a global variable onto data stack */
-				stack = OPTR(stack, -INT_SIZE);
-				stack->inty = ((int*)(OPTR(globals, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_LVAR: /* push a global variable onto data stack */
-				stack = OPTR(stack, -sizeof(long));
-				stack->l = ((long*)(OPTR(globals, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_PVAR: /* push a global pointer onto data stack */
-			case OP_GLO_VVAR: /* push a global function pointer onto data stack */
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt = ((Popot*)(OPTR(globals, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_FVAR: /* push a global variable onto data stack */
-				stack = OPTR(stack, -sizeof(double));
-				stack->d = ((float*)(OPTR(globals, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_DVAR: /* push a global variable onto data stack */
-				stack = OPTR(stack, -sizeof(double));
-				stack->d = ((double*)(OPTR(globals, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_GLO_STRING_VAR: /* push a global string onto data stack */
-				stack = OPTR(stack, -sizeof(PoString));
-				stack->postring = ((PoString*)(OPTR(globals, ip->doff)))[0];
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
-			case OP_LOC_CVAR: /* push a local variable onto data stack */
-				stack = OPTR(stack, -INT_SIZE);
-				stack->inty = ((char*)(OPTR(base, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_SVAR: /* push a local variable onto data stack */
-				stack = OPTR(stack, -INT_SIZE);
-				stack->inty = ((short*)(OPTR(base, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_IVAR: /* push a local variable onto data stack */
-				stack = OPTR(stack, -INT_SIZE);
-				stack->inty = ((int*)(OPTR(base, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_LVAR: /* push a local variable onto data stack */
-				stack = OPTR(stack, -sizeof(long));
-				stack->l = ((long*)(OPTR(base, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_PVAR: /* push a local variable onto data stack */
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt = ((Popot*)(OPTR(base, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_FVAR: /* push a local variable onto data stack */
-				stack = OPTR(stack, -sizeof(double));
-				stack->d = ((float*)(OPTR(base, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_DVAR: /* push a local variable onto data stack */
-				stack = OPTR(stack, -sizeof(double));
-				stack->d = ((double*)(OPTR(base, ip->doff)))[0];
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_LOC_STRING_VAR: /* push a local string onto data stack */
-				stack = OPTR(stack, -sizeof(PoString));
-				stack->postring = ((PoString*)(OPTR(base, ip->doff)))[0];
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * STORE A VARIABLE (DIRECT)
-				 *--------------------------------------------------------------------------*/
-
-			case OP_GLO_CASS: /* move top of stack to global variable */
-				(((char*)OPTR(globals, ip->doff))[0]) = stack->inty;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_SASS: /* move top of stack to global variable */
-				((short*)(OPTR(globals, ip->doff)))[0] = stack->inty;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_IASS: /* move top of stack to global variable */
-				((int*)(OPTR(globals, ip->doff)))[0] = stack->inty;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_LASS: /* move top of stack to global variable */
-				((long*)(OPTR(globals, ip->doff)))[0] = stack->l;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_PASS: /* move top of stack to global pointer variable */
-				((Popot*)(OPTR(globals, ip->doff)))[0] = stack->ppt;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_FASS: /* move top of stack to global variable */
-				((float*)(OPTR(globals, ip->doff)))[0] = stack->d;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_GLO_DASS: /* move top of stack to global variable */
-				((double*)(OPTR(globals, ip->doff)))[0] = stack->d;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_GLO_STRING_ASS: /* top of stack to global string variable */
-				po_sr_clean_ref((((PoString*)(OPTR(globals, ip->doff)))[0]));
-				((PoString*)(OPTR(globals, ip->doff)))[0] = stack->postring;
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
-			case OP_LOC_CASS: /* move top of stack to local variable */
-				((char*)(OPTR(base, ip->doff)))[0] = stack->inty;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_SASS: /* move top of stack to local variable */
-				((short*)(OPTR(base, ip->doff)))[0] = stack->inty;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_IASS: /* move top of stack to local variable */
-				((int*)(OPTR(base, ip->doff)))[0] = stack->inty;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_LASS: /* move top of stack to local variable */
-				((long*)(OPTR(base, ip->doff)))[0] = stack->l;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_PASS: /* move top of stack to local ptr variable */
-				((Popot*)(OPTR(base, ip->doff)))[0] = stack->ppt;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_FASS: /* move top of stack to local variable */
-				((float*)(OPTR(base, ip->doff)))[0] = stack->d;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-			case OP_LOC_DASS: /* move top of stack to local variable */
-				((double*)(OPTR(base, ip->doff)))[0] = stack->d;
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_LOC_STRING_ASS: /* top of stack to local string variable */
-				po_sr_clean_ref((((PoString*)(OPTR(base, ip->doff)))[0]));
-				((PoString*)(OPTR(base, ip->doff)))[0] = stack->postring;
-				po_sr_inc_ref(stack->postring);
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * LOAD A VARIABLE (INDIRECT)
-				 *--------------------------------------------------------------------------*/
-
-			case OP_CI_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(char),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
-				stack->inty = *((char*)(acc.ret.ppt.pt));
-				break;
-			case OP_SI_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(short),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
-				stack->inty = *((short*)(acc.ret.ppt.pt));
-				break;
-			case OP_II_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(int),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.inty));
-				stack->inty = *((int*)(acc.ret.ppt.pt));
-				break;
-			case OP_PI_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(Popot),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.ppt));
-				stack->ppt = *((Popot*)(acc.ret.ppt.pt));
-				break;
-			case OP_LI_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(long),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.l));
-				stack->l = *((long*)(acc.ret.ppt.pt));
-				break;
-			case OP_FI_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(float),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.f));
-				stack->d = *((float*)(acc.ret.ppt.pt));
-				break;
-			case OP_DI_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(double),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.d));
-				stack->d = *((double*)(acc.ret.ppt.pt));
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_I_VAR:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(PoString),
-														   POCO_POINTER_PERMISSION_READ)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(acc.ret.ppt) - sizeof(acc.ret.postring));
-				stack->postring = *((PoString*)(acc.ret.ppt.pt));
-				po_sr_inc_ref(stack->postring);
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * STORE A VARIABLE (INDIRECT)
-				 *--------------------------------------------------------------------------*/
-
-			case OP_CI_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(char),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				((char*)(acc.ret.ppt.pt))[0] = stack->inty;
-				break;
-			case OP_SI_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(short),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				((short*)(acc.ret.ppt.pt))[0] = stack->inty;
-				break;
-			case OP_II_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(int),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				((int*)(acc.ret.ppt.pt))[0] = stack->inty;
-				break;
-			case OP_PI_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(Popot),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				((Popot*)(acc.ret.ppt.pt))[0] = stack->ppt;
-				break;
-			case OP_LI_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(long),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				((long*)(acc.ret.ppt.pt))[0] = stack->l;
-				break;
-			case OP_FI_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(float),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				((float*)(acc.ret.ppt.pt))[0] = stack->d;
-				break;
-			case OP_DI_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(double),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				((double*)(acc.ret.ppt.pt))[0] = stack->d;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_I_ASS:
-				acc.ret.ppt = stack->ppt;
-				if (acc.ret.ppt.pt == NULL) {
-					goto ERR_NULL;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &acc.ret.ppt,
-														   sizeof(PoString),
-														   POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				if (acc.ret.ppt.pt < acc.ret.ppt.min) {
-					goto ERR_SMALL;
-				}
-				if (acc.ret.ppt.pt > acc.ret.ppt.max) {
-					goto ERR_BIG;
-				}
-				stack = OPTR(stack, sizeof(stack->ppt));
-				po_sr_clean_ref(((PoString*)(acc.ret.ppt.pt))[0]);
-				((PoString*)(acc.ret.ppt.pt))[0] = stack->postring;
-				po_sr_inc_ref(stack->postring);
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * ADDITION
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IADD: /* replace top two elements of stack one result */
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, INT_SIZE);
-				stack->inty += acc.ret.inty;
-				break;
-			case OP_LADD:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(long));
-				stack->l += acc.ret.l;
-				break;
-			case OP_DADD:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(double));
-				stack->d += acc.ret.d;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PADD:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->ppt.pt = OPTR(stack->ppt.pt, acc.ret.inty);
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_CAT: /* Concatenate top two strings */
-				acc.ret.postring = po_sr_cat_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->postring));
-				stack->postring = acc.ret.postring;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * SUBTRACTION
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ISUB:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, INT_SIZE);
-				stack->inty -= acc.ret.inty;
-				break;
-			case OP_LSUB:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(long));
-				stack->l -= acc.ret.l;
-				break;
-			case OP_DSUB:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(double));
-				stack->d -= acc.ret.d;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PSUB:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->ppt.pt = OPTR(stack->ppt.pt, -acc.ret.inty);
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * MULTIPLICATION
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IMUL:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, INT_SIZE);
-				stack->inty *= acc.ret.inty;
-				break;
-			case OP_LMUL:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(long));
-				stack->l *= acc.ret.l;
-				break;
-			case OP_DMUL:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(double));
-				stack->d *= acc.ret.d;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * DIVISION
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IDIV:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, INT_SIZE);
-				if (acc.ret.inty == 0) {
-					err = Err_zero_divide;
-					goto DEBUG_TRACE;
-				}
-				stack->inty /= acc.ret.inty;
-				break;
-			case OP_LDIV:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(long));
-				if (acc.ret.l == 0) {
-					err = Err_zero_divide;
-					goto DEBUG_TRACE;
-				}
-				stack->l /= acc.ret.l;
-				break;
-			case OP_DDIV:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(double));
-				stack->d /= acc.ret.d;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * COMPARISONS - EQ
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IEQ:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = (acc.ret.inty == stack->inty);
-				break;
-			case OP_LEQ:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				acc.ret.inty = (acc.ret.l == stack->l);
-				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_DEQ:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(stack->d));
-				acc.ret.inty = (acc.ret.d == stack->d);
-				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PEQ:
-				acc.ret.inty =
-					(stack->ppt.pt == ((Pt_num*)OPTR(stack, sizeof(stack->ppt)))->ppt.pt);
-				stack = OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_EQ:
-				acc.ret.inty = po_sr_eq_and_clean(
-					stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * COMPARISONS - NE
-				 *--------------------------------------------------------------------------*/
-
-			case OP_INE:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = (acc.ret.inty != stack->inty);
-				break;
-			case OP_LNE:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				acc.ret.inty = (acc.ret.l != stack->l);
-				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_DNE:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(stack->d));
-				acc.ret.inty = (acc.ret.d != stack->d);
-				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PNE:
-				acc.ret.inty =
-					(stack->ppt.pt != ((Pt_num*)OPTR(stack, sizeof(stack->ppt)))->ppt.pt);
-				stack = OPTR(stack, 2 * sizeof(stack->ppt) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_NE:
-				acc.ret.inty = !po_sr_eq_and_clean(
-					stack->postring, ((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * COMPARISONS - GE
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IGE:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = (stack->inty >= acc.ret.inty);
-				break;
-			case OP_LGE:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				acc.ret.inty = (stack->l >= acc.ret.l);
-				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_DGE:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(stack->d));
-				acc.ret.inty = (stack->d >= acc.ret.d);
-				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PGE:
-				acc.ret.ppt = stack->ppt;
-				stack = OPTR(stack, sizeof(stack->ppt));
-				acc.ret.inty = ((char*)(stack->ppt.pt) >= ((char*)acc.ret.ppt.pt));
-				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_GE:
-				acc.ret.inty = po_sr_ge_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * COMPARISONS - GT
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IGT:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = (stack->inty > acc.ret.inty);
-				break;
-			case OP_LGT:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				acc.ret.inty = (stack->l > acc.ret.l);
-				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_DGT:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(stack->d));
-				acc.ret.inty = (stack->d > acc.ret.d);
-				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PGT:
-				acc.ret.ppt = stack->ppt;
-				stack = OPTR(stack, sizeof(stack->ppt));
-				acc.ret.inty = ((char*)(stack->ppt.pt) > ((char*)acc.ret.ppt.pt));
-				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_GT:
-				acc.ret.inty = !po_sr_le_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * COMPARISONS - LE
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ILE:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = (stack->inty <= acc.ret.inty);
-				break;
-			case OP_LLE:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				acc.ret.inty = (stack->l <= acc.ret.l);
-				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_DLE:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(stack->d));
-				acc.ret.inty = (stack->d <= acc.ret.d);
-				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PLE:
-				acc.ret.ppt = stack->ppt;
-				stack = OPTR(stack, sizeof(stack->ppt));
-				acc.ret.inty = ((char*)(stack->ppt.pt) <= ((char*)acc.ret.ppt.pt));
-				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_LE:
-				acc.ret.inty = po_sr_le_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * COMPARISONS - LT
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ILT:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = (stack->inty < acc.ret.inty);
-				break;
-			case OP_LLT:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				acc.ret.inty = (stack->l < acc.ret.l);
-				stack = OPTR(stack, (sizeof(stack->l) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_DLT:
-				acc.ret.d = stack->d;
-				stack = OPTR(stack, sizeof(stack->d));
-				acc.ret.inty = (stack->d < acc.ret.d);
-				stack = OPTR(stack, (sizeof(stack->d) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				if (p->builtin_error != Success) {
-					goto ERR_INLINE_FPMATH;
-				}
-				break;
-			case OP_PLT:
-				acc.ret.ppt = stack->ppt;
-				stack = OPTR(stack, sizeof(stack->ppt));
-				acc.ret.inty = ((char*)(stack->ppt.pt) < ((char*)acc.ret.ppt.pt));
-				stack = OPTR(stack, (sizeof(stack->ppt) - sizeof(stack->inty)));
-				stack->inty = acc.ret.inty;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_LT:
-				acc.ret.inty = !po_sr_ge_and_clean(
-					((Pt_num*)OPTR(stack, sizeof(stack->postring)))->postring, stack->postring);
-				stack = OPTR(stack, 2 * sizeof(stack->postring) - sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * NEGATION
-				 *--------------------------------------------------------------------------*/
-
-			case OP_INEG:
-				stack->inty = -stack->inty;
-				break;
-			case OP_LNEG:
-				stack->l = -stack->l;
-				break;
-			case OP_DNEG:
-				stack->d = -stack->d;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * MODULO
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IMOD:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty %= acc.ret.inty;
-				break;
-			case OP_LMOD:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l %= acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * SHIFT LEFT
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ILSHIFT:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty <<= acc.ret.inty;
-				break;
-			case OP_LLSHIFT:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l <<= acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * SHIFT RIGHT
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IRSHIFT:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty >>= acc.ret.inty;
-				break;
-			case OP_LRSHIFT:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l >>= acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * BINARY AND
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IBAND:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = stack->inty & acc.ret.inty;
-				break;
-			case OP_LBAND:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l = stack->l & acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * BINARY OR
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IBOR:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = stack->inty | acc.ret.inty;
-				break;
-			case OP_LBOR:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l = stack->l | acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * BINARY XOR
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IXOR:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = stack->inty ^ acc.ret.inty;
-				break;
-			case OP_LXOR:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l = stack->l ^ acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * LOGICAL AND
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ILAND:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = stack->inty && acc.ret.inty;
-				break;
-			case OP_LLAND:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l = stack->l && acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * LOGICAL OR
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ILOR:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->inty = stack->inty || acc.ret.inty;
-				break;
-			case OP_LLOR:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->l = stack->l || acc.ret.l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * BINARY NOT
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ICOMP:
-				stack->inty = ~stack->inty;
-				break;
-			case OP_LCOMP:
-				stack->l = ~stack->l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * LOGICAL NOT
-				 *--------------------------------------------------------------------------*/
-
-			case OP_INOT:
-				stack->inty = !stack->inty;
-				break;
-			case OP_LNOT:
-				stack->l = !stack->l;
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * PUSH ACCUMULATOR TO STACK
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IPUSH:
-				stack = OPTR(stack, -sizeof(stack->inty));
-				stack->inty = acc.ret.inty;
-				break;
-			case OP_LPUSH:
-			case OP_CPPUSH:
-				stack = OPTR(stack, -sizeof(stack->l));
-				stack->l = acc.ret.l;
-				break;
-			case OP_DPUSH:
-				stack = OPTR(stack, -sizeof(stack->d));
-				stack->d = acc.ret.d;
-				break;
-			case OP_PPUSH:
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt = acc.ret.ppt;
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_PUSH:
-				stack = OPTR(stack, -sizeof(stack->postring));
-				stack->postring = acc.ret.postring;
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * POP STACK TO ACCUMULATOR (RETURN VALUE)
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IPOP:
-				acc.ret.inty = stack->inty;
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->inty));
-				break;
-			case OP_LPOP:
-			case OP_CPPOP:
-				acc.ret.l = stack->l;
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->l));
-				break;
-			case OP_DPOP:
-				acc.ret.d = stack->d;
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->d));
-				break;
-			case OP_PPOP:
-				acc.ret.ppt = stack->ppt;
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->ppt));
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_STRING_POP:
-				acc.ret.postring = stack->postring;
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->postring));
-				break;
-			case OP_CLEAN_STRING: /* Pop string and dec reference count */
-				acc.ret.postring = stack->postring;
-				po_sr_clean_ref(acc.ret.postring);
-				p->result = acc.ret;
-				stack = OPTR(stack, sizeof(stack->postring));
-				break;
-#endif /* STRING_EXPERIMENT */
-
-				/*----------------------------------------------------------------------------
-				 * DUPLICATE TOP-OF-STACK ITEM
-				 *--------------------------------------------------------------------------*/
-
-			case OP_IDUPE:
-				stack = OPTR(stack, -sizeof(stack->inty));
-				stack->inty = ((int*)(OPTR(stack, sizeof(stack->inty))))[0];
-				break;
-			case OP_LDUPE:
-				stack = OPTR(stack, -sizeof(stack->l));
-				stack->l = ((long*)(OPTR(stack, sizeof(stack->l))))[0];
-				break;
-			case OP_DDUPE:
-				stack = OPTR(stack, -sizeof(stack->d));
-				stack->d = ((double*)(OPTR(stack, sizeof(stack->d))))[0];
-				break;
-			case OP_PDUPE:
-				stack = OPTR(stack, -sizeof(stack->ppt));
-				stack->ppt = ((Popot*)(OPTR(stack, sizeof(stack->ppt))))[0];
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * POINTER MATH
-				 *--------------------------------------------------------------------------*/
-
-			case OP_ADD_IOFFSET:
-				acc.ret.inty = stack->inty;
-				stack = OPTR(stack, sizeof(stack->inty));
-				stack->ppt.pt = OPTR(stack->ppt.pt, acc.ret.inty);
-				break;
-			case OP_ADD_LOFFSET:
-				acc.ret.l = stack->l;
-				stack = OPTR(stack, sizeof(stack->l));
-				stack->ppt.pt = OPTR(stack->ppt.pt, acc.ret.l);
-				break;
-			case OP_PTRDIFF: /* subtract two pointers */
-				acc.ret.ppt.pt = stack->ppt.pt;
-				stack = OPTR(stack, sizeof(stack->ppt));
-				acc.ret.l = (char*)stack->ppt.pt - (char*)acc.ret.ppt.pt;
-				stack = OPTR(stack, sizeof(stack->ppt) - sizeof(long));
-				stack->l = acc.ret.l / ip->inty; /* scale result */
-				ip = OPTR(ip, sizeof(ip->inty));
-				break;
-
-				/*----------------------------------------------------------------------------
-				 * MISCELLANIOUS
-				 *--------------------------------------------------------------------------*/
-
-			case OP_COPY:
-				if (ip->l < 0) {
-					goto ERR_NULL;
-				}
-				if (!po_copy_span_has_capacity(&stack->ppt, (size_t)ip->l) ||
-					!po_copy_span_has_capacity((Popot*)OPTR(stack, sizeof(stack->ppt)),
-											   (size_t)ip->l)) {
-					goto ERR_BIG;
-				}
-				if (!po_registered_pointer_access_is_valid(p->pointer_registry, &stack->ppt,
-														   (size_t)ip->l,
-														   POCO_POINTER_PERMISSION_READ) ||
-					!po_registered_pointer_access_is_valid(
-						p->pointer_registry, (Popot*)OPTR(stack, sizeof(stack->ppt)), (size_t)ip->l,
-						POCO_POINTER_PERMISSION_WRITE)) {
-					goto ERR_POINTER_ACCESS;
-				}
-				poco_copy_bytes(((Popot*)OPTR(stack, sizeof(stack->ppt)))->pt, stack->ppt.pt,
-								ip->l);
-				ip = OPTR(ip, sizeof(ip->l));
-				stack = OPTR(stack, 2 * sizeof(stack->ppt));
-				break;
-			case OP_MOVE:
-				poco_copy_bytes(stack->ppt.pt, ((Popot*)OPTR(stack, sizeof(stack->ppt)))->pt,
-								ip->l);
-				ip = OPTR(ip, sizeof(ip->l));
-				stack = OPTR(stack, 2 * sizeof(stack->ppt));
-				break;
-#ifdef STRING_EXPERIMENT
-			case OP_FREE_STRING:
-				po_sr_clean_ref((((PoString*)(OPTR(base, ip->doff)))[0]));
-				ip = OPTR(ip, INTY_SIZE);
-				break;
-#endif /* STRING_EXPERIMENT */
-
-			/*----------------------------------------------------------------------------
-//			 * LIBFFI HELPERS
-			 *--------------------------------------------------------------------------*/
-			case OP_FFI_POP_ALL:
-				po_ffi_variadic_types_reset(&p->variadic);
-				break;
-
-			case OP_FFI_PUSH_POINTER:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_pointer);
-				break;
-
-			case OP_FFI_PUSH_SINT32:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_sint32);
-				break;
-
-			case OP_FFI_PUSH_FLOAT:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_float);
-				break;
-
-			case OP_FFI_PUSH_DOUBLE:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_double);
-				break;
-
-			case OP_FFI_PUSH_UINT8:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_uint8);
-				break;
-
-			case OP_FFI_PUSH_SINT8:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_sint8);
-				break;
-
-			case OP_FFI_PUSH_UINT16:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_uint16);
-				break;
-
-			case OP_FFI_PUSH_SINT16:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_sint16);
-				break;
-
-			case OP_FFI_PUSH_UINT32:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_uint32);
-				break;
-
-			case OP_FFI_PUSH_UINT64:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_uint64);
-				break;
-
-			case OP_FFI_PUSH_SINT64:
-				RECORD_VARIADIC_TYPE(p, &ffi_type_sint64);
-				break;
-
-			case OP_FFI_PUSH_VOID:
-			case OP_FFI_PUSH_NULL:
-				err = Err_poco_ffi_invalid_binding;
+			case PO_STEP_ERR_NOTAFUNC:
+				goto ERR_NOTAFUNC;
+			case PO_STEP_ERR_NULL:
+				goto ERR_NULL;
+			case PO_STEP_ERR_SMALL:
+				goto ERR_SMALL;
+			case PO_STEP_ERR_BIG:
+				goto ERR_BIG;
+			case PO_STEP_ERR_POINTER_ACCESS:
+				goto ERR_POINTER_ACCESS;
+			case PO_STEP_ERR_FPMATH:
+				goto ERR_INLINE_FPMATH;
+			case PO_STEP_ERR_LIBROUTINE:
+				goto ERR_IN_LIBROUTINE;
+			case PO_STEP_ERR_FFI:
 				goto ERR_IN_FFI;
-
-			case OP_NOP:
+			case PO_STEP_NEXT:
 				break;
 		}
 	}
@@ -1944,7 +2365,8 @@ DEBUG_TRACE:
 		if (tfile != NULL) {
 			get_errtext(err, buf);
 			fprintf(tfile, "%s ", buf);
-			po_print_trace(p, tfile, stack, base, globals, ip, p->builtin_error);
+			po_print_trace(p, tfile, state.stack, state.base, state.globals, state.ip,
+						   p->builtin_error);
 			if (tfile != stdout) {
 				fclose(tfile);
 			}

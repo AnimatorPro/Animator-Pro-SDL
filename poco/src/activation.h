@@ -7,7 +7,8 @@
 #ifndef POCO_ACTIVATION_H
 #define POCO_ACTIVATION_H
 
-#include "poco.h"
+#include "poco_internal.h"
+#include "poco_ffi.h"
 #include "standard_library.h"
 
 struct Poco_registered_library;
@@ -29,6 +30,9 @@ struct PocoVm {
 	int poe_libraries_disabled;
 	PocoModuleHooks module_hooks;
 	char last_error[512];
+	/* Return buffer for the strerror() binding.  Per-VM so two VMs on two
+	 * threads do not hand each other's text back to poco code. */
+	char strerror_text[ERRTEXT_SIZE];
 	void* diagnostic_lock;
 	PocoPointerRegistry* pointer_registry;
 	struct PocoActivation* activation;
@@ -70,6 +74,27 @@ typedef struct Poco_program_code {
 } Poco_program_code;
 
 /*
+ * Per-activation FFI state: the libffi cif cache, the scratch buffer struct
+ * returns are marshalled through, and the counters the cif-cache tests read.
+ *
+ * activation_magic identifies a PocoActivation to po_ffi_call(), which also
+ * accepts the NULL-activation path used by descriptor-level tests.
+ */
+typedef struct PocoFfiState {
+	uint64_t activation_magic;
+	struct po_ffi_activation_call* calls;
+	void* struct_result_allocation;
+	void* struct_result;
+	size_t struct_result_capacity;
+	size_t fixed_call_prep_count;
+	size_t variadic_call_prep_count;
+	size_t per_call_allocation_count;
+	size_t fixed_call_cache_hit_count;
+} PocoFfiState;
+
+#define POCO_FFI_ACTIVATION_MAGIC UINT64_C(0x504f434f46464941)
+
+/*
  * One independently allocatable execution of a const PocoProgram.
  *
  * Ownership:
@@ -98,6 +123,8 @@ struct PocoActivation {
 	bool (*check_abort)(void* data);
 	void* check_abort_data;
 	const char* trace_file;
+	/* Borrowed destination for the DEVELOPMENT instruction trace; NULL = off. */
+	FILE* instruction_trace;
 	long* err_line;
 	PoBoolean enable_debug_trace;
 	Pt_num result;
@@ -110,15 +137,7 @@ struct PocoActivation {
 	void* main_argv_allocation;
 
 	Po_FFI_Variadic_Descriptor variadic;
-	uint64_t ffi_activation_magic;
-	struct po_ffi_activation_call* ffi_calls;
-	void* ffi_struct_result_allocation;
-	void* ffi_struct_result;
-	size_t ffi_struct_result_capacity;
-	size_t ffi_fixed_call_prep_count;
-	size_t ffi_variadic_call_prep_count;
-	size_t ffi_per_call_allocation_count;
-	size_t ffi_fixed_call_cache_hit_count;
+	PocoFfiState ffi;
 	Func_frame* callback_frames;
 	Poco_lib* builtin_libraries;
 	Poco_lib* loaded_libraries;
@@ -141,6 +160,27 @@ Errcode poco_activation_marshal_main_argv(PocoActivation* activation, int argc, 
 void poco_activation_release_main_argv(PocoActivation* activation);
 Func_frame* poco_activation_callback_handle(PocoActivation* activation,
 											const Func_frame* compiled_frame);
+
+/* Copy a finished run's private diagnostic text into the shared program VM. */
+void po_activation_publish_last_error(PocoActivation* activation);
+
+/* Linear lookup of a compiled function by name; NULL when there is none. */
+const Func_frame* po_activation_find_function(const PocoActivation* activation, const char* name);
+
+/* Run a named entry with marshalled arguments, initializing the activation's
+ * libraries first and tearing them down again at the outermost call. */
+Errcode po_activation_run_entry_values(PocoActivation* activation, const char* entry,
+									   const PocoCallbackValue* values, size_t value_count,
+									   Pt_num* result);
+
+/* Inline so the call path that builds a result value per invocation does not
+ * pay a cross-translation-unit call for a two-field struct. */
+static inline PocoCallbackValue po_invalid_callback_value(void)
+{
+	PocoCallbackValue value = {POCO_CALLBACK_VALUE_INVALID, {0}};
+
+	return value;
+}
 
 Errcode po_ffi_activation_calls_create(PocoActivation* activation);
 void po_ffi_activation_calls_reset(PocoActivation* activation);

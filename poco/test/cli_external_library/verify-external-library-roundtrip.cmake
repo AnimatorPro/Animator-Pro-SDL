@@ -38,11 +38,17 @@ foreach(version_component IN ITEMS MAJOR MINOR PATCH)
     endif()
 endforeach()
 
+file(REMOVE_RECURSE "${POCO_FIXTURE_DIR}")
+file(MAKE_DIRECTORY "${POCO_FIXTURE_DIR}")
+# The debugger reports resolved paths, so compare against a resolved fixture
+# directory: a build tree under a symlink (/tmp -> /private/tmp) otherwise
+# fails every "Stopped at <file>:" match.
+get_filename_component(POCO_FIXTURE_DIR "${POCO_FIXTURE_DIR}" REALPATH)
+
 set(good_dir "${POCO_FIXTURE_DIR}/good")
 set(missing_dir "${POCO_FIXTURE_DIR}/missing")
 set(bad_abi_dir "${POCO_FIXTURE_DIR}/bad-abi")
 set(missing_symbol_dir "${POCO_FIXTURE_DIR}/missing-symbol")
-file(REMOVE_RECURSE "${POCO_FIXTURE_DIR}")
 file(MAKE_DIRECTORY
     "${good_dir}"
     "${missing_dir}"

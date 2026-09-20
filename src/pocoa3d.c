@@ -2,12 +2,13 @@
 
 #include "errcodes.h"
 #include "jimk.h"
-#include "pocoface.h"
 #include "pocolib.h"
 #include "a3d.h"
 #include "auto.h"
 
-extern Errcode builtin_err;
+/* Must follow every header that still declares the old global. */
+#include "ani_builtin_err.h"
+
 Popot poco_lmalloc(long size);
 void po_free(void* pt);
 Errcode po_poly_to_arrays(Poly* p, Popot* x, Popot* y);
@@ -563,6 +564,6 @@ PolibOptics po_liboptics = {
 Poco_lib po_optics_lib = {
 	NULL,
 	"Optics",
-	(Lib_proto*)&po_liboptics,
+	(const Lib_proto*)&po_liboptics,
 	POLIB_OPTICS_SIZE,
 };

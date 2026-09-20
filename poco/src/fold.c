@@ -25,8 +25,12 @@
  *				Added new routine po_is_static_init_const().
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include "activation.h"
+#include "bytecode_iter.h"
+#include "code.h"
+#include "pocotype.h"
+#include "runops.h"
 
 void po_fold_const(Poco_cb* pcb, Exp_frame* exp)
 /*****************************************************************************
@@ -106,9 +110,9 @@ bool po_is_static_init_const(Poco_cb* pcb, Code_buf* cb)
  * of static initializer expressions.
  ****************************************************************************/
 {
-	int op;
-	Poco_op_table* pta = po_ins_table;
-	void* code;
+	PoCodeIter iter;
+	PoCodeIns ins;
+	PoCodeIterStatus status;
 	bool rv = true;
 
 	(void)pcb;
@@ -116,13 +120,12 @@ bool po_is_static_init_const(Poco_cb* pcb, Code_buf* cb)
 	//	printf("\nTesting is_static_init_const on this code:\n");
 	//	po_dump_codebuf(pcb, cb);
 
-	for (code = cb->code_buf; code < (void*)cb->code_pt; /* nothing */) {
-		op = *(int*)code;
-		if (pta[op].op_flags & OFL_NOTCON) {
+	po_code_iter_init(&iter, cb->code_buf, (long)(cb->code_pt - cb->code_buf));
+	while ((status = po_code_iter_next(&iter, &ins)) != PO_CODE_ITER_END) {
+		if (status != PO_CODE_ITER_OK || (ins.entry->op_flags & OFL_NOTCON)) {
 			rv = false;
 			break;
 		}
-		code = OPTR(code, pta[op].op_size + sizeof(op));
 	}
 
 	//	printf("Result: %d\n\n", rv);

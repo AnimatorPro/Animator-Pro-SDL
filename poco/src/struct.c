@@ -28,8 +28,12 @@
  *				Removed NULL checks from calls to memory allocation.
  ****************************************************************************/
 
-#include "poco.h"
+#include "poco_internal.h"
 #include <string.h>
+#include "fold.h"
+#include "pocmemry.h"
+#include "pocotype.h"
+#include "statemen.h"
 
 /*****************************************************************************
  * find structure in linked list, return pointer to struct_info.
