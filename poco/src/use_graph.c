@@ -135,10 +135,19 @@ static char* poco_api_resolve_used_source(Poco_use_graph* graph, const char* usi
 	free(directory);
 	for (include_dir = graph->vm->include_dirs; include_dir != NULL;
 		 include_dir = include_dir->next) {
-		if (strlen(include_dir->name) + requested_length + 1 > sizeof(candidate)) {
+		size_t directory_length = strlen(include_dir->name);
+		/* Accept a directory written with or without its trailing separator,
+		 * matching the #include search. */
+		const char* separator = directory_length == 0 ||
+										include_dir->name[directory_length - 1] == '/' ||
+										include_dir->name[directory_length - 1] == '\\'
+									? ""
+									: "/";
+
+		if (directory_length + strlen(separator) + requested_length + 1 > sizeof(candidate)) {
 			continue;
 		}
-		snprintf(candidate, sizeof(candidate), "%s%s", include_dir->name, requested);
+		snprintf(candidate, sizeof(candidate), "%s%s%s", include_dir->name, separator, requested);
 		canonical = po_canonical_source_path(candidate);
 		if (canonical != NULL) {
 			return canonical;

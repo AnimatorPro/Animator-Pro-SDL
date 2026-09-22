@@ -1,0 +1,10 @@
+struct vec {
+	int x;
+	int y;
+	int z;
+};
+
+int main(void)
+{
+	return 0;
+}

@@ -1,0 +1,8 @@
+/* shared.h exists in both -I directories; second_only.h only in the second. */
+#include "shared.h"
+#include "second_only.h"
+
+int main(void)
+{
+	return SHARED_VALUE + SECOND_ONLY_VALUE;
+}

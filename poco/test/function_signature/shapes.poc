@@ -1,0 +1,53 @@
+#ifdef __POCO__
+#pragma poco native begin
+#endif
+int host_probe(int a);
+#ifdef __POCO__
+#pragma poco native end
+#endif
+
+struct vec {
+	int x;
+	double y;
+};
+
+union slot {
+	int as_int;
+	double as_double;
+};
+
+/* A Poco function cannot take a struct by value, so a struct crosses the
+ * boundary as a pointer.  The descriptor still names the struct it points to. */
+int measure(int a, float b, struct vec *c)
+{
+	return a + (int)b + c->x;
+}
+
+void nothing(int only)
+{
+	only = only;
+}
+
+long widen()
+{
+	return 7;
+}
+
+struct vec *pass_through(struct vec *v)
+{
+	return v;
+}
+
+double scale(union slot *s)
+{
+	return s->as_double;
+}
+
+main()
+{
+	struct vec v;
+
+	v.x = 1;
+	v.y = 2.0;
+	return measure(1, 2.0, &v) + (int)widen() + host_probe(0);
+}

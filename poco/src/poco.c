@@ -597,6 +597,12 @@ static Errcode po_compile_source(Poco_cb* pcb, char* name, const char* source,
 BADOUT:
 
 	po_free_token_lists(pcb);
+	/* Both lists are freed above.  Clearing them keeps the next unit's early
+	 * error paths - which reach BADOUT before rebuilding either - from walking
+	 * this unit's freed tokens, and keeps po_say_err off a dangling token when
+	 * a diagnostic is raised after this point. */
+	pcb->curtoken = NULL;
+	pcb->free_tokens = NULL;
 
 	/* pf is NULL when the global frame was never built; everything below that
 	 * touches it has to be skipped rather than faulting on the error path. */
@@ -606,6 +612,15 @@ BADOUT:
 
 	if (fuf != NULL && !globals_retained) {
 		fuf->parameters = NULL; /* we just freed these above! */
+	}
+
+	/* Diagnose a tag this unit defines with a layout that disagrees with the
+	 * one an earlier unit gave the same tag.  It has to happen here, while
+	 * this unit's tags are still a list of their own: once they are spliced
+	 * onto the accumulator below there is no way to tell them apart, and
+	 * nothing downstream compares layouts at all. */
+	if (err >= Success && !pcb->compile_aborted && pf != NULL) {
+		po_check_struct_agreement(pcb, pf->fsif, previous_struct_infos);
 	}
 
 	/* Struct-valued C bindings build their libffi descriptors after parsing

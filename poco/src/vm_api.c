@@ -610,6 +610,41 @@ OUT_OF_MEMORY:
 	return POCO_STATUS_OUT_OF_MEMORY;
 }
 
+PocoStatus poco_vm_add_include_path(PocoVm* vm, const char* path)
+{
+	Names* entry;
+	Names* tail;
+
+	if (vm == NULL || path == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	if (vm->destroy_requested || path[0] == '\0') {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL) {
+		return POCO_STATUS_OUT_OF_MEMORY;
+	}
+	entry->name = po_copy_string(path);
+	if (entry->name == NULL) {
+		free(entry);
+		return POCO_STATUS_OUT_OF_MEMORY;
+	}
+	/* The include list has no tail pointer: poco_vm_set_include_paths()
+	 * replaces the whole list, so walking is cheaper than keeping one
+	 * correct across both entry points. */
+	tail = vm->include_dirs;
+	if (tail == NULL) {
+		vm->include_dirs = entry;
+		return POCO_STATUS_OK;
+	}
+	while (tail->next != NULL) {
+		tail = tail->next;
+	}
+	tail->next = entry;
+	return POCO_STATUS_OK;
+}
+
 PocoStatus poco_vm_add_library_path(PocoVm* vm, const char* path)
 {
 	Names* entry;

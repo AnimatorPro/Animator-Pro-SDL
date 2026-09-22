@@ -1,0 +1,9 @@
+struct vec {
+	int first;
+	int second;
+};
+
+int main(void)
+{
+	return 0;
+}

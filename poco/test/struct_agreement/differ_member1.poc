@@ -1,0 +1,13 @@
+struct vec {
+	double x;
+	double y;
+};
+
+int main(void)
+{
+	struct vec here;
+
+	here.x = 1.0;
+	here.y = 2.0;
+	return 0;
+}

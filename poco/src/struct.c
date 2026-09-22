@@ -78,6 +78,7 @@ static Struct_info* new_sif(Poco_cb* pcb, Poco_frame* pf, char* name)
 	new = po_memzalloc(pcb, sizeof(*new) + strlen(name) + 1);
 	new->name = (char*)(new + 1);
 	strcpy(new->name, name);
+	new->unit_name = pcb->current_unit_name;
 	new->next = pf->fsif;
 	pf->fsif = new;
 	return (new);
@@ -296,4 +297,179 @@ Struct_info* po_get_struct(Poco_cb* pcb, Poco_frame* pf, SHORT struct_union_ttyp
 
 ERROR:
 	return (NULL);
+}
+
+/*****************************************************************************
+ * cross-unit agreement between struct/union/enum tags.
+ *
+ * Every translation unit mints its own Struct_info for each tag it sees, and
+ * po_compile_source hands the finished list to pcb->run.struct_infos when the
+ * unit closes.  Two units that give one tag two different layouts used to go
+ * unnoticed: a struct's identity downstream is its index in that accumulated
+ * table, so each unit silently resolved its own entry and the layouts
+ * diverged.  The routines below compare a closing unit's tags against the
+ * tags already accumulated, and report a disagreement.
+ *
+ * They only report.  Matching tags keep their separate entries, because that
+ * index *is* the identity: collapsing two equal entries would renumber the
+ * table and change what every encoded type reference means.
+ ****************************************************************************/
+
+/* Depth bound for the structural walk of anonymous tags.  Named tags stop the
+ * recursion at their name, so this only applies to nesting of unnamed ones. */
+#define MAX_TAG_COMPARE_DEPTH 16
+
+static bool sifs_agree(const Struct_info* a, const Struct_info* b, int depth);
+
+/*****************************************************************************
+ * do two references to a tag from inside a member's type agree?
+ *
+ * A named tag is compared by name and kind and not walked into.  That is what
+ * makes a self-referential tag terminate - 'struct node { struct node *next; }'
+ * would otherwise walk forever - and it is also the right answer: the
+ * referenced tag is itself in the unit's list, so its own members get compared
+ * on their own pass.  An anonymous tag has no name to compare and cannot refer
+ * to itself, so it is walked structurally instead, under a depth bound.
+ ****************************************************************************/
+static bool sif_refs_agree(const Struct_info* a, const Struct_info* b, int depth)
+{
+	if (a == b) {
+		return (true);
+	}
+	if (a == NULL || b == NULL) {
+		return (false);
+	}
+	if (a->type != b->type) {
+		return (false);
+	}
+	if (a->name[0] != '\0' || b->name[0] != '\0') {
+		return (po_eqstrcmp(a->name, b->name) == 0);
+	}
+	if (depth >= MAX_TAG_COMPARE_DEPTH) {
+		return (true);
+	}
+	return (sifs_agree(a, b, depth + 1));
+}
+
+/*****************************************************************************
+ * do two member types describe the same storage?
+ ****************************************************************************/
+static bool types_agree(const Type_info* a, const Type_info* b, int depth)
+{
+	int i;
+
+	if (a == b) {
+		return (true);
+	}
+	if (a == NULL || b == NULL) {
+		return (false);
+	}
+	if (a->ido_type != b->ido_type || a->comp_count != b->comp_count) {
+		return (false);
+	}
+	for (i = 0; i < a->comp_count; ++i) {
+		if (a->comp[i] != b->comp[i]) {
+			return (false);
+		}
+		switch (a->comp[i]) {
+			case TYPE_STRUCT:
+				if (!sif_refs_agree(a->sdims[i].pt, b->sdims[i].pt, depth)) {
+					return (false);
+				}
+				break;
+			case TYPE_ARRAY:
+				if (a->sdims[i].l != b->sdims[i].l) {
+					return (false);
+				}
+				break;
+			default:
+				/* TYPE_FUNCTION parks a Func_frame in sdims; a function
+				 * pointer member occupies the same storage whatever it points
+				 * at, so the signature is left out of a layout comparison. */
+				break;
+		}
+	}
+	return (true);
+}
+
+/*****************************************************************************
+ * do two tags of the same name describe the same layout?
+ *
+ * Compared member by member rather than by size, since '{int x; int y;}' and
+ * '{float a; float b;}' are both eight bytes and share nothing else.  Member
+ * *names* are deliberately not compared: two units spelling one field 'x' and
+ * 'first' still agree on layout.  The opposite choice is defensible - C's own
+ * compatible-type rule does require the names to match - but what is at stake
+ * here is the layout every consumer resolves by index, not source-level
+ * compatibility.
+ *
+ * An enum records no members at all (its constants become symbols in the
+ * enclosing frame, and its size is the -1 dup-tag sentinel), so two enums
+ * sharing a tag always agree here.  Differing enumerator lists are therefore
+ * not diagnosed; a tag used as an enum in one unit and a struct in another
+ * still is, through the kind comparison.
+ ****************************************************************************/
+static bool sifs_agree(const Struct_info* a, const Struct_info* b, int depth)
+{
+	const Symbol* sa;
+	const Symbol* sb;
+
+	if (a->type != b->type || a->el_count != b->el_count) {
+		return (false);
+	}
+	sa = a->elements;
+	sb = b->elements;
+	while (sa != NULL && sb != NULL) {
+		if (!types_agree(sa->ti, sb->ti, depth)) {
+			return (false);
+		}
+		sa = sa->next;
+		sb = sb->next;
+	}
+	return (sa == NULL && sb == NULL);
+}
+
+/*****************************************************************************
+ * a tag only describes a layout once a body has been parsed; sif->type stays
+ * TYPE_END for a bare 'struct vec;' forward declaration, which says nothing
+ * that could disagree with anything.
+ ****************************************************************************/
+static bool sif_is_defined(const Struct_info* sif)
+{
+	return (sif->type != TYPE_END);
+}
+
+/*****************************************************************************
+ * report any tag this unit defines whose layout disagrees with the layout an
+ * earlier unit gave the same tag.  Call at unit close, while the unit's own
+ * list is still separate from the accumulated one.
+ ****************************************************************************/
+void po_check_struct_agreement(Poco_cb* pcb, Struct_info* unit_sifs, Struct_info* earlier_sifs)
+{
+	Struct_info* mine;
+	Struct_info* theirs;
+
+	for (mine = unit_sifs; mine != NULL; mine = mine->next) {
+		/* An anonymous tag is unique to its definition, so it has no
+		 * counterpart in another unit to disagree with. */
+		if (mine->name[0] == '\0' || !sif_is_defined(mine)) {
+			continue;
+		}
+		for (theirs = earlier_sifs; theirs != NULL; theirs = theirs->next) {
+			if (theirs->name[0] == '\0' || !sif_is_defined(theirs)) {
+				continue;
+			}
+			if (po_eqstrcmp(mine->name, theirs->name) != 0) {
+				continue;
+			}
+			if (sifs_agree(mine, theirs, 0)) {
+				continue;
+			}
+			po_say_fatal(pcb, "struct/union/enum tag '%s' is defined differently in '%s' and '%s'",
+						 mine->name,
+						 theirs->unit_name != NULL ? theirs->unit_name : "an earlier unit",
+						 mine->unit_name != NULL ? mine->unit_name : "this unit");
+			break; /* one diagnostic per tag, naming the first unit it met */
+		}
+	}
 }

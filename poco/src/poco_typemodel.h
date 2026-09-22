@@ -234,6 +234,7 @@ typedef struct poco_debug_local {
 typedef struct struct_info {
 	struct struct_info* next;
 	char* name;
+	const char* unit_name; /* translation unit that defined this tag */
 	Symbol* elements;
 	long size;
 	SHORT el_count;

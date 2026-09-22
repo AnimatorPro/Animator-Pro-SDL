@@ -1,0 +1,6 @@
+#include "shared_natives.h"
+
+int leaf_value()
+{
+	return host_add(30, 10);
+}

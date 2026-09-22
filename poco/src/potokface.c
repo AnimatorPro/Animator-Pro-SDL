@@ -66,6 +66,7 @@ static Tstack* new_token(Poco_cb* pcb)
 	} else {
 		pcb->free_tokens = t->next;
 	}
+	t->native_region = false;
 	return t;
 }
 
@@ -164,6 +165,10 @@ NEED_MORE:
 
 	for (;;) {
 		ts->is_symbol = false;
+		/* The '#pragma poco native' state is the one in force when this line
+		 * was fetched, so a declaration keeps it even when the parser's
+		 * lookahead has already read past the region's closing pragma. */
+		ts->native_region = pcb->t.native_region;
 		ts->line_num = line_count;
 
 		line_pos = (char*)tokenize_word((UBYTE*)line_pos, (UBYTE*)ts->ctoke, (UBYTE*)strwrk,

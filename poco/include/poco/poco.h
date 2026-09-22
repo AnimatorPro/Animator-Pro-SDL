@@ -167,6 +167,46 @@ typedef struct PocoCallbackValue {
 } PocoCallbackValue;
 
 /*
+ * A struct's identity within one program is its index in that program's struct
+ * table, not its tag.  Poco compiles every unit of a program in one process and
+ * keeps each unit's layouts separately, so a tag is neither unique nor stable:
+ * two units may define the same tag with different layouts, and every unit that
+ * includes a shared header mints its own entry for each struct in it.  Compare
+ * struct_id, and treat struct_name as descriptive only.
+ */
+typedef uint32_t PocoStructId;
+#define POCO_STRUCT_NONE ((PocoStructId)-1)
+
+/*
+ * One parameter, return or member type as the loader sees it.
+ *
+ * kind is the value kind a host exchanges for this type through
+ * PocoCallbackValue; a type with no such representation - void, or a C pointer
+ * that only crosses the native ABI - reports POCO_CALLBACK_VALUE_INVALID.
+ * is_struct is set when the type names a struct or union anywhere in its
+ * declarator, so both a struct by value and a pointer to one report the struct
+ * they refer to.  struct_size is the packed size the loader computed, which is
+ * what a host should compare against its own sizeof.  struct_id is
+ * POCO_STRUCT_NONE when the struct is not in the program's struct table.
+ */
+typedef struct PocoTypeDesc {
+	PocoCallbackValueKind kind;
+	int is_struct;
+	PocoStructId struct_id;
+	const char* struct_name;
+	size_t struct_size;
+	size_t struct_member_count;
+} PocoTypeDesc;
+
+/* A compiled function's shape, read without calling it. */
+typedef struct PocoFunctionSignature {
+	const char* name;
+	int parameter_count;
+	int is_native;
+	PocoTypeDesc return_type;
+} PocoFunctionSignature;
+
+/*
  * A Poco binding is a C function exposed to a script through a Poco prototype
  * string.  The function must exactly match the prototype's fixed arguments
  * and return type.  The stable libffi ABI supports int, long, double, C
@@ -466,8 +506,31 @@ PocoStatus poco_vm_register_borrowed_span(PocoVm* vm, void* pointer, size_t byte
 										  uint32_t permissions);
 PocoStatus poco_vm_unregister_borrowed_span(PocoVm* vm, const void* pointer);
 
-/* Replace the VM include-path list.  The paths are copied and searched in order. */
+/*
+ * Replace the VM include-path list.  The paths are copied and searched in
+ * order, and each may include or omit its trailing directory separator.  This
+ * discards whatever list the VM already had, including anything
+ * supplied through PocoVmOptions or appended with poco_vm_add_include_path();
+ * pass NULL with a count of zero to clear the list.
+ */
 PocoStatus poco_vm_set_include_paths(PocoVm* vm, const char* const* paths, size_t path_count);
+
+/*
+ * Append one directory to the VM include-path list, keeping the entries
+ * already there.  The path is copied, may include or omit its trailing
+ * directory separator, and takes its place after every existing entry, so
+ * repeated calls build a search order matching the call order.  An
+ * empty path is POCO_STATUS_PARAMETER_RANGE and a NULL vm or path is
+ * POCO_STATUS_NULL_REFERENCE, matching poco_vm_add_library_path().
+ *
+ * Include paths are read during compilation only, so a call made after a
+ * program has been compiled is accepted and affects subsequent compiles alone;
+ * already-compiled programs are unaffected.  This deliberately differs from
+ * poco_vm_register_untrusted_expression_library(), which refuses once a
+ * program exists because it would retroactively change that program's
+ * capabilities.
+ */
+PocoStatus poco_vm_add_include_path(PocoVm* vm, const char* path);
 
 /*
  * Append a directory to the VM's native .poe module search list.  The path is
@@ -637,6 +700,31 @@ PocoStatus poco_call_push_pointer(PocoCall* call, void* pointer, size_t byte_cou
 								  PocoPointerPermission permissions);
 PocoStatus poco_call_invoke(PocoCall* call, PocoCallbackValue* out_result);
 void poco_call_end(PocoCall* call);
+
+/*
+ * Read a compiled function's shape without calling it, so a host can reject a
+ * mismatched script at load instead of discovering the mismatch mid-call.
+ * Both accessors are read-only and allocate nothing.  An unknown function name
+ * returns POCO_STATUS_NOT_FOUND and leaves the outputs untouched; a parameter
+ * index at or past the signature's parameter_count returns
+ * POCO_STATUS_PARAMETER_RANGE.  Parameters are reported in declaration order.
+ * Returned strings are borrowed from the program and remain valid for its
+ * lifetime, the same ownership contract poco_get_last_error uses.
+ */
+PocoStatus poco_activation_function_signature(PocoActivation* activation, const char* name,
+											  PocoFunctionSignature* out_signature);
+PocoStatus poco_activation_function_parameter(PocoActivation* activation, const char* name,
+											  size_t index, const char** out_parameter_name,
+											  PocoTypeDesc* out_type);
+
+/*
+ * Enumerate a struct's members in declaration order, for a host verifying a
+ * program from an untrusted source field by field.  An unknown id or an index
+ * past the last member returns POCO_STATUS_PARAMETER_RANGE.  This walks the
+ * program's layouts on every call; keep it off hot paths.
+ */
+PocoStatus poco_program_struct_member(PocoProgram* program, PocoStructId id, size_t index,
+									  const char** out_name, PocoTypeDesc* out_type);
 
 /*
  * Execute an acquired activation.  This backward-compatible convenience

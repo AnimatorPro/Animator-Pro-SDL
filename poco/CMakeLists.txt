@@ -105,6 +105,7 @@ set(POCO_CORE_SOURCES
     vm_api.c
     vm_diagnostics.c
     poco_call.c
+    poco_signature.c
     activation.c
     porunenv.c
 

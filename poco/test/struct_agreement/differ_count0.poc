@@ -1,0 +1,9 @@
+struct vec {
+	int x;
+	int y;
+};
+
+int differ_count_first(void)
+{
+	return 1;
+}

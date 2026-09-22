@@ -412,6 +412,9 @@ static Errcode func_proto(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, char* nam
 {
 	Func_frame* proto = NULL;
 	Poco_frame* rf;
+	/* Read before the lookahead below: the '(' we were called on belongs to
+	 * this declaration, so its region flag is this declaration's. */
+	bool host_provided = pcb->curtoken != NULL && pcb->curtoken->native_region;
 
 	lookup_token(pcb);
 	proto = po_memzalloc(pcb, sizeof(*proto));
@@ -434,6 +437,20 @@ static Errcode func_proto(Poco_cb* pcb, Poco_frame* pf, Type_info* ti, char* nam
 		proto->binding_contract = pcb->libcontract;
 		proto->binding_flags = pcb->libflags;
 		proto->got_code = true;
+		proto->type = CFF_C;
+		proto->magic = FUNC_MAGIC; /* helps detect wild pointers at runtime */
+	} else if (host_provided && pf->frame_type == FTY_GLOBAL) {
+		/*
+		 * a declaration inside a '#pragma poco native' region names a function
+		 * the host provides.  it compiles to the same CFF_C frame a registered
+		 * library's prototype would, minus the address: the loader fills that
+		 * in by name, or refuses the program.  got_code is true because the
+		 * code exists, just not here -- it keeps this out of the
+		 * undefined-function check and out of the linker's globals handling.
+		 */
+		proto->code_pt = NULL;
+		proto->got_code = true;
+		proto->host_provided = true;
 		proto->type = CFF_C;
 		proto->magic = FUNC_MAGIC; /* helps detect wild pointers at runtime */
 	} else {
@@ -574,6 +591,30 @@ static void check_dupe_proto(Poco_cb* pcb, Symbol* osym, Symbol* nsym)
 		if (!po_types_same(osym->ti, nsym->ti, 0)) {
 			po_say_fatal(pcb, "return type mismatch in redeclaration of %s", osym->name);
 			PO_CHECK_ABORT_VOID(pcb);
+		} else if (ofuf->got_code && ofuf->type == CFF_C && pcb->t.toktype != TOK_LBRACE &&
+				   (ofuf->host_provided || nfuf->host_provided)) {
+			/*
+			 * re-declaring a native is not a redefinition: the same function
+			 * can be named by a host-provided declaration and by a registered
+			 * library's prototype.  keep one frame, and let the library's
+			 * address win when it is the one that has it.
+			 */
+			if (ofuf->host_provided && !nfuf->host_provided && nfuf->code_pt != NULL) {
+				ofuf->code_pt = nfuf->code_pt;
+				ofuf->binding_contract = nfuf->binding_contract;
+				ofuf->binding_flags = nfuf->binding_flags;
+				ofuf->host_provided = false;
+			}
+			/* drop the duplicate frame func_proto() just pushed, so the
+			 * program carries one frame per native rather than one per
+			 * declaration of it. */
+			if (pcb->run.protos == nfuf) {
+				pcb->run.protos = nfuf->mlink;
+				nfuf->mlink = NULL;
+			}
+			part_free_proto(pcb, nsym, ofuf);
+			ofuf->parameters = nfuf->parameters;
+			nfuf->parameters = NULL;
 		} else if (ofuf->got_code && (ofuf->type == CFF_C || pcb->t.toktype == TOK_LBRACE)) {
 			po_redefined(pcb, nsym->name);
 		} else {
@@ -699,7 +740,7 @@ void po_pop_off_result(Poco_cb* pcb, Exp_frame* e)
  ****************************************************************************/
 void po_get_typedef(Poco_cb* pcb, Poco_frame* pf)
 {
-	Symbol* var;
+	Symbol* var = NULL;
 	Itypi tip;
 	Type_info* ti;
 	Type_info* rti;
@@ -711,7 +752,15 @@ void po_get_typedef(Poco_cb* pcb, Poco_frame* pf)
 		PO_CHECK_ABORT_VOID(pcb);
 		goto OUT;
 	}
+	/* one_dec() leaves 'var' untouched on any of its early exits -- an aborted
+	 * compile (a fatal raised while the tokenizer was reading ahead, e.g. a
+	 * malformed directive on the following line) or a type it could not build.
+	 * Both must stop here rather than dereference an unset symbol. */
 	one_dec(pcb, pf, ti, &var);
+	PO_CHECK_ABORT_VOID(pcb);
+	if (var == NULL) {
+		goto OUT;
+	}
 	var->tok_type = PTOK_USER_TYPE;
 	/* reverse type info so it will read as if it were being parsed */
 	if ((rti = rev_type_info(pcb, var->ti)) == NULL) {

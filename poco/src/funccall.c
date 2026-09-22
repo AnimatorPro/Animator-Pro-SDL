@@ -320,7 +320,14 @@ NOT_ENOUGH_PARMS:
 		po_code_op(pcb, &e->ecd, OP_CALLI);
 	} else {
 		if (fff->type == CFF_C) {
-			po_code_void_pt(pcb, &e->ecd, po_ccall_ops[idot], ((C_frame*)fff)->code_pt);
+			/* A host-provided native has no address until the loader resolves
+			 * it, so its call sites carry the frame as their key; decoding an
+			 * image rewrites that operand to the resolved function. */
+			void* key = fff->host_provided && ((C_frame*)fff)->code_pt == NULL
+							? (void*)fff
+							: (void*)((C_frame*)fff)->code_pt;
+
+			po_code_void_pt(pcb, &e->ecd, po_ccall_ops[idot], key);
 		} else {
 			po_code_void_pt(pcb, &e->ecd, OP_PCALL, fff);
 		}

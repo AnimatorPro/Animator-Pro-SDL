@@ -1,0 +1,6 @@
+#include "shared.h"
+
+int header_second(void)
+{
+	return 2;
+}

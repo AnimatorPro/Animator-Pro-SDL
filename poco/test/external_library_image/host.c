@@ -103,8 +103,8 @@ int main(void)
 					image_size == view.image_size - ARCHIVE_HEADER_SIZE - source_table_size,
 				"serialized archive framing is invalid");
 	image = view.image + ARCHIVE_HEADER_SIZE + source_table_size;
-	ok &= check(read_u32(image + 8) == 3 && read_u32(image + 12) == 6,
-				"external-library image did not use format version 3");
+	ok &= check(read_u32(image + 8) == 4 && read_u32(image + 12) == 6,
+				"external-library image did not use format version 4");
 	ok &= check(read_u32(image + 160) == PO_PROGRAM_IMAGE_SECTION_EXTERNAL_LIBRARIES,
 				"external-library section was not appended to the image");
 	library_offset = read_u64(image + 168);

@@ -1,0 +1,9 @@
+#pragma poco use "use_leaf.poc"
+#include "shared_natives.h"
+
+int leaf_value();
+
+main()
+{
+	return host_add(leaf_value(), 2);
+}

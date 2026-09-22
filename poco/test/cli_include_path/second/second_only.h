@@ -1,0 +1,1 @@
+#define SECOND_ONLY_VALUE 5
