@@ -1,0 +1,44 @@
+/*
+ * Cancellation on the by-name call path.
+ *
+ * poco_activation_run() has always taken a cancel callback in its run
+ * options; poco_call_invoke() takes no options, so a host that reaches a
+ * named entry point by name ran it uninterruptibly.  These functions cover
+ * both sides of that: a call that never returns on its own, and ordinary
+ * calls that must be unaffected by an installed callback.
+ */
+
+int spin_count = 0;
+
+/* Never returns.  Only a cancel callback can end this call. */
+spin_forever()
+{
+	for (;;) {
+		spin_count = spin_count + 1;
+	}
+	return spin_count;
+}
+
+/* A bounded loop, so the abort check runs on a backward branch many times
+ * without ever being asked to stop. */
+int bounded_loop(int times)
+{
+	int i;
+	int total;
+
+	total = 0;
+	for (i = 0; i < times; i = i + 1) {
+		total = total + i;
+	}
+	return total;
+}
+
+int add_ints(int left, int right)
+{
+	return left + right;
+}
+
+main()
+{
+	return 7;
+}

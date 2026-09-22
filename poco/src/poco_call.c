@@ -335,6 +335,8 @@ PocoStatus poco_call_invoke(PocoCall* call, PocoCallbackValue* out_result)
 	Pt_num result = {0};
 	long error_line = 0;
 	long* previous_err_line;
+	bool (*previous_check_abort)(void*) = NULL;
+	void* previous_check_abort_data = NULL;
 	size_t index;
 
 	if (out_result != NULL) {
@@ -379,8 +381,15 @@ PocoStatus poco_call_invoke(PocoCall* call, PocoCallbackValue* out_result)
 	}
 	previous_err_line = call->activation->err_line;
 	call->activation->err_line = &error_line;
+	/* A by-name call takes no run options, so its cancellation comes from the
+	 * activation, whose lifetime covers the call.  Saving and restoring the
+	 * hook keeps a nested call from disarming its caller's. */
+	po_activation_push_cancel_hook(call->activation, &previous_check_abort,
+								   &previous_check_abort_data);
 	status = (PocoStatus)po_activation_run_entry_values(call->activation, call->function->name,
 														coerced, call->value_count, &result);
+	po_activation_pop_cancel_hook(call->activation, previous_check_abort,
+								  previous_check_abort_data);
 	call->activation->err_line = previous_err_line;
 	if (status == Err_in_err_file && call->activation->builtin_error == Err_poco_ffi_bounds) {
 		status = POCO_STATUS_FFI_BOUNDS;

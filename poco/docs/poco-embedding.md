@@ -327,6 +327,59 @@ hashing convention into the public API that both sides would have to honour
 forever, and a host that controls its own build already has an ABI version for
 that purpose.
 
+## Cancelling a running call
+
+`PocoRunOptions.cancel_callback` covers a run started by `poco_vm_run()` or
+`poco_activation_run()`.  A host that drives scripts by name —
+`poco_call_begin()` / `poco_call_invoke()` for `on_tick`, an event handler, a
+posted continuation — passes no run options and so had no way to stop a call
+once it had started.  A single unbounded loop in a script hung the host with no
+diagnostic.
+
+Cancellation for that path is installed on the activation instead of passed per
+call:
+
+```c
+static int over_budget(void* user_data)
+{
+    const struct Frame* frame = user_data;
+
+    return frame->elapsed_seconds > frame->budget_seconds;
+}
+
+poco_activation_set_cancel_callback(activation, over_budget, &frame);
+
+status = poco_call_invoke(call, &result);
+if (status == POCO_STATUS_ABORTED) {
+    /* the script ran too long; the activation is still usable */
+}
+```
+
+The callback is consulted where `PocoRunOptions.cancel_callback` already is —
+on loop back-edges and at function entry — and a non-zero answer ends the call
+with `POCO_STATUS_ABORTED`.  The aborted call unwinds its own frames and
+releases its borrowed pointer spans, so later calls on the same activation run
+normally; nothing about the activation needs to be reset first.
+
+The setting is opt-in and per activation.  With no callback installed nothing
+is consulted and no call changes behaviour, which is what an existing embedder
+gets.  Passing NULL clears it.  A run started with `PocoRunOptions` still
+prefers that run's own `cancel_callback` when it is non-NULL and falls back to
+the installed one otherwise.
+
+**Lifetimes.**  The callback and its user data are stored in the activation and
+borrowed by the interpreter for the length of each call, so both must stay
+valid until they are cleared or the activation is released.  Storing them in
+the activation is the point: the interpreter holds its abort hook's context for
+the whole of a run, and an earlier implementation installed that context from a
+local in `poco_activation_run()`, which left a dangling pointer behind the
+moment that function returned.  The setting survives `poco_activation_reset()`,
+which clears run state rather than host configuration.
+
+A cancel callback runs inside the interpreter, between two instructions.  Keep
+it cheap and side-effect free — read a deadline, check a flag — and in
+particular do not call back into Poco from it.
+
 ## Native modules
 
 ### Generic Poco modules

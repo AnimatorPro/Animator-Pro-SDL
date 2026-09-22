@@ -1025,6 +1025,21 @@ set_target_properties(poco_call_builder PROPERTIES
 add_test(NAME poco_call_builder COMMAND $<TARGET_FILE:poco_call_builder>)
 set_tests_properties(poco_call_builder PROPERTIES TIMEOUT 10)
 
+# A by-name call can be cancelled through the activation's cancel callback.
+# The fixture's spin_forever() only ends when the callback says so, so the
+# timeout below is this test's assertion against a call that cannot be stopped.
+add_executable(poco_call_cancel call_cancel/call_cancel.c)
+target_compile_definitions(poco_call_cancel PRIVATE
+    POCO_CALL_CANCEL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/call_cancel"
+)
+target_link_libraries(poco_call_cancel PRIVATE Poco::poco)
+set_target_properties(poco_call_cancel PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED YES
+)
+add_test(NAME poco_call_cancel COMMAND $<TARGET_FILE:poco_call_cancel>)
+set_tests_properties(poco_call_cancel PROPERTIES TIMEOUT 20)
+
 # Call-builder pointer arguments borrow exact host spans. Direct interpreter
 # reads and writes consult the same permission registry as native contracts.
 add_executable(poco_call_pointer_args call_pointer_args/call_pointer_args.c)

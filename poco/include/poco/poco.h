@@ -702,6 +702,26 @@ PocoStatus poco_call_invoke(PocoCall* call, PocoCallbackValue* out_result);
 void poco_call_end(PocoCall* call);
 
 /*
+ * Install the cancellation callback consulted by every call this activation
+ * runs, including poco_call_invoke(), which takes no run options of its own.
+ * The callback is asked on loop back-edges and function entries, exactly where
+ * PocoRunOptions.cancel_callback is asked, and a non-zero answer ends the call
+ * with POCO_STATUS_ABORTED.  A cancelled call unwinds its own frames; the
+ * activation stays usable for later calls.
+ *
+ * This is opt-in: with no callback installed - the default - nothing is
+ * consulted and no call changes behaviour.  Passing NULL clears it again.  The
+ * callback and its user data are stored in the activation, so both must stay
+ * valid until they are cleared or the activation is released; the setting
+ * survives poco_activation_reset() because it is host configuration rather
+ * than run state.  A run started by poco_activation_run() or poco_vm_run()
+ * still prefers its own PocoRunOptions.cancel_callback when that is non-NULL,
+ * and falls back to the installed one otherwise.
+ */
+PocoStatus poco_activation_set_cancel_callback(PocoActivation* activation,
+											   PocoCancelCallback callback, void* user_data);
+
+/*
  * Read a compiled function's shape without calling it, so a host can reject a
  * mismatched script at load instead of discovering the mismatch mid-call.
  * Both accessors are read-only and allocate nothing.  An unknown function name
