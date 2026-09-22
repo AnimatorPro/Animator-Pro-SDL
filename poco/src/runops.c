@@ -674,7 +674,14 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
 				return PO_STEP_ERR_BIG;
 			}
-			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.f));
+			/* The slot this reserves must match what is written into it and
+			 * what OP_DPOP later removes. A float is widened to double on the
+			 * interpreter stack - OP_LOC_FVAR reserves sizeof(double) for
+			 * exactly that reason - so reserving sizeof(float) here left the
+			 * stack four bytes short on every indirect float read, and three
+			 * such reads in one function drifted the frame far enough for
+			 * OP_RET to fetch a garbage return address. */
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.d));
 			st->stack->d = *((float*)(st->acc->ret.ppt.pt));
 			return PO_STEP_NEXT;
 		case OP_DI_VAR:

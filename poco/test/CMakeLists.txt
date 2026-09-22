@@ -1039,6 +1039,21 @@ set_target_properties(poco_call_pointer_args PROPERTIES
 add_test(NAME poco_call_pointer_args COMMAND $<TARGET_FILE:poco_call_pointer_args>)
 set_tests_properties(poco_call_pointer_args PROPERTIES TIMEOUT 10)
 
+# Reading a float member through a struct pointer widens to a double on the
+# interpreter stack, so OP_FI_VAR has to reserve a double-sized slot. It once
+# reserved a float-sized one, leaving the frame four bytes short per read.
+add_executable(poco_indirect_float_member indirect_float_member/indirect_float_member.c)
+target_compile_definitions(poco_indirect_float_member PRIVATE
+    POCO_INDIRECT_FLOAT_MEMBER_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/indirect_float_member"
+)
+target_link_libraries(poco_indirect_float_member PRIVATE Poco::poco)
+set_target_properties(poco_indirect_float_member PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED YES
+)
+add_test(NAME poco_indirect_float_member COMMAND $<TARGET_FILE:poco_indirect_float_member>)
+set_tests_properties(poco_indirect_float_member PROPERTIES TIMEOUT 30)
+
 # The explicit standard catalog is an embedding-host feature, not the CLI's
 # legacy table.  This fixture covers the real host-neutral console, string,
 # memory, file, math, and path bindings, including cleanup of intentionally
