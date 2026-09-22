@@ -82,8 +82,8 @@ int main(void)
 					PO_PROGRAM_IMAGE_OK,
 				"image encoding failed");
 	ok &= check(image_size >= 160 && memcmp(image, "POIMG001", 8) == 0, "image header is missing");
-	ok &= check(read_u32(image + 8) == 4 && read_u32(image + 12) == 6,
-				"image header is not canonical multi-source version 4");
+	ok &= check(read_u32(image + 8) == 5 && read_u32(image + 12) == 6,
+				"image header is not canonical multi-source version 5");
 	ok &= check(read_u32(image + 40) == PO_PROGRAM_IMAGE_SECTION_CODE &&
 					read_u32(image + 64) == PO_PROGRAM_IMAGE_SECTION_CONSTANTS &&
 					read_u32(image + 88) == PO_PROGRAM_IMAGE_SECTION_PROTOTYPES &&

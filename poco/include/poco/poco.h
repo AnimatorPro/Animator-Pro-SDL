@@ -198,6 +198,50 @@ typedef struct PocoTypeDesc {
 	size_t struct_member_count;
 } PocoTypeDesc;
 
+/*
+ * The C type a PocoTypeDesc stands for, as it was declared rather than as a
+ * host exchanges it.  PocoTypeDesc::kind folds char, short and int into INT,
+ * float into DOUBLE, and every pointer depth into POPOT; a PocoTypeShape keeps
+ * the difference, so a host can tell a redeclared "char **" from the "char *"
+ * it expects, or a "float" from a "double".  It is a companion to PocoTypeDesc
+ * rather than new fields in it, so PocoTypeDesc and PocoFunctionSignature keep
+ * their layout.
+ *
+ * base_type is the declaration's base type, a POCO_BASE_TYPE_* value: what is
+ * left once every pointer, array and function declarator has been peeled off.
+ * pointer_depth counts the pointer declarators: 0 for a value, 1 for "T *",
+ * 2 for "T **".  array_rank counts array declarators and is_function is set
+ * when a function declarator appears, as it does in a function pointer; a type
+ * with array_rank 0 and is_function 0 is exactly base_type followed by
+ * pointer_depth stars.  A struct or union base reports POCO_BASE_TYPE_STRUCT
+ * and is identified by the PocoTypeDesc for the same type.  Unused fields are
+ * zero.
+ */
+enum {
+	POCO_BASE_TYPE_INVALID = 0,
+	POCO_BASE_TYPE_VOID = 1,
+	POCO_BASE_TYPE_CHAR = 2,
+	POCO_BASE_TYPE_UCHAR = 3,
+	POCO_BASE_TYPE_SHORT = 4,
+	POCO_BASE_TYPE_USHORT = 5,
+	POCO_BASE_TYPE_INT = 6,
+	POCO_BASE_TYPE_UINT = 7,
+	POCO_BASE_TYPE_LONG = 8,
+	POCO_BASE_TYPE_ULONG = 9,
+	POCO_BASE_TYPE_FLOAT = 10,
+	POCO_BASE_TYPE_DOUBLE = 11,
+	POCO_BASE_TYPE_STRUCT = 12,
+	/* A Poco-specific base with no C equivalent, such as FILE or Screen. */
+	POCO_BASE_TYPE_OTHER = 13
+};
+
+typedef struct PocoTypeShape {
+	uint32_t base_type;
+	uint32_t pointer_depth;
+	uint32_t array_rank;
+	uint32_t is_function;
+} PocoTypeShape;
+
 /* A compiled function's shape, read without calling it. */
 typedef struct PocoFunctionSignature {
 	const char* name;
@@ -745,6 +789,18 @@ PocoStatus poco_activation_function_parameter(PocoActivation* activation, const 
  */
 PocoStatus poco_program_struct_member(PocoProgram* program, PocoStructId id, size_t index,
 									  const char** out_name, PocoTypeDesc* out_type);
+
+/*
+ * The declared shape of the same return, parameter and member types the three
+ * accessors above describe; see PocoTypeShape.  Lookup, range checking and the
+ * untouched-output rule are exactly theirs.
+ */
+PocoStatus poco_activation_function_return_shape(PocoActivation* activation, const char* name,
+												 PocoTypeShape* out_shape);
+PocoStatus poco_activation_function_parameter_shape(PocoActivation* activation, const char* name,
+													size_t index, PocoTypeShape* out_shape);
+PocoStatus poco_program_struct_member_shape(PocoProgram* program, PocoStructId id, size_t index,
+											PocoTypeShape* out_shape);
 
 /*
  * Execute an acquired activation.  This backward-compatible convenience

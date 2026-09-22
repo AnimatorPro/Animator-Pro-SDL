@@ -322,6 +322,50 @@ host side of that comparison must be packed too.
 for a host that wants to verify a layout field by field.  It walks the
 program's layouts on every call, so keep it off hot paths.
 
+### The declared type: `PocoTypeShape`
+
+`kind` is deliberately lossy.  `char`, `short` and `int` all report
+`POCO_CALLBACK_VALUE_INT`, `float` and `double` both report `DOUBLE`, and
+`char *` and `char **` both report `POPOT`.  A host checking a program from an
+untrusted source needs the difference: a script that redeclares a
+pointer-returning native one level deeper reads its own bytes as an address.
+Three companion accessors report the type as it was declared, for the same
+returns, parameters and members the `PocoTypeDesc` accessors describe:
+
+```c
+PocoTypeShape shape;
+
+if (poco_activation_function_return_shape(activation, "get_name", &shape) != POCO_STATUS_OK ||
+    shape.base_type != POCO_BASE_TYPE_CHAR || shape.pointer_depth != 1 ||
+    shape.array_rank != 0 || shape.is_function) {
+    return reject("script redeclared get_name; this host provides char *get_name(void)");
+}
+poco_activation_function_parameter_shape(activation, "on_hit", 0, &shape);
+poco_program_struct_member_shape(program, type.struct_id, 3, &shape);
+```
+
+- `base_type` is a `POCO_BASE_TYPE_*` value: `VOID`, `CHAR`/`UCHAR`,
+  `SHORT`/`USHORT`, `INT`/`UINT`, `LONG`/`ULONG`, `FLOAT`, `DOUBLE`, `STRUCT`
+  (a struct or union; its identity is the `PocoTypeDesc`'s `struct_id`), or
+  `OTHER` for a Poco-only base such as `FILE`.  `signed` is the default and is
+  not reported separately; `unsigned` is, including through a typedef.
+- `pointer_depth` counts pointer declarators: 0 for a value, 1 for `T *`, 2 for
+  `T **`.
+- `array_rank` counts array declarators, and `is_function` is set when a
+  function declarator appears (a function pointer).  With both zero the type
+  is exactly `base_type` followed by `pointer_depth` stars.
+
+They work for Poco functions, registered bindings and `#pragma poco native`
+declarations alike, and a program restored from a `.pex` answers exactly as the
+program that was serialized.  Lookup, range errors and the untouched-output
+rule are the same as for the `PocoTypeDesc` accessors.  The shape is a separate
+struct rather than new fields in `PocoTypeDesc` so that `PocoTypeDesc` and
+`PocoFunctionSignature` keep their layout.
+
+Carrying signedness through an image moved the program image format to
+version 5; a version 4 image is rejected with
+`POCO_STATUS_IMAGE_VERSION_MISMATCH` and must be recompiled.
+
 There is deliberately no structural digest over a layout.  That would bake a
 hashing convention into the public API that both sides would have to honour
 forever, and a host that controls its own build already has an ABI version for

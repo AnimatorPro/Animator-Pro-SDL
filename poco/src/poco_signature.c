@@ -134,6 +134,96 @@ static void po_signature_describe_type(const Poco_run_env* executable, const Typ
 	}
 }
 
+static uint32_t po_signature_base_type(TypeComp component)
+{
+	switch (component) {
+		case TYPE_VOID:
+			return POCO_BASE_TYPE_VOID;
+		case TYPE_CHAR:
+			return POCO_BASE_TYPE_CHAR;
+		case TYPE_UCHAR:
+			return POCO_BASE_TYPE_UCHAR;
+		case TYPE_SHORT:
+			return POCO_BASE_TYPE_SHORT;
+		case TYPE_USHORT:
+			return POCO_BASE_TYPE_USHORT;
+		case TYPE_INT:
+			return POCO_BASE_TYPE_INT;
+		case TYPE_UINT:
+			return POCO_BASE_TYPE_UINT;
+		case TYPE_LONG:
+			return POCO_BASE_TYPE_LONG;
+		case TYPE_ULONG:
+			return POCO_BASE_TYPE_ULONG;
+		case TYPE_FLOAT:
+			return POCO_BASE_TYPE_FLOAT;
+		case TYPE_DOUBLE:
+			return POCO_BASE_TYPE_DOUBLE;
+		case TYPE_STRUCT:
+		case TYPE_UNION:
+			return POCO_BASE_TYPE_STRUCT;
+		case TYPE_END:
+		case TYPE_BAD:
+			return POCO_BASE_TYPE_INVALID;
+		default:
+			return POCO_BASE_TYPE_OTHER;
+	}
+}
+
+/*
+ * A Type_info lists its declarators base first: "char **" is CHAR, POINTER,
+ * POINTER, and "int (*f)(int)" is INT, FUNCTION, POINTER.  A native pointer
+ * may be TYPE_CPT rather than TYPE_POINTER; both are one level of indirection.
+ * The image stores this list component for component, so a restored program
+ * answers exactly as the program that was serialized.
+ */
+static void po_signature_shape(const Type_info* type, PocoTypeShape* out_shape)
+{
+	unsigned int component;
+
+	memset(out_shape, 0, sizeof(*out_shape));
+	if (type == NULL || type->comp == NULL || type->comp_count == 0) {
+		return;
+	}
+	out_shape->base_type = po_signature_base_type(type->comp[0]);
+	/* The compiler parses "unsigned T" as T and keeps only TFL_UNSIGNED. */
+	if ((type->flags & TFL_UNSIGNED) != 0) {
+		switch (out_shape->base_type) {
+			case POCO_BASE_TYPE_CHAR:
+				out_shape->base_type = POCO_BASE_TYPE_UCHAR;
+				break;
+			case POCO_BASE_TYPE_SHORT:
+				out_shape->base_type = POCO_BASE_TYPE_USHORT;
+				break;
+			case POCO_BASE_TYPE_INT:
+				out_shape->base_type = POCO_BASE_TYPE_UINT;
+				break;
+			case POCO_BASE_TYPE_LONG:
+				out_shape->base_type = POCO_BASE_TYPE_ULONG;
+				break;
+			default:
+				break;
+		}
+	}
+	for (component = 1; component < type->comp_count; ++component) {
+		switch (type->comp[component]) {
+			case TYPE_POINTER:
+			case TYPE_CPT:
+				++out_shape->pointer_depth;
+				break;
+			case TYPE_ARRAY:
+				++out_shape->array_rank;
+				break;
+			case TYPE_FUNCTION:
+			case TYPE_CFUNCTION:
+				out_shape->is_function = 1;
+				break;
+			default:
+				break;
+		}
+	}
+}
+
 static PocoStatus po_signature_find(PocoActivation* activation, const char* name,
 									const Func_frame** out_frame,
 									const Poco_run_env** out_executable)
@@ -191,20 +281,16 @@ PocoStatus poco_activation_function_signature(PocoActivation* activation, const 
 	return POCO_STATUS_OK;
 }
 
-PocoStatus poco_activation_function_parameter(PocoActivation* activation, const char* name,
-											  size_t index, const char** out_parameter_name,
-											  PocoTypeDesc* out_type)
+static PocoStatus po_signature_parameter(PocoActivation* activation, const char* name,
+										 size_t index, const Symbol** out_parameter,
+										 const Poco_run_env** out_executable)
 {
-	const Poco_run_env* executable = NULL;
 	const Func_frame* frame = NULL;
 	const Symbol* parameter;
 	PocoStatus status;
 	size_t position;
 
-	if (out_type == NULL) {
-		return POCO_STATUS_NULL_REFERENCE;
-	}
-	status = po_signature_find(activation, name, &frame, &executable);
+	status = po_signature_find(activation, name, &frame, out_executable);
 	if (status != POCO_STATUS_OK) {
 		return status;
 	}
@@ -218,6 +304,25 @@ PocoStatus poco_activation_function_parameter(PocoActivation* activation, const 
 	if (parameter == NULL) {
 		return POCO_STATUS_PARAMETER_RANGE;
 	}
+	*out_parameter = parameter;
+	return POCO_STATUS_OK;
+}
+
+PocoStatus poco_activation_function_parameter(PocoActivation* activation, const char* name,
+											  size_t index, const char** out_parameter_name,
+											  PocoTypeDesc* out_type)
+{
+	const Poco_run_env* executable = NULL;
+	const Symbol* parameter = NULL;
+	PocoStatus status;
+
+	if (out_type == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	status = po_signature_parameter(activation, name, index, &parameter, &executable);
+	if (status != POCO_STATUS_OK) {
+		return status;
+	}
 	po_signature_describe_type(executable, parameter->ti, out_type);
 	if (out_parameter_name != NULL) {
 		*out_parameter_name = parameter->name;
@@ -225,17 +330,15 @@ PocoStatus poco_activation_function_parameter(PocoActivation* activation, const 
 	return POCO_STATUS_OK;
 }
 
-PocoStatus poco_program_struct_member(PocoProgram* program, PocoStructId id, size_t index,
-									  const char** out_name, PocoTypeDesc* out_type)
+static PocoStatus po_signature_member(PocoProgram* program, PocoStructId id, size_t index,
+									  const Symbol** out_member,
+									  const Poco_run_env** out_executable)
 {
 	const Poco_run_env* executable;
 	const Struct_info* entry;
 	const Symbol* member;
 	size_t position;
 
-	if (program == NULL || out_type == NULL) {
-		return POCO_STATUS_NULL_REFERENCE;
-	}
 	executable = po_signature_executable(program);
 	entry = po_signature_struct_at(executable, id);
 	if (entry == NULL) {
@@ -248,9 +351,82 @@ PocoStatus poco_program_struct_member(PocoProgram* program, PocoStructId id, siz
 	if (member == NULL) {
 		return POCO_STATUS_PARAMETER_RANGE;
 	}
+	*out_member = member;
+	*out_executable = executable;
+	return POCO_STATUS_OK;
+}
+
+PocoStatus poco_program_struct_member(PocoProgram* program, PocoStructId id, size_t index,
+									  const char** out_name, PocoTypeDesc* out_type)
+{
+	const Poco_run_env* executable = NULL;
+	const Symbol* member = NULL;
+	PocoStatus status;
+
+	if (program == NULL || out_type == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	status = po_signature_member(program, id, index, &member, &executable);
+	if (status != POCO_STATUS_OK) {
+		return status;
+	}
 	po_signature_describe_type(executable, member->ti, out_type);
 	if (out_name != NULL) {
 		*out_name = member->name;
 	}
+	return POCO_STATUS_OK;
+}
+
+PocoStatus poco_activation_function_return_shape(PocoActivation* activation, const char* name,
+												 PocoTypeShape* out_shape)
+{
+	const Poco_run_env* executable = NULL;
+	const Func_frame* frame = NULL;
+	PocoStatus status;
+
+	if (out_shape == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	status = po_signature_find(activation, name, &frame, &executable);
+	if (status != POCO_STATUS_OK) {
+		return status;
+	}
+	po_signature_shape(frame->return_type, out_shape);
+	return POCO_STATUS_OK;
+}
+
+PocoStatus poco_activation_function_parameter_shape(PocoActivation* activation, const char* name,
+													size_t index, PocoTypeShape* out_shape)
+{
+	const Poco_run_env* executable = NULL;
+	const Symbol* parameter = NULL;
+	PocoStatus status;
+
+	if (out_shape == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	status = po_signature_parameter(activation, name, index, &parameter, &executable);
+	if (status != POCO_STATUS_OK) {
+		return status;
+	}
+	po_signature_shape(parameter->ti, out_shape);
+	return POCO_STATUS_OK;
+}
+
+PocoStatus poco_program_struct_member_shape(PocoProgram* program, PocoStructId id, size_t index,
+											PocoTypeShape* out_shape)
+{
+	const Poco_run_env* executable = NULL;
+	const Symbol* member = NULL;
+	PocoStatus status;
+
+	if (program == NULL || out_shape == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	status = po_signature_member(program, id, index, &member, &executable);
+	if (status != POCO_STATUS_OK) {
+		return status;
+	}
+	po_signature_shape(member->ti, out_shape);
 	return POCO_STATUS_OK;
 }

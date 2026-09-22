@@ -1,0 +1,248 @@
+/*
+ * type_shape fixture: every base type at pointer depth 0, 1 and 2, as a Poco
+ * function, as a '#pragma poco native' declaration and (in type_shape.c) as a
+ * registered binding.  Each family is named <kind><depth>_<base>: the depth-0
+ * function also takes the base at depths 0, 1 and 2 as parameters a, b and c.
+ * void has no depth-0 value, so its depth-0 function takes only b and c.
+ */
+#ifdef __POCO__
+#pragma poco native begin
+#endif
+char n0_char(char a, char *b, char **c);
+char *n1_char(void);
+char **n2_char(void);
+unsigned char n0_uchar(unsigned char a, unsigned char *b, unsigned char **c);
+unsigned char *n1_uchar(void);
+unsigned char **n2_uchar(void);
+short n0_short(short a, short *b, short **c);
+short *n1_short(void);
+short **n2_short(void);
+unsigned short n0_ushort(unsigned short a, unsigned short *b, unsigned short **c);
+unsigned short *n1_ushort(void);
+unsigned short **n2_ushort(void);
+int n0_int(int a, int *b, int **c);
+int *n1_int(void);
+int **n2_int(void);
+unsigned int n0_uint(unsigned int a, unsigned int *b, unsigned int **c);
+unsigned int *n1_uint(void);
+unsigned int **n2_uint(void);
+long n0_long(long a, long *b, long **c);
+long *n1_long(void);
+long **n2_long(void);
+unsigned long n0_ulong(unsigned long a, unsigned long *b, unsigned long **c);
+unsigned long *n1_ulong(void);
+unsigned long **n2_ulong(void);
+float n0_float(float a, float *b, float **c);
+float *n1_float(void);
+float **n2_float(void);
+double n0_double(double a, double *b, double **c);
+double *n1_double(void);
+double **n2_double(void);
+void n0_void(void *b, void **c);
+void *n1_void(void);
+void **n2_void(void);
+#ifdef __POCO__
+#pragma poco native end
+#endif
+
+struct probe {
+	char c;
+	unsigned char uc;
+	short s;
+	unsigned short us;
+	int i;
+	unsigned int ui;
+	long l;
+	unsigned long ul;
+	float f;
+	double d;
+	char *pc;
+	float **ppf;
+	void *pv;
+	struct probe *next;
+	int grid[4];
+};
+
+typedef unsigned short u16;
+typedef u16 *u16_ptr;
+
+/* Signedness survives a typedef, and a typedef of a pointer to one. */
+u16 t_link(u16 a, u16_ptr b, u16_ptr *c)
+{
+	return a;
+}
+
+struct probe *p_link(struct probe *a, struct probe **b)
+{
+	return a;
+}
+
+char f0_char(char a, char *b, char **c)
+{
+	return a;
+}
+
+char *f1_char(void)
+{
+	return NULL;
+}
+
+char **f2_char(void)
+{
+	return NULL;
+}
+
+unsigned char f0_uchar(unsigned char a, unsigned char *b, unsigned char **c)
+{
+	return a;
+}
+
+unsigned char *f1_uchar(void)
+{
+	return NULL;
+}
+
+unsigned char **f2_uchar(void)
+{
+	return NULL;
+}
+
+short f0_short(short a, short *b, short **c)
+{
+	return a;
+}
+
+short *f1_short(void)
+{
+	return NULL;
+}
+
+short **f2_short(void)
+{
+	return NULL;
+}
+
+unsigned short f0_ushort(unsigned short a, unsigned short *b, unsigned short **c)
+{
+	return a;
+}
+
+unsigned short *f1_ushort(void)
+{
+	return NULL;
+}
+
+unsigned short **f2_ushort(void)
+{
+	return NULL;
+}
+
+int f0_int(int a, int *b, int **c)
+{
+	return a;
+}
+
+int *f1_int(void)
+{
+	return NULL;
+}
+
+int **f2_int(void)
+{
+	return NULL;
+}
+
+unsigned int f0_uint(unsigned int a, unsigned int *b, unsigned int **c)
+{
+	return a;
+}
+
+unsigned int *f1_uint(void)
+{
+	return NULL;
+}
+
+unsigned int **f2_uint(void)
+{
+	return NULL;
+}
+
+long f0_long(long a, long *b, long **c)
+{
+	return a;
+}
+
+long *f1_long(void)
+{
+	return NULL;
+}
+
+long **f2_long(void)
+{
+	return NULL;
+}
+
+unsigned long f0_ulong(unsigned long a, unsigned long *b, unsigned long **c)
+{
+	return a;
+}
+
+unsigned long *f1_ulong(void)
+{
+	return NULL;
+}
+
+unsigned long **f2_ulong(void)
+{
+	return NULL;
+}
+
+float f0_float(float a, float *b, float **c)
+{
+	return a;
+}
+
+float *f1_float(void)
+{
+	return NULL;
+}
+
+float **f2_float(void)
+{
+	return NULL;
+}
+
+double f0_double(double a, double *b, double **c)
+{
+	return a;
+}
+
+double *f1_double(void)
+{
+	return NULL;
+}
+
+double **f2_double(void)
+{
+	return NULL;
+}
+
+void f0_void(void *b, void **c)
+{
+	b = b;
+}
+
+void *f1_void(void)
+{
+	return NULL;
+}
+
+void **f2_void(void)
+{
+	return NULL;
+}
+
+main()
+{
+	return 0;
+}

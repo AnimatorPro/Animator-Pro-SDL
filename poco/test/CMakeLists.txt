@@ -871,6 +871,16 @@ target_link_libraries(poco_function_signature PRIVATE Poco::poco)
 add_test(NAME poco_function_signature COMMAND $<TARGET_FILE:poco_function_signature>)
 set_tests_properties(poco_function_signature PROPERTIES TIMEOUT 10)
 
+# The declared type behind each descriptor - base type and pointer depth -
+# fresh and after an image round trip.
+add_executable(poco_type_shape type_shape/type_shape.c)
+target_compile_definitions(poco_type_shape PRIVATE
+    POCO_TYPE_SHAPE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/type_shape/"
+)
+target_link_libraries(poco_type_shape PRIVATE Poco::poco)
+add_test(NAME poco_type_shape COMMAND $<TARGET_FILE:poco_type_shape>)
+set_tests_properties(poco_type_shape PROPERTIES TIMEOUT 10)
+
 # The public memory entry point compiles without opening its diagnostic name.
 # File compilation delegates through the same path, so successful results and
 # syntax-error name/line/message details must remain identical.

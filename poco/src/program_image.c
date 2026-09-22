@@ -19,8 +19,11 @@
 #include "pocmemry.h"
 #include "pocoface.h"
 
-/* 4: prototypes carry the host-provided flag ('#pragma poco native'). */
-#define PO_IMAGE_VERSION_MULTI_SOURCE 4u
+/* 4: prototypes carry the host-provided flag ('#pragma poco native').
+ * 5: a type's flags carry TFL_UNSIGNED, so a restored program reports an
+ *    unsigned declaration as unsigned (PocoTypeShape).  A version 4 image
+ *    stored every unsigned type as its signed counterpart. */
+#define PO_IMAGE_VERSION_MULTI_SOURCE 5u
 #define PO_IMAGE_MINIMAL_SECTION_COUNT 5u
 #define PO_IMAGE_EXTENDED_SECTION_COUNT 6u
 #define PO_IMAGE_MAX_SECTION_COUNT (PO_IMAGE_EXTENDED_SECTION_COUNT + 1u)
