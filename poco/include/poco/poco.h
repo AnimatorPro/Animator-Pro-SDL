@@ -623,6 +623,25 @@ PocoStatus poco_vm_register_trusted_graph_library(PocoVm* vm);
 PocoStatus poco_vm_register_untrusted_expression_library(PocoVm* vm);
 
 /*
+ * Enable or disable opt-in untrusted-pointer hardening for this VM.  When
+ * enabled (enabled != 0), the interpreter enforces, on every indirect
+ * dereference, that a script-minted pointer (one that is not a host-registered
+ * borrowed span) has its whole access range fall inside memory the VM owns:
+ * the activation data segment or the interpreter stack.  A pointer that a
+ * script forged out of its own bytes to escape those regions is refused with
+ * POCO_STATUS_POINTER_ACCESS, a clean recoverable error, instead of reading or
+ * writing host memory.  Well-formed programs are unaffected because their real
+ * pointers always target those two regions.
+ *
+ * The control is independent of the capability-tier registration calls and may
+ * be toggled at any time, including after a program is compiled; it changes
+ * only run-time dereference checking, never compilation or FFI capability.  A
+ * newly created VM has it disabled, so existing embedders see no change.  A
+ * NULL vm is POCO_STATUS_NULL_REFERENCE.
+ */
+PocoStatus poco_vm_set_untrusted_pointers(PocoVm* vm, int enabled);
+
+/*
  * Compile source bytes into a program owned by the caller.  source_name is
  * copied into compiler metadata and used in diagnostics; it need not name a
  * filesystem object.  source_length excludes any terminating NUL byte, and

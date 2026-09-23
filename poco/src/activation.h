@@ -39,6 +39,16 @@ struct PocoVm {
 	int standard_library_registered;
 	int trusted_graph_library_registered;
 	int untrusted_expression_library_registered;
+	/*
+	 * Opt-in run-time hardening for hosts that run untrusted programs.  When
+	 * set, every indirect dereference of a script-minted (non host-registered)
+	 * pointer must have its whole access range fall inside VM-owned memory (the
+	 * activation data segment or the interpreter stack); a pointer escaping both
+	 * regions is refused with POCO_STATUS_POINTER_ACCESS rather than touching
+	 * host memory.  Off by default, so existing embedders are unaffected.  Set
+	 * through poco_vm_set_untrusted_pointers().
+	 */
+	int untrusted_pointers_enabled;
 	int program_count;
 	int destroy_requested;
 };

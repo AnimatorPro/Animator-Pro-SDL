@@ -859,6 +859,21 @@ PocoStatus poco_vm_register_untrusted_expression_library(PocoVm* vm)
 	return status;
 }
 
+PocoStatus poco_vm_set_untrusted_pointers(PocoVm* vm, int enabled)
+{
+	if (vm == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	if (vm->destroy_requested) {
+		return POCO_STATUS_PARAMETER_RANGE;
+	}
+	/* Run-time-only policy: it gates dereference checking, not compilation or
+	 * FFI capability, so unlike the tier registrations it is safe to toggle
+	 * after a program exists. */
+	vm->untrusted_pointers_enabled = enabled ? 1 : 0;
+	return POCO_STATUS_OK;
+}
+
 static int poco_api_replace_frame_source_path(Poco_cb* owner, Func_frame* frames,
 											  const char* source_path, const char* source_name)
 {
