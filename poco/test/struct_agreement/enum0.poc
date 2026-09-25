@@ -1,0 +1,9 @@
+enum colour {
+	RED,
+	GREEN
+};
+
+int enum_first(void)
+{
+	return RED;
+}

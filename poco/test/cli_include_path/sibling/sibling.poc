@@ -1,0 +1,7 @@
+/* shared.h sits beside this source and in the -I directory. */
+#include "shared.h"
+
+int main(void)
+{
+	return SHARED_VALUE;
+}

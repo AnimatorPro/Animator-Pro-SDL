@@ -1,0 +1,11 @@
+struct vec {
+	int x;
+	int y;
+};
+
+struct vec differ_member_origin;
+
+int differ_member_first(void)
+{
+	return differ_member_origin.x;
+}

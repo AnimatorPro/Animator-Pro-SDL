@@ -178,13 +178,13 @@ int main(void)
 				"program image framing is invalid");
 	if (program_image_offset + PROGRAM_IMAGE_LAST_SECTION_SIZE_OFFSET + 8 <= size) {
 		memcpy(changed, bytes, size);
-		write_u32(changed + program_image_offset + PROGRAM_IMAGE_VERSION_OFFSET, 4);
+		write_u32(changed + program_image_offset + PROGRAM_IMAGE_VERSION_OFFSET, 6);
 		repair_envelope_image_hash(changed, size);
 		ok &= expect_rejection(vm, changed, size, POCO_STATUS_IMAGE_VERSION_MISMATCH,
 							   "program image version bump was not diagnosed");
 
 		memcpy(changed, bytes, size);
-		write_u32(changed + program_image_offset + PROGRAM_IMAGE_VERSION_OFFSET, 2);
+		write_u32(changed + program_image_offset + PROGRAM_IMAGE_VERSION_OFFSET, 4);
 		repair_envelope_image_hash(changed, size);
 		ok &= expect_rejection(vm, changed, size, POCO_STATUS_IMAGE_VERSION_MISMATCH,
 							   "legacy program image version was not rejected");

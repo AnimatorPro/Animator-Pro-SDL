@@ -277,6 +277,9 @@ static void usage(FILE* stream)
 	fprintf(
 		stream,
 		"  -o, --output <file>  Write compiled output (.pex recommended; implies --compile).\n");
+	fprintf(stream,
+			"  -I, --include <dir>  Add an #include search directory; repeatable, searched in\n"
+			"                       the order given after the source file's own directory.\n");
 	fprintf(stream, "      --version        Print version and exit.\n");
 	fprintf(stream, "      --verbose        Enable verbose debug output.\n");
 	fprintf(stream, "      --gui            Launch Poco GUI (not implemented).\n");
@@ -585,6 +588,9 @@ int main(int argc, char* argv[])
 	 * takes it per run through PocoRunOptions. */
 	FILE* instruction_trace = NULL;
 	bool parse_options = true;
+	/* -I paths borrow argv's storage and are applied in command-line order. */
+	const char** include_paths = NULL;
+	size_t include_path_count = 0;
 	const char* argp;
 	int counter;
 	Poco_lib* builtin_libs;
@@ -597,6 +603,14 @@ int main(int argc, char* argv[])
 
 	builtin_libs = get_poco_libs();
 
+	if (argc > 1) {
+		include_paths = calloc((size_t)(argc - 1), sizeof(*include_paths));
+		if (include_paths == NULL) {
+			fprintf(stdout, "Out of memory\n");
+			return Err_no_memory;
+		}
+	}
+
 	for (counter = 1; counter < argc; counter++) {
 		argp = argv[counter];
 		if (parse_options && strcmp(argp, "--") == 0) {
@@ -608,34 +622,45 @@ int main(int argc, char* argv[])
 		} else if (parse_options && strcmp(argp, "-o") == 0) {
 			if (++counter >= argc) {
 				fprintf(stderr, "poco: option '-o' requires an argument\n");
-				usage(stderr);
-				return EXIT_FAILURE;
+				goto usage_error;
 			}
 			output_filename = argv[counter];
 			runflag = false;
 		} else if (parse_options && strcmp(argp, "--output") == 0) {
 			if (++counter >= argc) {
 				fprintf(stderr, "poco: option '--output' requires an argument\n");
-				usage(stderr);
-				return EXIT_FAILURE;
+				goto usage_error;
 			}
 			output_filename = argv[counter];
 			runflag = false;
 		} else if (parse_options && strncmp(argp, "--output=", 9) == 0) {
 			if (argp[9] == '\0') {
 				fprintf(stderr, "poco: option '--output' requires an argument\n");
-				usage(stderr);
-				return EXIT_FAILURE;
+				goto usage_error;
 			}
 			output_filename = argp + 9;
 			runflag = false;
+		} else if (parse_options && (strcmp(argp, "-I") == 0 || strcmp(argp, "--include") == 0)) {
+			if (++counter >= argc) {
+				fprintf(stderr, "poco: option '%s' requires an argument\n", argp);
+				goto usage_error;
+			}
+			include_paths[include_path_count++] = argv[counter];
+		} else if (parse_options && strncmp(argp, "--include=", 10) == 0) {
+			if (argp[10] == '\0') {
+				fprintf(stderr, "poco: option '--include' requires an argument\n");
+				goto usage_error;
+			}
+			include_paths[include_path_count++] = argp + 10;
 		} else if (parse_options && strcmp(argp, "--version") == 0) {
 			print_version();
+			free(include_paths);
 			return EXIT_SUCCESS;
 		} else if (parse_options && strcmp(argp, "--verbose") == 0) {
 			verbose = true;
 		} else if (parse_options && strcmp(argp, "--gui") == 0) {
 			fprintf(stdout, "Poco GUI not yet implemented\n");
+			free(include_paths);
 			return Err_not_implemented;
 		} else if (parse_options &&
 				   (strcmp(argp, "-g") == 0 || strcmp(argp, "--debug-info") == 0)) {
@@ -652,8 +677,7 @@ int main(int argc, char* argv[])
 #endif /* DEVELOPMENT */
 		} else if (parse_options && argp[0] == '-' && argp[1] != '\0') {
 			fprintf(stderr, "poco: unknown option '%s'\n", argp);
-			usage(stderr);
-			return EXIT_FAILURE;
+			goto usage_error;
 		} else {
 			/* Compact positionals into argv's already-consumed prefix. This keeps
 			 * their command-line order without allocating or mutating the strings. */
@@ -663,6 +687,7 @@ int main(int argc, char* argv[])
 
 	if (input_count == 0) {
 		usage(stdout);
+		free(include_paths);
 		return 0;
 	}
 	sfname = input_filenames[0];
@@ -673,8 +698,22 @@ int main(int argc, char* argv[])
 
 	vm_options.verbose = verbose;
 	if (poco_vm_create(&vm_options, &vm) != POCO_STATUS_OK) {
+		free(include_paths);
 		return Err_no_memory;
 	}
+	/* Seed the search path before anything compiles.  The append form is what
+	 * an embedding host has, and using it here keeps the two surfaces honest. */
+	for (size_t include_index = 0; include_index < include_path_count; ++include_index) {
+		if (poco_vm_add_include_path(vm, include_paths[include_index]) != POCO_STATUS_OK) {
+			fprintf(stderr, "poco: unable to add include directory '%s'\n",
+					include_paths[include_index]);
+			free(include_paths);
+			poco_vm_destroy(vm);
+			return EXIT_FAILURE;
+		}
+	}
+	free(include_paths);
+	include_paths = NULL;
 	for (size_t input_index = 0; input_index < input_count; ++input_index) {
 		FILE* inspected_file = NULL;
 		bool inspected_is_binary = false;
@@ -778,4 +817,9 @@ report_status:
 	poco_vm_destroy(vm);
 
 	return err;
+
+usage_error:
+	free(include_paths);
+	usage(stderr);
+	return EXIT_FAILURE;
 }

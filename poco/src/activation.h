@@ -39,6 +39,16 @@ struct PocoVm {
 	int standard_library_registered;
 	int trusted_graph_library_registered;
 	int untrusted_expression_library_registered;
+	/*
+	 * Opt-in run-time hardening for hosts that run untrusted programs.  When
+	 * set, every indirect dereference of a script-minted (non host-registered)
+	 * pointer must have its whole access range fall inside VM-owned memory (the
+	 * activation data segment or the interpreter stack); a pointer escaping both
+	 * regions is refused with POCO_STATUS_POINTER_ACCESS rather than touching
+	 * host memory.  Off by default, so existing embedders are unaffected.  Set
+	 * through poco_vm_set_untrusted_pointers().
+	 */
+	int untrusted_pointers_enabled;
 	int program_count;
 	int destroy_requested;
 };
@@ -122,6 +132,14 @@ struct PocoActivation {
 	long data_size;
 	bool (*check_abort)(void* data);
 	void* check_abort_data;
+	/*
+	 * The host's cancellation callback, owned by the activation rather than by
+	 * the frame that installed it.  check_abort_data points at the activation
+	 * itself while a cancellable call runs, so nothing the interpreter borrows
+	 * can outlive its owner.
+	 */
+	PocoCancelCallback cancel_callback;
+	void* cancel_user_data;
 	const char* trace_file;
 	/* Borrowed destination for the DEVELOPMENT instruction trace; NULL = off. */
 	FILE* instruction_trace;
@@ -160,6 +178,22 @@ Errcode poco_activation_marshal_main_argv(PocoActivation* activation, int argc, 
 void poco_activation_release_main_argv(PocoActivation* activation);
 Func_frame* poco_activation_callback_handle(PocoActivation* activation,
 											const Func_frame* compiled_frame);
+
+/*
+ * The interpreter's abort hook for a host cancellation callback.  Its context
+ * is the PocoActivation, whose lifetime covers every call it runs.
+ */
+bool po_activation_cancel_requested(void* context);
+
+/*
+ * Point the interpreter's abort hook at this activation's installed cancel
+ * callback, returning the previous hook so the caller can restore it.  With no
+ * callback installed the hook is left exactly as it was.
+ */
+void po_activation_push_cancel_hook(PocoActivation* activation, bool (**out_previous)(void*),
+									void** out_previous_data);
+void po_activation_pop_cancel_hook(PocoActivation* activation, bool (*previous)(void*),
+								   void* previous_data);
 
 /* Copy a finished run's private diagnostic text into the shared program VM. */
 void po_activation_publish_last_error(PocoActivation* activation);

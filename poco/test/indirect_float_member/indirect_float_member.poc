@@ -1,0 +1,73 @@
+/*
+ * Reading a float member through a struct pointer.
+ *
+ * OP_FI_VAR once reserved sizeof(float) for a slot it then wrote a double
+ * into and OP_DPOP later removed eight bytes from, so every indirect float
+ * read left the frame four bytes short. One read returned a plausible value;
+ * three in a row - the shape of reading a whole three-float vector - drifted
+ * the frame far enough that OP_RET fetched a garbage return address.
+ */
+
+typedef struct vec3_t { float x, y, z; } vec3_t;
+typedef struct mixed_t { int tag; float value; int trailer; } mixed_t;
+
+/* One indirect float read, returned straight back out. */
+double read_one(vec3_t *v)
+{
+	return v->x;
+}
+
+/* Three indirect float reads in one function: the case that crashed. */
+double read_three(vec3_t *v)
+{
+	return v->x + v->y + v->z;
+}
+
+/* The same three reads by way of locals, so the widened value has to survive
+ * a store as well as the pop. */
+double read_three_via_locals(vec3_t *v)
+{
+	float x, y, z;
+
+	x = v->x;
+	y = v->y;
+	z = v->z;
+	return x + y + z;
+}
+
+/* Indirect float reads inside a call that then has to return normally to its
+ * own caller - a drifted frame takes the return address down with it. */
+double read_nested(vec3_t *v)
+{
+	double sum;
+
+	sum = read_three(v);
+	sum = sum + read_three_via_locals(v);
+	return sum;
+}
+
+/* Indirect reads in a loop, so the drift accumulates over many iterations
+ * rather than a fixed handful. */
+double read_looped(vec3_t *v, int times)
+{
+	double sum;
+	int i;
+
+	sum = 0;
+	for (i = 0; i < times; i = i + 1) {
+		sum = sum + v->x + v->y + v->z;
+	}
+	return sum;
+}
+
+/* A float read through a pointer mixed with int reads through the same
+ * struct, so a wrong slot size shows up in the integer members too. */
+int read_mixed(mixed_t *m)
+{
+	return m->tag + m->value + m->trailer;
+}
+
+main()
+{
+	return 0;
+}

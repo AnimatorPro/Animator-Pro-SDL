@@ -169,6 +169,11 @@ static const char incl_open[] = "can't open source file %s";
 static const char pragma_unknown[] = "'%s' is not a valid poco pragma";
 static const char lib_name_missing[] = "missing or malformed filename for library pragma";
 static const char use_name_missing[] = "missing or malformed filename for use pragma";
+static const char native_arg_bad[] = "'#pragma poco native' expects 'begin' or 'end'";
+static const char native_already_open[] =
+	"'#pragma poco native begin' inside an open native region";
+static const char native_not_open[] = "'#pragma poco native end' without a matching 'begin'";
+static const char native_unterminated[] = "'#pragma poco native begin' without a matching 'end'";
 static const char lib_cant_find[] = "can't find POE library module %s";
 static const char lib_open_failed[] = "can't load POE library module %s";
 static const char stksz_value_bad[] = "stacksize value must be in kbytes, between 4 and 64";
@@ -235,8 +240,16 @@ static char* pp_findfile(Poco_cb* pcb, Names* idirs, char* fname, char path[PATH
 	}
 
 	while (idirs != NULL) {
-		if (namelen + strlen(idirs->name) < PATH_SIZE) {
-			sprintf(path, "%s%s", idirs->name, fname);
+		size_t dirlen = strlen(idirs->name);
+		/* A directory may be given with or without its trailing separator, the
+		 * same latitude poco_vm_add_library_path() allows.  An empty entry
+		 * still means "use the name as written". */
+		const char* separator =
+			dirlen == 0 || idirs->name[dirlen - 1] == '/' || idirs->name[dirlen - 1] == '\\' ? ""
+																							 : "/";
+
+		if ((size_t)namelen + dirlen + strlen(separator) < PATH_SIZE) {
+			sprintf(path, "%s%s%s", idirs->name, separator, fname);
 			if (verbose) {
 				fprintf(stderr, "[poco include search] trying '%s'\n", path);
 			}
@@ -376,8 +389,10 @@ static void new_file_stack_entry(Poco_cb* pcb, void* fp, char* fname, Fsflags fl
 	new_filep->name = po_clone_string(pcb, fname);
 	new_filep->line_count = 0;
 	new_filep->flags = flags;
+	new_filep->native_region = pcb->t.native_region;
 	new_filep->pred = pcb->t.file_stack;
 	pcb->t.file_stack = new_filep;
+	pcb->t.native_region = false;
 }
 
 static void new_buffer_stack_entry(Poco_cb* pcb, const char* source, size_t source_length,
@@ -392,8 +407,10 @@ static void new_buffer_stack_entry(Poco_cb* pcb, const char* source, size_t sour
 	new_filep->name = po_clone_string(pcb, source_name);
 	new_filep->line_count = 0;
 	new_filep->flags = FSF_ISBUFFER | FSF_MACSUB;
+	new_filep->native_region = pcb->t.native_region;
 	new_filep->pred = pcb->t.file_stack;
 	pcb->t.file_stack = new_filep;
+	pcb->t.native_region = false;
 }
 
 /*****************************************************************************
@@ -403,16 +420,23 @@ static void prev_file_stack_entry(Poco_cb* pcb)
 {
 	File_stack* fs = pcb->t.file_stack;
 	bool source_ended = (fs->flags & (FSF_ISFILE | FSF_ISBUFFER)) != 0;
+	bool region_open = pcb->t.native_region;
 
 	if (fs->flags & FSF_ISFILE) {
 		fclose(fs->source.file);
 	}
 
+	pcb->t.native_region = fs->native_region;
 	free_string(fs->name);
 	pcb->t.file_stack = fs->pred;
 	po_freemem(fs);
 
 	fs = pcb->t.file_stack;
+
+	if (region_open) {
+		pp_say_fatal(pcb, native_unterminated);
+		PO_CHECK_ABORT_VOID(pcb);
+	}
 
 	if (fs == NULL && pcb->t.ifdef_stack != NULL) {
 		if (source_ended) {
@@ -1404,6 +1428,12 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 				} else if (0 == strcmp("nomacrosub", word_buf)) {
 					pcb->t.file_stack->flags &= ~FSF_MACSUB;
 					goto pragma_done;
+				} else if (0 == strcmp("native", word_buf)) {
+					/* end_ok stays true so a bare '#pragma poco native' reaches
+					 * state 7 and gets the native diagnostic, not "Unexpected". */
+					end_ok = true;
+					word_buf[0] = '\0';
+					state = 7;
 				} else if (0 == strcmp("stacksize", word_buf)) {
 					state = 2;
 				} else if (0 == strcmp("echo", word_buf)) {
@@ -1479,6 +1509,44 @@ static void pp_pragma(Poco_cb* pcb, char* line, char* word_buf)
 				if (word_buf[0] == '\0') {
 					pp_say_fatal(pcb, use_name_missing);
 					PO_CHECK_ABORT_VOID(pcb);
+				}
+				goto pragma_done;
+			}
+				/**** host-provided native region cases ****/
+			case 7: {
+				/* A missing argument is as wrong as a misspelt one, and says so
+				 * with the same message rather than a bare "Unexpected". */
+				if (word_buf[0] == '\0' || word_buf[0] == ';') {
+					fatal = native_arg_bad;
+					goto fatal_error;
+				}
+				if (0 == strcmp("begin", word_buf)) {
+					if (pcb->t.native_region) {
+						fatal = native_already_open;
+						goto fatal_error;
+					}
+					pcb->t.native_region = true;
+				} else if (0 == strcmp("end", word_buf)) {
+					if (!pcb->t.native_region) {
+						fatal = native_not_open;
+						goto fatal_error;
+					}
+					pcb->t.native_region = false;
+				} else {
+					fatal = native_arg_bad;
+					goto fatal_error;
+				}
+				/* Nothing may follow the keyword: silently swallowing trailing
+				 * tokens hides typos that change which region a declaration is
+				 * in, and that changes how it is bound. */
+				state = 8;
+				end_ok = true;
+				break;
+			}
+			case 8: {
+				if (word_buf[0] != '\0' && word_buf[0] != ';') {
+					fatal = native_arg_bad;
+					goto fatal_error;
 				}
 				goto pragma_done;
 			}
@@ -1595,7 +1663,8 @@ bool po_pp_scan_uses(const char* source, size_t source_length, Poco_use_visitor 
 		while (scan < line_end && *scan != delimiter) {
 			if (path_length + 1 >= sizeof(path)) {
 				if (error != NULL && error_capacity != 0) {
-					snprintf(error, error_capacity, "use path is too long at line %zu", line_number);
+					snprintf(error, error_capacity, "use path is too long at line %zu",
+							 line_number);
 				}
 				return false;
 			}
@@ -1832,6 +1901,7 @@ static void po_init_pp_defines(Poco_cb* pcb)
 
 
 	pcb->t.out_of_it = 0;
+	pcb->t.native_region = false;
 
 	/*
 	 * do pre-defined symbols passed to us by our parent...

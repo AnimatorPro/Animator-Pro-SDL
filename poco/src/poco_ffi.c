@@ -1416,6 +1416,13 @@ int po_ffi_build_structures(Poco_run_env* env)
 		if (frame->type != CFF_C) {
 			continue;
 		}
+		/* A host-provided native that no registered binding supplies has no
+		 * address to dispatch to.  Compiling such a program is legal -- the
+		 * image is meant to be loaded elsewhere -- so leave it out of the
+		 * dispatch map, where a call to it fails as a missing binding. */
+		if (frame->host_provided && frame->code_pt == NULL) {
+			continue;
+		}
 
 		err = po_ffi_create_binding(env->vm, frame, &binding);
 		if (err != Success) {

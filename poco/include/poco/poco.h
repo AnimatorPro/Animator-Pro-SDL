@@ -167,6 +167,90 @@ typedef struct PocoCallbackValue {
 } PocoCallbackValue;
 
 /*
+ * A struct's identity within one program is its index in that program's struct
+ * table, not its tag.  Poco compiles every unit of a program in one process and
+ * keeps each unit's layouts separately, so a tag is neither unique nor stable:
+ * two units may define the same tag with different layouts, and every unit that
+ * includes a shared header mints its own entry for each struct in it.  Compare
+ * struct_id, and treat struct_name as descriptive only.
+ */
+typedef uint32_t PocoStructId;
+#define POCO_STRUCT_NONE ((PocoStructId)-1)
+
+/*
+ * One parameter, return or member type as the loader sees it.
+ *
+ * kind is the value kind a host exchanges for this type through
+ * PocoCallbackValue; a type with no such representation - void, or a C pointer
+ * that only crosses the native ABI - reports POCO_CALLBACK_VALUE_INVALID.
+ * is_struct is set when the type names a struct or union anywhere in its
+ * declarator, so both a struct by value and a pointer to one report the struct
+ * they refer to.  struct_size is the packed size the loader computed, which is
+ * what a host should compare against its own sizeof.  struct_id is
+ * POCO_STRUCT_NONE when the struct is not in the program's struct table.
+ */
+typedef struct PocoTypeDesc {
+	PocoCallbackValueKind kind;
+	int is_struct;
+	PocoStructId struct_id;
+	const char* struct_name;
+	size_t struct_size;
+	size_t struct_member_count;
+} PocoTypeDesc;
+
+/*
+ * The C type a PocoTypeDesc stands for, as it was declared rather than as a
+ * host exchanges it.  PocoTypeDesc::kind folds char, short and int into INT,
+ * float into DOUBLE, and every pointer depth into POPOT; a PocoTypeShape keeps
+ * the difference, so a host can tell a redeclared "char **" from the "char *"
+ * it expects, or a "float" from a "double".  It is a companion to PocoTypeDesc
+ * rather than new fields in it, so PocoTypeDesc and PocoFunctionSignature keep
+ * their layout.
+ *
+ * base_type is the declaration's base type, a POCO_BASE_TYPE_* value: what is
+ * left once every pointer, array and function declarator has been peeled off.
+ * pointer_depth counts the pointer declarators: 0 for a value, 1 for "T *",
+ * 2 for "T **".  array_rank counts array declarators and is_function is set
+ * when a function declarator appears, as it does in a function pointer; a type
+ * with array_rank 0 and is_function 0 is exactly base_type followed by
+ * pointer_depth stars.  A struct or union base reports POCO_BASE_TYPE_STRUCT
+ * and is identified by the PocoTypeDesc for the same type.  Unused fields are
+ * zero.
+ */
+enum {
+	POCO_BASE_TYPE_INVALID = 0,
+	POCO_BASE_TYPE_VOID = 1,
+	POCO_BASE_TYPE_CHAR = 2,
+	POCO_BASE_TYPE_UCHAR = 3,
+	POCO_BASE_TYPE_SHORT = 4,
+	POCO_BASE_TYPE_USHORT = 5,
+	POCO_BASE_TYPE_INT = 6,
+	POCO_BASE_TYPE_UINT = 7,
+	POCO_BASE_TYPE_LONG = 8,
+	POCO_BASE_TYPE_ULONG = 9,
+	POCO_BASE_TYPE_FLOAT = 10,
+	POCO_BASE_TYPE_DOUBLE = 11,
+	POCO_BASE_TYPE_STRUCT = 12,
+	/* A Poco-specific base with no C equivalent, such as FILE or Screen. */
+	POCO_BASE_TYPE_OTHER = 13
+};
+
+typedef struct PocoTypeShape {
+	uint32_t base_type;
+	uint32_t pointer_depth;
+	uint32_t array_rank;
+	uint32_t is_function;
+} PocoTypeShape;
+
+/* A compiled function's shape, read without calling it. */
+typedef struct PocoFunctionSignature {
+	const char* name;
+	int parameter_count;
+	int is_native;
+	PocoTypeDesc return_type;
+} PocoFunctionSignature;
+
+/*
  * A Poco binding is a C function exposed to a script through a Poco prototype
  * string.  The function must exactly match the prototype's fixed arguments
  * and return type.  The stable libffi ABI supports int, long, double, C
@@ -466,8 +550,31 @@ PocoStatus poco_vm_register_borrowed_span(PocoVm* vm, void* pointer, size_t byte
 										  uint32_t permissions);
 PocoStatus poco_vm_unregister_borrowed_span(PocoVm* vm, const void* pointer);
 
-/* Replace the VM include-path list.  The paths are copied and searched in order. */
+/*
+ * Replace the VM include-path list.  The paths are copied and searched in
+ * order, and each may include or omit its trailing directory separator.  This
+ * discards whatever list the VM already had, including anything
+ * supplied through PocoVmOptions or appended with poco_vm_add_include_path();
+ * pass NULL with a count of zero to clear the list.
+ */
 PocoStatus poco_vm_set_include_paths(PocoVm* vm, const char* const* paths, size_t path_count);
+
+/*
+ * Append one directory to the VM include-path list, keeping the entries
+ * already there.  The path is copied, may include or omit its trailing
+ * directory separator, and takes its place after every existing entry, so
+ * repeated calls build a search order matching the call order.  An
+ * empty path is POCO_STATUS_PARAMETER_RANGE and a NULL vm or path is
+ * POCO_STATUS_NULL_REFERENCE, matching poco_vm_add_library_path().
+ *
+ * Include paths are read during compilation only, so a call made after a
+ * program has been compiled is accepted and affects subsequent compiles alone;
+ * already-compiled programs are unaffected.  This deliberately differs from
+ * poco_vm_register_untrusted_expression_library(), which refuses once a
+ * program exists because it would retroactively change that program's
+ * capabilities.
+ */
+PocoStatus poco_vm_add_include_path(PocoVm* vm, const char* path);
 
 /*
  * Append a directory to the VM's native .poe module search list.  The path is
@@ -514,6 +621,25 @@ PocoStatus poco_vm_register_trusted_graph_library(PocoVm* vm);
  * attempts to infer whether source text is trustworthy.
  */
 PocoStatus poco_vm_register_untrusted_expression_library(PocoVm* vm);
+
+/*
+ * Enable or disable opt-in untrusted-pointer hardening for this VM.  When
+ * enabled (enabled != 0), the interpreter enforces, on every indirect
+ * dereference, that a script-minted pointer (one that is not a host-registered
+ * borrowed span) has its whole access range fall inside memory the VM owns:
+ * the activation data segment or the interpreter stack.  A pointer that a
+ * script forged out of its own bytes to escape those regions is refused with
+ * POCO_STATUS_POINTER_ACCESS, a clean recoverable error, instead of reading or
+ * writing host memory.  Well-formed programs are unaffected because their real
+ * pointers always target those two regions.
+ *
+ * The control is independent of the capability-tier registration calls and may
+ * be toggled at any time, including after a program is compiled; it changes
+ * only run-time dereference checking, never compilation or FFI capability.  A
+ * newly created VM has it disabled, so existing embedders see no change.  A
+ * NULL vm is POCO_STATUS_NULL_REFERENCE.
+ */
+PocoStatus poco_vm_set_untrusted_pointers(PocoVm* vm, int enabled);
 
 /*
  * Compile source bytes into a program owned by the caller.  source_name is
@@ -637,6 +763,63 @@ PocoStatus poco_call_push_pointer(PocoCall* call, void* pointer, size_t byte_cou
 								  PocoPointerPermission permissions);
 PocoStatus poco_call_invoke(PocoCall* call, PocoCallbackValue* out_result);
 void poco_call_end(PocoCall* call);
+
+/*
+ * Install the cancellation callback consulted by every call this activation
+ * runs, including poco_call_invoke(), which takes no run options of its own.
+ * The callback is asked on loop back-edges and function entries, exactly where
+ * PocoRunOptions.cancel_callback is asked, and a non-zero answer ends the call
+ * with POCO_STATUS_ABORTED.  A cancelled call unwinds its own frames; the
+ * activation stays usable for later calls.
+ *
+ * This is opt-in: with no callback installed - the default - nothing is
+ * consulted and no call changes behaviour.  Passing NULL clears it again.  The
+ * callback and its user data are stored in the activation, so both must stay
+ * valid until they are cleared or the activation is released; the setting
+ * survives poco_activation_reset() because it is host configuration rather
+ * than run state.  A run started by poco_activation_run() or poco_vm_run()
+ * still prefers its own PocoRunOptions.cancel_callback when that is non-NULL,
+ * and falls back to the installed one otherwise.
+ */
+PocoStatus poco_activation_set_cancel_callback(PocoActivation* activation,
+											   PocoCancelCallback callback, void* user_data);
+
+/*
+ * Read a compiled function's shape without calling it, so a host can reject a
+ * mismatched script at load instead of discovering the mismatch mid-call.
+ * Both accessors are read-only and allocate nothing.  An unknown function name
+ * returns POCO_STATUS_NOT_FOUND and leaves the outputs untouched; a parameter
+ * index at or past the signature's parameter_count returns
+ * POCO_STATUS_PARAMETER_RANGE.  Parameters are reported in declaration order.
+ * Returned strings are borrowed from the program and remain valid for its
+ * lifetime, the same ownership contract poco_get_last_error uses.
+ */
+PocoStatus poco_activation_function_signature(PocoActivation* activation, const char* name,
+											  PocoFunctionSignature* out_signature);
+PocoStatus poco_activation_function_parameter(PocoActivation* activation, const char* name,
+											  size_t index, const char** out_parameter_name,
+											  PocoTypeDesc* out_type);
+
+/*
+ * Enumerate a struct's members in declaration order, for a host verifying a
+ * program from an untrusted source field by field.  An unknown id or an index
+ * past the last member returns POCO_STATUS_PARAMETER_RANGE.  This walks the
+ * program's layouts on every call; keep it off hot paths.
+ */
+PocoStatus poco_program_struct_member(PocoProgram* program, PocoStructId id, size_t index,
+									  const char** out_name, PocoTypeDesc* out_type);
+
+/*
+ * The declared shape of the same return, parameter and member types the three
+ * accessors above describe; see PocoTypeShape.  Lookup, range checking and the
+ * untouched-output rule are exactly theirs.
+ */
+PocoStatus poco_activation_function_return_shape(PocoActivation* activation, const char* name,
+												 PocoTypeShape* out_shape);
+PocoStatus poco_activation_function_parameter_shape(PocoActivation* activation, const char* name,
+													size_t index, PocoTypeShape* out_shape);
+PocoStatus poco_program_struct_member_shape(PocoProgram* program, PocoStructId id, size_t index,
+											PocoTypeShape* out_shape);
 
 /*
  * Execute an acquired activation.  This backward-compatible convenience

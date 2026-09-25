@@ -53,6 +53,104 @@ static int run_program(PocoVm* vm, PocoProgram* program, int32_t* result)
 	return check(status == POCO_STATUS_OK, "program run failed");
 }
 
+/*
+ * poco_vm_add_include_path() appends rather than replacing, so an embedder can
+ * extend a list it did not build.  Its search order, its argument checking, and
+ * its behaviour once a program exists are all part of the published contract.
+ */
+static int check_add_include_path(const char* first_directory, const char* second_directory)
+{
+	static const char include_source[] =
+		"#include \"buffer_value.h\"\n"
+		"main()\n"
+		"{\n"
+		"\treturn BUFFER_INCLUDE_VALUE;\n"
+		"}\n";
+	const char* seeded_paths[1];
+	PocoVmOptions options = {0};
+	PocoVm* vm = NULL;
+	PocoProgram* seeded_program = NULL;
+	PocoProgram* appended_program = NULL;
+	PocoProgram* rejected_program = NULL;
+	char unseparated_directory[1024];
+	size_t directory_length;
+	int32_t seeded_result = 0;
+	int32_t appended_result = 0;
+	int ok = 1;
+
+	/* A VM seeded through PocoVmOptions: the appended path must extend that
+	 * list, not discard it. */
+	seeded_paths[0] = second_directory;
+	options.include_paths = seeded_paths;
+	options.include_path_count = 1;
+	ok &= check(poco_vm_create(&options, &vm) == POCO_STATUS_OK,
+		"seeded VM creation failed");
+	if (!ok)
+		return 0;
+	ok &= check(poco_vm_register_standard_library(vm) == POCO_STATUS_OK,
+		"seeded VM standard library registration failed");
+
+	ok &= check(poco_vm_add_include_path(NULL, first_directory) == POCO_STATUS_NULL_REFERENCE,
+		"a NULL VM was not rejected");
+	ok &= check(poco_vm_add_include_path(vm, NULL) == POCO_STATUS_NULL_REFERENCE,
+		"a NULL path was not rejected");
+	ok &= check(poco_vm_add_include_path(vm, "") == POCO_STATUS_PARAMETER_RANGE,
+		"an empty path was not rejected");
+
+	/* The seeded directory still resolves the header, and a rejected call left
+	 * nothing behind. */
+	ok &= check(poco_vm_compile_buffer(vm, "virtual/seeded.poc", include_source,
+		sizeof(include_source) - 1, &seeded_program) == POCO_STATUS_OK,
+		"the seeded include directory stopped resolving");
+	if (seeded_program != NULL)
+		ok &= run_program(vm, seeded_program, &seeded_result);
+	ok &= check(seeded_result == 19, "the seeded include directory resolved the wrong header");
+
+	/* Appending after a program exists is accepted and affects later compiles
+	 * only; the seeded entry keeps its place at the head of the search order. */
+	ok &= check(poco_vm_add_include_path(vm, first_directory) == POCO_STATUS_OK,
+		"appending an include path after a compile was refused");
+	ok &= check(poco_vm_compile_buffer(vm, "virtual/appended.poc", include_source,
+		sizeof(include_source) - 1, &appended_program) == POCO_STATUS_OK,
+		"the appended include directory did not compile");
+	if (appended_program != NULL)
+		ok &= run_program(vm, appended_program, &appended_result);
+	ok &= check(appended_result == 19,
+		"the appended path displaced the path it should have followed");
+
+	/* Replacing the list still replaces it, appended entries included. */
+	ok &= check(poco_vm_set_include_paths(vm, NULL, 0) == POCO_STATUS_OK,
+		"clearing the include-path list failed");
+	ok &= check(poco_vm_compile_buffer(vm, "virtual/cleared.poc", include_source,
+		sizeof(include_source) - 1, &rejected_program) == POCO_STATUS_REPORTED &&
+		rejected_program == NULL,
+		"an appended include path survived poco_vm_set_include_paths");
+
+	/* Appending to an emptied list makes that path the only entry.  The
+	 * trailing directory separator is optional, as it is for library paths. */
+	copy_text(unseparated_directory, sizeof(unseparated_directory), first_directory);
+	directory_length = strlen(unseparated_directory);
+	if (directory_length > 0 && unseparated_directory[directory_length - 1] == '/')
+		unseparated_directory[directory_length - 1] = '\0';
+	ok &= check(poco_vm_add_include_path(vm, unseparated_directory) == POCO_STATUS_OK,
+		"appending to an emptied include-path list failed");
+	poco_program_destroy(appended_program);
+	appended_program = NULL;
+	appended_result = 0;
+	ok &= check(poco_vm_compile_buffer(vm, "virtual/reappended.poc", include_source,
+		sizeof(include_source) - 1, &appended_program) == POCO_STATUS_OK,
+		"the re-appended include directory did not resolve");
+	if (appended_program != NULL)
+		ok &= run_program(vm, appended_program, &appended_result);
+	ok &= check(appended_result == 91,
+		"the re-appended include directory resolved the wrong header");
+
+	poco_program_destroy(appended_program);
+	poco_program_destroy(seeded_program);
+	poco_vm_destroy(vm);
+	return ok;
+}
+
 int main(void)
 {
 	static const char valid_source[] =
@@ -220,6 +318,8 @@ int main(void)
 	ok &= check(poco_vm_compile_buffer(vm, "embedded-nul.poc", embedded_nul,
 		sizeof(embedded_nul), &rejected_program) == POCO_STATUS_PARAMETER_RANGE &&
 		rejected_program == NULL, "embedded NUL source was not rejected");
+
+	ok &= check_add_include_path(include_directory, second_include_directory);
 
 	poco_program_destroy(virtual_program);
 	poco_program_destroy(sibling_include_program);

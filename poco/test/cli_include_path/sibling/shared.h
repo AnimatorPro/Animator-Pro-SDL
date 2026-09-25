@@ -1,0 +1,1 @@
+#define SHARED_VALUE 33

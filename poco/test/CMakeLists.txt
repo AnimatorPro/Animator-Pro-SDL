@@ -109,6 +109,7 @@ add_poco_pos_test(array_1d "pos/array_1d.poc")
 add_poco_pos_test(array_2d "pos/array_2d.poc")
 add_poco_pos_test(array_max_dims "pos/array_max_dims.poc")
 add_poco_pos_test(char_constants "pos/char_constants.poc")
+add_poco_pos_test(comma_operator "pos/comma_operator.poc")
 add_poco_pos_test(fnsplit_roundtrip "pos/fnsplit_roundtrip.poc")
 add_poco_pos_test(for_nested "pos/for_nested.poc")
 add_poco_pos_test(if_nested "pos/if_nested.poc")
@@ -135,6 +136,8 @@ add_poco_neg_test(call_int_as_func "neg/call_int_as_func.poc")
 add_poco_neg_test(cast_ptr_to_func "neg/cast_ptr_to_func.poc")
 add_poco_neg_test(char_in_param_list "neg/char_in_param_list.poc")
 add_poco_neg_test(char_to_ptr "neg/char_to_ptr.poc")
+add_poco_neg_test(comma_not_lvalue "neg/comma_not_lvalue.poc")
+add_poco_neg_test(comma_variadic_arg_error "neg/comma_variadic_arg_error.poc")
 add_poco_neg_test(dollar_in_name_01 "neg/dollar_in_name_01.poc")
 add_poco_neg_test(dollar_in_name_02 "neg/dollar_in_name_02.poc")
 add_poco_neg_test(dollar_in_name_03 "neg/dollar_in_name_03.poc")
@@ -241,6 +244,19 @@ add_test(
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_binary/verify-detect-and-run.cmake"
 )
 set_tests_properties(poco_cli_detect_and_run_binary PROPERTIES TIMEOUT 10)
+
+# Include search is configurable from the command line, not only from an
+# embedding host.  Exercise every spelling of the flag, accumulation order, the
+# source directory's precedence, and the missing-argument usage error.
+add_test(
+    NAME poco_cli_include_path
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
+        "-DPOCO_FIXTURE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cli_include_path"
+        "-DPOCO_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli_include_path/main.pex"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_include_path/verify-include-path.cmake"
+)
+set_tests_properties(poco_cli_include_path PROPERTIES TIMEOUT 20)
 
 # The internal serialization hash helper is the single entry point for source
 # addresses and image integrity. Check published BLAKE3 vectors, including a
@@ -350,6 +366,22 @@ target_include_directories(poco_multi_unit_compile PRIVATE
 target_link_libraries(poco_multi_unit_compile PRIVATE Poco::poco poco_ffi)
 add_test(NAME poco_multi_unit_compile COMMAND $<TARGET_FILE:poco_multi_unit_compile>)
 set_tests_properties(poco_multi_unit_compile PROPERTIES
+    LABELS "poco_multi_source"
+    TIMEOUT 10
+)
+
+add_executable(poco_struct_agreement
+    struct_agreement/struct_agreement.c
+)
+target_compile_definitions(poco_struct_agreement PRIVATE
+    POCO_STRUCT_AGREEMENT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/struct_agreement/"
+)
+target_include_directories(poco_struct_agreement PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+target_link_libraries(poco_struct_agreement PRIVATE Poco::poco poco_ffi)
+add_test(NAME poco_struct_agreement COMMAND $<TARGET_FILE:poco_struct_agreement>)
+set_tests_properties(poco_struct_agreement PROPERTIES
     LABELS "poco_multi_source"
     TIMEOUT 10
 )
@@ -779,6 +811,32 @@ target_link_libraries(poco_ffi_bounds PRIVATE Poco::poco)
 add_test(NAME poco_ffi_bounds COMMAND $<TARGET_FILE:poco_ffi_bounds>)
 set_tests_properties(poco_ffi_bounds PROPERTIES TIMEOUT 10)
 
+# A '#pragma poco native' declaration compiles to a native frame with no
+# address, so a program can be built without the host that provides the
+# function and resolved by name -- or refused -- when it is loaded.
+add_executable(poco_host_native host_native/host_native.c)
+target_compile_definitions(poco_host_native PRIVATE
+    POCO_HOST_NATIVE_USE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/host_native/use_root.poc"
+)
+target_include_directories(poco_host_native PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
+)
+target_link_libraries(poco_host_native PRIVATE Poco::poco poco_ffi)
+add_test(NAME poco_host_native COMMAND $<TARGET_FILE:poco_host_native>)
+set_tests_properties(poco_host_native PROPERTIES TIMEOUT 10)
+
+# The same region, malformed, driven through the CLI: every bad spelling of the
+# argument has to come back as a diagnostic and a normal non-zero exit rather
+# than a signal.
+add_test(
+    NAME poco_cli_native_pragma
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
+        "-DPOCO_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/host_native"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/host_native/verify-native-pragma.cmake"
+)
+set_tests_properties(poco_cli_native_pragma PROPERTIES TIMEOUT 20)
+
 # Native host callbacks enter the Poco interpreter with explicitly typed
 # values.  This fixture covers every value shape used by the Animator callback
 # sites and rejects malformed callback values before execution.
@@ -804,6 +862,27 @@ target_compile_definitions(poco_public_api PRIVATE
 target_link_libraries(poco_public_api PRIVATE Poco::poco)
 add_test(NAME poco_public_api COMMAND $<TARGET_FILE:poco_public_api>)
 set_tests_properties(poco_public_api PROPERTIES TIMEOUT 10)
+
+# Reading a function's arity and types before calling it, so a host can reject
+# a mismatched program at load.  Public headers only: the accessors exist so an
+# embedder never has to reach into src/ for a signature.
+add_executable(poco_function_signature function_signature/function_signature.c)
+target_compile_definitions(poco_function_signature PRIVATE
+    POCO_FUNCTION_SIGNATURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/function_signature/"
+)
+target_link_libraries(poco_function_signature PRIVATE Poco::poco)
+add_test(NAME poco_function_signature COMMAND $<TARGET_FILE:poco_function_signature>)
+set_tests_properties(poco_function_signature PROPERTIES TIMEOUT 10)
+
+# The declared type behind each descriptor - base type and pointer depth -
+# fresh and after an image round trip.
+add_executable(poco_type_shape type_shape/type_shape.c)
+target_compile_definitions(poco_type_shape PRIVATE
+    POCO_TYPE_SHAPE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/type_shape/"
+)
+target_link_libraries(poco_type_shape PRIVATE Poco::poco)
+add_test(NAME poco_type_shape COMMAND $<TARGET_FILE:poco_type_shape>)
+set_tests_properties(poco_type_shape PROPERTIES TIMEOUT 10)
 
 # The public memory entry point compiles without opening its diagnostic name.
 # File compilation delegates through the same path, so successful results and
@@ -959,6 +1038,21 @@ set_target_properties(poco_call_builder PROPERTIES
 add_test(NAME poco_call_builder COMMAND $<TARGET_FILE:poco_call_builder>)
 set_tests_properties(poco_call_builder PROPERTIES TIMEOUT 10)
 
+# A by-name call can be cancelled through the activation's cancel callback.
+# The fixture's spin_forever() only ends when the callback says so, so the
+# timeout below is this test's assertion against a call that cannot be stopped.
+add_executable(poco_call_cancel call_cancel/call_cancel.c)
+target_compile_definitions(poco_call_cancel PRIVATE
+    POCO_CALL_CANCEL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/call_cancel"
+)
+target_link_libraries(poco_call_cancel PRIVATE Poco::poco)
+set_target_properties(poco_call_cancel PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED YES
+)
+add_test(NAME poco_call_cancel COMMAND $<TARGET_FILE:poco_call_cancel>)
+set_tests_properties(poco_call_cancel PROPERTIES TIMEOUT 20)
+
 # Call-builder pointer arguments borrow exact host spans. Direct interpreter
 # reads and writes consult the same permission registry as native contracts.
 add_executable(poco_call_pointer_args call_pointer_args/call_pointer_args.c)
@@ -972,6 +1066,35 @@ set_target_properties(poco_call_pointer_args PROPERTIES
 )
 add_test(NAME poco_call_pointer_args COMMAND $<TARGET_FILE:poco_call_pointer_args>)
 set_tests_properties(poco_call_pointer_args PROPERTIES TIMEOUT 10)
+
+# Reading a float member through a struct pointer widens to a double on the
+# interpreter stack, so OP_FI_VAR has to reserve a double-sized slot. It once
+# reserved a float-sized one, leaving the frame four bytes short per read.
+add_executable(poco_indirect_float_member indirect_float_member/indirect_float_member.c)
+target_compile_definitions(poco_indirect_float_member PRIVATE
+    POCO_INDIRECT_FLOAT_MEMBER_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/indirect_float_member"
+)
+target_link_libraries(poco_indirect_float_member PRIVATE Poco::poco)
+set_target_properties(poco_indirect_float_member PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED YES
+)
+add_test(NAME poco_indirect_float_member COMMAND $<TARGET_FILE:poco_indirect_float_member>)
+set_tests_properties(poco_indirect_float_member PROPERTIES TIMEOUT 30)
+
+# Callers promote a float argument to double, so a float parameter's slot
+# holds a double. The callee once read it as a float and saw the low half.
+add_executable(poco_float_param float_param/float_param.c)
+target_compile_definitions(poco_float_param PRIVATE
+    POCO_FLOAT_PARAM_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/float_param"
+)
+target_link_libraries(poco_float_param PRIVATE Poco::poco)
+set_target_properties(poco_float_param PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED YES
+)
+add_test(NAME poco_float_param COMMAND $<TARGET_FILE:poco_float_param>)
+set_tests_properties(poco_float_param PROPERTIES TIMEOUT 30)
 
 # The explicit standard catalog is an embedding-host feature, not the CLI's
 # legacy table.  This fixture covers the real host-neutral console, string,

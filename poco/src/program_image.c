@@ -19,7 +19,11 @@
 #include "pocmemry.h"
 #include "pocoface.h"
 
-#define PO_IMAGE_VERSION_MULTI_SOURCE 3u
+/* 4: prototypes carry the host-provided flag ('#pragma poco native').
+ * 5: a type's flags carry TFL_UNSIGNED, so a restored program reports an
+ *    unsigned declaration as unsigned (PocoTypeShape).  A version 4 image
+ *    stored every unsigned type as its signed counterpart. */
+#define PO_IMAGE_VERSION_MULTI_SOURCE 5u
 #define PO_IMAGE_MINIMAL_SECTION_COUNT 5u
 #define PO_IMAGE_EXTENDED_SECTION_COUNT 6u
 #define PO_IMAGE_MAX_SECTION_COUNT (PO_IMAGE_EXTENDED_SECTION_COUNT + 1u)
@@ -230,7 +234,18 @@ static uint32_t po_frame_code_index(const PoFrameSet* frames, const void* code)
 {
 	size_t index;
 	for (index = 0; index < frames->count; ++index) {
-		if (frames->items[index]->type == CFF_C && frames->items[index]->code_pt == code) {
+		const Func_frame* frame = frames->items[index];
+
+		if (frame->type != CFF_C) {
+			continue;
+		}
+		/* An unresolved host-provided native shares its null code_pt with
+		 * every other one, so its call sites key on the frame instead. */
+		if (frame->host_provided && frame->code_pt == NULL) {
+			if ((const void*)frame == code) {
+				return (uint32_t)index;
+			}
+		} else if (frame->code_pt == code) {
 			return (uint32_t)index;
 		}
 	}
@@ -719,6 +734,7 @@ static PoProgramImageStatus po_encode_prototypes(PoWriter* section, const PoFram
 			!po_writer_u32(section, frame->binding_flags) ||
 			!po_writer_u64(section, (uint64_t)(int64_t)frame->magic) ||
 			!po_writer_u32(section, frame->got_code != 0) ||
+			!po_writer_u32(section, frame->host_provided != 0) ||
 			!po_writer_u32(section, po_frame_index(frames, frame->next)) ||
 			!po_writer_u32(section, po_frame_index(frames, frame->mlink)) ||
 			!po_writer_u32(section, po_frame_index(frames, frame->compiled_frame)) ||
@@ -1538,6 +1554,7 @@ static PoProgramImageStatus po_decode_prototypes(PoSectionView section, Poco_cb*
 		uint32_t flags;
 		uint64_t magic;
 		uint32_t got_code;
+		uint32_t host_provided;
 		uint32_t next;
 		uint32_t mlink;
 		uint32_t compiled;
@@ -1550,9 +1567,10 @@ static PoProgramImageStatus po_decode_prototypes(PoSectionView section, Poco_cb*
 		if (frame->name == NULL || !po_reader_u32(&reader, &pcount) ||
 			!po_reader_u32(&reader, &type) || !po_reader_u32(&reader, &flags) ||
 			!po_reader_u64(&reader, &magic) || !po_reader_u32(&reader, &got_code) ||
-			!po_reader_u32(&reader, &next) || !po_reader_u32(&reader, &mlink) ||
-			!po_reader_u32(&reader, &compiled) || !po_reader_u32(&reader, &unit_index) ||
-			type > CFF_C || !po_valid_reference(next, count) || !po_valid_reference(mlink, count) ||
+			!po_reader_u32(&reader, &host_provided) || !po_reader_u32(&reader, &next) ||
+			!po_reader_u32(&reader, &mlink) || !po_reader_u32(&reader, &compiled) ||
+			!po_reader_u32(&reader, &unit_index) || type > CFF_C ||
+			!po_valid_reference(next, count) || !po_valid_reference(mlink, count) ||
 			!po_valid_reference(compiled, count)) {
 			free(frames);
 			return PO_PROGRAM_IMAGE_MALFORMED;
@@ -1570,6 +1588,7 @@ static PoProgramImageStatus po_decode_prototypes(PoSectionView section, Poco_cb*
 			return PO_PROGRAM_IMAGE_UNSUPPORTED;
 		}
 		frame->got_code = got_code != 0;
+		frame->host_provided = host_provided != 0;
 		frame->next = next != PO_IMAGE_NO_INDEX ? frames[next] : NULL;
 		frame->mlink = mlink != PO_IMAGE_NO_INDEX ? frames[mlink] : NULL;
 		frame->compiled_frame = compiled != PO_IMAGE_NO_INDEX ? frames[compiled] : NULL;
@@ -1637,7 +1656,12 @@ static PoProgramImageStatus po_decode_prototypes(PoSectionView section, Poco_cb*
 				free(frames);
 				return PO_PROGRAM_IMAGE_UNKNOWN_BINDING;
 			}
-			if (binding_flags != frame->binding_flags) {
+			if (frame->host_provided) {
+				/* The declaration says nothing about how the host calls its
+				 * own function, so the registration is authoritative for the
+				 * run-context flag. */
+				frame->binding_flags = binding_flags;
+			} else if (binding_flags != frame->binding_flags) {
 				free(frames);
 				return PO_PROGRAM_IMAGE_UNKNOWN_BINDING;
 			}

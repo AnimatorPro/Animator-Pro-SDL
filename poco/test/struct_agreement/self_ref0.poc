@@ -1,0 +1,9 @@
+struct node {
+	int value;
+	struct node *next;
+};
+
+int self_ref_first(void)
+{
+	return 1;
+}

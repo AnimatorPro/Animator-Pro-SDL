@@ -1,0 +1,72 @@
+/* Script-to-script and host-to-script calls with float parameters. */
+
+double echo(float x)
+{
+	return x;
+}
+
+double via_literal(void)
+{
+	return echo(25.0);
+}
+
+double via_float_var(void)
+{
+	float f;
+	f = 0.1;
+	return echo(f);
+}
+
+double via_double_var(void)
+{
+	double d;
+	d = 1.0 / 3.0;
+	return echo(d);
+}
+
+double mixed(int a, float b, double c, float d, int e)
+{
+	return a + b + c + d + e;
+}
+
+double via_mixed(void)
+{
+	return mixed(1, 2.5, 4.25, 8.5, 16);
+}
+
+double read_through(float* p)
+{
+	return *p;
+}
+
+double address_of(float x)
+{
+	return read_through(&x);
+}
+
+double via_address(void)
+{
+	return address_of(3.5);
+}
+
+double reassign(float x)
+{
+	x = x * 2.0;
+	return x;
+}
+
+double via_reassign(void)
+{
+	return reassign(1.25);
+}
+
+/* Entry points the host calls directly with a double argument. */
+double host_echo(float x)
+{
+	return x;
+}
+
+double host_pair(int self, float goal)
+{
+	return self + goal;
+}

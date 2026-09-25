@@ -629,6 +629,7 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 	SHORT type_token;
 	Struct_info* sif;
 	UBYTE flags = 0;
+	UBYTE inherited_flags = 0;
 	UBYTE comp;
 
 	ti->comp_count = 1;
@@ -638,6 +639,8 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 		PO_CHECK_ABORT(pcb, false);
 		if (pcb->t.toktype == PTOK_USER_TYPE) {
 			po_copy_type(pcb, pcb->curtoken->val.symbol->ti, ti);
+			/* A typedef keeps the signedness it was declared with. */
+			inherited_flags = pcb->curtoken->val.symbol->ti->flags & TFL_UNSIGNED;
 			comp = ti->comp[ti->comp_count - 1];
 			break;
 		} else if (pcb->t.toktype != PTOK_TYPE) {
@@ -775,7 +778,13 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 		}
 	}
 
-	ti->flags = flags & (TFL_STATIC | TFL_EXTERN); /* retain unit linkage */
+	/*
+	 * Retain unit linkage, and whether the base was declared unsigned.  The
+	 * compiler itself treats unsigned types as their signed counterparts; the
+	 * flag is kept only so a host reading a signature can see the declaration.
+	 * It travels with the type into every declarator and into the image.
+	 */
+	ti->flags = (TypeFlags)((flags & (TFL_STATIC | TFL_EXTERN | TFL_UNSIGNED)) | inherited_flags);
 	ti->comp[ti->comp_count - 1] = comp;           /* save any mods to the base type */
 
 	if (comp != TYPE_BAD) {

@@ -140,6 +140,9 @@ typedef struct func_frame {
 	const struct func_frame* compiled_frame; /* activation-handle source */
 	struct PocoActivation* activation;       /* owner for callback handles */
 	PoBoolean got_code;
+	/* Declared inside a '#pragma poco native' region: a CFF_C frame whose
+	 * code_pt stays null until the host's binding is found by name at load. */
+	PoBoolean host_provided;
 } Func_frame;
 
 typedef Func_frame C_frame;

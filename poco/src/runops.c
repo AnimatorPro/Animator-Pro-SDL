@@ -122,14 +122,6 @@ static bool po_copy_span_has_capacity(const Popot* span, size_t byte_count)
 	return byte_count == 0 || maximum - current >= byte_count - 1;
 }
 
-static bool po_registered_pointer_access_is_valid(PocoPointerRegistry* registry,
-												  const Popot* pointer, size_t byte_count,
-												  uint32_t permissions)
-{
-	return !poco_pointer_registry_is_managed(registry, pointer) ||
-		   poco_pointer_registry_validate(registry, pointer, byte_count, permissions);
-}
-
 typedef struct {
 	long data[32];
 } Parmdata;
@@ -161,7 +153,116 @@ typedef struct {
 	Eax* acc; /* kept out of line: the union defeats scalar promotion */
 	Errcode err;
 	size_t debug_depth_floor;
+	/*
+	 * Extents of the two regions a script-minted pointer is permitted to reach
+	 * when untrusted_pointers is on: the activation data segment [data,
+	 * data+data_size) (globals live here, addressed from its top with negative
+	 * offsets) and the interpreter stack [stack_area, stack_area+stack_size).
+	 */
+	UBYTE* data;
+	size_t data_size;
+	size_t stack_size;
+	int untrusted_pointers;
+	/*
+	 * Shadow control stack.  It mirrors the return addresses (OP_PCALL /
+	 * CFF_POCO / the initial &end_op) and saved frame pointers (OP_ENTER) that
+	 * are also pushed onto the data stack, but lives in a distinct allocation
+	 * outside both regions above.  No opcode ever mints a pointer into it, so a
+	 * script can neither read nor write it; OP_RET and OP_LEAVE take the trusted
+	 * copy from here, making a forged overwrite of the data-stack slot inert.
+	 * It grows down like the data stack.
+	 */
+	void** control;
+	UBYTE* control_area;
+	size_t control_size;
 } PoRunState;
+
+/*****************************************************************************
+ * VM-owned-memory region check (Option A) and the shadow control stack.
+ ****************************************************************************/
+
+/*
+ * True when the whole byte range [pt, pt+byte_count) lies inside the block
+ * [block, block+block_size).  A zero-length access need only have its base
+ * inside the (inclusive) block.  block==NULL / block_size==0 is an empty block.
+ */
+static bool po_range_in_block(const void* pt, size_t byte_count, const void* block,
+							  size_t block_size)
+{
+	uintptr_t start;
+	uintptr_t low;
+	uintptr_t high;
+
+	if (block == NULL || block_size == 0) {
+		return false;
+	}
+	start = (uintptr_t)pt;
+	low = (uintptr_t)block;
+	high = low + block_size; /* one past the last valid byte */
+	if (start < low) {
+		return false;
+	}
+	if (byte_count == 0) {
+		return start <= high;
+	}
+	/* start >= low guarantees start does not wrap; guard the region end. */
+	return start <= high - byte_count;
+}
+
+static bool po_pointer_in_vm_region(const PoRunState* st, const void* pt, size_t byte_count)
+{
+	/*
+	 * The FFI struct-return buffer is VM-owned scratch too: a native returning
+	 * an aggregate by value has libffi write it here, and the script then reads
+	 * or copies the result through a Popot bounded to it.  It is read live from
+	 * the activation because a call may have grown it, and it holds only the
+	 * script's own just-returned value - never control data - so admitting it is
+	 * as safe as admitting the data segment.
+	 */
+	return po_range_in_block(pt, byte_count, st->data, st->data_size) ||
+		   po_range_in_block(pt, byte_count, st->stack_area, st->stack_size) ||
+		   po_range_in_block(pt, byte_count, st->p->ffi.struct_result,
+							 st->p->ffi.struct_result_capacity);
+}
+
+/*
+ * Shared dereference guard.  A host-registered (managed) span is validated
+ * against the registry exactly as before.  A script-minted pointer is accepted
+ * unconditionally unless untrusted-pointer hardening is on, in which case its
+ * whole access range must fall inside VM-owned memory.
+ */
+static bool po_registered_pointer_access_is_valid(PoRunState* st, const Popot* pointer,
+												  size_t byte_count, uint32_t permissions)
+{
+	if (poco_pointer_registry_is_managed(st->p->pointer_registry, pointer)) {
+		return poco_pointer_registry_validate(st->p->pointer_registry, pointer, byte_count,
+											  permissions);
+	}
+	if (st->untrusted_pointers) {
+		return po_pointer_in_vm_region(st, pointer->pt, byte_count);
+	}
+	return true;
+}
+
+/*
+ * Push a trusted control word (return address or saved base) onto the shadow
+ * control stack.  Returns false if it would overflow; it cannot overflow before
+ * the data stack does, since it is the same size and holds at most one word per
+ * frame, but the guard is kept.
+ */
+static inline bool po_control_push(PoRunState* st, void* value)
+{
+	if ((UBYTE*)st->control <= st->control_area) {
+		return false;
+	}
+	*--st->control = value;
+	return true;
+}
+
+static inline void* po_control_pop(PoRunState* st)
+{
+	return *st->control++;
+}
 
 /*
  * What an opcode handler tells the dispatch loop to do next.  These replace
@@ -279,7 +380,10 @@ PO_STEP_HANDLER po_step_frame(PoRunState* st, int op)
 {
 	switch (op) {
 		case OP_RET:
-			st->ip = st->stack->p;
+			/* The data-stack slot is still popped so the frame layout is
+			 * byte-for-byte unchanged, but ip is taken from the shadow control
+			 * stack, which a forged pointer cannot reach or overwrite. */
+			st->ip = po_control_pop(st);
 			st->stack = OPTR(st->stack, sizeof(st->ip));
 			if (st->p->debug_call_depth > st->debug_depth_floor) {
 				--st->p->debug_call_depth;
@@ -296,6 +400,11 @@ PO_STEP_HANDLER po_step_frame(PoRunState* st, int op)
 			}
 			st->stack = OPTR(st->stack, -sizeof(st->base));
 			st->stack->p = st->base;
+			/* Shadow the saved base onto the control stack too. */
+			if (!po_control_push(st, st->base)) {
+				st->err = Err_stack;
+				return PO_STEP_TRAP;
+			}
 			st->base = st->stack;
 			st->stack = OPTR(st->stack, -st->ip->doff);
 			poco_zero_bytes(st->stack, st->ip->doff);
@@ -303,7 +412,9 @@ PO_STEP_HANDLER po_step_frame(PoRunState* st, int op)
 			return PO_STEP_NEXT;
 		case OP_LEAVE:
 			st->stack = st->base;                          /* clear off local vars  */
-			st->base = st->stack->p;                       /* restore parent base	 */
+			/* Restore the parent base from the trusted control-stack copy, not
+			 * the writable data-stack slot. */
+			st->base = po_control_pop(st);                 /* restore parent base	 */
 			st->stack = OPTR(st->stack, sizeof(st->base)); /* clean off parent base */
 			return PO_STEP_NEXT;
 	}
@@ -569,7 +680,7 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(char),
 													   POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -588,7 +699,7 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(short),
 													   POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -607,7 +718,7 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(int), POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
 			}
@@ -625,7 +736,7 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(Popot),
 													   POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -644,7 +755,7 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(long),
 													   POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -663,7 +774,7 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(float),
 													   POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -674,7 +785,14 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt > st->acc->ret.ppt.max) {
 				return PO_STEP_ERR_BIG;
 			}
-			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.f));
+			/* The slot this reserves must match what is written into it and
+			 * what OP_DPOP later removes. A float is widened to double on the
+			 * interpreter stack - OP_LOC_FVAR reserves sizeof(double) for
+			 * exactly that reason - so reserving sizeof(float) here left the
+			 * stack four bytes short on every indirect float read, and three
+			 * such reads in one function drifted the frame far enough for
+			 * OP_RET to fetch a garbage return address. */
+			st->stack = OPTR(st->stack, sizeof(st->acc->ret.ppt) - sizeof(st->acc->ret.d));
 			st->stack->d = *((float*)(st->acc->ret.ppt.pt));
 			return PO_STEP_NEXT;
 		case OP_DI_VAR:
@@ -682,7 +800,7 @@ PO_STEP_HANDLER po_step_load_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(double),
 													   POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -711,7 +829,7 @@ PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(char),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -730,7 +848,7 @@ PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(short),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -749,7 +867,7 @@ PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(int),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -768,7 +886,7 @@ PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(Popot),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -787,7 +905,7 @@ PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(long),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -806,7 +924,7 @@ PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(float),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -825,7 +943,7 @@ PO_STEP_HANDLER po_step_store_indirect(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(double),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -1434,11 +1552,11 @@ PO_STEP_HANDLER po_step_memory(PoRunState* st, int op)
 										   (size_t)st->ip->l)) {
 				return PO_STEP_ERR_BIG;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->stack->ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->stack->ppt,
 													   (size_t)st->ip->l,
 													   POCO_POINTER_PERMISSION_READ) ||
 				!po_registered_pointer_access_is_valid(
-					st->p->pointer_registry, (Popot*)OPTR(st->stack, sizeof(st->stack->ppt)),
+					st, (Popot*)OPTR(st->stack, sizeof(st->stack->ppt)),
 					(size_t)st->ip->l, POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
 			}
@@ -1616,6 +1734,11 @@ PO_STEP_HANDLER po_step_call(PoRunState* st, int op)
 					}
 					st->stack = OPTR(st->stack, sizeof(st->stack->ppt) - sizeof(st->stack->p));
 					st->stack->p = st->ip;
+					/* Shadow the return address onto the control stack too. */
+					if (!po_control_push(st, st->ip)) {
+						st->err = Err_stack;
+						return PO_STEP_TRAP;
+					}
 					st->ip = (Pt_num*)st->acc->f->code_pt;
 					++st->p->debug_call_depth;
 					break;
@@ -1634,6 +1757,11 @@ PO_STEP_HANDLER po_step_call(PoRunState* st, int op)
 			st->ip = OPTR(st->ip, sizeof(st->acc->f));
 			st->stack = OPTR(st->stack, -sizeof(st->ip));
 			st->stack->p = st->ip;
+			/* Shadow the return address onto the control stack too. */
+			if (!po_control_push(st, st->ip)) {
+				st->err = Err_stack;
+				return PO_STEP_TRAP;
+			}
 			st->ip = (Pt_num*)st->acc->f->code_pt;
 			++st->p->debug_call_depth;
 			if ((st->p->check_abort)(st->p->check_abort_data)) {
@@ -1737,7 +1865,7 @@ PO_STEP_HANDLER po_step_string(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(PoString),
 													   POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -1758,7 +1886,7 @@ PO_STEP_HANDLER po_step_string(PoRunState* st, int op)
 			if (st->acc->ret.ppt.pt == NULL) {
 				return PO_STEP_ERR_NULL;
 			}
-			if (!po_registered_pointer_access_is_valid(st->p->pointer_registry, &st->acc->ret.ppt,
+			if (!po_registered_pointer_access_is_valid(st, &st->acc->ret.ppt,
 													   sizeof(PoString),
 													   POCO_POINTER_PERMISSION_WRITE)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
@@ -2155,6 +2283,7 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 	PoStep step;
 	Errcode err;
 	UBYTE* stack_area;
+	UBYTE* control_area;
 	Pt_num* stack;
 	int op;
 	int end_op = OP_END;
@@ -2202,6 +2331,10 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 	state.globals = (Pt_num*)(p->data + p->data_size);
 	state.acc = &acc;
 	state.err = Success;
+	state.data = (UBYTE*)p->data;
+	state.data_size = p->data_size > 0 ? (size_t)p->data_size : 0;
+	state.stack_size = p->stack_size > 0 ? (size_t)p->stack_size : 0;
+	state.untrusted_pointers = (p->vm != NULL && p->vm->untrusted_pointers_enabled) ? 1 : 0;
 
 	saved_debug_call_depth = p->debug_call_depth;
 	debug_depth_floor = p->run_depth != 0 ? saved_debug_call_depth + 1 : 0;
@@ -2221,6 +2354,25 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 	stack = (Pt_num*)(stack_area + p->stack_size);
 	state.stack_area = stack_area;
 
+	/*
+	 * The shadow control stack is always allocated (it is a transparent shadow,
+	 * on regardless of the untrusted-pointer mode) and freed on every exit path.
+	 * It is the same size as the data stack and holds at most one word per
+	 * frame, so it cannot overflow before the data stack does.
+	 */
+	control_area = pj_malloc(p->stack_size);
+	if (control_area == NULL) {
+		if (temporary_stack) {
+			pj_free(stack_area);
+		}
+		--p->run_depth;
+		p->debug_call_depth = saved_debug_call_depth;
+		return Err_no_memory;
+	}
+	state.control_area = control_area;
+	state.control_size = (size_t)p->stack_size;
+	state.control = (void**)(control_area + p->stack_size);
+
 	if (argument_bytes > 0) {
 		stack = OPTR(stack, -(long)argument_bytes);
 		err = po_push_callback_values(stack, values, value_count);
@@ -2236,6 +2388,10 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 	state.stack = stack;
 	state.base = stack;
 	state.debug_depth_floor = debug_depth_floor;
+
+	/* Shadow the initial return address so the top-level OP_RET reads it from
+	 * the control stack, matching every nested call/return. */
+	(void)po_control_push(&state, &end_op);
 
 	/* assume a starting condition of success */
 
@@ -2376,6 +2532,7 @@ DEBUG_TRACE:
 	}
 
 DEALLOC_AND_EXIT:
+	pj_free(control_area);
 	if (temporary_stack) {
 		pj_free(stack_area);
 	}

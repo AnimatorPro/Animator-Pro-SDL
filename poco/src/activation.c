@@ -479,17 +479,57 @@ void po_activation_publish_last_error(PocoActivation* activation)
 	po_vm_diagnostic_unlock(shared);
 }
 
-typedef struct Poco_api_cancel_context {
-	PocoCancelCallback callback;
-	void* user_data;
-} Poco_api_cancel_context;
-
-static bool poco_api_cancel(void* context)
+/*
+ * The cancellation state lives in the activation, not in the frame that
+ * installed it: the interpreter keeps check_abort_data for the whole of a run,
+ * and a run started from a stack local left that pointer dangling the moment
+ * the starting function returned.
+ */
+bool po_activation_cancel_requested(void* context)
 {
-	Poco_api_cancel_context* cancel_context = context;
+	PocoActivation* activation = context;
 
-	return cancel_context != NULL && cancel_context->callback != NULL &&
-		   cancel_context->callback(cancel_context->user_data) != 0;
+	return activation != NULL && activation->cancel_callback != NULL &&
+		   activation->cancel_callback(activation->cancel_user_data) != 0;
+}
+
+void po_activation_push_cancel_hook(PocoActivation* activation, bool (**out_previous)(void*),
+									void** out_previous_data)
+{
+	if (activation == NULL) {
+		return;
+	}
+	if (out_previous != NULL) {
+		*out_previous = activation->check_abort;
+	}
+	if (out_previous_data != NULL) {
+		*out_previous_data = activation->check_abort_data;
+	}
+	if (activation->cancel_callback != NULL) {
+		activation->check_abort = po_activation_cancel_requested;
+		activation->check_abort_data = activation;
+	}
+}
+
+void po_activation_pop_cancel_hook(PocoActivation* activation, bool (*previous)(void*),
+								   void* previous_data)
+{
+	if (activation == NULL) {
+		return;
+	}
+	activation->check_abort = previous;
+	activation->check_abort_data = previous_data;
+}
+
+PocoStatus poco_activation_set_cancel_callback(PocoActivation* activation,
+											   PocoCancelCallback callback, void* user_data)
+{
+	if (activation == NULL) {
+		return POCO_STATUS_NULL_REFERENCE;
+	}
+	activation->cancel_callback = callback;
+	activation->cancel_user_data = callback != NULL ? user_data : NULL;
+	return POCO_STATUS_OK;
 }
 
 static const Symbol* poco_activation_find_global(const PocoActivation* activation, const char* name)
@@ -915,7 +955,10 @@ PocoStatus poco_activation_run(PocoActivation* activation, const PocoRunOptions*
 	Errcode run_status;
 	long error_line = 0;
 	PocoVm* vm;
-	Poco_api_cancel_context cancel_context;
+	PocoCancelCallback saved_callback;
+	void* saved_user_data;
+	bool (*previous_check_abort)(void*);
+	void* previous_check_abort_data;
 
 	if (activation == NULL) {
 		return POCO_STATUS_NULL_REFERENCE;
@@ -927,11 +970,22 @@ PocoStatus poco_activation_run(PocoActivation* activation, const PocoRunOptions*
 	if (vm->destroy_requested || activation->needs_reset) {
 		return POCO_STATUS_PARAMETER_RANGE;
 	}
-	cancel_context.callback = options != NULL ? options->cancel_callback : NULL;
-	cancel_context.user_data = options != NULL ? options->cancel_user_data : NULL;
+	/* This run's options win while it runs; an activation-installed callback is
+	 * the fallback.  Both are stored in the activation, which outlives the run,
+	 * rather than in a local the interpreter would be left pointing at. */
+	saved_callback = activation->cancel_callback;
+	saved_user_data = activation->cancel_user_data;
+	if (options != NULL && options->cancel_callback != NULL) {
+		activation->cancel_callback = options->cancel_callback;
+		activation->cancel_user_data = options->cancel_user_data;
+	}
 	activation->enable_debug_trace = true;
-	activation->check_abort = cancel_context.callback != NULL ? poco_api_cancel : NULL;
-	activation->check_abort_data = cancel_context.callback != NULL ? &cancel_context : NULL;
+	previous_check_abort = activation->check_abort;
+	previous_check_abort_data = activation->check_abort_data;
+	if (activation->cancel_callback != NULL) {
+		activation->check_abort = po_activation_cancel_requested;
+		activation->check_abort_data = activation;
+	}
 	activation->trace_file = options != NULL ? options->trace_file : NULL;
 	activation->instruction_trace = options != NULL ? options->instruction_trace : NULL;
 	activation->err_line = &error_line;
@@ -947,6 +1001,10 @@ PocoStatus poco_activation_run(PocoActivation* activation, const PocoRunOptions*
 	if (run_status == Err_in_err_file && activation->builtin_error == Err_poco_ffi_bounds) {
 		run_status = Err_poco_ffi_bounds;
 	}
+	activation->cancel_callback = saved_callback;
+	activation->cancel_user_data = saved_user_data;
+	activation->check_abort = previous_check_abort;
+	activation->check_abort_data = previous_check_abort_data;
 	if (run_status == Success && out_result != NULL) {
 		*out_result = activation->result.i;
 	}

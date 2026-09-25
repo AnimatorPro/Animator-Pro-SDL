@@ -173,6 +173,10 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 		exp->next = param_exps;
 		param_exps = exp;
 		po_get_expression(pcb, exp);
+		if (pcb->compile_aborted) {
+			/* a variadic parameter never advances, so only this ends the loop */
+			goto OUT;
+		}
 
 		if (param->flags & SFL_ELLIP) {
 			// this is a variadic parameter
@@ -320,7 +324,14 @@ NOT_ENOUGH_PARMS:
 		po_code_op(pcb, &e->ecd, OP_CALLI);
 	} else {
 		if (fff->type == CFF_C) {
-			po_code_void_pt(pcb, &e->ecd, po_ccall_ops[idot], ((C_frame*)fff)->code_pt);
+			/* A host-provided native has no address until the loader resolves
+			 * it, so its call sites carry the frame as their key; decoding an
+			 * image rewrites that operand to the resolved function. */
+			void* key = fff->host_provided && ((C_frame*)fff)->code_pt == NULL
+							? (void*)fff
+							: (void*)((C_frame*)fff)->code_pt;
+
+			po_code_void_pt(pcb, &e->ecd, po_ccall_ops[idot], key);
 		} else {
 			po_code_void_pt(pcb, &e->ecd, OP_PCALL, fff);
 		}
@@ -336,6 +347,7 @@ NOT_ENOUGH_PARMS:
 	}
 
 	e->includes_function = true;
+OUT:
 	while (param_exps != NULL) {
 		exp = param_exps->next;
 		po_dispose_expframe(pcb, param_exps);

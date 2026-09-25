@@ -74,6 +74,7 @@ typedef struct file_stack { /* file management structure for #includes */
 	char* name;
 	long line_count;
 	Fsflags flags;
+	PoBoolean native_region; /* '#pragma poco native' state on entry */
 } File_stack;
 
 typedef struct text_symbol {
@@ -110,6 +111,7 @@ typedef struct tstack {
 	short ctoke_size;
 	char ctoke[MAX_SYM_LEN];
 	PoBoolean is_symbol;
+	PoBoolean native_region; /* token came from a '#pragma poco native' region */
 } Tstack;
 
 /*----------------------------------------------------------------------------
@@ -136,6 +138,9 @@ typedef struct preprocessor_state {
 	Names* library_dirs; /* host-added directories to find .poe modules */
 	Names* pre_defines;  /* symbols DEFINED before we start */
 	PoBoolean verbose;   /* enable verbose debug output for searches */
+	/* inside a '#pragma poco native begin' ... 'end' region: the declarations
+	 * it encloses are provided by the host and resolved by name at load. */
+	PoBoolean native_region;
 	struct text_symbol* define_list[HASH_SIZE];
 	char line_b1[SZTOKE];
 	char line_b2[SZTOKE];

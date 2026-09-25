@@ -1,0 +1,6 @@
+#include "shared.h"
+
+int take1(struct vec *v)
+{
+	return v->x;
+}

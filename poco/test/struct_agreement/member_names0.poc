@@ -1,0 +1,9 @@
+struct vec {
+	int x;
+	int y;
+};
+
+int member_names_first(void)
+{
+	return 1;
+}

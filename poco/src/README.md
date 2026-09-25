@@ -81,7 +81,8 @@ sites are the fastest way to see what it depends on.
 `vm_api.c` owns the VM, the program and the boundary conversions — turning a
 host's `PocoLibrary` binding tables into the type structures the compiler
 expects, and turning internal `Errcode`s into `PocoStatus`.  `poco_call.c` is
-the host-to-script call path beside it, and `vm_diagnostics.c` holds the VM's
+the host-to-script call path beside it, `poco_signature.c` reads the shapes that
+path would otherwise only discover mid-call, and `vm_diagnostics.c` holds the VM's
 last-error text and the thread-local active-VM slot the older no-VM-parameter
 bindings report through.  `poco_lock.c` is the only threading primitive in the
 tree.

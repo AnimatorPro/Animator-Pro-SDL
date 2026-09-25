@@ -1,0 +1,10 @@
+enum colour {
+	CRIMSON,
+	EMERALD,
+	COBALT
+};
+
+int main(void)
+{
+	return COBALT;
+}

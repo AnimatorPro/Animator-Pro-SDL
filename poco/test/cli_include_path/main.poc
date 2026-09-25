@@ -1,0 +1,7 @@
+/* shared.h is resolved only through an include directory named on the CLI. */
+#include "shared.h"
+
+int main(void)
+{
+	return SHARED_VALUE;
+}

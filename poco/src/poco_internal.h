@@ -360,6 +360,7 @@ void po_get_prim(Poco_cb* pcb, Exp_frame* e);
 void po_get_unop_expression(Poco_cb* pcb, Exp_frame* e);
 bool po_assign_after_equals(Poco_cb* pcb, Exp_frame* e, Symbol* var, bool must_be_static_init);
 void po_get_expression(Poco_cb* pcb, Exp_frame* e);
+void po_get_comma_expression(Poco_cb* pcb, Exp_frame* e);
 bool po_new_frame(Poco_cb* pcb, int scope, char* name, int type);
 void po_old_frame(Poco_cb* pcb);
 bool po_check_undefined_funcs(Poco_cb* pcb, Symbol* sl);

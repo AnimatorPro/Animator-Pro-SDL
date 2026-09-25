@@ -1,0 +1,9 @@
+struct vec {
+	int x;
+	int y;
+};
+
+int same_first(void)
+{
+	return 1;
+}

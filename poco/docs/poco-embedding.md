@@ -83,6 +83,35 @@ policy.  Use `PocoRunOptions` for cancellation and tracing.  Diagnostics
 include a Poco-owned `PocoStatus`; hosts should map that status to their own
 error domain instead of sharing Animator's `Errcode` values.
 
+## Include paths
+
+Three entry points configure the directories an `#include` or a `#pragma poco
+use` searches after the using file's own directory.  `PocoVmOptions.include_paths`
+seeds the list at `poco_vm_create()`.  `poco_vm_set_include_paths()` replaces
+the whole list, discarding anything seeded or appended earlier; passing NULL
+with a count of zero clears it.  `poco_vm_add_include_path()` appends one
+directory after the existing entries, which is what a host extending a list it
+did not build wants, and mirrors `poco_vm_add_library_path()` for `.poe`
+modules.  Directories are searched in list order, and each may be written with
+or without a trailing separator.
+
+Include paths are read during compilation, so adding one after a program has
+compiled is accepted and affects later compiles only.  This differs from
+`poco_vm_register_untrusted_expression_library()`, which refuses once a program
+exists because it would retroactively change that program's capabilities; an
+include path changes nothing about an already-compiled image.
+
+The command line exposes the same list through `-I <dir>`, `--include <dir>`,
+and `--include=<dir>`.  The flag is repeatable and accumulates in the order
+given:
+
+```sh
+poco -c -I engine/include -I game/include main.poc -o game.pex
+```
+
+A header present in more than one of those directories resolves to the first
+one named, and the source file's own directory is still searched first.
+
 ## Multi-source linking
 
 Poco can link several `.poc` files into one program through either an explicit
@@ -130,6 +159,22 @@ functions, duplicate globals, and function/global name collisions are errors.
 File-scope `static` functions and globals remain private to their own unit, so
 different files may use the same private name without colliding.
 
+Struct, union and enum tags are not part of that flat namespace: each unit
+mints its own layout record for every tag it defines, and two units including
+one shared header are the ordinary case.  Two units that give the same tag
+*different* layouts are an error, reported at the close of the second unit and
+naming the tag and both units.  Bodies are compared member by member—member
+types and order, and the struct/union/enum kind—rather than by size, so two
+eight-byte bodies with different member types are still caught; member *names*
+carry no layout and may differ.  Poco can diagnose this only because it
+compiles every unit in one process and keeps all the layouts; a C toolchain
+sees one unit at a time and cannot.  Two exceptions are worth knowing: a tag
+declared but never defined in a unit (`struct vec;`) says nothing that could
+disagree, and an enum records no members, so two enums sharing a tag with
+different enumerator lists are accepted—only an enum against a struct or union
+of the same name is diagnosed.  Redefinition within one unit remains a
+separate, pre-existing error.
+
 A runnable program—and a persisted `.pex` written with `-o`—must define exactly
 one `main()`.  A runnable program with no `main()` and any link with multiple
 `main()` definitions are rejected.  A bare compile check such as
@@ -172,10 +217,212 @@ entry.  A binding implementation's C return type must match the Poco prototype
 and its libffi representation exactly; do not use C `bool` for a prototype
 whose Poco `Boolean` representation is `int`.
 
+### Declaring a host-provided native
+
+A prototype only becomes a native call site when the compiler is told the host
+provides it.  An ordinary `#include`d prototype does not: it compiles to a Poco
+function nobody ever defined.  Declaring the function inside a `#pragma poco
+native` region says the host provides it, which is what the compiler needs when
+the VM that will run the program is not the process compiling it — the
+standalone `poco -c` compiler, above all, since it cannot register an
+application's binding tables.
+
+```c
+#ifdef __POCO__
+#pragma poco native begin
+#endif
+float sys_time(void);
+void  sys_log(char *text);
+#ifdef __POCO__
+#pragma poco native end
+#endif
+```
+
+The `#ifdef __POCO__` guard matters: `-Wunknown-pragmas` is part of `-Wall` for
+both GCC and Clang, so an unguarded pragma warns in the C build that shares the
+header.  `__POCO__` is predefined by the Poco compiler.  Every declaration
+between `begin` and `end` is host-provided; the region does not nest, does not
+continue into an `#include`d file, and must be closed before the file it opened
+in ends.
+
+Such a declaration compiles to the same native frame a registered library's
+prototype produces, minus the address.  The declared prototype is what argument
+checking uses, so calling one with the wrong argument count or types is a
+compile error.  A function that is neither defined nor declared this way
+remains the error it has always been.
+
+Resolution happens **by name, at load**, against the bindings the loading VM has
+registered.  It is the same path a serialized native from a registered library
+takes: an image naming a function the host does not provide is refused with
+`POCO_STATUS_FFI_FUNCTION_NOT_FOUND` before anything runs, and a program that is
+compiled and run in one process fails the same way at the call.  There is **no
+signature check** at load — the name is the whole contract — so keeping a
+shared header and a host's binding table in agreement, and versioning them when
+they change, is the host's responsibility.  A host that wants to close that gap
+itself can read the declared signature and compare it before running anything;
+see [Reading a function's signature](#reading-a-functions-signature).
+
+Binding contracts and `POCO_BINDING_RUN_CONTEXT` live on the host's binding
+entry, not on the declaration, and still apply when a call reaches the binding
+this way: a contracted native stays bounds-checked.  A function that a
+registered library also supplies is bound at compile time as before, and yields
+one frame either way.
+
 The opt-in standard catalog provides real console, string, managed-memory,
 safe-file, math, and portable-path bindings.  It intentionally excludes
 Animator and interactive CLI behavior such as `Qtext`.  Prefer `snprintf` to
 legacy `sprintf` when a destination capacity is known.
+
+## Reading a function's signature
+
+A host that loads a `.pex` it did not compile can check an entry point's shape
+before calling it:
+
+```c
+PocoFunctionSignature signature;
+PocoTypeDesc type;
+const char* parameter_name;
+
+if (poco_activation_function_signature(activation, "on_tick", &signature) != POCO_STATUS_OK ||
+    signature.parameter_count != 1) {
+    return reject("script does not provide on_tick(state)");
+}
+poco_activation_function_parameter(activation, "on_tick", 0, &parameter_name, &type);
+if (!type.is_struct || type.struct_size != sizeof(struct HostState)) {
+    return reject("script's state layout does not match this host");
+}
+```
+
+The accessors are read-only and allocate nothing.  An unknown name returns
+`POCO_STATUS_NOT_FOUND` and leaves the outputs untouched; a parameter index at
+or past `parameter_count` returns `POCO_STATUS_PARAMETER_RANGE`.  Parameters
+come back in declaration order, and every returned string is borrowed from the
+program for its lifetime, the same ownership rule `poco_get_last_error` uses.
+
+`PocoTypeDesc::kind` is the `PocoCallbackValue` kind a host exchanges for that
+type, so it already accounts for the compiler's promotions: a `float` parameter
+reports `POCO_CALLBACK_VALUE_DOUBLE`.  A type with no host value — `void`, or a
+C pointer that only crosses the native ABI — reports
+`POCO_CALLBACK_VALUE_INVALID`.  `is_native` distinguishes a `CFF_C` frame, so a
+registered binding and a `#pragma poco native` declaration are both visible
+here alongside ordinary Poco functions.
+
+**`struct_name` is descriptive; `struct_id` is the identity.**  Poco compiles
+every unit of a program in one process and keeps each unit's layouts
+separately, so a tag is neither unique nor stable across a program: every unit
+that includes a shared header mints its own entry for the structs in it, and
+three units including one header yield three distinct `PocoStructId`s with the
+same name and the same size.  That is normal and is not an error.  Compare
+`struct_id` when you need to know whether two types are the same type, and
+compare `struct_size` against your own packed `sizeof` when you need to know
+whether a layout matches.  Poco packs members with no alignment padding, so the
+host side of that comparison must be packed too.
+
+`poco_program_struct_member` enumerates a struct's members in declaration order
+for a host that wants to verify a layout field by field.  It walks the
+program's layouts on every call, so keep it off hot paths.
+
+### The declared type: `PocoTypeShape`
+
+`kind` is deliberately lossy.  `char`, `short` and `int` all report
+`POCO_CALLBACK_VALUE_INT`, `float` and `double` both report `DOUBLE`, and
+`char *` and `char **` both report `POPOT`.  A host checking a program from an
+untrusted source needs the difference: a script that redeclares a
+pointer-returning native one level deeper reads its own bytes as an address.
+Three companion accessors report the type as it was declared, for the same
+returns, parameters and members the `PocoTypeDesc` accessors describe:
+
+```c
+PocoTypeShape shape;
+
+if (poco_activation_function_return_shape(activation, "get_name", &shape) != POCO_STATUS_OK ||
+    shape.base_type != POCO_BASE_TYPE_CHAR || shape.pointer_depth != 1 ||
+    shape.array_rank != 0 || shape.is_function) {
+    return reject("script redeclared get_name; this host provides char *get_name(void)");
+}
+poco_activation_function_parameter_shape(activation, "on_hit", 0, &shape);
+poco_program_struct_member_shape(program, type.struct_id, 3, &shape);
+```
+
+- `base_type` is a `POCO_BASE_TYPE_*` value: `VOID`, `CHAR`/`UCHAR`,
+  `SHORT`/`USHORT`, `INT`/`UINT`, `LONG`/`ULONG`, `FLOAT`, `DOUBLE`, `STRUCT`
+  (a struct or union; its identity is the `PocoTypeDesc`'s `struct_id`), or
+  `OTHER` for a Poco-only base such as `FILE`.  `signed` is the default and is
+  not reported separately; `unsigned` is, including through a typedef.
+- `pointer_depth` counts pointer declarators: 0 for a value, 1 for `T *`, 2 for
+  `T **`.
+- `array_rank` counts array declarators, and `is_function` is set when a
+  function declarator appears (a function pointer).  With both zero the type
+  is exactly `base_type` followed by `pointer_depth` stars.
+
+They work for Poco functions, registered bindings and `#pragma poco native`
+declarations alike, and a program restored from a `.pex` answers exactly as the
+program that was serialized.  Lookup, range errors and the untouched-output
+rule are the same as for the `PocoTypeDesc` accessors.  The shape is a separate
+struct rather than new fields in `PocoTypeDesc` so that `PocoTypeDesc` and
+`PocoFunctionSignature` keep their layout.
+
+Carrying signedness through an image moved the program image format to
+version 5; a version 4 image is rejected with
+`POCO_STATUS_IMAGE_VERSION_MISMATCH` and must be recompiled.
+
+There is deliberately no structural digest over a layout.  That would bake a
+hashing convention into the public API that both sides would have to honour
+forever, and a host that controls its own build already has an ABI version for
+that purpose.
+
+## Cancelling a running call
+
+`PocoRunOptions.cancel_callback` covers a run started by `poco_vm_run()` or
+`poco_activation_run()`.  A host that drives scripts by name —
+`poco_call_begin()` / `poco_call_invoke()` for `on_tick`, an event handler, a
+posted continuation — passes no run options and so had no way to stop a call
+once it had started.  A single unbounded loop in a script hung the host with no
+diagnostic.
+
+Cancellation for that path is installed on the activation instead of passed per
+call:
+
+```c
+static int over_budget(void* user_data)
+{
+    const struct Frame* frame = user_data;
+
+    return frame->elapsed_seconds > frame->budget_seconds;
+}
+
+poco_activation_set_cancel_callback(activation, over_budget, &frame);
+
+status = poco_call_invoke(call, &result);
+if (status == POCO_STATUS_ABORTED) {
+    /* the script ran too long; the activation is still usable */
+}
+```
+
+The callback is consulted where `PocoRunOptions.cancel_callback` already is —
+on loop back-edges and at function entry — and a non-zero answer ends the call
+with `POCO_STATUS_ABORTED`.  The aborted call unwinds its own frames and
+releases its borrowed pointer spans, so later calls on the same activation run
+normally; nothing about the activation needs to be reset first.
+
+The setting is opt-in and per activation.  With no callback installed nothing
+is consulted and no call changes behaviour, which is what an existing embedder
+gets.  Passing NULL clears it.  A run started with `PocoRunOptions` still
+prefers that run's own `cancel_callback` when it is non-NULL and falls back to
+the installed one otherwise.
+
+**Lifetimes.**  The callback and its user data are stored in the activation and
+borrowed by the interpreter for the length of each call, so both must stay
+valid until they are cleared or the activation is released.  Storing them in
+the activation is the point: the interpreter holds its abort hook's context for
+the whole of a run, and an earlier implementation installed that context from a
+local in `poco_activation_run()`, which left a dangling pointer behind the
+moment that function returned.  The setting survives `poco_activation_reset()`,
+which clears run state rather than host configuration.
+
+A cancel callback runs inside the interpreter, between two instructions.  Keep
+it cheap and side-effect free — read a deadline, check a flag — and in
+particular do not call back into Poco from it.
 
 ## Native modules
 
