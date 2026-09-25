@@ -1079,6 +1079,20 @@ set_target_properties(poco_indirect_float_member PROPERTIES
 add_test(NAME poco_indirect_float_member COMMAND $<TARGET_FILE:poco_indirect_float_member>)
 set_tests_properties(poco_indirect_float_member PROPERTIES TIMEOUT 30)
 
+# Callers promote a float argument to double, so a float parameter's slot
+# holds a double. The callee once read it as a float and saw the low half.
+add_executable(poco_float_param float_param/float_param.c)
+target_compile_definitions(poco_float_param PRIVATE
+    POCO_FLOAT_PARAM_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/float_param"
+)
+target_link_libraries(poco_float_param PRIVATE Poco::poco)
+set_target_properties(poco_float_param PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED YES
+)
+add_test(NAME poco_float_param COMMAND $<TARGET_FILE:poco_float_param>)
+set_tests_properties(poco_float_param PROPERTIES TIMEOUT 30)
+
 # The explicit standard catalog is an embedding-host feature, not the CLI's
 # legacy table.  This fixture covers the real host-neutral console, string,
 # memory, file, math, and path bindings, including cleanup of intentionally

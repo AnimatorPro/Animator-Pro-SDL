@@ -675,6 +675,27 @@ Func_frame* po_get_proto(Type_info* ti)
 }
 
 /*****************************************************************************
+ * callers pass a float argument promoted to double, filling the parameter's
+ * double-sized slot.  convert each float parameter in place at function entry
+ * so the body (and &param) sees a float in the first bytes of its slot.
+ ****************************************************************************/
+static void narrow_float_params(Poco_cb* pcb, Poco_frame* rf, Func_frame* proto)
+{
+	Symbol* param;
+
+	for (param = proto->parameters; param != NULL; param = param->link) {
+		if (param->flags & SFL_ELLIP) {
+			break;
+		}
+		if (param->ti->comp_count == 1 && param->ti->comp[0] == TYPE_FLOAT) {
+			po_code_int(pcb, &rf->fcd, OP_LOC_DVAR, param->symval.doff);
+			po_code_int(pcb, &rf->fcd, OP_LOC_FASS, param->symval.doff);
+			po_code_op(pcb, &rf->fcd, OP_DPOP);
+		}
+	}
+}
+
+/*****************************************************************************
  * parse and code-gen from just past opening '{' of function until '}'.
  ****************************************************************************/
 static void get_body(Poco_cb* pcb, Poco_frame* pf, Symbol* fvar)
@@ -710,6 +731,7 @@ static void get_body(Poco_cb* pcb, Poco_frame* pf, Symbol* fvar)
 		}
 		PO_CHECK_ABORT_VOID(pcb);
 		enter_fixup = po_code_int(pcb, &rf->fcd, OP_ENTER, 0);
+		narrow_float_params(pcb, rf, proto);
 		po_get_block(pcb, rf);
 		local_space = -rf->doff;
 		po_int_fixup(&rf->fcd, enter_fixup, local_space);
