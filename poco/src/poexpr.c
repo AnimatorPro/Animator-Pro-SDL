@@ -372,7 +372,7 @@ void po_get_prim(Poco_cb* pcb, Exp_frame* e)
 	PO_CHECK_ABORT_VOID(pcb);
 	switch (pcb->t.toktype) {
 		case TOK_LPAREN: {
-			po_get_expression(pcb, e);
+			po_get_comma_expression(pcb, e);
 			lookup_token(pcb);
 			if (pcb->t.toktype != TOK_RPAREN) {
 				po_say_fatal(pcb, "missing right parenthesis");
@@ -601,13 +601,13 @@ static void get_pre_increment(Poco_cb* pcb, Exp_frame* e, const Op_type op_group
  ****************************************************************************/
 static void get_dereference(Poco_cb* pcb, Exp_frame* e)
 {
-	if (any_code(pcb, &e->left)) {
-		if (po_is_pointer(&e->ctc) || po_is_array(&e->ctc)) {
-			e->ctc.comp_count -= 1;
-			po_set_ido_type(&e->ctc);
-			po_make_deref(pcb, e);
-			return;
-		}
+	/* the operand's value is the address, so it need not be an lvalue:
+	 * *&x, *"abc" and *(0, p) are all fine. */
+	if (po_is_pointer(&e->ctc) || po_is_array(&e->ctc)) {
+		e->ctc.comp_count -= 1;
+		po_set_ido_type(&e->ctc);
+		po_make_deref(pcb, e);
+		return;
 	}
 
 	po_say_fatal(pcb, " '*' on non-pointer expression");
@@ -893,5 +893,37 @@ void po_get_expression(Poco_cb* pcb, Exp_frame* e)
 				pushback_token(&pcb->t);
 				break;
 		}
+	}
+}
+
+/*****************************************************************************
+ * parse the comma operator: evaluate each operand left to right, discarding
+ * all but the last, whose type the whole expression takes.  the result is
+ * neither an lvalue nor a constant expression.
+ ****************************************************************************/
+void po_get_comma_expression(Poco_cb* pcb, Exp_frame* e)
+{
+	Exp_frame ef;
+
+	po_get_expression(pcb, e);
+	for (;;) {
+		PO_CHECK_ABORT_VOID(pcb);
+		lookup_token(pcb);
+		if (pcb->t.toktype != ',') {
+			pushback_token(&pcb->t);
+			break;
+		}
+		po_pop_off_result(pcb, e);
+		po_init_expframe(pcb, &ef);
+		po_get_expression(pcb, &ef);
+		po_concatenate_code(pcb, &e->ecd, &ef.ecd);
+		po_copy_type(pcb, &ef.ctc, &e->ctc);
+		clear_code_buf(pcb, &e->left);
+		e->var = NULL;
+		e->left_complex = false;
+		e->pure_const = false;
+		e->includes_assignment += ef.includes_assignment;
+		e->includes_function += ef.includes_function;
+		po_trash_expframe(pcb, &ef);
 	}
 }

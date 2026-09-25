@@ -1,0 +1,6 @@
+/* A syntax error inside a variadic call's argument must stop the compile,
+ * not loop forever: a '...' parameter never advances the argument loop. */
+main()
+{
+	printf("%d\n", (1 2));
+}

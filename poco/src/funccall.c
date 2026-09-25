@@ -173,6 +173,10 @@ static void mk_function_call(Poco_cb* pcb, Exp_frame* e, Func_frame* fff, SHORT 
 		exp->next = param_exps;
 		param_exps = exp;
 		po_get_expression(pcb, exp);
+		if (pcb->compile_aborted) {
+			/* a variadic parameter never advances, so only this ends the loop */
+			goto OUT;
+		}
 
 		if (param->flags & SFL_ELLIP) {
 			// this is a variadic parameter
@@ -343,6 +347,7 @@ NOT_ENOUGH_PARMS:
 	}
 
 	e->includes_function = true;
+OUT:
 	while (param_exps != NULL) {
 		exp = param_exps->next;
 		po_dispose_expframe(pcb, param_exps);

@@ -1,0 +1,81 @@
+/* The comma operator: operands run left to right and the last one is the
+ * value.  A comma expression inside a variadic call's arguments used to hang
+ * the compiler. */
+#pragma poco echo "expect>Success"
+
+int v_ok = 0;
+int side = 0;
+
+void v_float(int self, float goal) { v_ok = goal > 24.9 && goal < 25.1; }
+int bump(void) { side++; return side; }
+int pair(int a, int b) { return a * 10 + b; }
+
+struct pt { int x; int y; };
+
+int g = (1, 2);
+
+main()
+{
+	int bad = 0;
+	int x;
+	int i;
+	int j;
+	int n;
+	double d;
+	int a[3];
+	int* p;
+	struct pt s;
+	struct pt* sp;
+	char buf[32];
+
+	sprintf(buf, "%d", (v_float(1, 25.0), v_ok));
+	if (buf[0] != '1' || buf[1] != 0) bad = 1;
+
+	x = (1, 2);
+	if (x != 2) bad = 2;
+
+	d = (x = 7, 2.5);
+	if (d != 2.5 || x != 7) bad = 3;
+
+	x = (bump(), bump(), bump());
+	if (x != 3 || side != 3) bad = 4;
+
+	x = 1, x = x + 10;
+	if (x != 11) bad = 5;
+
+	n = 0;
+	for (i = 0, j = 10; i < j; i++, j--)
+		n++;
+	if (n != 5) bad = 6;
+
+	if (!(x = 0, x == 0)) bad = 7;
+
+	a[0] = 5; a[1] = 6; a[2] = 7;
+	p = a;
+	if (*(0, p + 1) != 6) bad = 8;
+	*(0, p) = 42;
+	if (a[0] != 42) bad = 9;
+	if (a[(0, 2)] != 7) bad = 10;
+
+	s.x = 3; s.y = 4;
+	sp = &s;
+	if ((0, sp)->y != 4) bad = 11;
+
+	if ((1, 2) + (3, 4) * 2 != 10) bad = 12;
+
+	i = 0;
+	while (i++, i < 5)
+		;
+	if (i != 5) bad = 13;
+
+	if (pair((1, 2), 3) != 23) bad = 14;
+	if (g != 2) bad = 15;
+
+	x = 5;
+	if (*&x != 5) bad = 16;
+
+	if (bad)
+		printf("FAIL %d", bad);
+	else
+		printf("Success");
+}

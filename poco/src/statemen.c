@@ -243,7 +243,7 @@ static void get_while(Poco_cb* pcb, Poco_frame* pf)
 	if (!po_eat_lparen(pcb)) {
 		goto OUT;
 	}
-	po_get_expression(pcb, ef);
+	po_get_comma_expression(pcb, ef);
 	if (!po_eat_rparen(pcb)) {
 		goto OUT;
 	}
@@ -301,7 +301,7 @@ static void get_do(Poco_cb* pcb, Poco_frame* pf)
 	if (!po_eat_lparen(pcb)) {
 		goto OUT;
 	}
-	po_get_expression(pcb, ef);
+	po_get_comma_expression(pcb, ef);
 	if (!po_eat_rparen(pcb)) {
 		goto OUT;
 	}
@@ -360,7 +360,7 @@ static void get_switch(Poco_cb* pcb, Poco_frame* pf)
 	if (!po_eat_lparen(pcb)) {
 		goto OUT;
 	}
-	po_get_expression(pcb, &ef);
+	po_get_comma_expression(pcb, &ef);
 	if (po_force_int_exp(pcb, &ef.ctc) < 0) {
 		goto OUT;
 	}
@@ -522,7 +522,7 @@ static void get_if(Poco_cb* pcb, Poco_frame* pf)
 	if (!po_eat_lparen(pcb)) {
 		goto OUT;
 	}
-	po_get_expression(pcb, ef);
+	po_get_comma_expression(pcb, ef);
 	if (!po_eat_rparen(pcb)) {
 		goto OUT;
 	}
@@ -582,7 +582,7 @@ static void get_return(Poco_cb* pcb, Poco_frame* pf)
 		PO_CHECK_ABORT_VOID(pcb);
 		pushback_token(&pcb->t);
 		po_init_expframe(pcb, &ef);
-		po_get_expression(pcb, &ef);
+		po_get_comma_expression(pcb, &ef);
 		po_coerce_expression(pcb, &ef, pf->return_type, false);
 		po_code_op(pcb, &ef.ecd, po_find_pop_op(pcb, &ef.ctc));
 		po_concatenate_code(pcb, &pf->fcd, &ef.ecd);
@@ -594,31 +594,6 @@ static void get_return(Poco_cb* pcb, Poco_frame* pf)
 #endif /* STRING_EXPERIMENT */
 	po_code_op(pcb, &pf->fcd, OP_LEAVE);
 	po_code_op(pcb, &pf->fcd, OP_RET);
-}
-
-/*****************************************************************************
- * parse and code comma-separated expressions.
- ****************************************************************************/
-static void get_comma(Poco_cb* pcb, Exp_frame* e)
-{
-	Exp_frame ef;
-
-	po_get_expression(pcb, e);
-	for (;;) {
-		lookup_token(pcb);
-		if (pcb->t.toktype == ',') {
-			po_init_expframe(pcb, &ef);
-			po_get_expression(pcb, &ef);
-			po_pop_off_result(pcb, &ef);
-			/* po_code_op(pcb, &ef.ecd, po_find_pop_op(pcb, &ef.ctc)); ~~~*/
-			po_concatenate_code(pcb, &e->ecd, &ef.ecd);
-			po_trash_expframe(pcb, &ef);
-			clear_code_buf(pcb, &e->left);
-		} else {
-			pushback_token(&pcb->t);
-			break;
-		}
-	}
 }
 
 /*****************************************************************************
@@ -646,7 +621,7 @@ static void get_for(Poco_cb* pcb, Poco_frame* pf)
 		goto OUT;
 	}
 	if (!po_is_next_token(pcb, ';')) {
-		get_comma(pcb, efstart);
+		po_get_comma_expression(pcb, efstart);
 		po_pop_off_result(pcb, efstart);
 		warn_no_effect(pcb, efstart);
 	}
@@ -654,7 +629,7 @@ static void get_for(Poco_cb* pcb, Poco_frame* pf)
 		goto OUT;
 	}
 	if (!po_is_next_token(pcb, ';')) {
-		po_get_expression(pcb, efcond);
+		po_get_comma_expression(pcb, efcond);
 		po_coerce_to_boolean(pcb, efcond);
 		got_cond = true;
 	}
@@ -662,7 +637,7 @@ static void get_for(Poco_cb* pcb, Poco_frame* pf)
 		goto OUT;
 	}
 	if (!po_is_next_token(pcb, TOK_RPAREN)) {
-		get_comma(pcb, efend);
+		po_get_comma_expression(pcb, efend);
 		po_pop_off_result(pcb, efend);
 		warn_no_effect(pcb, efend);
 	}
@@ -839,7 +814,7 @@ void po_exp_statement(Poco_cb* pcb, Poco_frame* pf)
 
 	pushback_token(&pcb->t);
 	po_init_expframe(pcb, &eee);
-	po_get_expression(pcb, &eee);
+	po_get_comma_expression(pcb, &eee);
 	po_pop_off_result(pcb, &eee);
 	po_eat_semi(pcb);
 	po_concatenate_code(pcb, &pf->fcd, &eee.ecd);
