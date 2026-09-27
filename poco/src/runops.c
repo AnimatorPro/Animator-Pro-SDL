@@ -154,15 +154,19 @@ typedef struct {
 	Errcode err;
 	size_t debug_depth_floor;
 	/*
-	 * Extents of the two regions a script-minted pointer is permitted to reach
+	 * Extents of the regions a script-minted pointer is permitted to reach
 	 * when untrusted_pointers is on: the activation data segment [data,
 	 * data+data_size) (globals live here, addressed from its top with negative
 	 * offsets) and the interpreter stack [stack_area, stack_area+stack_size).
+	 * po_pointer_in_vm_region adds the struct-return buffer and, for reads,
+	 * the program's string literals.
 	 */
 	UBYTE* data;
 	size_t data_size;
 	size_t stack_size;
 	int untrusted_pointers;
+	/* Set when the region check, not a host span, refused the access. */
+	bool outside_vm_region;
 	/*
 	 * Shadow control stack.  It mirrors the return addresses (OP_PCALL /
 	 * CFF_POCO / the initial &end_op) and saved frame pointers (OP_ENTER) that
@@ -209,7 +213,30 @@ static bool po_range_in_block(const void* pt, size_t byte_count, const void* blo
 	return start <= high - byte_count;
 }
 
-static bool po_pointer_in_vm_region(const PoRunState* st, const void* pt, size_t byte_count)
+/*
+ * True when [pt, pt+byte_count) lies inside a single string literal.  Literals
+ * are separate allocations, so the range must not run from one into the next.
+ */
+static bool po_range_in_literal(const Poco_program_code* code, const void* pt, size_t byte_count)
+{
+	const PoLiteralSpan* spans = code->literal_spans;
+	size_t low = 0;
+	size_t high = code->literal_span_count;
+
+	/* Find the last literal starting at or below pt. */
+	while (low < high) {
+		size_t mid = low + (high - low) / 2;
+		if ((uintptr_t)spans[mid].start <= (uintptr_t)pt) {
+			low = mid + 1;
+		} else {
+			high = mid;
+		}
+	}
+	return low > 0 && po_range_in_block(pt, byte_count, spans[low - 1].start, spans[low - 1].size);
+}
+
+static bool po_pointer_in_vm_region(const PoRunState* st, const void* pt, size_t byte_count,
+									uint32_t permissions)
 {
 	/*
 	 * The FFI struct-return buffer is VM-owned scratch too: a native returning
@@ -219,17 +246,26 @@ static bool po_pointer_in_vm_region(const PoRunState* st, const void* pt, size_t
 	 * script's own just-returned value - never control data - so admitting it is
 	 * as safe as admitting the data segment.
 	 */
-	return po_range_in_block(pt, byte_count, st->data, st->data_size) ||
-		   po_range_in_block(pt, byte_count, st->stack_area, st->stack_size) ||
-		   po_range_in_block(pt, byte_count, st->p->ffi.struct_result,
-							 st->p->ffi.struct_result_capacity);
+	if (po_range_in_block(pt, byte_count, st->data, st->data_size) ||
+		po_range_in_block(pt, byte_count, st->stack_area, st->stack_size) ||
+		po_range_in_block(pt, byte_count, st->p->ffi.struct_result,
+						  st->p->ffi.struct_result_capacity)) {
+		return true;
+	}
+	/*
+	 * String literals belong to the program and are shared by every activation
+	 * of it, so a script may read them but never write them.
+	 */
+	return (permissions & POCO_POINTER_PERMISSION_WRITE) == 0 &&
+		   po_range_in_literal(st->p->code, pt, byte_count);
 }
 
 /*
  * Shared dereference guard.  A host-registered (managed) span is validated
  * against the registry exactly as before.  A script-minted pointer is accepted
  * unconditionally unless untrusted-pointer hardening is on, in which case its
- * whole access range must fall inside VM-owned memory.
+ * whole access range must fall inside VM-owned memory; a write must also stay
+ * out of the string literals.
  */
 static bool po_registered_pointer_access_is_valid(PoRunState* st, const Popot* pointer,
 												  size_t byte_count, uint32_t permissions)
@@ -238,8 +274,9 @@ static bool po_registered_pointer_access_is_valid(PoRunState* st, const Popot* p
 		return poco_pointer_registry_validate(st->p->pointer_registry, pointer, byte_count,
 											  permissions);
 	}
-	if (st->untrusted_pointers) {
-		return po_pointer_in_vm_region(st, pointer->pt, byte_count);
+	if (st->untrusted_pointers && !po_pointer_in_vm_region(st, pointer->pt, byte_count, permissions)) {
+		st->outside_vm_region = true;
+		return false;
 	}
 	return true;
 }
@@ -1552,12 +1589,13 @@ PO_STEP_HANDLER po_step_memory(PoRunState* st, int op)
 										   (size_t)st->ip->l)) {
 				return PO_STEP_ERR_BIG;
 			}
+			/* The top operand is the destination, the one beneath it the source. */
 			if (!po_registered_pointer_access_is_valid(st, &st->stack->ppt,
 													   (size_t)st->ip->l,
-													   POCO_POINTER_PERMISSION_READ) ||
+													   POCO_POINTER_PERMISSION_WRITE) ||
 				!po_registered_pointer_access_is_valid(
 					st, (Popot*)OPTR(st->stack, sizeof(st->stack->ppt)),
-					(size_t)st->ip->l, POCO_POINTER_PERMISSION_WRITE)) {
+					(size_t)st->ip->l, POCO_POINTER_PERMISSION_READ)) {
 				return PO_STEP_ERR_POINTER_ACCESS;
 			}
 			poco_copy_bytes(((Popot*)OPTR(st->stack, sizeof(st->stack->ppt)))->pt,
@@ -2290,6 +2328,7 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 	size_t argument_bytes = 0;
 	size_t value_index;
 	bool temporary_stack;
+	bool script_access_refused = false;
 	size_t saved_debug_call_depth;
 	size_t debug_depth_floor;
 
@@ -2335,6 +2374,7 @@ static Errcode poco_run_callback(PocoActivation* p, void* code_pt, Pt_num* pret,
 	state.data_size = p->data_size > 0 ? (size_t)p->data_size : 0;
 	state.stack_size = p->stack_size > 0 ? (size_t)p->stack_size : 0;
 	state.untrusted_pointers = (p->vm != NULL && p->vm->untrusted_pointers_enabled) ? 1 : 0;
+	state.outside_vm_region = false;
 
 	saved_debug_call_depth = p->debug_call_depth;
 	debug_depth_floor = p->run_depth != 0 ? saved_debug_call_depth + 1 : 0;
@@ -2476,7 +2516,10 @@ ERR_BIG:
 	goto DEBUG_TRACE;
 
 ERR_POINTER_ACCESS:
+	/* builtin_error carries the status out to the host; no library routine was
+	 * involved, so the trace must not name one. */
 	p->builtin_error = err = Err_poco_ffi_bounds;
+	script_access_refused = true;
 	goto DEBUG_TRACE;
 
 ERR_INLINE_FPMATH:               // the host has indicated an 80x87 math err happened
@@ -2519,10 +2562,14 @@ DEBUG_TRACE:
 		}
 
 		if (tfile != NULL) {
-			get_errtext(err, buf);
+			if (state.outside_vm_region) {
+				strcpy(buf, "Poco script pointer outside VM memory (untrusted-pointer check)");
+			} else {
+				get_errtext(err, buf);
+			}
 			fprintf(tfile, "%s ", buf);
 			po_print_trace(p, tfile, state.stack, state.base, state.globals, state.ip,
-						   p->builtin_error);
+						   script_access_refused ? Success : p->builtin_error);
 			if (tfile != stdout) {
 				fclose(tfile);
 			}

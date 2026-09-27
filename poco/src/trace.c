@@ -145,21 +145,28 @@ bool po_add_line_data(Poco_cb* pcb, Line_data* ld, long offset, long line)
 }
 
 /*****************************************************************************
- * find the source code line number for a given code offset.
+ * find the source code line number for a given code offset: the line of the
+ * last statement whose code starts at or before it.  0 if there is none.
  ****************************************************************************/
-static long find_line(Line_data* ld, long offset)
+static long find_line(const Line_data* ld, long offset)
 {
-	int i = ld->count;
-	long* offsets = ld->offsets;
-	long* lines = ld->lines;
+	int low = 0;
+	int high;
 
-	while (i--) {
-		++lines;
-		if (offset < *offsets++) {
-			break;
+	if (ld == NULL || ld->count <= 0 || offset < ld->offsets[0]) {
+		return 0;
+	}
+	high = ld->count;
+	while (low < high) {
+		int middle = low + (high - low) / 2;
+
+		if (ld->offsets[middle] <= offset) {
+			low = middle + 1;
+		} else {
+			high = middle;
 		}
 	}
-	return (*(--lines));
+	return ld->lines[low - 1];
 }
 
 /*****************************************************************************
@@ -289,7 +296,10 @@ void po_print_trace(PocoActivation* pe, FILE* tfile, Pt_num* stack, Pt_num* base
 	long line = 0;
 
 	if ((fuf = which_frame(pe, ip)) != NULL) {
-		line = find_line(fuf->ld, (Code*)ip - fuf->code_pt);
+		/* ip is already past the failing opcode and may sit on the first byte
+		 * of the next statement; the byte before it is inside the failing
+		 * instruction. */
+		line = find_line(fuf->ld, (long)((Code*)ip - fuf->code_pt) - 1);
 		fprintf(tfile, "near line %ld of %s\n", line, pe->code->functions->name);
 	}
 

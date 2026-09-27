@@ -181,14 +181,15 @@ NEED_MORE:
 		ts->char_num = 1 + ((line_pos - ctoke_size) - line_start);
 
 		if (prev_ts->type == TOK_QUO && ts->type != TOK_QUO) {
-			register Names* n;
+			register PoLiteral* n;
 
 			n = po_memzalloc(pcb, sizeof(*n) + strlit_len + 1);
-			n->name = (char*)(n + 1);
-			poco_copy_bytes(strbase, n->name, strlit_len + 1);
+			n->text = (char*)(n + 1);
+			n->length = strlit_len;
+			poco_copy_bytes(strbase, n->text, strlit_len + 1);
 			n->next = pcb->run.literals;
 			pcb->run.literals = n;
-			prev_ts->val.string = n->name;
+			prev_ts->val.string = n->text;
 			prev_ts->type = PTOK_QUO;
 			prev_ts->ctoke_size = strlit_len;
 			strncpy(prev_ts->ctoke, prev_ts->val.string, MAX_SYM_LEN - 1);

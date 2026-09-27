@@ -811,6 +811,29 @@ target_link_libraries(poco_ffi_bounds PRIVATE Poco::poco)
 add_test(NAME poco_ffi_bounds COMMAND $<TARGET_FILE:poco_ffi_bounds>)
 set_tests_properties(poco_ffi_bounds PROPERTIES TIMEOUT 10)
 
+# With poco_vm_set_untrusted_pointers() on, scripts can still read their own
+# string literals but not write them, including from a deserialized program.
+# Also covers struct copies checking the destination for write access and the
+# source for read access.
+add_executable(poco_untrusted_pointers untrusted_pointers/untrusted_pointers.c)
+target_compile_definitions(poco_untrusted_pointers PRIVATE
+    POCO_UNTRUSTED_POINTERS_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/untrusted_pointers"
+    POCO_UNTRUSTED_POINTERS_TRACE_FILE="${CMAKE_CURRENT_BINARY_DIR}/untrusted_pointers_trace.txt"
+)
+target_link_libraries(poco_untrusted_pointers PRIVATE Poco::poco)
+add_test(NAME poco_untrusted_pointers COMMAND $<TARGET_FILE:poco_untrusted_pointers>)
+set_tests_properties(poco_untrusted_pointers PROPERTIES TIMEOUT 10)
+
+# A run-time error names the line of the failing statement, not the next one.
+add_executable(poco_trace_line trace_line/trace_line.c)
+target_compile_definitions(poco_trace_line PRIVATE
+    POCO_TRACE_LINE_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/trace_line"
+    POCO_TRACE_LINE_TRACE_FILE="${CMAKE_CURRENT_BINARY_DIR}/trace_line_trace.txt"
+)
+target_link_libraries(poco_trace_line PRIVATE Poco::poco)
+add_test(NAME poco_trace_line COMMAND $<TARGET_FILE:poco_trace_line>)
+set_tests_properties(poco_trace_line PROPERTIES TIMEOUT 10)
+
 # A '#pragma poco native' declaration compiles to a native frame with no
 # address, so a program can be built without the host that provides the
 # function and resolved by name -- or refused -- when it is loaded.

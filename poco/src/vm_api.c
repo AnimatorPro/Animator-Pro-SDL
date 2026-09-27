@@ -436,6 +436,49 @@ int po_vm_resolve_serialized_binding(PocoVm* vm, const Poco_lib* loaded_librarie
 	return 0;
 }
 
+static int poco_api_literal_span_compare(const void* left, const void* right)
+{
+	uintptr_t a = (uintptr_t)((const PoLiteralSpan*)left)->start;
+	uintptr_t b = (uintptr_t)((const PoLiteralSpan*)right)->start;
+
+	return a < b ? -1 : a > b;
+}
+
+/*
+ * Build code's address-sorted table of the program's string literals, which the
+ * untrusted-pointer check searches to let a script read them.  Returns 0 only
+ * when the table cannot be allocated.
+ */
+static int poco_api_index_literals(Poco_program_code* code, const PoLiteral* literals)
+{
+	const PoLiteral* literal;
+	PoLiteralSpan* spans;
+	size_t count = 0;
+
+	code->literal_spans = NULL;
+	code->literal_span_count = 0;
+	for (literal = literals; literal != NULL; literal = literal->next) {
+		++count;
+	}
+	if (count == 0) {
+		return 1;
+	}
+	spans = malloc(count * sizeof(*spans));
+	if (spans == NULL) {
+		return 0;
+	}
+	count = 0;
+	for (literal = literals; literal != NULL; literal = literal->next) {
+		spans[count].start = literal->text;
+		spans[count].size = literal->length + 1;
+		++count;
+	}
+	qsort(spans, count, sizeof(*spans), poco_api_literal_span_compare);
+	code->literal_spans = spans;
+	code->literal_span_count = count;
+	return 1;
+}
+
 PocoStatus po_program_adopt_decoded(PocoVm* vm, Poco_run_env* executable, PocoProgram** out_program)
 {
 	PocoProgram* program;
@@ -464,6 +507,11 @@ PocoStatus po_program_adopt_decoded(PocoVm* vm, Poco_run_env* executable, PocoPr
 		poco_api_free_program_libraries(program->libraries);
 		free(program);
 		return POCO_STATUS_INTERNAL_ERROR;
+	}
+	if (!poco_api_index_literals(&program->code, executable->literals)) {
+		poco_api_free_program_libraries(program->libraries);
+		free(program);
+		return POCO_STATUS_OUT_OF_MEMORY;
 	}
 	program->vm = vm;
 	program->executable = executable;
@@ -1133,6 +1181,10 @@ PocoStatus po_vm_compile_sources(PocoVm* vm, const char* const* source_names,
 		program->code.allocation_owner = executable->compile_pcb;
 	}
 	++vm->program_count;
+	if (!poco_api_index_literals(&program->code, program->code.literals)) {
+		poco_program_destroy(program);
+		return POCO_STATUS_OUT_OF_MEMORY;
+	}
 	*out_program = program;
 	return POCO_STATUS_OK;
 }
@@ -1192,6 +1244,7 @@ void poco_program_destroy(PocoProgram* program)
 		po_free_executable(&program->executable);
 	}
 	poco_api_free_program_libraries(program->libraries);
+	free((void*)program->code.literal_spans);
 	if (program->sources != NULL) {
 		size_t source_index;
 		for (source_index = 0; source_index < program->source_count; ++source_index) {

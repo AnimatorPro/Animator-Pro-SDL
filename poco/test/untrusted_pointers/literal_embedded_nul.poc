@@ -1,0 +1,12 @@
+int main(void)
+{
+	char *s;
+	char a[] = "ab\0cd";
+
+	s = "xy\0z";
+	if (s[3] != 'z' || s[4] != 0)
+		return 1;
+	if (sizeof(a) != 6 || a[3] != 'c' || a[4] != 'd')
+		return 2;
+	return 0;
+}

@@ -43,9 +43,10 @@ struct PocoVm {
 	 * Opt-in run-time hardening for hosts that run untrusted programs.  When
 	 * set, every indirect dereference of a script-minted (non host-registered)
 	 * pointer must have its whole access range fall inside VM-owned memory (the
-	 * activation data segment or the interpreter stack); a pointer escaping both
-	 * regions is refused with POCO_STATUS_POINTER_ACCESS rather than touching
-	 * host memory.  Off by default, so existing embedders are unaffected.  Set
+	 * activation data segment, the interpreter stack, the FFI struct-return
+	 * buffer, or - for reads only - the program's string literals); anything
+	 * else is refused with POCO_STATUS_FFI_BOUNDS rather than touching host
+	 * memory.  Off by default, so existing embedders are unaffected.  Set
 	 * through poco_vm_set_untrusted_pointers().
 	 */
 	int untrusted_pointers_enabled;
@@ -64,6 +65,16 @@ typedef struct Poco_program_library {
 } Poco_program_library;
 
 /*
+ * The bytes of one string literal, NUL included.  Poco_program_code keeps these
+ * sorted by start so the untrusted-pointer check can find a literal by binary
+ * search; each literal is its own allocation, so there is no single range.
+ */
+typedef struct PoLiteralSpan {
+	const char* start;
+	size_t size;
+} PoLiteralSpan;
+
+/*
  * Compiled artifacts owned by PocoProgram.  Once compilation publishes a
  * program, every field below is read-only until program destruction.  The
  * pointees are const here so new run paths cannot accidentally use this type to
@@ -74,7 +85,9 @@ typedef struct Poco_program_code {
 	long stack_size;
 	long data_size;
 	const Func_frame* functions;
-	const Names* literals;
+	const PoLiteral* literals;
+	const PoLiteralSpan* literal_spans;
+	size_t literal_span_count;
 	const Func_frame* prototypes;
 	const Po_FuncMap* ffi_bindings;
 	const Poco_lib* builtin_libraries;
