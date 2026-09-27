@@ -399,8 +399,10 @@ void po_get_prim(Poco_cb* pcb, Exp_frame* e)
 			break;
 		}
 		case PTOK_QUO: {
+			/* ctoke_size, not strlen(), so a literal holding "\0" keeps its
+			 * full extent. */
 			po_code_popot(pcb, &e->ecd, OP_PCON, pcb->curtoken->val.string,
-						  pcb->curtoken->val.string + strlen(pcb->curtoken->val.string),
+						  pcb->curtoken->val.string + pcb->curtoken->ctoke_size,
 						  pcb->curtoken->val.string);
 			po_set_base_type(pcb, &e->ctc, TYPE_CHAR, 0, NULL);
 			po_append_type(pcb, &e->ctc, TYPE_POINTER, 0, NULL);

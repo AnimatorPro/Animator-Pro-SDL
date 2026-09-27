@@ -132,11 +132,15 @@ static int po_writer_u64(PoWriter* writer, uint64_t value)
 	return po_writer_bytes(writer, bytes, sizeof(bytes));
 }
 
-static int po_writer_string(PoWriter* writer, const char* text)
+static int po_writer_counted_bytes(PoWriter* writer, const char* text, size_t length)
 {
-	size_t length = text != NULL ? strlen(text) : 0;
 	return length <= UINT32_MAX && po_writer_u32(writer, (uint32_t)length) &&
 		   po_writer_bytes(writer, text, length);
+}
+
+static int po_writer_string(PoWriter* writer, const char* text)
+{
+	return po_writer_counted_bytes(writer, text, text != NULL ? strlen(text) : 0);
 }
 
 static int po_reader_bytes(PoReader* reader, void* out, size_t size)
@@ -171,7 +175,9 @@ static int po_reader_u64(PoReader* reader, uint64_t* out)
 	return 1;
 }
 
-static char* po_reader_arena_string(PoReader* reader, Poco_cb* owner)
+/* Read a length-prefixed byte string into owner's arena, NUL-terminated.  The
+ * bytes may themselves contain NULs; out_length, if given, receives the count. */
+static char* po_reader_arena_counted_bytes(PoReader* reader, Poco_cb* owner, size_t* out_length)
 {
 	uint32_t length;
 	char* text;
@@ -187,7 +193,15 @@ static char* po_reader_arena_string(PoReader* reader, Poco_cb* owner)
 	if (!po_reader_bytes(reader, text, length)) {
 		return NULL;
 	}
+	if (out_length != NULL) {
+		*out_length = length;
+	}
 	return text;
+}
+
+static char* po_reader_arena_string(PoReader* reader, Poco_cb* owner)
+{
+	return po_reader_arena_counted_bytes(reader, owner, NULL);
 }
 
 static int po_frames_add(PoFrameSet* frames, const Func_frame* frame)
@@ -377,7 +391,7 @@ static PoProgramImageStatus po_collect_structs(const PocoProgram* program, const
 	return PO_PROGRAM_IMAGE_OK;
 }
 
-static size_t po_literal_count(const Names* literal)
+static size_t po_literal_count(const PoLiteral* literal)
 {
 	size_t count = 0;
 	for (; literal != NULL; literal = literal->next) {
@@ -386,7 +400,7 @@ static size_t po_literal_count(const Names* literal)
 	return count;
 }
 
-static const Names* po_literal_at(const Names* literal, uint32_t wanted)
+static const PoLiteral* po_literal_at(const PoLiteral* literal, uint32_t wanted)
 {
 	uint32_t index = 0;
 	for (; literal != NULL; literal = literal->next, ++index) {
@@ -397,15 +411,15 @@ static const Names* po_literal_at(const Names* literal, uint32_t wanted)
 	return NULL;
 }
 
-static int po_literal_pointer(const Names* literal, const void* pointer, uint32_t* out_index,
+static int po_literal_pointer(const PoLiteral* literal, const void* pointer, uint32_t* out_index,
 							  uint64_t* out_offset)
 {
 	uint32_t index = 0;
 	uintptr_t address = (uintptr_t)pointer;
 
 	for (; literal != NULL; literal = literal->next, ++index) {
-		uintptr_t start = (uintptr_t)literal->name;
-		size_t length = strlen(literal->name);
+		uintptr_t start = (uintptr_t)literal->text;
+		size_t length = literal->length;
 		if (address >= start && address <= start + length) {
 			*out_index = index;
 			*out_offset = (uint64_t)(address - start);
@@ -539,7 +553,7 @@ static PoProgramImageStatus po_decode_type(PoReader* reader, Poco_cb* owner, Fun
 }
 
 static PoProgramImageStatus po_encode_code_frame(PoWriter* writer, const Func_frame* frame,
-												 const PoFrameSet* frames, const Names* literals)
+												 const PoFrameSet* frames, const PoLiteral* literals)
 {
 	PoCodeIter iter;
 	PoCodeIns ins;
@@ -669,7 +683,7 @@ static PoProgramImageStatus po_encode_code_frame(PoWriter* writer, const Func_fr
 }
 
 static PoProgramImageStatus po_encode_code(PoWriter* section, const PoFrameSet* frames,
-										   const Names* literals)
+										   const PoLiteral* literals)
 {
 	size_t index;
 
@@ -694,14 +708,14 @@ static PoProgramImageStatus po_encode_code(PoWriter* section, const PoFrameSet* 
 	return PO_PROGRAM_IMAGE_OK;
 }
 
-static PoProgramImageStatus po_encode_constants(PoWriter* section, const Names* literal)
+static PoProgramImageStatus po_encode_constants(PoWriter* section, const PoLiteral* literal)
 {
 	size_t count = po_literal_count(literal);
 	if (count > UINT32_MAX || !po_writer_u32(section, (uint32_t)count)) {
 		return PO_PROGRAM_IMAGE_OUT_OF_MEMORY;
 	}
 	for (; literal != NULL; literal = literal->next) {
-		if (!po_writer_string(section, literal->name)) {
+		if (!po_writer_counted_bytes(section, literal->text, literal->length)) {
 			return PO_PROGRAM_IMAGE_OUT_OF_MEMORY;
 		}
 	}
@@ -1115,20 +1129,21 @@ CLEANUP:
 }
 
 static PoProgramImageStatus po_decode_constants(PoSectionView section, Poco_cb* owner,
-												Names** out_literals)
+												PoLiteral** out_literals)
 {
 	PoReader reader = {section.data, section.size, 0};
 	uint32_t count;
 	uint32_t index;
-	Names* first = NULL;
-	Names* tail = NULL;
+	PoLiteral* first = NULL;
+	PoLiteral* tail = NULL;
 
 	if (!po_reader_u32(&reader, &count)) {
 		return PO_PROGRAM_IMAGE_MALFORMED;
 	}
 	for (index = 0; index < count; ++index) {
-		char* text = po_reader_arena_string(&reader, owner);
-		Names* literal;
+		size_t length = 0;
+		char* text = po_reader_arena_counted_bytes(&reader, owner, &length);
+		PoLiteral* literal;
 		if (text == NULL) {
 			return PO_PROGRAM_IMAGE_MALFORMED;
 		}
@@ -1136,7 +1151,8 @@ static PoProgramImageStatus po_decode_constants(PoSectionView section, Poco_cb* 
 		if (literal == NULL) {
 			return PO_PROGRAM_IMAGE_OUT_OF_MEMORY;
 		}
-		literal->name = text;
+		literal->text = text;
+		literal->length = length;
 		if (tail != NULL) {
 			tail->next = literal;
 		} else {
@@ -1838,7 +1854,7 @@ const PocoDebugLocal* po_program_debug_local_lookup(const Func_frame* frame, con
 
 static PoProgramImageStatus po_decode_code_frame(PoReader* encoded, Poco_cb* owner,
 												 Func_frame* frame, Func_frame** frames,
-												 size_t frame_count, const Names* literals)
+												 size_t frame_count, const PoLiteral* literals)
 {
 	PoWriter native = {0};
 	PoProgramImageStatus status = PO_PROGRAM_IMAGE_OK;
@@ -1954,7 +1970,7 @@ static PoProgramImageStatus po_decode_code_frame(PoReader* encoded, Poco_cb* own
 					uint64_t minimum;
 					uint64_t maximum;
 					uint64_t current;
-					const Names* literal;
+					const PoLiteral* literal;
 					size_t length;
 					if (!po_reader_u32(encoded, &literal_index) ||
 						!po_reader_u64(encoded, &minimum) || !po_reader_u64(encoded, &maximum) ||
@@ -1963,14 +1979,14 @@ static PoProgramImageStatus po_decode_code_frame(PoReader* encoded, Poco_cb* own
 						status = PO_PROGRAM_IMAGE_MALFORMED;
 						goto CLEANUP;
 					}
-					length = strlen(literal->name);
+					length = literal->length;
 					if (minimum > current || current > maximum || maximum > length) {
 						status = PO_PROGRAM_IMAGE_MALFORMED;
 						goto CLEANUP;
 					}
-					pointer.min = literal->name + minimum;
-					pointer.max = literal->name + maximum;
-					pointer.pt = literal->name + current;
+					pointer.min = literal->text + minimum;
+					pointer.max = literal->text + maximum;
+					pointer.pt = literal->text + current;
 				} else {
 					status = PO_PROGRAM_IMAGE_MALFORMED;
 					goto CLEANUP;
@@ -2013,7 +2029,7 @@ CLEANUP:
 
 static PoProgramImageStatus po_decode_code(PoSectionView section, Poco_cb* owner,
 										   Func_frame** frames, size_t frame_count,
-										   const Names* literals)
+										   const PoLiteral* literals)
 {
 	PoReader reader = {section.data, section.size, 0};
 	uint32_t count;

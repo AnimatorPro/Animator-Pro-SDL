@@ -1,0 +1,8 @@
+int main(void)
+{
+	char *lit;
+
+	lit = "abc";
+	lit[0] = 'x';
+	return 0;
+}

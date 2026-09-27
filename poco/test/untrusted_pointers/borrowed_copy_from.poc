@@ -1,0 +1,13 @@
+struct Quad {
+	char b[4];
+};
+
+int main(void)
+{
+	struct Quad *span;
+	struct Quad copy;
+
+	span = (struct Quad *)borrowed_span();
+	copy = *span;
+	return copy.b[0] + copy.b[3];
+}

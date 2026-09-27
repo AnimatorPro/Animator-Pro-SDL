@@ -627,11 +627,13 @@ PocoStatus poco_vm_register_untrusted_expression_library(PocoVm* vm);
  * enabled (enabled != 0), the interpreter enforces, on every indirect
  * dereference, that a script-minted pointer (one that is not a host-registered
  * borrowed span) has its whole access range fall inside memory the VM owns:
- * the activation data segment or the interpreter stack.  A pointer that a
- * script forged out of its own bytes to escape those regions is refused with
- * POCO_STATUS_POINTER_ACCESS, a clean recoverable error, instead of reading or
- * writing host memory.  Well-formed programs are unaffected because their real
- * pointers always target those two regions.
+ * the activation data segment, the interpreter stack, the buffer a native's
+ * by-value struct result is returned through, or one of the program's string
+ * literals.  Literals may be read but not written.  A pointer that a script
+ * forged out of its own bytes to escape those regions, or a write into a
+ * literal, is refused with POCO_STATUS_FFI_BOUNDS, a clean recoverable error,
+ * instead of reading or writing host memory.  Well-formed programs are
+ * unaffected because their real pointers always target those regions.
  *
  * The control is independent of the capability-tier registration calls and may
  * be toggled at any time, including after a program is compiled; it changes

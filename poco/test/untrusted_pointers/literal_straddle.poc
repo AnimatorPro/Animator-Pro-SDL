@@ -1,0 +1,8 @@
+int main(void)
+{
+	char *lit;
+
+	lit = "abc";
+	/* In bounds by address, but four bytes from lit + 2 run past the NUL. */
+	return *(int *)(lit + 2);
+}

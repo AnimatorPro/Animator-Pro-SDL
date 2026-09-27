@@ -1,0 +1,12 @@
+int f(int *p)
+{
+	return *p;
+}
+
+int main(void)
+{
+	int x;
+	x = 1;
+	x = f(NULL);
+	return x;
+}

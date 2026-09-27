@@ -196,7 +196,7 @@ typedef struct poco_run_env {
 	long stack_size;
 	long data_size;
 	Func_frame* fff;
-	Names* literals; /* string constants */
+	PoLiteral* literals; /* string constants */
 	Poco_lib* lib;   /* list of arrays of library function info */
 	Func_frame* protos;
 	Struct_info* struct_infos; /* retained compiler layouts used by FFI descriptors */

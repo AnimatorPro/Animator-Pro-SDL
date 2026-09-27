@@ -11,7 +11,7 @@
 POCO_STATIC_ASSERT(functions_are_const,
 				   POCO_TYPE_IS(((Poco_program_code*)0)->functions, const Func_frame*));
 POCO_STATIC_ASSERT(literals_are_const,
-				   POCO_TYPE_IS(((Poco_program_code*)0)->literals, const Names*));
+				   POCO_TYPE_IS(((Poco_program_code*)0)->literals, const PoLiteral*));
 POCO_STATIC_ASSERT(prototypes_are_const,
 				   POCO_TYPE_IS(((Poco_program_code*)0)->prototypes, const Func_frame*));
 POCO_STATIC_ASSERT(ffi_bindings_are_const,

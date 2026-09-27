@@ -1,0 +1,16 @@
+struct Pair {
+	char a;
+	char b;
+};
+
+int main(void)
+{
+	struct Pair *target;
+	struct Pair value;
+
+	value.a = 'x';
+	value.b = 'y';
+	target = (struct Pair *)"abc";
+	*target = value;
+	return 0;
+}

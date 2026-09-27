@@ -1,0 +1,26 @@
+int length(char *s)
+{
+	int n;
+
+	n = 0;
+	while (s[n] != 0)
+		n++;
+	return n;
+}
+
+int main(void)
+{
+	char *lit;
+	char a[8] = "hi";
+
+	lit = "hello";
+	if (lit[0] != 'h' || lit[4] != 'o' || lit[5] != 0)
+		return 1;
+	if (a[0] != 'h' || a[1] != 'i' || a[2] != 0)
+		return 2;
+	if (length("abc") != 3)
+		return 3;
+	if (*(int *)"abc" == 0)
+		return 4;
+	return 0;
+}
