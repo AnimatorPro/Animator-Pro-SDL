@@ -469,8 +469,12 @@ static PoProgramImageStatus po_encode_type(PoWriter* writer, const Type_info* ty
 				return PO_PROGRAM_IMAGE_OUT_OF_MEMORY;
 			}
 		} else {
-			if (!po_writer_u32(writer, 0) ||
-				!po_writer_u64(writer, (uint64_t)(int64_t)type->sdims[index].l)) {
+			/* Only an array's dimension means anything here; the decoder reads
+			 * no other scalar.  Writing 0 for every other component keeps the
+			 * image reproducible and free of host addresses even if a parse
+			 * path leaves a component's sdims slot unset. */
+			int64_t dimension = comp == TYPE_ARRAY ? (int64_t)type->sdims[index].l : 0;
+			if (!po_writer_u32(writer, 0) || !po_writer_u64(writer, (uint64_t)dimension)) {
 				return PO_PROGRAM_IMAGE_OUT_OF_MEMORY;
 			}
 		}
