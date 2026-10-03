@@ -12,6 +12,7 @@
 #include "pocoface.h"
 #include "pocotype.h"
 #include "program_internal.h"
+#include "trace.h"
 #include "vm_api.h"
 
 #include <limits.h>
@@ -379,6 +380,7 @@ PocoStatus poco_call_invoke(PocoCall* call, PocoCallbackValue* out_result)
 		status = POCO_STATUS_PARAMETER_RANGE;
 		goto OUT;
 	}
+	po_clear_fault(call->activation);
 	previous_err_line = call->activation->err_line;
 	call->activation->err_line = &error_line;
 	/* A by-name call takes no run options, so its cancellation comes from the
@@ -396,8 +398,7 @@ PocoStatus poco_call_invoke(PocoCall* call, PocoCallbackValue* out_result)
 	}
 	po_activation_publish_last_error(call->activation);
 	if (status != POCO_STATUS_OK) {
-		po_vm_report(call->activation->program->vm, status, NULL, error_line, 0,
-					 "Poco function call failed");
+		po_report_run_failure(call->activation, status, error_line, "Poco function call failed");
 		goto OUT;
 	}
 	if (out_result != NULL) {

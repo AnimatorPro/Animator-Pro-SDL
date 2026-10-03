@@ -135,6 +135,22 @@ typedef struct PocoFfiState {
  * out of the shared program.  callback_frames similarly prevent
  * Func_frame::run_env from becoming a write into shared compiled frames.
  */
+/*
+ * The run-time error the innermost failing run met, kept so the host's report
+ * can name it: the error, the function it happened in and the line of that
+ * function's own source unit.  Each public entry point clears it before it
+ * runs; the first fault recorded after that wins, so an outer run unwinding
+ * from a failed nested one keeps the nested run's cause.
+ */
+typedef struct Poco_fault {
+	int recorded;
+	Errcode err;
+	int outside_vm_region;
+	const Func_frame* frame;
+	const char* library_function;
+	long line;
+} Poco_fault;
+
 struct PocoActivation {
 	const PocoProgram* program;
 	const Poco_program_code* code;
@@ -160,6 +176,7 @@ struct PocoActivation {
 	PoBoolean enable_debug_trace;
 	Pt_num result;
 	Errcode builtin_error;
+	Poco_fault fault;
 	unsigned int run_depth;
 	size_t debug_call_depth;
 	int needs_reset;

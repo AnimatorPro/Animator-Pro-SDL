@@ -40,12 +40,18 @@
  *				first item in the linedata was found in find_line().
  ****************************************************************************/
 
+#include <stdio.h>
 #include <string.h>
 
 #include "poco_internal.h"
 #include "activation.h"
+#include "poco_errcodes.h"
 #include "pocoface.h"
+#include "pocolib.h"
 #include "pocmemry.h"
+#include "program_internal.h"
+#include "trace.h"
+#include "vm_api.h"
 
 #define i86_ptr_to_long(a) (a)
 
@@ -203,6 +209,93 @@ static Func_frame* which_frame(PocoActivation* pe, void* ipin)
 }
 
 /*****************************************************************************
+ * the name of the source unit a function was compiled from, from the program's
+ * source table (which a loaded image keeps too); NULL when there is none.
+ ****************************************************************************/
+static const char* unit_name(const PocoActivation* pe, const Func_frame* fuf)
+{
+	const PocoProgram* program = pe != NULL ? pe->program : NULL;
+
+	if (fuf == NULL || program == NULL || program->sources == NULL ||
+		fuf->unit_index >= program->source_count) {
+		return NULL;
+	}
+	return program->sources[fuf->unit_index].name;
+}
+
+/*****************************************************************************
+ * the line of the statement that failed: ip is already past the failing opcode
+ * and may sit on the first byte of the next statement; the byte before it is
+ * inside the failing instruction.
+ ****************************************************************************/
+static long fault_line(const Func_frame* fuf, const Pt_num* ip)
+{
+	return find_line(fuf->ld, (long)((const Code*)ip - fuf->code_pt) - 1);
+}
+
+void po_clear_fault(PocoActivation* pe)
+{
+	if (pe != NULL) {
+		memset(&pe->fault, 0, sizeof(pe->fault));
+	}
+}
+
+void po_record_fault(PocoActivation* pe, Pt_num* ip, Errcode err, Errcode cerr,
+					 bool outside_vm_region)
+{
+	Func_frame* fuf;
+
+	if (pe == NULL || pe->fault.recorded) {
+		return;
+	}
+	pe->fault.recorded = 1;
+	pe->fault.err = err;
+	pe->fault.outside_vm_region = outside_vm_region;
+	pe->fault.frame = fuf = which_frame(pe, ip);
+	pe->fault.line = fuf != NULL ? fault_line(fuf, ip) : 0;
+	pe->fault.library_function = cerr ? find_builtin_name(pe, ip->func) : NULL;
+}
+
+void po_report_run_failure(PocoActivation* pe, PocoStatus status, long line,
+						   const char* generic_message)
+{
+	const Poco_fault* fault;
+	const char* source_name;
+	char reason[ERRTEXT_SIZE];
+	char message[ERRTEXT_SIZE + 512];
+
+	if (pe == NULL || pe->program == NULL) {
+		return;
+	}
+	fault = &pe->fault;
+	if (!fault->recorded) {
+		po_vm_report(pe->program->vm, status, NULL, line, 0, generic_message);
+		return;
+	}
+	if (fault->outside_vm_region) {
+		snprintf(reason, sizeof(reason), "%s",
+				 "Poco script pointer outside VM memory (untrusted-pointer check)");
+	} else if (get_errtext(fault->err, reason) == 0) {
+		snprintf(reason, sizeof(reason), "Error code %d", (int)fault->err);
+	}
+	/* A unit's global initializers run as a code frame of their own, named
+	 * after the unit rather than after a function. */
+	if (fault->frame != NULL && fault->frame->got_code && fault->library_function != NULL) {
+		snprintf(message, sizeof(message), "%s (in %s, detected by %s())", reason,
+				 fault->frame->name, fault->library_function);
+	} else if (fault->frame != NULL && fault->frame->got_code) {
+		snprintf(message, sizeof(message), "%s (in %s)", reason, fault->frame->name);
+	} else if (fault->frame != NULL) {
+		snprintf(message, sizeof(message), "%s (in global initialization)", reason);
+	} else {
+		snprintf(message, sizeof(message), "%s", reason);
+	}
+	source_name = unit_name(pe, fault->frame);
+	po_vm_report(pe->program->vm, status, source_name, fault->line != 0 ? fault->line : line, 0,
+				 message);
+}
+
+/*****************************************************************************
  * indicate whether symbol is an array of or pointer to char (ie, a string).
  ****************************************************************************/
 static bool is_char_string_type(Type_info* ti)
@@ -296,11 +389,13 @@ void po_print_trace(PocoActivation* pe, FILE* tfile, Pt_num* stack, Pt_num* base
 	long line = 0;
 
 	if ((fuf = which_frame(pe, ip)) != NULL) {
-		/* ip is already past the failing opcode and may sit on the first byte
-		 * of the next statement; the byte before it is inside the failing
-		 * instruction. */
-		line = find_line(fuf->ld, (long)((Code*)ip - fuf->code_pt) - 1);
-		fprintf(tfile, "near line %ld of %s\n", line, pe->code->functions->name);
+		const char* source_name = unit_name(pe, fuf);
+
+		/* The line counts through the failing function's own source unit, so
+		 * name that unit rather than the program's first one. */
+		line = fault_line(fuf, ip);
+		fprintf(tfile, "near line %ld of %s\n", line,
+				source_name != NULL ? source_name : pe->code->functions->name);
 	}
 
 	if (pe->err_line != NULL) {
