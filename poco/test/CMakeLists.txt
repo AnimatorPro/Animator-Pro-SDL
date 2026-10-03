@@ -245,6 +245,19 @@ add_test(
 )
 set_tests_properties(poco_cli_detect_and_run_binary PROPERTIES TIMEOUT 10)
 
+# Compiling the same source twice must give the same bytes.  A type
+# component's unused dimension slot once carried stack garbage (often a host
+# pointer) into the image, so every compile differed and leaked addresses.
+add_test(
+    NAME poco_cli_reproducible_image
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPOCO_EXECUTABLE=$<TARGET_FILE:poco_cli>"
+        "-DPOCO_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/cli_reproducible/reproducible.poc"
+        "-DPOCO_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/cli_reproducible"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_reproducible/verify-reproducible.cmake"
+)
+set_tests_properties(poco_cli_reproducible_image PROPERTIES TIMEOUT 20)
+
 # Include search is configurable from the command line, not only from an
 # embedding host.  Exercise every spelling of the flag, accumulation order, the
 # source directory's precedence, and the missing-argument usage error.

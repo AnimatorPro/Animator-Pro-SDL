@@ -633,6 +633,13 @@ bool po_get_base_type(Poco_cb* pcb, Poco_frame* pf, Type_info* ti)
 	UBYTE comp;
 
 	ti->comp_count = 1;
+	/*
+	 * Only a struct base writes sdims[0]; a scalar base leaves it alone.  Most
+	 * callers parse into an Itypi on the stack, so without this the base
+	 * component's dimension is whatever the stack held - a stale host pointer
+	 * that a serialised program image would then carry.
+	 */
+	poco_zero_bytes(&ti->sdims[0], sizeof(ti->sdims[0]));
 	comp = TYPE_BAD;
 
 	for (;;) {

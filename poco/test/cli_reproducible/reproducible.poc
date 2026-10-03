@@ -1,0 +1,72 @@
+/* Scalar, pointer, array, struct and typedef declarations in every scope the
+ * program image records: globals, struct members, parameters, locals and
+ * return types.  Each one runs through the base-type parser, which is where a
+ * scalar component's dimension slot used to be left as stack garbage. */
+typedef int Count;
+typedef double Real;
+
+struct point {
+	int x;
+	short y;
+	char tag;
+	float weight;
+	double depth;
+	long serial;
+	int grid[3];
+};
+
+int g_int;
+long g_long;
+double g_double;
+float g_float;
+char *g_name;
+Count g_count;
+Real g_real;
+struct point g_point;
+int g_table[4];
+
+static double scale(double value, float factor, int bias)
+{
+	double scaled;
+	int rounded;
+
+	scaled = value * factor;
+	rounded = (int)scaled + bias;
+	return (double)rounded;
+}
+
+static long sum_points(struct point *p, Count n)
+{
+	long total;
+	int i;
+	short step;
+
+	total = 0;
+	step = 1;
+	for (i = 0; i < n; i += step) {
+		total += p[i].x + p[i].y + p[i].serial + p[i].grid[2];
+	}
+	return total;
+}
+
+int main(void)
+{
+	struct point points[2];
+	Real r;
+	char c;
+	unsigned int u;
+
+	points[0].x = 1;
+	points[0].y = 2;
+	points[0].serial = 3;
+	points[0].grid[2] = 4;
+	points[1].x = 5;
+	points[1].y = 6;
+	points[1].serial = 7;
+	points[1].grid[2] = 8;
+	r = scale(2.0, 1.5, 1);
+	c = 'a';
+	u = sizeof(long) + sizeof(struct point) - sizeof(struct point);
+	g_int = (int)sum_points(points, 2) + (int)r + (c - 'a') + (int)(u - sizeof(long));
+	return g_int;
+}
