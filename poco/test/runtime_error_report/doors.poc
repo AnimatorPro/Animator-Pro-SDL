@@ -1,0 +1,14 @@
+/* Used by root.poc; the division below is the fault the test expects. */
+
+int door_zero(void)
+{
+	return 0;
+}
+
+int door_tick(int a)
+{
+	int z;
+
+	z = door_zero();
+	return a / z;
+}

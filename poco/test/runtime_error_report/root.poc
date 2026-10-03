@@ -1,0 +1,22 @@
+#pragma poco use "doors.poc"
+
+int null_tick(void)
+{
+	int* p;
+
+	p = NULL;
+	return *p;
+}
+
+int library_tick(void)
+{
+	char* s;
+
+	s = NULL;
+	return strlen(s);
+}
+
+int main(void)
+{
+	return door_tick(5);
+}

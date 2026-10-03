@@ -847,6 +847,17 @@ target_link_libraries(poco_trace_line PRIVATE Poco::poco)
 add_test(NAME poco_trace_line COMMAND $<TARGET_FILE:poco_trace_line>)
 set_tests_properties(poco_trace_line PROPERTIES TIMEOUT 10)
 
+# A run-time error reaches the diagnostic callback with its specific reason, the
+# function, and the file and line of that function's own source unit.
+add_executable(poco_runtime_error_report runtime_error_report/runtime_error_report.c)
+target_compile_definitions(poco_runtime_error_report PRIVATE
+    POCO_RUNTIME_ERROR_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/runtime_error_report/root.poc"
+    POCO_RUNTIME_ERROR_TRACE_FILE="${CMAKE_CURRENT_BINARY_DIR}/runtime_error_report_trace.txt"
+)
+target_link_libraries(poco_runtime_error_report PRIVATE Poco::poco)
+add_test(NAME poco_runtime_error_report COMMAND $<TARGET_FILE:poco_runtime_error_report>)
+set_tests_properties(poco_runtime_error_report PROPERTIES TIMEOUT 10)
+
 # A '#pragma poco native' declaration compiles to a native frame with no
 # address, so a program can be built without the host that provides the
 # function and resolved by name -- or refused -- when it is loaded.

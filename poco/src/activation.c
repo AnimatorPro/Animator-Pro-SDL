@@ -12,6 +12,7 @@
 #include "program_internal.h"
 #include "runops.h"
 #include "strlib.h"
+#include "trace.h"
 #include "vm_api.h"
 #include "vm_diagnostics.h"
 
@@ -640,13 +641,14 @@ PocoStatus poco_activation_init(PocoActivation* activation)
 	if (vm->destroy_requested || activation->needs_reset) {
 		return POCO_STATUS_PARAMETER_RANGE;
 	}
+	po_clear_fault(activation);
 	activation->err_line = &error_line;
 	init_status = po_pev_alloc_data(activation);
 	activation->err_line = NULL;
 	po_activation_publish_last_error(activation);
 	if (init_status != Success) {
-		po_vm_report(vm, (PocoStatus)init_status, NULL, error_line, 0,
-					 "Poco global initialization failed");
+		po_report_run_failure(activation, (PocoStatus)init_status, error_line,
+							  "Poco global initialization failed");
 	}
 	return (PocoStatus)init_status;
 }
@@ -908,6 +910,7 @@ PocoStatus poco_activation_run_main(PocoActivation* activation, int argc, char**
 		return POCO_STATUS_PARAMETER_RANGE;
 	}
 	if (main_frame->pcount == 0 && main_frame->parameters == NULL) {
+		po_clear_fault(activation);
 		activation->err_line = &error_line;
 		activation->needs_reset = 1;
 		status = (PocoStatus)po_activation_run_entry_values(activation, "main", NULL, 0, &result);
@@ -930,6 +933,7 @@ PocoStatus poco_activation_run_main(PocoActivation* activation, int argc, char**
 		arguments[0].value.int_value = argc;
 		arguments[1].kind = POCO_CALLBACK_VALUE_POPOT;
 		arguments[1].value.popot_value = marshaled_argv;
+		po_clear_fault(activation);
 		activation->err_line = &error_line;
 		activation->needs_reset = 1;
 		status =
@@ -939,8 +943,7 @@ PocoStatus poco_activation_run_main(PocoActivation* activation, int argc, char**
 	poco_activation_release_main_argv(activation);
 	po_activation_publish_last_error(activation);
 	if (status != POCO_STATUS_OK) {
-		po_vm_report(activation->program->vm, status, NULL, error_line, 0,
-					 "Poco main execution failed");
+		po_report_run_failure(activation, status, error_line, "Poco main execution failed");
 		return status;
 	}
 	if (out_result != NULL) {
@@ -988,6 +991,7 @@ PocoStatus poco_activation_run(PocoActivation* activation, const PocoRunOptions*
 	}
 	activation->trace_file = options != NULL ? options->trace_file : NULL;
 	activation->instruction_trace = options != NULL ? options->instruction_trace : NULL;
+	po_clear_fault(activation);
 	activation->err_line = &error_line;
 	run_status = po_pev_alloc_data(activation);
 	activation->needs_reset = 1;
@@ -1010,8 +1014,8 @@ PocoStatus poco_activation_run(PocoActivation* activation, const PocoRunOptions*
 	}
 	po_activation_publish_last_error(activation);
 	if (run_status != Success) {
-		po_vm_report(vm, (PocoStatus)run_status, NULL, error_line, 0,
-					 "Poco program execution failed");
+		po_report_run_failure(activation, (PocoStatus)run_status, error_line,
+							  "Poco program execution failed");
 	}
 	return (PocoStatus)run_status;
 }

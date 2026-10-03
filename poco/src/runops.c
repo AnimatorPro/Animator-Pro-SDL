@@ -2548,6 +2548,12 @@ ERR_IN_FFI:
 	goto DEBUG_TRACE;
 
 DEBUG_TRACE:
+	/* An error a nested run already traced arrives as Err_in_err_file; that
+	 * run recorded the fault, and its cause is the one to report. */
+	if (err != Err_in_err_file) {
+		po_record_fault(p, state.ip, err, script_access_refused ? Success : p->builtin_error,
+						state.outside_vm_region);
+	}
 	if (!p->enable_debug_trace) {
 		goto DEALLOC_AND_EXIT;
 	}
